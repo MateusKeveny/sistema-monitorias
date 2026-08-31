@@ -46,13 +46,13 @@ async function listar() {
     .select('id, nome, auth_id').eq('email', email).maybeSingle();
   if (!pessoa) {
     console.error(`Não existe pessoa com o e-mail ${email}.`);
-    console.error('Cadastre em Configurações > Pessoas, ou crie a conta no Supabase.');
+    console.error(`Cadastre e crie o acesso:  npm run acesso -- ${email} "Nome Completo"`);
     process.exit(1);
   }
 
   if (!pessoa.auth_id) {
     console.error(`${pessoa.nome} não tem login: o papel não teria efeito.`);
-    console.error('Crie a conta no Supabase com este e-mail — o vínculo é automático.');
+    console.error(`Crie o acesso primeiro:  npm run acesso -- ${email}`);
     process.exit(1);
   }
 
