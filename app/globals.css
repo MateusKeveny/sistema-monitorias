@@ -1,0 +1,25 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --color-marca-50: #ecfdf5;
+  --color-marca-100: #d1fae5;
+  --color-marca-500: #10b981;
+  --color-marca-600: #059669;
+  --color-marca-700: #047857;
+  --color-marca-900: #064e3b;
+}
+
+html, body {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+/* Ajustes para a folha de feedback impressa / salva em PDF */
+@media print {
+  .sem-impressao { display: none !important; }
+  .pagina-impressa { break-after: page; }
+  body { background: #fff; }
+  main { padding: 0 !important; }
+  a[href]::after { content: none !important; }
+}

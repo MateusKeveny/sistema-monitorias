@@ -1,0 +1,19 @@
+# Dependências e artefatos de build
+node_modules/
+.next/
+.open-next/
+.wrangler/
+*.tsbuildinfo
+
+# Segredos — nunca versionar
+.env.local
+.env*.local
+.dev.vars
+
+# Dados reais de monitoria: os pareceres são nominais e avaliam pessoas.
+# A pasta é recriada por `npm run extrair` e `npm run exportar`.
+dados/
+
+# Diversos
+*.log
+.DS_Store

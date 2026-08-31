@@ -1,0 +1,38 @@
+{
+  "name": "sistema-monitorias",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sistema de Monitorias de Qualidade (C-SAT) — IGreen Energia",
+  "scripts": {
+    "dev": "node scripts/preparar-dev.js && next dev",
+    "build": "next build",
+    "start": "next start",
+    "extrair": "node scripts/extrair-planilha.js",
+    "importar": "node --env-file=.env.local scripts/importar-supabase.js",
+    "conferir": "node --env-file=.env.local scripts/conferir-conexao.js",
+    "perfis": "node --env-file=.env.local scripts/sincronizar-perfis.js",
+    "exportar": "node --env-file=.env.local scripts/gerar-exportacao.js",
+    "cf:build": "opennextjs-cloudflare build",
+    "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.12.5",
+    "@supabase/supabase-js": "^2.112.4",
+    "next": "^15.5.24",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "recharts": "^3.10.1"
+  },
+  "devDependencies": {
+    "@opennextjs/cloudflare": "^1.20.4",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^26.4.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "postcss": "^8.5.26",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.127.1"
+  }
+}

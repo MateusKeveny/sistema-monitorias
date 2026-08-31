@@ -1,0 +1,41 @@
+name: Publicar no Cloudflare
+
+# Roda a cada push na branch principal e também sob demanda, pelo botão
+# "Run workflow" na aba Actions do GitHub.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    # O OpenNext não é totalmente compatível com Windows; o build aqui roda em
+    # Linux, que é o ambiente onde ele é testado pelos mantenedores.
+
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Preparar o Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Construir e publicar
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
+          preCommands: npx opennextjs-cloudflare build
+        env:
+          # Estas duas precisam existir no momento do BUILD, não só em execução:
+          # o Next.js grava valores NEXT_PUBLIC_ dentro do JavaScript que vai
+          # para o navegador. Sem elas aqui, o login falha em produção.
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
