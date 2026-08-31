@@ -6,9 +6,32 @@ import type { Monitoria, Operador } from '@/lib/tipos';
 
 export const dynamic = 'force-dynamic';
 
-type Busca = { operador?: string; mes?: string; zeradas?: string; pagina?: string };
+type Busca = {
+  operador?: string; mes?: string; zeradas?: string; pagina?: string;
+  ordenar?: string; direcao?: string;
+};
 
 const POR_PAGINA = 100;
+
+/**
+ * Colunas por onde a lista pode ser ordenada.
+ *
+ * A relação é fechada de propósito: o nome vem da URL e vai direto para a
+ * consulta, então aceitar texto livre deixaria qualquer um ordenar por coluna
+ * que a tela não expõe. `crescentePadrao` é a direção que faz sentido no
+ * primeiro clique — data começa da mais recente, nome começa de A.
+ */
+const ORDENAVEIS = {
+  data_atendimento: { crescentePadrao: false },
+  protocolo: { crescentePadrao: true },
+  operador: { crescentePadrao: true },
+  canal: { crescentePadrao: true },
+  semana_mes: { crescentePadrao: true },
+  numero_monitoria: { crescentePadrao: true },
+  nota_final: { crescentePadrao: true },
+} as const;
+
+type ColunaOrdenavel = keyof typeof ORDENAVEIS;
 
 export default async function ListaMonitorias({
   searchParams,
@@ -22,11 +45,21 @@ export default async function ListaMonitorias({
   const pagina = Math.max(1, Number(filtros.pagina) || 1);
   const inicio = (pagina - 1) * POR_PAGINA;
 
+  const ordenar: ColunaOrdenavel =
+    filtros.ordenar && filtros.ordenar in ORDENAVEIS
+      ? filtros.ordenar as ColunaOrdenavel
+      : 'data_atendimento';
+  const crescente = filtros.direcao
+    ? filtros.direcao === 'asc'
+    : ORDENAVEIS[ordenar].crescentePadrao;
+
   // count: 'exact' devolve o total real junto com a página. Antes a lista
   // cortava em 500 sem avisar; agora o total é sempre visível.
+  // O segundo critério é fixo, para linhas empatadas não trocarem de posição
+  // entre uma página e outra.
   let consulta = db.from('vw_monitorias').select('*', { count: 'exact' })
-    .order('data_atendimento', { ascending: false })
-    .order('operador')
+    .order(ordenar, { ascending: crescente })
+    .order('id')
     .range(inicio, inicio + POR_PAGINA - 1);
 
   if (filtros.operador) consulta = consulta.eq('operador_id', filtros.operador);
@@ -43,16 +76,37 @@ export default async function ListaMonitorias({
   const total = count ?? monitorias.length;
   const ultimaPagina = Math.max(1, Math.ceil(total / POR_PAGINA));
 
-  /** Mantém os filtros ao trocar de página. */
-  const linkPagina = (n: number) => {
+  /** Monta o endereço preservando o que já estava aplicado. */
+  const link = (mudancas: Partial<Busca>) => {
     const p = new URLSearchParams();
-    if (filtros.operador) p.set('operador', filtros.operador);
-    if (filtros.mes) p.set('mes', filtros.mes);
-    if (filtros.zeradas) p.set('zeradas', filtros.zeradas);
-    if (n > 1) p.set('pagina', String(n));
+    const atual: Busca = { ...filtros, ...mudancas };
+    if (atual.operador) p.set('operador', atual.operador);
+    if (atual.mes) p.set('mes', atual.mes);
+    if (atual.zeradas) p.set('zeradas', atual.zeradas);
+    if (atual.ordenar) p.set('ordenar', atual.ordenar);
+    if (atual.direcao) p.set('direcao', atual.direcao);
+    if (atual.pagina && atual.pagina !== '1') p.set('pagina', atual.pagina);
     const q = p.toString();
     return q ? `/monitorias?${q}` : '/monitorias';
   };
+
+  const linkPagina = (n: number) => link({ pagina: String(n) });
+
+  /**
+   * Clicar numa coluna ordena por ela; clicar de novo inverte. Volta sempre
+   * para a primeira página, senão a pessoa continuaria na página 3 de uma
+   * ordenação que não existe mais.
+   */
+  const linkOrdem = (coluna: ColunaOrdenavel) => link({
+    ordenar: coluna,
+    direcao: ordenar === coluna
+      ? (crescente ? 'desc' : 'asc')
+      : (ORDENAVEIS[coluna].crescentePadrao ? 'asc' : 'desc'),
+    pagina: '1',
+  });
+
+  const seta = (coluna: ColunaOrdenavel) =>
+    ordenar !== coluna ? '' : crescente ? ' ↑' : ' ↓';
   const mesesUnicos = [...new Set(((meses ?? []) as { mes_referencia: string }[])
     .map((m) => m.mes_referencia))];
 
@@ -76,7 +130,7 @@ export default async function ListaMonitorias({
                        font-medium text-slate-700 hover:bg-slate-50">
             Exportar Excel
           </Link>
-          {perfil.papel === 'admin' && (
+          {perfil.papel !== 'operador' && (
             <Link href="/monitorias/nova"
               className="rounded-lg bg-marca-600 px-3 py-1.5 text-sm font-semibold text-white
                          hover:bg-marca-700">
@@ -87,6 +141,10 @@ export default async function ListaMonitorias({
       </div>
 
       <form className="flex flex-wrap items-center gap-2">
+        {/* Filtrar não desfaz a ordenação escolhida. */}
+        <input type="hidden" name="ordenar" value={ordenar} />
+        <input type="hidden" name="direcao" value={crescente ? 'asc' : 'desc'} />
+
         {perfil.papel !== 'operador' && (
           <select name="operador" defaultValue={filtros.operador ?? ''} className={estilo}>
             <option value="">Todos os operadores</option>
@@ -111,7 +169,7 @@ export default async function ListaMonitorias({
                      font-medium text-slate-700 hover:bg-slate-50">
           Filtrar
         </button>
-        <Link href="/monitorias" className="px-2 text-sm text-slate-500 hover:underline">
+        <Link href="/monitorias" className="px-2 text-sm text-sobre-fundo-suave hover:underline">
           limpar
         </Link>
       </form>
@@ -123,13 +181,27 @@ export default async function ListaMonitorias({
           <Tabela>
             <thead>
               <tr>
-                <Th>Data</Th>
-                <Th>Protocolo</Th>
-                <Th>Operador</Th>
-                <Th>Canal</Th>
-                <Th className="text-center">Semana</Th>
-                <Th className="text-center">Nº</Th>
-                <Th className="text-right">Nota</Th>
+                {([
+                  ['data_atendimento', 'Data', ''],
+                  ['protocolo', 'Protocolo', 'text-center'],
+                  ['operador', 'Operador', ''],
+                  ['canal', 'Canal', ''],
+                  ['semana_mes', 'Semana', 'text-center'],
+                  ['numero_monitoria', 'Nº', 'text-center'],
+                  ['nota_final', 'Nota', 'text-right'],
+                ] as [ColunaOrdenavel, string, string][]).map(([coluna, rotulo, alinha]) => (
+                  <Th key={coluna} className={alinha}>
+                    <Link
+                      href={linkOrdem(coluna)}
+                      className={`hover:text-slate-900 ${
+                        ordenar === coluna ? 'text-slate-900' : ''}`}
+                      title={`Ordenar por ${rotulo.toLowerCase()}`}
+                    >
+                      {rotulo}
+                      <span className="tabular-nums">{seta(coluna)}</span>
+                    </Link>
+                  </Th>
+                ))}
                 <Th>Parecer</Th>
                 <Th />
               </tr>
@@ -138,7 +210,7 @@ export default async function ListaMonitorias({
               {monitorias.map((m) => (
                 <tr key={m.id} className="hover:bg-slate-50">
                   <Td className="whitespace-nowrap tabular-nums">{formatarData(m.data_atendimento)}</Td>
-                  <Td className="whitespace-nowrap font-mono text-xs">{m.protocolo}</Td>
+                  <Td className="whitespace-nowrap text-center font-mono text-xs">{m.protocolo}</Td>
                   <Td className="whitespace-nowrap font-medium text-slate-900">{m.operador}</Td>
                   <Td className="whitespace-nowrap text-slate-500">{m.canal ?? '—'}</Td>
                   <Td className="text-center tabular-nums">{m.semana_mes}ª</Td>

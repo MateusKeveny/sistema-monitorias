@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { exigirGestor } from '@/lib/supabase/servidor';
+import { exigirVisaoDoTime } from '@/lib/supabase/servidor';
 
 const RELATORIOS = [
   {
@@ -26,7 +26,7 @@ const RELATORIOS = [
 ];
 
 export default async function Relatorios() {
-  await exigirGestor();
+  await exigirVisaoDoTime();
 
   return (
     <div className="space-y-6">

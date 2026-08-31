@@ -69,10 +69,21 @@ export async function exigirPerfil(): Promise<Perfil> {
   return perfil;
 }
 
-/** Igual a exigirPerfil, mas bloqueia quem não for admin (qualidade). */
-export async function exigirAdmin(): Promise<Perfil> {
+/**
+ * Administração — pesos, cadastros e acessos. Só gestor.
+ */
+export async function exigirGestor(): Promise<Perfil> {
   const perfil = await exigirPerfil();
-  if (perfil.papel !== 'admin') redirect('/?erro=sem-permissao');
+  if (perfil.papel !== 'gestor') redirect('/?erro=sem-permissao');
+  return perfil;
+}
+
+/**
+ * Lançar e editar monitoria: gestor e qualidade.
+ */
+export async function exigirMonitor(): Promise<Perfil> {
+  const perfil = await exigirPerfil();
+  if (perfil.papel === 'operador') redirect('/?erro=sem-permissao');
   return perfil;
 }
 
@@ -81,7 +92,7 @@ export async function exigirAdmin(): Promise<Perfil> {
  * enxerga o time. Esconder o item no menu não basta — sem esta checagem, quem
  * digitasse a URL entraria assim mesmo.
  */
-export async function exigirGestor(): Promise<Perfil> {
+export async function exigirVisaoDoTime(): Promise<Perfil> {
   const perfil = await exigirPerfil();
   if (perfil.papel === 'operador') redirect('/');
   return perfil;

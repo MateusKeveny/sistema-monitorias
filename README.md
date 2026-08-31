@@ -24,11 +24,15 @@ online, três níveis de acesso e relatórios prontos.
 
 ### Perfis de acesso
 
-| Perfil | Enxerga | Lança monitoria | Administra |
-|---|---|---|---|
-| **Qualidade (admin)** | tudo | sim | sim |
-| **Gestor** | o time inteiro | não | não |
-| **Operador** | somente as próprias monitorias | não | não |
+| Perfil | Enxerga | Monitora | Pesos e cadastros | Acessos | Exclui |
+|---|---|---|---|---|---|
+| **Gestor** | tudo | sim | sim | sim | direto |
+| **Qualidade** | tudo | lança e edita | não | não | solicita, gestor aprova |
+| **Operador** | só as próprias | não | não | não | não |
+
+A exclusão pedida pela Qualidade fica pendente até um gestor decidir, e a monitoria
+continua valendo nos relatórios enquanto isso. Quem decide o caminho é o banco, pelo
+papel de quem chamou — não a interface.
 
 O isolamento é feito por **Row Level Security no próprio Postgres**, não só na interface —
 mesmo que alguém chame a API diretamente, não consegue ler os dados de outra pessoa.

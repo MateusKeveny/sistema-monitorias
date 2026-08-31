@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
+import { criarClienteServidor, exigirVisaoDoTime } from '@/lib/supabase/servidor';
 import { Cartao, Vazio } from '@/componentes/ui';
 import BotaoImprimir from '@/componentes/BotaoImprimir';
 import { mesRotulo, data as formatarData, nota, percentual } from '@/lib/formatar';
@@ -12,7 +12,7 @@ export default async function FolhaFeedback({
 }: {
   searchParams: Promise<{ operador?: string; mes?: string }>;
 }) {
-  const perfil = await exigirGestor();
+  const perfil = await exigirVisaoDoTime();
   const filtros = await searchParams;
   const db = await criarClienteServidor();
 
@@ -24,7 +24,7 @@ export default async function FolhaFeedback({
   const meses = [...new Set(((mesesBrutos ?? []) as { mes_referencia: string }[])
     .map((m) => m.mes_referencia))];
 
-  // Só admin e gestor chegam aqui (exigirGestor), então o seletor de operador
+  // Só gestor e qualidade chegam aqui (exigirVisaoDoTime), então o seletor de operador
   // é sempre exibido.
   const operadorId = filtros.operador ?? '';
   const mes = filtros.mes && meses.includes(filtros.mes) ? filtros.mes : meses[0];

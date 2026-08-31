@@ -1,4 +1,4 @@
-import { criarClienteServidor, exigirAdmin } from '@/lib/supabase/servidor';
+import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
 import PainelUsuarios from '@/componentes/PainelUsuarios';
 import PainelCriterios from '@/componentes/PainelCriterios';
 import PainelCadastro from '@/componentes/PainelCadastro';
@@ -7,7 +7,7 @@ import type { Canal, Criterio, Operador, Perfil } from '@/lib/tipos';
 export const dynamic = 'force-dynamic';
 
 export default async function Configuracoes() {
-  await exigirAdmin();
+  await exigirGestor();
   const db = await criarClienteServidor();
 
   const [{ data: criterios }, { data: operadores }, { data: perfis }, { data: canais }] =

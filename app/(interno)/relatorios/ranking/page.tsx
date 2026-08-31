@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
+import { criarClienteServidor, exigirVisaoDoTime } from '@/lib/supabase/servidor';
 import { Cartao, EtiquetaNota, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import { mesRotulo, mesCurto, nota, percentual } from '@/lib/formatar';
 import type { LinhaRanking } from '@/lib/tipos';
@@ -11,7 +11,7 @@ export default async function RelatorioRanking({
 }: {
   searchParams: Promise<{ mes?: string }>;
 }) {
-  await exigirGestor();
+  await exigirVisaoDoTime();
   const { mes: mesEscolhido } = await searchParams;
   const db = await criarClienteServidor();
 

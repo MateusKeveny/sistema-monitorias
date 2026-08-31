@@ -12,11 +12,11 @@ type Item = { href: string; rotulo: string; papeis: Perfil['papel'][] };
 // dele já está em "Monitorias" e no painel. Menu com item que não acrescenta
 // nada é ruído.
 const ITENS: Item[] = [
-  { href: '/', rotulo: 'Painel', papeis: ['admin', 'gestor', 'operador'] },
-  { href: '/monitorias', rotulo: 'Monitorias', papeis: ['admin', 'gestor', 'operador'] },
-  { href: '/monitorias/nova', rotulo: 'Nova monitoria', papeis: ['admin'] },
-  { href: '/relatorios', rotulo: 'Relatórios', papeis: ['admin', 'gestor'] },
-  { href: '/configuracoes', rotulo: 'Configurações', papeis: ['admin'] },
+  { href: '/', rotulo: 'Painel', papeis: ['gestor', 'qualidade', 'operador'] },
+  { href: '/monitorias', rotulo: 'Monitorias', papeis: ['gestor', 'qualidade', 'operador'] },
+  { href: '/monitorias/nova', rotulo: 'Nova monitoria', papeis: ['gestor', 'qualidade'] },
+  { href: '/relatorios', rotulo: 'Relatórios', papeis: ['gestor', 'qualidade'] },
+  { href: '/configuracoes', rotulo: 'Configurações', papeis: ['gestor'] },
 ];
 
 export default function Navegacao({ perfil }: { perfil: Perfil }) {

@@ -1,4 +1,4 @@
-export type PapelUsuario = 'admin' | 'gestor' | 'operador';
+export type PapelUsuario = 'gestor' | 'qualidade' | 'operador';
 
 export type Perfil = {
   id: string;
@@ -93,7 +93,7 @@ export type LinhaFeedback = {
 };
 
 export const NOMES_PAPEL: Record<PapelUsuario, string> = {
-  admin: 'Qualidade (admin)',
   gestor: 'Gestor',
+  qualidade: 'Qualidade',
   operador: 'Operador',
 };

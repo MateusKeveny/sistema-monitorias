@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { criarClienteServidor, exigirAdmin } from '@/lib/supabase/servidor';
+import { criarClienteServidor, exigirMonitor } from '@/lib/supabase/servidor';
 import FormularioMonitoria, { type MonitoriaEmEdicao } from '@/componentes/FormularioMonitoria';
 import type { Canal, Criterio, Operador } from '@/lib/tipos';
 
@@ -12,7 +12,7 @@ export default async function EditarMonitoria({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const perfil = await exigirAdmin();
+  const perfil = await exigirMonitor();
   const { id } = await params;
   const db = await criarClienteServidor();
 

@@ -1,11 +1,11 @@
-import { criarClienteServidor, exigirAdmin } from '@/lib/supabase/servidor';
+import { criarClienteServidor, exigirMonitor } from '@/lib/supabase/servidor';
 import FormularioMonitoria from '@/componentes/FormularioMonitoria';
 import type { Criterio, Operador, Canal } from '@/lib/tipos';
 
 export const dynamic = 'force-dynamic';
 
 export default async function NovaMonitoria() {
-  const perfil = await exigirAdmin();
+  const perfil = await exigirMonitor();
   const db = await criarClienteServidor();
 
   const [{ data: criterios }, { data: operadores }, { data: canais }] = await Promise.all([

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { Cartao } from '@/componentes/ui';
@@ -48,7 +48,6 @@ export default function FormularioMonitoria({
 
   const [protocolo, setProtocolo] = useState(emEdicao?.protocolo ?? '');
   const [dataAtendimento, setDataAtendimento] = useState(emEdicao?.data_atendimento ?? hoje());
-  const [numero, setNumero] = useState(emEdicao?.numero_monitoria ?? 1);
   const [operadorId, setOperadorId] = useState(emEdicao?.operador_id ?? '');
   const [canalId, setCanalId] = useState(emEdicao?.canal_id ?? canais[0]?.id ?? '');
   const [tempo, setTempo] = useState(
@@ -64,6 +63,43 @@ export default function FormularioMonitoria({
   // deriva os mesmos valores no gravar; aqui é só para o monitor conferir.
   const semana = semanaDoCiclo(dataAtendimento);
   const competencia = mesDeCompetencia(dataAtendimento);
+
+  // Quais números já foram usados naquele operador, naquela semana do ciclo.
+  // O nº da monitoria deixa de ser escolhido: é o primeiro slot livre.
+  const [ocupados, setOcupados] = useState<number[] | null>(null);
+
+  useEffect(() => {
+    if (!operadorId) { setOcupados(null); return; }
+
+    let cancelado = false;
+    setOcupados(null);
+
+    (async () => {
+      const db = criarClienteNavegador();
+      let consulta = db.from('monitorias')
+        .select('numero_monitoria')
+        .eq('operador_id', operadorId)
+        .eq('mes_referencia', competencia)
+        .eq('semana_mes', semana);
+
+      // Na edição, a própria monitoria não conta como slot ocupado.
+      if (emEdicao) consulta = consulta.neq('id', emEdicao.id);
+
+      const { data } = await consulta;
+      if (!cancelado) setOcupados((data ?? []).map((m) => m.numero_monitoria as number));
+    })();
+
+    return () => { cancelado = true; };
+  }, [operadorId, competencia, semana, emEdicao]);
+
+  const POR_SEMANA = 4;
+  const livres = ocupados === null
+    ? []
+    : [1, 2, 3, 4].filter((n) => !ocupados.includes(n));
+  const semanaCheia = ocupados !== null && livres.length === 0;
+
+  // Em edição o número original é preservado; em lançamento novo, o primeiro livre.
+  const numero = emEdicao ? emEdicao.numero_monitoria : (livres[0] ?? POR_SEMANA);
 
   // Num lançamento novo tudo começa "Sim", que é o caso comum. Em edição, cada
   // critério vem como está gravado — e um critério criado depois da monitoria
@@ -107,6 +143,7 @@ export default function FormularioMonitoria({
     setErro(null);
 
     if (!operadorId) return setErro('Selecione o operador avaliado.');
+    if (semanaCheia) return setErro('Esta semana já tem as 4 monitorias do operador. Escolha outra data ou outro operador.');
     if (pendentes > 0) return setErro(`Faltam ${pendentes} critério(s) sem resposta.`);
     if (zerado && !motivoZeramento.trim())
       return setErro('Descreva o motivo do zeramento por falha crítica.');
@@ -210,6 +247,15 @@ export default function FormularioMonitoria({
         </p>
       </div>
 
+      {semanaCheia && !editando && (
+        <p className="rounded-xl bg-amber-50 px-5 py-4 text-sm text-amber-900
+                      ring-1 ring-amber-600/20">
+          <strong>Semana concluída.</strong> Este operador já tem as {POR_SEMANA} monitorias
+          da {semana}ª semana de {mesRotulo(competencia)}. Para lançar outra, escolha uma data
+          de outra semana ou outro operador.
+        </p>
+      )}
+
       <Cartao titulo="Identificação do atendimento">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <label>
@@ -251,12 +297,28 @@ export default function FormularioMonitoria({
             </p>
           </div>
 
-          <label>
+          <div>
             <span className={rotuloCampo}>Nº da monitoria na semana</span>
-            <select value={numero} onChange={(e) => setNumero(Number(e.target.value))} className={campo}>
-              {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}ª Monitoria</option>)}
-            </select>
-          </label>
+            <p className={`${campo} ${semanaCheia
+              ? 'border-rose-300 bg-rose-50 text-rose-900'
+              : 'bg-slate-50 text-slate-700'}`}>
+              {!operadorId ? (
+                <span className="text-slate-400">selecione o operador</span>
+              ) : ocupados === null ? (
+                <span className="text-slate-400">verificando…</span>
+              ) : semanaCheia ? (
+                <span className="font-medium">Semana concluída · 4 de 4</span>
+              ) : (
+                <>
+                  {numero}ª Monitoria
+                  <span className="ml-2 text-xs text-slate-500">
+                    · {ocupados.length} de {POR_SEMANA} já lançada
+                    {ocupados.length === 1 ? '' : 's'} nesta semana
+                  </span>
+                </>
+              )}
+            </p>
+          </div>
 
           <label>
             <span className={rotuloCampo}>Tempo de atendimento (min)</span>
@@ -389,7 +451,7 @@ export default function FormularioMonitoria({
             </p>
           )}
 
-          <button type="submit" disabled={salvando}
+          <button type="submit" disabled={salvando || semanaCheia}
             className="rounded-lg bg-marca-600 px-5 py-2.5 text-sm font-semibold text-white
                        hover:bg-marca-700 disabled:opacity-60">
             {salvando ? 'Salvando…' : editando ? 'Salvar alterações' : 'Salvar monitoria'}

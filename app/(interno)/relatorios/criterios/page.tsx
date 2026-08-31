@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
+import { criarClienteServidor, exigirVisaoDoTime } from '@/lib/supabase/servidor';
 import { Cartao, Tabela, Th, Td, Vazio, Indicador } from '@/componentes/ui';
 import { mesRotulo, percentual, nota } from '@/lib/formatar';
 import type { LinhaCriterio } from '@/lib/tipos';
@@ -11,7 +11,7 @@ export default async function RelatorioCriterios({
 }: {
   searchParams: Promise<{ mes?: string }>;
 }) {
-  await exigirGestor();
+  await exigirVisaoDoTime();
   const { mes: mesEscolhido } = await searchParams;
   const db = await criarClienteServidor();
 

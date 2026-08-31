@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { version } from '@/package.json';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -31,7 +32,20 @@ export default function LayoutRaiz({ children }: { children: React.ReactNode }) 
       <head>
         <script dangerouslySetInnerHTML={{ __html: APLICAR_TEMA }} />
       </head>
-      <body className="min-h-screen antialiased">{children}</body>
+      <body className="min-h-screen antialiased">
+        {children}
+
+        {/* Versão em uso. Discreta de propósito: serve para quem reporta um
+            problema dizer em qual versão viu, sem competir com o conteúdo.
+            `pointer-events-none` garante que nunca atrapalhe um clique. */}
+        <span
+          aria-label={`Versão ${version}`}
+          className="sem-impressao pointer-events-none fixed bottom-2 right-3 z-50
+                     select-none text-[10px] tabular-nums text-slate-400/50"
+        >
+          v{version}
+        </span>
+      </body>
     </html>
   );
 }

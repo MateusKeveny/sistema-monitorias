@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { Cartao, EtiquetaNota, Vazio } from '@/componentes/ui';
+import BotaoExcluirMonitoria from '@/componentes/BotaoExcluirMonitoria';
 import { data as formatarData, dataHora, duracao, percentual, nota } from '@/lib/formatar';
 import type { Monitoria } from '@/lib/tipos';
 
@@ -187,7 +188,7 @@ export default async function DetalheMonitoria({
             Folha de feedback do mês
           </Link>
         )}
-        {perfil.papel === 'admin' && (
+        {perfil.papel !== 'operador' && (
           <Link
             href={`/monitorias/${m.id}/editar`}
             className="rounded-lg bg-marca-600 px-3 py-1.5 text-sm font-semibold text-white
@@ -195,6 +196,16 @@ export default async function DetalheMonitoria({
           >
             Editar monitoria
           </Link>
+        )}
+        {/* Excluir fica por último e em vermelho: é a única ação daqui que não
+            tem volta. Gestor apaga direto; qualidade abre solicitação. */}
+        {perfil.papel !== 'operador' && (
+          <BotaoExcluirMonitoria
+            monitoriaId={m.id}
+            protocolo={m.protocolo}
+            operador={m.operador}
+            ehGestor={perfil.papel === 'gestor'}
+          />
         )}
       </div>
     </div>

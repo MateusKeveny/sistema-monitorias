@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { Cartao, Indicador, EtiquetaNota, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import EvolucaoMensal from '@/componentes/EvolucaoMensal';
+import CoberturaDoCiclo from '@/componentes/CoberturaDoCiclo';
+import SolicitacoesDeExclusao, { type Solicitacao } from '@/componentes/SolicitacoesDeExclusao';
 import { nota, mesRotulo, mesCurto, percentual, data as formatarData } from '@/lib/formatar';
 import type { LinhaRanking, LinhaCriterio, Monitoria } from '@/lib/tipos';
 
@@ -52,24 +54,88 @@ export default async function Painel({
   const mes = escolhido && meses.includes(escolhido) ? escolhido : meses[0];
   const ehOperador = perfil.papel === 'operador';
 
-  const [{ data: criterios }, { data: recentes }] = await Promise.all([
-    // A view respeita a RLS: para um operador estes já são os critérios que
-    // ele próprio reprovou, não os do time.
-    db.from('vw_criterios_reprovados').select('*').eq('mes_referencia', mes)
-      .gt('reprovacoes', 0)
-      .order('pontos_perdidos', { ascending: false })
-      .limit(ehOperador ? 3 : 6),
-    ehOperador
-      ? db.from('vw_monitorias').select('*').eq('mes_referencia', mes)
-          .order('data_atendimento', { ascending: false }).limit(6)
-      : Promise.resolve({ data: null }),
-  ]);
+  const [{ data: criterios }, { data: recentes }, { data: porSemana }, { data: ativos },
+         { data: solicitacoes }] =
+    await Promise.all([
+      // A view respeita a RLS: para um operador estes já são os critérios que
+      // ele próprio reprovou, não os do time.
+      db.from('vw_criterios_reprovados').select('*').eq('mes_referencia', mes)
+        .gt('reprovacoes', 0)
+        .order('pontos_perdidos', { ascending: false })
+        .limit(ehOperador ? 3 : 6),
+      ehOperador
+        ? db.from('vw_monitorias').select('*').eq('mes_referencia', mes)
+            .order('data_atendimento', { ascending: false }).limit(6)
+        : Promise.resolve({ data: null }),
+      // Cobertura do ciclo: só faz sentido para quem enxerga o time inteiro.
+      ehOperador
+        ? Promise.resolve({ data: null })
+        : db.from('vw_monitorias').select('operador_id, semana_mes').eq('mes_referencia', mes),
+      ehOperador
+        ? Promise.resolve({ data: null })
+        : db.from('operadores').select('id, nome').eq('ativo', true).order('nome'),
+      // Fila de exclusões: só o gestor decide, então só ele carrega.
+      perfil.papel === 'gestor'
+        ? db.from('solicitacoes_exclusao')
+            .select('id, motivo, solicitada_por_nome, solicitada_em,'
+              + ' monitoria:monitorias(id, protocolo, data_atendimento, nota_final,'
+              + ' operadores(nome))')
+            .eq('status', 'pendente')
+            .order('solicitada_em')
+        : Promise.resolve({ data: null }),
+    ]);
 
   const linhas = ranking
     .filter((l) => l.mes_referencia === mes)
     .sort((a, b) => Number(b.nota_media) - Number(a.nota_media));
   const piores = (criterios ?? []) as LinhaCriterio[];
   const minhasUltimas = (recentes ?? []) as Monitoria[];
+
+  // Grade operador × semana. Parte da lista de operadores ativos, não das
+  // monitorias: quem não foi monitorado nenhuma vez precisa aparecer com zero,
+  // e é justamente esse o caso que passava despercebido.
+  const contagem = new Map<string, number[]>();
+  for (const o of (ativos ?? []) as { id: string }[]) contagem.set(o.id, [0, 0, 0, 0]);
+  for (const m of (porSemana ?? []) as { operador_id: string; semana_mes: number }[]) {
+    const linha = contagem.get(m.operador_id);
+    if (linha && m.semana_mes >= 1 && m.semana_mes <= 4) linha[m.semana_mes - 1]++;
+  }
+  const cobertura = ((ativos ?? []) as { id: string; nome: string }[]).map((o) => ({
+    operador_id: o.id,
+    operador: o.nome,
+    semanas: contagem.get(o.id) ?? [0, 0, 0, 0],
+  }));
+
+  // A consulta traz o operador aninhado; a tela quer o nome direto.
+  type SolicitacaoBruta = {
+    id: string; motivo: string; solicitada_por_nome: string | null; solicitada_em: string;
+    monitoria: {
+      id: string; protocolo: string; data_atendimento: string; nota_final: number;
+      operadores: { nome: string } | null;
+    } | null;
+  };
+  const pendentes: Solicitacao[] = ((solicitacoes ?? []) as unknown as SolicitacaoBruta[])
+    .map((s) => ({
+      id: s.id,
+      motivo: s.motivo,
+      solicitada_por_nome: s.solicitada_por_nome,
+      solicitada_em: s.solicitada_em,
+      monitoria: s.monitoria && {
+        id: s.monitoria.id,
+        protocolo: s.monitoria.protocolo,
+        data_atendimento: s.monitoria.data_atendimento,
+        nota_final: s.monitoria.nota_final,
+        operador: s.monitoria.operadores?.nome ?? '—',
+      },
+    }));
+
+  // Quantas semanas do ciclo já terminaram. No ciclo 26→25 as semanas fecham
+  // nos dias 02, 10, 18 e 25 do mês de competência. Num ciclo em andamento,
+  // cobrar semana que ainda não aconteceu apontaria falha onde não há.
+  const fimDasSemanas = [2, 10, 18, 25];
+  const hoje = new Date().toISOString().slice(0, 10);
+  const semanasEncerradas = fimDasSemanas.filter(
+    (dia) => `${mes.slice(0, 8)}${String(dia).padStart(2, '0')}` < hoje).length;
 
   // Os totais saem do próprio ranking, que já vem agregado pelo banco. Antes
   // havia uma quarta consulta trazendo as monitorias inteiras do mês — cerca de
@@ -147,6 +213,8 @@ export default async function Painel({
           </Link>
         </div>
       </div>
+
+      {perfil.papel === 'gestor' && <SolicitacoesDeExclusao pendentes={pendentes} />}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Indicador
@@ -322,6 +390,10 @@ export default async function Painel({
           )}
         </Cartao>
       </div>
+
+      {!ehOperador && (
+        <CoberturaDoCiclo linhas={cobertura} semanasEncerradas={semanasEncerradas} />
+      )}
     </div>
   );
 }

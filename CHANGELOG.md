@@ -9,6 +9,57 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 4.0.0 — crítica
+
+**Cargos reestruturados e duas falhas de permissão corrigidas.**
+
+### Cargos
+
+`admin` sai e vira `gestor`. O papel deixou de ser enum e virou texto com
+restrição — enum não aceita remover valor, e mudar a lista de cargos passa a ser
+uma linha.
+
+| Cargo | Vê | Monitora | Pesos e cadastros | Acessos | Exclui |
+|---|---|---|---|---|---|
+| Gestor | tudo | sim | sim | sim | direto |
+| Qualidade | tudo | lança e edita | não | não | solicita |
+| Operador | só as próprias | não | não | não | não |
+
+A exclusão pedida pela Qualidade fica pendente até um gestor aprovar ou recusar,
+e a monitoria continua valendo nos relatórios enquanto isso. Migração `09`.
+
+### Falhas corrigidas
+
+**Guarda de exclusão contornável** — migração `08`.
+
+`eh_admin()` devolvia `NULL` para quem não tem perfil, e em PL/pgSQL
+`if not NULL then` não entra no bloco. A guarda não disparava: qualquer pessoa,
+sem sessão, apagava qualquer monitoria usando a chave pública que vai no
+navegador. Encontrada em teste; apagou um registro, restaurado a partir do
+registro de exclusão e da extração original da planilha. Todas as funções de
+papel passam a usar `coalesce` e nunca devolvem `NULL`.
+
+**Funções internas expostas** — migração `10`.
+
+`apagar_monitoria`, que apaga sem verificar permissão porque a verificação vive
+em quem a chama, e `registrar_alteracao`, que grava no histórico, estavam
+chamáveis por qualquer um. `revoke ... from public` não basta no Supabase: ele
+concede execução aos papéis `anon` e `authenticated` de forma explícita, e é
+preciso nomeá-los para revogar.
+
+### Também nesta versão
+
+- O nº da monitoria deixa de ser escolhido: ao selecionar operador e data, o
+  formulário consulta a semana e informa qual será a próxima. Semana com as 4
+  já lançadas avisa e bloqueia o salvamento.
+- Quadro "Cobertura do ciclo" no painel, para gestor e qualidade: grade de
+  operador por semana, partindo da lista de operadores ativos — quem não foi
+  monitorado nenhuma vez aparece com zero. Só cobra semanas já encerradas.
+- Exclusão de monitoria com registro do que foi apagado, por quem e por quê,
+  incluindo as respostas dos critérios. Migrações `07` e `08`.
+- Lista de monitorias ordenável por qualquer coluna, preservando o filtro.
+- Versão do sistema no rodapé.
+
 ## 3.4.0
 
 Fundos da marca nos dois temas.
