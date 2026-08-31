@@ -7,6 +7,8 @@ export type Perfil = {
   papel: PapelUsuario;
   operador_id: string | null;
   ativo: boolean;
+  /** false enquanto a pessoa não trocar a senha inicial no primeiro acesso. */
+  senha_definida: boolean;
 };
 
 export type Operador = {

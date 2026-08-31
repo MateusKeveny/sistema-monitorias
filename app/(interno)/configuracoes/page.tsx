@@ -14,7 +14,7 @@ export default async function Configuracoes() {
     await Promise.all([
       db.from('criterios').select('*').order('ordem'),
       db.from('operadores').select('*').order('nome'),
-      db.from('perfis').select('id, nome, email, papel, operador_id, ativo').order('nome'),
+      db.from('perfis').select('id, nome, email, papel, operador_id, ativo, senha_definida').order('nome'),
       db.from('canais').select('*').order('nome'),
     ]);
 

@@ -54,6 +54,7 @@ export default function PainelUsuarios({
               <Th>E-mail</Th>
               <Th className="w-48">Papel</Th>
               <Th className="w-52">Operador vinculado</Th>
+              <Th className="w-40">Senha</Th>
               <Th className="w-24 text-center">Ativo</Th>
             </tr>
           </thead>
@@ -101,6 +102,22 @@ export default function PainelUsuarios({
                     <span className="text-xs text-slate-400">vê o time inteiro</span>
                   )}
                 </Td>
+                <Td>
+                  {p.senha_definida ? (
+                    <button
+                      type="button" disabled={ocupado === p.id}
+                      onClick={() => atualizar(p.id, { senha_definida: false })}
+                      className="text-xs text-slate-500 hover:text-rose-700 hover:underline"
+                      title="A pessoa terá de definir uma nova senha no próximo acesso"
+                    >
+                      definida · exigir troca
+                    </button>
+                  ) : (
+                    <span className="text-xs font-medium text-amber-700">
+                      trocará no 1º acesso
+                    </span>
+                  )}
+                </Td>
                 <Td className="text-center">
                   <input
                     type="checkbox" checked={p.ativo} disabled={ocupado === p.id}
@@ -115,7 +132,7 @@ export default function PainelUsuarios({
       )}
 
       <p className="mt-4 text-xs leading-relaxed text-slate-500">
-        Um operador <strong>sem vínculo</strong> entra no sistema e não vê nenhuma monitoria —
+        Quem nunca acessou precisa <strong>definir a própria senha</strong> antes de entrar. Um operador <strong>sem vínculo</strong> entra e não vê nenhuma monitoria —
         é o estado seguro por padrão. Só a <strong>Qualidade (admin)</strong> lança e edita
         monitorias; gestor tem leitura do time inteiro.
       </p>

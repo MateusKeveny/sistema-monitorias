@@ -47,18 +47,25 @@ export const obterPerfil = cache(async (): Promise<Perfil | null> => {
 
   const { data } = await db
     .from('perfis')
-    .select('id, nome, email, papel, operador_id, ativo')
+    .select('id, nome, email, papel, operador_id, ativo, senha_definida')
     .eq('id', user.id)
     .maybeSingle();
 
   return (data as Perfil | null) ?? null;
 });
 
-/** Perfil do usuário logado; sem sessão válida, manda para o login. */
+/**
+ * Perfil do usuário logado, exigido pelas telas internas.
+ *
+ * Sem sessão válida, manda para o login. Com a senha inicial ainda não trocada,
+ * manda para a tela de definir senha — é o portão do primeiro acesso, e vale
+ * para todas as páginas internas de uma vez.
+ */
 export async function exigirPerfil(): Promise<Perfil> {
   const perfil = await obterPerfil();
   if (!perfil) redirect('/login?erro=perfil-ausente');
   if (!perfil.ativo) redirect('/login?erro=inativo');
+  if (!perfil.senha_definida) redirect('/definir-senha');
   return perfil;
 }
 
