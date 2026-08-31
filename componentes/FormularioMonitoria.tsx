@@ -4,7 +4,10 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { Cartao } from '@/componentes/ui';
-import { nota as formatarNota, faixa, percentual } from '@/lib/formatar';
+import {
+  nota as formatarNota, faixa, percentual,
+  semanaDoCiclo, mesDeCompetencia, mesExtenso,
+} from '@/lib/formatar';
 import type { Canal, Criterio, Operador } from '@/lib/tipos';
 
 type Resposta = { conforme: boolean | null; observacao: string };
@@ -27,7 +30,6 @@ export default function FormularioMonitoria({
 
   const [protocolo, setProtocolo] = useState('');
   const [dataAtendimento, setDataAtendimento] = useState(hoje());
-  const [semana, setSemana] = useState(1);
   const [numero, setNumero] = useState(1);
   const [operadorId, setOperadorId] = useState('');
   const [canalId, setCanalId] = useState(canais[0]?.id ?? '');
@@ -37,6 +39,12 @@ export default function FormularioMonitoria({
   const [parecer, setParecer] = useState('');
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+
+  // No ciclo 26→25 da IGreen, semana e mês de competência são função
+  // determinística da data do atendimento — por isso não são digitados. O banco
+  // deriva os mesmos valores no gravar; aqui é só para o monitor conferir.
+  const semana = semanaDoCiclo(dataAtendimento);
+  const competencia = mesDeCompetencia(dataAtendimento);
 
   const [respostas, setRespostas] = useState<Record<string, Resposta>>(() =>
     Object.fromEntries(criterios.map((c) => [c.id, { conforme: true, observacao: '' }])));
@@ -170,12 +178,15 @@ export default function FormularioMonitoria({
             </select>
           </label>
 
-          <label>
+          <div>
             <span className={rotuloCampo}>Semana do ciclo</span>
-            <select value={semana} onChange={(e) => setSemana(Number(e.target.value))} className={campo}>
-              {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}ª Semana</option>)}
-            </select>
-          </label>
+            <p className={`${campo} bg-slate-50 text-slate-700`}>
+              {semana}ª Semana
+              <span className="ml-2 text-xs text-slate-500">
+                · competência {mesExtenso(competencia)}
+              </span>
+            </p>
+          </div>
 
           <label>
             <span className={rotuloCampo}>Nº da monitoria na semana</span>

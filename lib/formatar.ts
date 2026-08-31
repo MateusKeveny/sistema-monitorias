@@ -61,8 +61,28 @@ export function mesAtual(): string {
   return `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`;
 }
 
-/** Calcula em qual semana do mês uma data cai (1 a 5). */
-export function semanaDoMes(iso: string): number {
+/**
+ * Ciclo de metrificação da IGreen: o mês vai do dia 26 ao dia 25.
+ * As mesmas regras existem no banco (mes_de_competencia / semana_do_ciclo);
+ * aqui elas servem só para mostrar o resultado no formulário antes de salvar.
+ */
+
+/** Semana do ciclo: 1ª 26–02 | 2ª 03–10 | 3ª 11–18 | 4ª 19–25 */
+export function semanaDoCiclo(iso: string): number {
   const dia = Number(iso.slice(8, 10));
-  return Math.min(5, Math.ceil(dia / 7));
+  if (dia >= 26 || dia <= 2) return 1;
+  if (dia <= 10) return 2;
+  if (dia <= 18) return 3;
+  return 4;
+}
+
+/** Mês de competência: dia >= 26 já pertence ao mês seguinte. */
+export function mesDeCompetencia(iso: string): string {
+  let ano = Number(iso.slice(0, 4));
+  let mes = Number(iso.slice(5, 7));
+  if (Number(iso.slice(8, 10)) >= 26) {
+    mes += 1;
+    if (mes === 13) { mes = 1; ano += 1; }
+  }
+  return `${ano}-${String(mes).padStart(2, '0')}-01`;
 }
