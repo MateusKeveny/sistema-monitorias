@@ -19,7 +19,13 @@ const ITENS: Item[] = [
   { href: '/configuracoes', rotulo: 'Configurações', papeis: ['gestor'] },
 ];
 
-export default function Navegacao({ perfil }: { perfil: Perfil }) {
+export default function Navegacao({
+  perfil, pendentes = 0,
+}: {
+  perfil: Perfil;
+  /** Exclusões esperando decisão do gestor. Zero esconde o contador. */
+  pendentes?: number;
+}) {
   const caminho = usePathname();
   const router = useRouter();
 
@@ -51,6 +57,17 @@ export default function Navegacao({ perfil }: { perfil: Perfil }) {
               }`}
             >
               {item.rotulo}
+              {/* Só no Painel, que é onde a fila de exclusões aparece. */}
+              {item.href === '/' && pendentes > 0 && (
+                <span
+                  title={`${pendentes} exclusão(ões) aguardando sua decisão`}
+                  className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center
+                             rounded-full bg-amber-500 px-1 text-xs font-bold
+                             tabular-nums text-white"
+                >
+                  {pendentes}
+                </span>
+              )}
             </Link>
           ))}
         </nav>

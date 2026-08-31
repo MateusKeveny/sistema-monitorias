@@ -9,6 +9,13 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 4.1.0
+
+- Contador no menu quando há exclusões aguardando decisão do gestor. O quadro
+  da fila só existe quando há pendência, o que o tornava indescobrível: o
+  gestor só o veria se abrisse o Painel justamente no dia certo. O contador
+  aparece em qualquer tela e some sozinho quando a fila zera.
+
 ## 4.0.0 — crítica
 
 **Cargos reestruturados e duas falhas de permissão corrigidas.**
