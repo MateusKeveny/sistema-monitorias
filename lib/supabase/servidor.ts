@@ -1,10 +1,16 @@
+import { cache } from 'react';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import type { Perfil } from '@/lib/tipos';
 
-/** Cliente Supabase para Server Components, Route Handlers e Server Actions. */
-export async function criarClienteServidor() {
+/**
+ * Cliente Supabase para Server Components, Route Handlers e Server Actions.
+ *
+ * Envolvido em cache() para que layout e página compartilhem a mesma instância
+ * dentro de uma renderização, em vez de montar uma nova a cada chamada.
+ */
+export const criarClienteServidor = cache(async () => {
   const armazem = await cookies();
 
   return createServerClient(
@@ -23,27 +29,37 @@ export async function criarClienteServidor() {
       },
     },
   );
-}
+});
 
 /**
- * Devolve o perfil do usuário logado. Se não houver sessão, manda para o login.
- * Todas as páginas internas começam por aqui.
+ * Busca o perfil do usuário logado.
+ *
+ * O cache() aqui é o que mais pesa no desempenho: sem ele, o layout e a página
+ * repetiam a mesma dupla de chamadas (getUser + consulta a perfis) na mesma
+ * renderização — quatro idas à rede em série onde bastam duas. Com o cache, a
+ * segunda chamada devolve o resultado da primeira, de graça.
  */
-export async function exigirPerfil(): Promise<Perfil> {
+export const obterPerfil = cache(async (): Promise<Perfil | null> => {
   const db = await criarClienteServidor();
-  const { data: { user } } = await db.auth.getUser();
-  if (!user) redirect('/login');
 
-  const { data: perfil } = await db
+  const { data: { user } } = await db.auth.getUser();
+  if (!user) return null;
+
+  const { data } = await db
     .from('perfis')
     .select('id, nome, email, papel, operador_id, ativo')
     .eq('id', user.id)
     .maybeSingle();
 
+  return (data as Perfil | null) ?? null;
+});
+
+/** Perfil do usuário logado; sem sessão válida, manda para o login. */
+export async function exigirPerfil(): Promise<Perfil> {
+  const perfil = await obterPerfil();
   if (!perfil) redirect('/login?erro=perfil-ausente');
   if (!perfil.ativo) redirect('/login?erro=inativo');
-
-  return perfil as Perfil;
+  return perfil;
 }
 
 /** Igual a exigirPerfil, mas bloqueia quem não for admin (qualidade). */

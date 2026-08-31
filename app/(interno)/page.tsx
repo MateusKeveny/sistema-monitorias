@@ -3,7 +3,7 @@ import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { Cartao, Indicador, EtiquetaNota, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import EvolucaoMensal from '@/componentes/EvolucaoMensal';
 import { nota, mesExtenso, mesCurto, percentual } from '@/lib/formatar';
-import type { LinhaRanking, LinhaCriterio, Monitoria } from '@/lib/tipos';
+import type { LinhaRanking, LinhaCriterio } from '@/lib/tipos';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,23 +35,27 @@ export default async function Painel() {
 
   const mes = ultima.mes_referencia as string;
 
-  const [{ data: ranking }, { data: criterios }, { data: doMes }, { data: evolucao }] =
+  const [{ data: ranking }, { data: criterios }, { data: evolucao }] =
     await Promise.all([
       db.from('vw_ranking_mensal').select('*').eq('mes_referencia', mes)
         .order('nota_media', { ascending: false }),
       db.from('vw_criterios_reprovados').select('*').eq('mes_referencia', mes)
         .gt('reprovacoes', 0).order('pontos_perdidos', { ascending: false }).limit(6),
-      db.from('vw_monitorias').select('*').eq('mes_referencia', mes),
       db.from('vw_ranking_mensal').select('mes_referencia, total_monitorias, nota_media, zeradas'),
     ]);
 
   const linhas = (ranking ?? []) as LinhaRanking[];
   const piores = (criterios ?? []) as LinhaCriterio[];
-  const monitorias = (doMes ?? []) as Monitoria[];
 
-  const total = monitorias.length;
-  const media = total ? monitorias.reduce((s, m) => s + Number(m.nota_final), 0) / total : null;
-  const zeradas = monitorias.filter((m) => m.zerado).length;
+  // Os totais saem do próprio ranking, que já vem agregado pelo banco. Antes
+  // havia uma quarta consulta trazendo as monitorias inteiras do mês — cerca de
+  // 10 KB de pareceres — só para contar quatro números.
+  const total = linhas.reduce((s, l) => s + l.total_monitorias, 0);
+  const media = total
+    ? linhas.reduce((s, l) => s + Number(l.nota_media) * l.total_monitorias, 0) / total
+    : null;
+  const zeradas = linhas.reduce((s, l) => s + l.zeradas, 0);
+  const impecaveis = linhas.reduce((s, l) => s + l.impecaveis, 0);
   const abaixo = linhas.filter((l) => Number(l.nota_media) < 0.85).length;
 
   // Série mensal consolidada para o gráfico.
@@ -105,7 +109,7 @@ export default async function Painel() {
         />
         <Indicador
           rotulo={ehOperador ? 'Minhas notas 100%' : 'Atendimentos impecáveis'}
-          valor={String(monitorias.filter((m) => Number(m.nota_final) === 1).length)}
+          valor={String(impecaveis)}
           tom="bom" detalhe="nota cheia, sem desconto"
         />
         <Indicador
