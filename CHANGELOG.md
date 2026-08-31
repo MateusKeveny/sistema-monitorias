@@ -9,6 +9,16 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 4.3.0
+
+- `npm run acesso` cria o acesso de uma pessoa com a senha padrão e obriga a
+  troca no primeiro login — o equivalente à macro de Excel que fazia isso antes.
+  Aceita `--todos` para cobrir de uma vez quem está cadastrado sem login.
+- A senha padrão vem de `SENHA_PADRAO` no `.env.local`, fora do repositório.
+- O comando é local, e não um botão no site, porque criar conta exige a chave
+  `service_role`, que ignora toda a segurança do banco. Enquanto ela existir só
+  na máquina de quem administra, um vazamento do site não expõe o banco.
+
 ## 4.2.0
 
 **Uma tabela de pessoas no lugar de duas.**

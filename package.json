@@ -1,6 +1,6 @@
 {
   "name": "sistema-monitorias",
-  "version": "4.2.0",
+  "version": "4.3.0",
   "private": true,
   "description": "Sistema de Monitorias de Qualidade (C-SAT) — IGreen Energia",
   "scripts": {
@@ -15,7 +15,8 @@
     "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "papel": "node --env-file=.env.local scripts/definir-papel.js",
-    "vincular": "node --env-file=.env.local scripts/vincular-contas.js"
+    "vincular": "node --env-file=.env.local scripts/vincular-contas.js",
+    "acesso": "node --env-file=.env.local scripts/criar-acesso.js"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.5",

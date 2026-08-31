@@ -125,20 +125,15 @@ Abra <http://localhost:3000>.
 
 ### 6. Criar o primeiro gestor
 
-1. No Supabase: **Authentication → Users → Add user**, com seu e-mail e uma senha,
-   marcando *Auto Confirm User*.
-2. Ligue a conta à pessoa e defina o papel:
+Cadastre a pessoa e crie o acesso dela:
 
 ```bash
-npm run vincular
+npm run acesso -- seu.email@igreenenergy.com.br "Seu Nome"
 npm run papel -- seu.email@igreenenergy.com.br gestor
 ```
 
-`vincular` liga contas do Supabase às pessoas pelo e-mail — o gatilho do banco já
-faz isso em contas novas, e o comando cobre o que ficou para trás. `papel` sem
-argumentos lista todo mundo.
-
-A partir daí você libera os demais pela tela **Configurações**, sem linha de comando.
+Entre com a senha de `SENHA_PADRAO` e defina a sua — a troca é obrigatória antes
+de qualquer tela. A partir daí você libera os demais pela tela **Configurações**.
 
 ---
 
@@ -284,3 +279,29 @@ Levantados durante a extração — valem uma conferência sua:
   hoje são feitas no painel do Supabase. É o primeiro candidato natural a evoluir.
 - O PDF do feedback sai pela impressão do navegador (Ctrl+P → *Salvar como PDF*), sem
   biblioteca extra.
+
+---
+
+## Criar acessos
+
+O sistema não cria contas pelo site, de propósito: isso exige a chave
+`service_role`, que ignora toda a segurança do banco. Enquanto ela existir só na
+sua máquina, um vazamento do site não expõe o banco.
+
+A criação fica num comando local, no lugar da macro de Excel que fazia isso antes:
+
+```bash
+npm run acesso -- pessoa@igreenenergy.com.br
+npm run acesso -- nova@igreenenergy.com.br "Nome Completo" qualidade
+npm run acesso -- --todos
+```
+
+Ele cria a conta com a senha de `SENHA_PADRAO` (definida no `.env.local`, fora do
+repositório), liga à pessoa e marca a senha como pendente — então ela entra com a
+senha padrão e **é obrigada a trocá-la** antes de ver qualquer tela.
+
+`--todos` faz isso para todas as pessoas cadastradas que ainda não têm login.
+
+> A janela entre criar a conta e a pessoa entrar é o ponto fraco de qualquer senha
+> padrão: quem conhece o padrão pode entrar no lugar dela e definir a senha
+> primeiro. Vale criar o acesso perto de quando a pessoa vai usá-lo.
