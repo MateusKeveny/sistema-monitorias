@@ -18,25 +18,44 @@ const rotuloCampo = 'mb-1 block text-sm font-medium text-slate-700';
 const campo = `w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none
                focus:border-marca-600 focus:ring-2 focus:ring-marca-100`;
 
+/** Valores de uma monitoria existente, quando o formulário está em edição. */
+export type MonitoriaEmEdicao = {
+  id: string;
+  protocolo: string;
+  data_atendimento: string;
+  numero_monitoria: number;
+  operador_id: string;
+  canal_id: string | null;
+  tempo_atendimento_seg: number | null;
+  zerado: boolean;
+  motivo_zeramento: string | null;
+  parecer: string | null;
+  respostas: Record<string, Resposta>;
+};
+
 export default function FormularioMonitoria({
-  perfilId, criterios, operadores, canais,
+  perfilId, criterios, operadores, canais, emEdicao,
 }: {
   perfilId: string;
   criterios: Criterio[];
   operadores: Operador[];
   canais: Canal[];
+  /** Ausente = lançamento novo. Presente = edição da monitoria indicada. */
+  emEdicao?: MonitoriaEmEdicao;
 }) {
   const router = useRouter();
+  const editando = Boolean(emEdicao);
 
-  const [protocolo, setProtocolo] = useState('');
-  const [dataAtendimento, setDataAtendimento] = useState(hoje());
-  const [numero, setNumero] = useState(1);
-  const [operadorId, setOperadorId] = useState('');
-  const [canalId, setCanalId] = useState(canais[0]?.id ?? '');
-  const [tempo, setTempo] = useState('');
-  const [zerado, setZerado] = useState(false);
-  const [motivoZeramento, setMotivoZeramento] = useState('');
-  const [parecer, setParecer] = useState('');
+  const [protocolo, setProtocolo] = useState(emEdicao?.protocolo ?? '');
+  const [dataAtendimento, setDataAtendimento] = useState(emEdicao?.data_atendimento ?? hoje());
+  const [numero, setNumero] = useState(emEdicao?.numero_monitoria ?? 1);
+  const [operadorId, setOperadorId] = useState(emEdicao?.operador_id ?? '');
+  const [canalId, setCanalId] = useState(emEdicao?.canal_id ?? canais[0]?.id ?? '');
+  const [tempo, setTempo] = useState(
+    emEdicao?.tempo_atendimento_seg ? String(Math.round(emEdicao.tempo_atendimento_seg / 60)) : '');
+  const [zerado, setZerado] = useState(emEdicao?.zerado ?? false);
+  const [motivoZeramento, setMotivoZeramento] = useState(emEdicao?.motivo_zeramento ?? '');
+  const [parecer, setParecer] = useState(emEdicao?.parecer ?? '');
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -46,8 +65,16 @@ export default function FormularioMonitoria({
   const semana = semanaDoCiclo(dataAtendimento);
   const competencia = mesDeCompetencia(dataAtendimento);
 
+  // Num lançamento novo tudo começa "Sim", que é o caso comum. Em edição, cada
+  // critério vem como está gravado — e um critério criado depois da monitoria
+  // aparece sem resposta, para ser respondido em vez de assumir conformidade.
   const [respostas, setRespostas] = useState<Record<string, Resposta>>(() =>
-    Object.fromEntries(criterios.map((c) => [c.id, { conforme: true, observacao: '' }])));
+    Object.fromEntries(criterios.map((c) => [
+      c.id,
+      emEdicao
+        ? emEdicao.respostas[c.id] ?? { conforme: null, observacao: '' }
+        : { conforme: true, observacao: '' },
+    ])));
 
   // Mesma fórmula da planilha: zerado -> 0; senão 1 - soma dos pesos reprovados.
   const { notaPrevia, reprovados, pendentes } = useMemo(() => {
@@ -87,29 +114,61 @@ export default function FormularioMonitoria({
     setSalvando(true);
     const db = criarClienteNavegador();
 
+    const campos = {
+      protocolo: protocolo.trim(),
+      data_atendimento: dataAtendimento,
+      semana_mes: semana,
+      numero_monitoria: numero,
+      operador_id: operadorId,
+      canal_id: canalId || null,
+      tempo_atendimento_seg: tempo ? Math.round(Number(tempo) * 60) : null,
+      zerado,
+      motivo_zeramento: zerado ? motivoZeramento.trim() : null,
+      parecer: parecer.trim() || null,
+    };
+
+    const mensagemDeErro = (e: { code?: string; message: string }) =>
+      e.code === '23505'
+        ? 'Já existe uma monitoria com essa combinação de operador, mês, semana e número.'
+        : e.message;
+
+    // ------------------------------------------------------------- edição
+    if (emEdicao) {
+      const { error } = await db.from('monitorias').update(campos).eq('id', emEdicao.id);
+      if (error) { setSalvando(false); setErro(mensagemDeErro(error)); return; }
+
+      const itens = criterios.map((c) => ({
+        monitoria_id: emEdicao.id,
+        criterio_id: c.id,
+        conforme: respostas[c.id].conforme as boolean,
+        observacao: respostas[c.id].observacao.trim() || null,
+      }));
+
+      // Upsert cobre os dois casos: atualiza o que já existia e cria a resposta
+      // de um critério que passou a existir depois desta monitoria.
+      const { error: erroItens } = await db.from('monitoria_itens')
+        .upsert(itens, { onConflict: 'monitoria_id,criterio_id' });
+      if (erroItens) {
+        setSalvando(false);
+        setErro(`Falha ao gravar os critérios: ${erroItens.message}`);
+        return;
+      }
+
+      router.push(`/monitorias/${emEdicao.id}`);
+      router.refresh();
+      return;
+    }
+
+    // ---------------------------------------------------------- lançamento
     const { data: criada, error: erroMonitoria } = await db
       .from('monitorias')
-      .insert({
-        protocolo: protocolo.trim(),
-        data_atendimento: dataAtendimento,
-        semana_mes: semana,
-        numero_monitoria: numero,
-        operador_id: operadorId,
-        canal_id: canalId || null,
-        tempo_atendimento_seg: tempo ? Math.round(Number(tempo) * 60) : null,
-        zerado,
-        motivo_zeramento: zerado ? motivoZeramento.trim() : null,
-        parecer: parecer.trim() || null,
-        monitor_id: perfilId,
-      })
+      .insert({ ...campos, monitor_id: perfilId })
       .select('id')
       .single();
 
     if (erroMonitoria) {
       setSalvando(false);
-      setErro(erroMonitoria.code === '23505'
-        ? 'Já existe uma monitoria com essa combinação de operador, mês, semana e número.'
-        : erroMonitoria.message);
+      setErro(mensagemDeErro(erroMonitoria));
       return;
     }
 
@@ -141,9 +200,13 @@ export default function FormularioMonitoria({
   return (
     <form onSubmit={salvar} className="space-y-6 pb-24">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900">Nova monitoria</h1>
+        <h1 className="text-xl font-semibold text-slate-900">
+          {editando ? `Editar monitoria ${emEdicao!.protocolo}` : 'Nova monitoria'}
+        </h1>
         <p className="text-sm text-slate-500">
-          A nota é calculada automaticamente pelos pesos dos critérios.
+          {editando
+            ? 'Toda alteração fica registrada no histórico da monitoria, com autor e data.'
+            : 'A nota é calculada automaticamente pelos pesos dos critérios.'}
         </p>
       </div>
 
@@ -329,7 +392,7 @@ export default function FormularioMonitoria({
           <button type="submit" disabled={salvando}
             className="rounded-lg bg-marca-600 px-5 py-2.5 text-sm font-semibold text-white
                        hover:bg-marca-700 disabled:opacity-60">
-            {salvando ? 'Salvando…' : 'Salvar monitoria'}
+            {salvando ? 'Salvando…' : editando ? 'Salvar alterações' : 'Salvar monitoria'}
           </button>
         </div>
       </div>

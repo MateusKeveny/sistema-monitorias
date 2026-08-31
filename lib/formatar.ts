@@ -13,6 +13,15 @@ export const data = (iso: string | null | undefined) => {
   return `${d}/${m}/${a}`;
 };
 
+/** 31/08/2026 às 14:07 — usado no histórico de alterações. */
+export const dataHora = (iso: string | null | undefined) => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`
+    + ` às ${p(d.getHours())}:${p(d.getMinutes())}`;
+};
+
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
   'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 
@@ -25,8 +34,6 @@ export const mesCurto = (iso: string) => {
   const [a, m] = iso.slice(0, 10).split('-');
   return `${m}/${a}`;
 };
-
-export const ordinal = (n: number) => `${n}ª`;
 
 export const duracao = (segundos: number | null | undefined) => {
   if (segundos == null || segundos <= 0) return '—';
@@ -54,12 +61,6 @@ export const CORES_FAIXA: Record<string, string> = {
   critico: 'bg-rose-100 text-rose-800 ring-rose-600/20',
   vazio: 'bg-slate-100 text-slate-600 ring-slate-500/20',
 };
-
-/** Mês corrente no formato aceito pelas consultas (primeiro dia do mês). */
-export function mesAtual(): string {
-  const hoje = new Date();
-  return `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`;
-}
 
 /**
  * Ciclo de metrificação da IGreen: o mês vai do dia 26 ao dia 25.

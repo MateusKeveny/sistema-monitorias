@@ -6,7 +6,9 @@ import type { Monitoria, Operador } from '@/lib/tipos';
 
 export const dynamic = 'force-dynamic';
 
-type Busca = { operador?: string; mes?: string; zeradas?: string };
+type Busca = { operador?: string; mes?: string; zeradas?: string; pagina?: string };
+
+const POR_PAGINA = 100;
 
 export default async function ListaMonitorias({
   searchParams,
@@ -17,22 +19,40 @@ export default async function ListaMonitorias({
   const filtros = await searchParams;
   const db = await criarClienteServidor();
 
-  let consulta = db.from('vw_monitorias').select('*')
+  const pagina = Math.max(1, Number(filtros.pagina) || 1);
+  const inicio = (pagina - 1) * POR_PAGINA;
+
+  // count: 'exact' devolve o total real junto com a página. Antes a lista
+  // cortava em 500 sem avisar; agora o total é sempre visível.
+  let consulta = db.from('vw_monitorias').select('*', { count: 'exact' })
     .order('data_atendimento', { ascending: false })
     .order('operador')
-    .limit(500);
+    .range(inicio, inicio + POR_PAGINA - 1);
 
   if (filtros.operador) consulta = consulta.eq('operador_id', filtros.operador);
   if (filtros.mes) consulta = consulta.eq('mes_referencia', filtros.mes);
   if (filtros.zeradas === 'sim') consulta = consulta.eq('zerado', true);
 
-  const [{ data: lista }, { data: operadores }, { data: meses }] = await Promise.all([
+  const [{ data: lista, count }, { data: operadores }, { data: meses }] = await Promise.all([
     consulta,
     db.from('operadores').select('id, nome').eq('ativo', true).order('nome'),
     db.from('vw_monitorias').select('mes_referencia').order('mes_referencia', { ascending: false }),
   ]);
 
   const monitorias = (lista ?? []) as Monitoria[];
+  const total = count ?? monitorias.length;
+  const ultimaPagina = Math.max(1, Math.ceil(total / POR_PAGINA));
+
+  /** Mantém os filtros ao trocar de página. */
+  const linkPagina = (n: number) => {
+    const p = new URLSearchParams();
+    if (filtros.operador) p.set('operador', filtros.operador);
+    if (filtros.mes) p.set('mes', filtros.mes);
+    if (filtros.zeradas) p.set('zeradas', filtros.zeradas);
+    if (n > 1) p.set('pagina', String(n));
+    const q = p.toString();
+    return q ? `/monitorias?${q}` : '/monitorias';
+  };
   const mesesUnicos = [...new Set(((meses ?? []) as { mes_referencia: string }[])
     .map((m) => m.mes_referencia))];
 
@@ -45,8 +65,8 @@ export default async function ListaMonitorias({
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Monitorias</h1>
           <p className="text-sm text-slate-500">
-            {monitorias.length} registro{monitorias.length === 1 ? '' : 's'}
-            {monitorias.length === 500 && ' (limite de exibição)'}
+            {total} registro{total === 1 ? '' : 's'}
+            {ultimaPagina > 1 && ` · página ${pagina} de ${ultimaPagina}`}
           </p>
         </div>
 
@@ -141,6 +161,30 @@ export default async function ListaMonitorias({
           </Tabela>
         )}
       </Cartao>
+
+      {ultimaPagina > 1 && (
+        <nav className="flex items-center justify-between gap-4">
+          {pagina > 1 ? (
+            <Link href={linkPagina(pagina - 1)}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm
+                         font-medium text-slate-700 hover:bg-slate-50">
+              ← Anteriores
+            </Link>
+          ) : <span />}
+
+          <span className="text-sm text-slate-500">
+            {inicio + 1}–{Math.min(inicio + POR_PAGINA, total)} de {total}
+          </span>
+
+          {pagina < ultimaPagina ? (
+            <Link href={linkPagina(pagina + 1)}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm
+                         font-medium text-slate-700 hover:bg-slate-50">
+              Próximas →
+            </Link>
+          ) : <span />}
+        </nav>
+      )}
     </div>
   );
 }

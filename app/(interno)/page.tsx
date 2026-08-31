@@ -20,14 +20,24 @@ export default async function Painel() {
     .limit(1)
     .maybeSingle();
 
+  // Um operador sem monitorias e um sistema recém-instalado chegam aqui pelo
+  // mesmo caminho, mas precisam de mensagens diferentes: instrução de
+  // instalação não é assunto de quem está sendo avaliado.
   if (!ultima) {
-    return (
+    return perfil.papel === 'operador' ? (
+      <Cartao titulo="Nenhuma monitoria por enquanto">
+        <Vazio>
+          Você ainda não tem monitorias registradas. Assim que a Qualidade avaliar
+          um atendimento seu, o resultado aparece aqui.
+        </Vazio>
+      </Cartao>
+    ) : (
       <Cartao titulo="Nenhuma monitoria registrada">
         <Vazio>
-          O banco ainda está vazio. Rode a importação da planilha
-          (<code className="rounded bg-slate-100 px-1">npm run importar</code>) ou lance a
-          primeira monitoria em <Link href="/monitorias/nova" className="text-marca-700 underline">
-            Nova monitoria</Link>.
+          Nenhuma monitoria foi lançada ainda. Comece em{' '}
+          <Link href="/monitorias/nova" className="text-marca-700 underline">
+            Nova monitoria
+          </Link>.
         </Vazio>
       </Cartao>
     );
@@ -112,12 +122,21 @@ export default async function Painel() {
           valor={String(impecaveis)}
           tom="bom" detalhe="nota cheia, sem desconto"
         />
-        <Indicador
-          rotulo={ehOperador ? 'Operadores no mês' : 'Operadores abaixo de 85%'}
-          valor={ehOperador ? String(linhas.length) : String(abaixo)}
-          tom={!ehOperador && abaixo > 0 ? 'alerta' : 'neutro'}
-          detalhe={`${linhas.length} com monitoria no mês`}
-        />
+        {ehOperador ? (
+          <Indicador
+            rotulo="Menor nota do mês"
+            valor={nota(linhas.length ? Number(linhas[0].nota_minima) : null)}
+            tom={linhas.length && Number(linhas[0].nota_minima) < 0.85 ? 'alerta' : 'neutro'}
+            detalhe="a avaliação mais baixa do período"
+          />
+        ) : (
+          <Indicador
+            rotulo="Operadores abaixo de 85%"
+            valor={String(abaixo)}
+            tom={abaixo > 0 ? 'alerta' : 'neutro'}
+            detalhe={`de ${linhas.length} com monitoria no mês`}
+          />
+        )}
       </div>
 
       {serie.length > 1 && (

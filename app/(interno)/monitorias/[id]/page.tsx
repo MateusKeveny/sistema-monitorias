@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { Cartao, EtiquetaNota, Vazio } from '@/componentes/ui';
-import { data as formatarData, duracao, percentual, nota } from '@/lib/formatar';
+import { data as formatarData, dataHora, duracao, percentual, nota } from '@/lib/formatar';
 import type { Monitoria } from '@/lib/tipos';
 
 export const dynamic = 'force-dynamic';
@@ -13,24 +13,39 @@ type Item = {
   criterios: { nome: string; ordem: number; peso: number } | null;
 };
 
+type Alteracao = {
+  id: string;
+  autor_nome: string | null;
+  alterado_em: string;
+  campo: string;
+  valor_anterior: string | null;
+  valor_novo: string | null;
+};
+
 export default async function DetalheMonitoria({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await exigirPerfil();
+  const perfil = await exigirPerfil();
   const { id } = await params;
   const db = await criarClienteServidor();
 
-  const [{ data: monitoria }, { data: itens }] = await Promise.all([
+  const [{ data: monitoria }, { data: itens }, { data: historico }] = await Promise.all([
     db.from('vw_monitorias').select('*').eq('id', id).maybeSingle(),
     db.from('monitoria_itens')
       .select('conforme, observacao, criterios(nome, ordem, peso)')
       .eq('monitoria_id', id),
+    db.from('monitoria_alteracoes')
+      .select('id, autor_nome, alterado_em, campo, valor_anterior, valor_novo')
+      .eq('monitoria_id', id)
+      .order('alterado_em', { ascending: false }),
   ]);
 
   if (!monitoria) notFound();
   const m = monitoria as Monitoria;
+
+  const alteracoes = (historico ?? []) as Alteracao[];
 
   const avaliados = ((itens ?? []) as unknown as Item[])
     .filter((i) => i.criterios)
@@ -136,7 +151,31 @@ export default async function DetalheMonitoria({
         </Cartao>
       )}
 
-      <div className="flex gap-2">
+      {alteracoes.length > 0 && (
+        <Cartao titulo={`Histórico de alterações (${alteracoes.length})`}>
+          <ul className="divide-y divide-slate-100">
+            {alteracoes.map((a) => (
+              <li key={a.id} className="py-2.5 first:pt-0 text-sm">
+                <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+                  <span className="font-medium text-slate-800">{a.campo}</span>
+                  <span className="text-xs text-slate-500">
+                    {a.autor_nome ?? 'autor removido'} · {dataHora(a.alterado_em)}
+                  </span>
+                </div>
+                <p className="text-slate-600">
+                  <span className="text-rose-700 line-through decoration-rose-300">
+                    {a.valor_anterior ?? '(vazio)'}
+                  </span>
+                  <span className="mx-2 text-slate-400">→</span>
+                  <span className="text-emerald-700">{a.valor_novo ?? '(vazio)'}</span>
+                </p>
+              </li>
+            ))}
+          </ul>
+        </Cartao>
+      )}
+
+      <div className="flex flex-wrap gap-2">
         <Link
           href={`/relatorios/feedback?operador=${m.operador_id}&mes=${m.mes_referencia}`}
           className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm
@@ -144,6 +183,15 @@ export default async function DetalheMonitoria({
         >
           Folha de feedback do mês
         </Link>
+        {perfil.papel === 'admin' && (
+          <Link
+            href={`/monitorias/${m.id}/editar`}
+            className="rounded-lg bg-marca-600 px-3 py-1.5 text-sm font-semibold text-white
+                       hover:bg-marca-700"
+          >
+            Editar monitoria
+          </Link>
+        )}
       </div>
     </div>
   );
