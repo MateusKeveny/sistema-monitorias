@@ -1,25 +1,97 @@
 @import 'tailwindcss';
 
+/* O modo escuro é decidido por classe no <html>, não pela preferência do
+   sistema, porque existe um botão que a pessoa controla. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: 'Segoe UI', system-ui, -apple-system, sans-serif;
+
+  /* Verde da marca. Não muda entre os temas: é fundo de botão com texto
+     branco, e inverter quebraria o contraste. */
   --color-marca-50: #ecfdf5;
   --color-marca-100: #d1fae5;
+  --color-marca-400: #34d399;
   --color-marca-500: #10b981;
   --color-marca-600: #059669;
   --color-marca-700: #047857;
   --color-marca-900: #064e3b;
+
+  /* Fundo dos cartões e da página. São as únicas cores estruturais que
+     precisaram virar token próprio — o resto se resolve na paleta abaixo. */
+  --color-superficie: #ffffff;
+  --color-pagina: #f8fafc;
+}
+
+/* ---------------------------------------------------------------------------
+   Modo escuro.
+
+   Em vez de espalhar `dark:` por ~250 lugares, o tema escuro reescreve a
+   própria paleta: a escala slate é invertida, e os tons -50/-100 dos acentos
+   viram fundos escuros com o texto correspondente clareado. Assim cada
+   componente continua pedindo `text-slate-900` ou `bg-rose-50` e recebe a cor
+   certa para o tema em que está.
+
+   Fica de fora tudo que é fundo de botão (marca-600/700, rose-600, emerald-600)
+   e o branco puro, porque o texto sobre eles é branco nos dois temas.
+--------------------------------------------------------------------------- */
+.dark {
+  --color-superficie: #131c2e;
+  --color-pagina: #0b1120;
+
+  --color-slate-50:  #1b2437;
+  --color-slate-100: #273046;
+  --color-slate-200: #2f3a52;
+  --color-slate-300: #3f4b66;
+  --color-slate-400: #6b7a99;
+  --color-slate-500: #94a3b8;
+  --color-slate-600: #b6c2d4;
+  --color-slate-700: #d4dce8;
+  --color-slate-800: #e8eef6;
+  --color-slate-900: #f4f7fb;
+
+  --color-emerald-50:  #06281f;
+  --color-emerald-100: #06301f;
+  --color-emerald-700: #4ade9f;
+  --color-emerald-800: #86efac;
+
+  --color-rose-50:  #34121a;
+  --color-rose-100: #3f1520;
+  --color-rose-700: #fb7185;
+  --color-rose-800: #fda4af;
+  --color-rose-900: #ffe4e6;
+
+  --color-amber-50:  #33260a;
+  --color-amber-100: #3d2d0b;
+  --color-amber-700: #fbbf24;
+  --color-amber-800: #fcd34d;
+  --color-amber-900: #fde68a;
+
+  --color-sky-100: #0d2b40;
+  --color-sky-700: #7dd3fc;
+  --color-sky-800: #bae6fd;
+
+  --color-marca-50: #06281f;
+}
+
+html {
+  color-scheme: light;
+}
+
+.dark {
+  color-scheme: dark;
 }
 
 html, body {
-  background: #f8fafc;
-  color: #0f172a;
+  background: var(--color-pagina);
+  color: var(--color-slate-900);
 }
 
-/* Ajustes para a folha de feedback impressa / salva em PDF */
+/* A folha de feedback sai sempre em papel branco, independente do tema. */
 @media print {
   .sem-impressao { display: none !important; }
   .pagina-impressa { break-after: page; }
-  body { background: #fff; }
+  html, body { background: #fff !important; color: #0f172a !important; }
   main { padding: 0 !important; }
   a[href]::after { content: none !important; }
 }

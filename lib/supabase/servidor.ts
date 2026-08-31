@@ -75,3 +75,14 @@ export async function exigirAdmin(): Promise<Perfil> {
   if (perfil.papel !== 'admin') redirect('/?erro=sem-permissao');
   return perfil;
 }
+
+/**
+ * Telas de relatório: são recortes do time inteiro, então ficam com quem
+ * enxerga o time. Esconder o item no menu não basta — sem esta checagem, quem
+ * digitasse a URL entraria assim mesmo.
+ */
+export async function exigirGestor(): Promise<Perfil> {
+  const perfil = await exigirPerfil();
+  if (perfil.papel === 'operador') redirect('/');
+  return perfil;
+}

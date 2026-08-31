@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
+import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
 import { Cartao, Vazio } from '@/componentes/ui';
 import BotaoImprimir from '@/componentes/BotaoImprimir';
 import { mesExtenso, data as formatarData, nota, percentual } from '@/lib/formatar';
@@ -12,7 +12,7 @@ export default async function FolhaFeedback({
 }: {
   searchParams: Promise<{ operador?: string; mes?: string }>;
 }) {
-  const perfil = await exigirPerfil();
+  const perfil = await exigirGestor();
   const filtros = await searchParams;
   const db = await criarClienteServidor();
 
@@ -24,28 +24,25 @@ export default async function FolhaFeedback({
   const meses = [...new Set(((mesesBrutos ?? []) as { mes_referencia: string }[])
     .map((m) => m.mes_referencia))];
 
-  // Operador só enxerga a si mesmo — a RLS já garante, isto é só a interface.
-  const operadorId = perfil.papel === 'operador'
-    ? perfil.operador_id ?? ''
-    : filtros.operador ?? '';
+  // Só admin e gestor chegam aqui (exigirGestor), então o seletor de operador
+  // é sempre exibido.
+  const operadorId = filtros.operador ?? '';
   const mes = filtros.mes && meses.includes(filtros.mes) ? filtros.mes : meses[0];
 
   const seletor = (
     <form className="sem-impressao flex flex-wrap items-center gap-2">
-      {perfil.papel !== 'operador' && (
-        <select name="operador" defaultValue={operadorId}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm">
-          <option value="">Selecione o operador…</option>
-          {((operadores ?? []) as Operador[]).map((o) => (
-            <option key={o.id} value={o.id}>{o.nome}</option>
-          ))}
-        </select>
-      )}
+      <select name="operador" defaultValue={operadorId}
+        className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm">
+        <option value="">Selecione o operador…</option>
+        {((operadores ?? []) as Operador[]).map((o) => (
+          <option key={o.id} value={o.id}>{o.nome}</option>
+        ))}
+      </select>
       <select name="mes" defaultValue={mes}
-        className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm">
+        className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm">
         {meses.map((m) => <option key={m} value={m}>{mesExtenso(m)}</option>)}
       </select>
-      <button className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm
+      <button className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
                          font-medium text-slate-700 hover:bg-slate-50">
         Gerar folha
       </button>
@@ -122,9 +119,9 @@ export default async function FolhaFeedback({
       {monitorias.length === 0 ? (
         <Cartao><Vazio>Sem monitorias para {nomeOperador} em {mesExtenso(mes)}.</Vazio></Cartao>
       ) : (
-        <article className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm print:border-0 print:p-0 print:shadow-none">
+        <article className="rounded-xl border border-slate-200 bg-superficie p-8 shadow-sm print:border-0 print:p-0 print:shadow-none">
           <header className="border-b border-slate-200 pb-4">
-            <p className="text-xs font-semibold uppercase tracking-widest text-marca-700">
+            <p className="text-xs font-semibold uppercase tracking-widest text-marca-700 dark:text-marca-400">
               Monitoria de qualidade de atendimento · C-SAT
             </p>
             <h2 className="mt-1 text-2xl font-semibold text-slate-900">{nomeOperador}</h2>

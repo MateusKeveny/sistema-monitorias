@@ -31,7 +31,7 @@ export default function PainelUsuarios({
     router.refresh();
   }
 
-  const seletor = `rounded-md border border-slate-300 bg-white px-2 py-1 text-sm
+  const seletor = `rounded-md border border-slate-300 bg-superficie px-2 py-1 text-sm
                    outline-none focus:border-marca-600 disabled:opacity-50`;
 
   return (

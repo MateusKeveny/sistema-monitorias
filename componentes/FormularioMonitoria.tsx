@@ -307,7 +307,7 @@ export default function FormularioMonitoria({
                         className={`px-4 py-1.5 text-sm font-medium transition ${
                           r?.conforme === valor
                             ? valor ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'
-                            : 'bg-white text-slate-600 hover:bg-slate-50'
+                            : 'bg-superficie text-slate-600 hover:bg-slate-50'
                         }`}
                       >
                         {valor ? 'Sim' : 'Não'}
@@ -362,7 +362,7 @@ export default function FormularioMonitoria({
       </Cartao>
 
       {/* Barra fixa com a nota calculada em tempo real */}
-      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-slate-200 bg-white/95 backdrop-blur">
+      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-slate-200 bg-superficie/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-6 py-3">
           <div>
             <span className="block text-xs uppercase tracking-wide text-slate-500">

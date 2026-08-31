@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { exigirPerfil } from '@/lib/supabase/servidor';
+import { exigirGestor } from '@/lib/supabase/servidor';
 
 const RELATORIOS = [
   {
@@ -26,7 +26,7 @@ const RELATORIOS = [
 ];
 
 export default async function Relatorios() {
-  await exigirPerfil();
+  await exigirGestor();
 
   return (
     <div className="space-y-6">
@@ -42,10 +42,10 @@ export default async function Relatorios() {
           <Link
             key={r.href}
             href={r.href}
-            className="group rounded-xl border border-slate-200 bg-white p-5 shadow-sm
+            className="group rounded-xl border border-slate-200 bg-superficie p-5 shadow-sm
                        transition hover:border-marca-500 hover:shadow"
           >
-            <h2 className="text-sm font-semibold text-slate-900 group-hover:text-marca-700">
+            <h2 className="text-sm font-semibold text-slate-900 group-hover:text-marca-700 dark:text-marca-400">
               {r.titulo}
               {r.externo && <span className="ml-2 text-xs font-normal text-slate-400">baixar</span>}
             </h2>

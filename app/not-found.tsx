@@ -4,7 +4,7 @@ export default function NaoEncontrada() {
   return (
     <main className="flex min-h-screen items-center justify-center px-6">
       <div className="max-w-md text-center">
-        <p className="text-sm font-semibold text-marca-700">404</p>
+        <p className="text-sm font-semibold text-marca-700 dark:text-marca-400">404</p>
         <h1 className="mt-1 text-xl font-semibold text-slate-900">Página não encontrada</h1>
         <p className="mt-2 text-sm leading-relaxed text-slate-600">
           O endereço não existe, ou a monitoria que você procurava foi removida.

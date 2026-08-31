@@ -3,15 +3,19 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
+import BotaoTema from '@/componentes/BotaoTema';
 import { NOMES_PAPEL, type Perfil } from '@/lib/tipos';
 
 type Item = { href: string; rotulo: string; papeis: Perfil['papel'][] };
 
+// O operador não tem "Relatórios": todos eles são recortes do time, e o que é
+// dele já está em "Monitorias" e no painel. Menu com item que não acrescenta
+// nada é ruído.
 const ITENS: Item[] = [
   { href: '/', rotulo: 'Painel', papeis: ['admin', 'gestor', 'operador'] },
   { href: '/monitorias', rotulo: 'Monitorias', papeis: ['admin', 'gestor', 'operador'] },
   { href: '/monitorias/nova', rotulo: 'Nova monitoria', papeis: ['admin'] },
-  { href: '/relatorios', rotulo: 'Relatórios', papeis: ['admin', 'gestor', 'operador'] },
+  { href: '/relatorios', rotulo: 'Relatórios', papeis: ['admin', 'gestor'] },
   { href: '/configuracoes', rotulo: 'Configurações', papeis: ['admin'] },
 ];
 
@@ -29,9 +33,9 @@ export default function Navegacao({ perfil }: { perfil: Perfil }) {
     href === '/' ? caminho === '/' : caminho.startsWith(href);
 
   return (
-    <header className="sem-impressao sticky top-0 z-20 border-b border-slate-200 bg-white">
+    <header className="sem-impressao sticky top-0 z-20 border-b border-slate-200 bg-superficie">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-6 py-3">
-        <span className="text-sm font-bold tracking-tight text-marca-700">
+        <span className="text-sm font-bold tracking-tight text-marca-700 dark:text-marca-400">
           Monitorias de Qualidade
         </span>
 
@@ -42,7 +46,7 @@ export default function Navegacao({ perfil }: { perfil: Perfil }) {
               href={item.href}
               className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
                 ativo(item.href)
-                  ? 'bg-marca-50 text-marca-700'
+                  ? 'bg-marca-50 text-marca-700 dark:text-marca-400'
                   : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
               }`}
             >
@@ -56,6 +60,7 @@ export default function Navegacao({ perfil }: { perfil: Perfil }) {
             <span className="block font-medium text-slate-800">{perfil.nome}</span>
             <span className="block text-xs text-slate-500">{NOMES_PAPEL[perfil.papel]}</span>
           </span>
+          <BotaoTema />
           <button
             onClick={sair}
             className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
+import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
 import { Cartao, Tabela, Th, Td, Vazio, Indicador } from '@/componentes/ui';
 import { mesExtenso, percentual, nota } from '@/lib/formatar';
 import type { LinhaCriterio } from '@/lib/tipos';
@@ -11,7 +11,7 @@ export default async function RelatorioCriterios({
 }: {
   searchParams: Promise<{ mes?: string }>;
 }) {
-  await exigirPerfil();
+  await exigirGestor();
   const { mes: mesEscolhido } = await searchParams;
   const db = await criarClienteServidor();
 
@@ -72,11 +72,11 @@ export default async function RelatorioCriterios({
 
         <form className="flex items-center gap-2">
           <select name="mes" defaultValue={mes}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm">
+            className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm">
             <option value="todos">Todo o período</option>
             {meses.map((m) => <option key={m} value={m}>{mesExtenso(m)}</option>)}
           </select>
-          <button className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm
+          <button className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
                              font-medium text-slate-700 hover:bg-slate-50">
             Ver
           </button>

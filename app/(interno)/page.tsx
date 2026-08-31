@@ -2,8 +2,8 @@ import Link from 'next/link';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { Cartao, Indicador, EtiquetaNota, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import EvolucaoMensal from '@/componentes/EvolucaoMensal';
-import { nota, mesExtenso, mesCurto, percentual } from '@/lib/formatar';
-import type { LinhaRanking, LinhaCriterio } from '@/lib/tipos';
+import { nota, mesExtenso, mesCurto, percentual, data as formatarData } from '@/lib/formatar';
+import type { LinhaRanking, LinhaCriterio, Monitoria } from '@/lib/tipos';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,7 +35,7 @@ export default async function Painel() {
       <Cartao titulo="Nenhuma monitoria registrada">
         <Vazio>
           Nenhuma monitoria foi lançada ainda. Comece em{' '}
-          <Link href="/monitorias/nova" className="text-marca-700 underline">
+          <Link href="/monitorias/nova" className="text-marca-700 dark:text-marca-400 underline">
             Nova monitoria
           </Link>.
         </Vazio>
@@ -45,17 +45,28 @@ export default async function Painel() {
 
   const mes = ultima.mes_referencia as string;
 
-  const [{ data: ranking }, { data: criterios }, { data: evolucao }] =
+  const ehOperador = perfil.papel === 'operador';
+
+  const [{ data: ranking }, { data: criterios }, { data: evolucao }, { data: recentes }] =
     await Promise.all([
       db.from('vw_ranking_mensal').select('*').eq('mes_referencia', mes)
         .order('nota_media', { ascending: false }),
+      // A view respeita a RLS: para um operador estes já são os critérios que
+      // ele próprio reprovou, não os do time.
       db.from('vw_criterios_reprovados').select('*').eq('mes_referencia', mes)
-        .gt('reprovacoes', 0).order('pontos_perdidos', { ascending: false }).limit(6),
+        .gt('reprovacoes', 0)
+        .order('pontos_perdidos', { ascending: false })
+        .limit(ehOperador ? 3 : 6),
       db.from('vw_ranking_mensal').select('mes_referencia, total_monitorias, nota_media, zeradas'),
+      ehOperador
+        ? db.from('vw_monitorias').select('*')
+            .order('data_atendimento', { ascending: false }).limit(6)
+        : Promise.resolve({ data: null }),
     ]);
 
   const linhas = (ranking ?? []) as LinhaRanking[];
   const piores = (criterios ?? []) as LinhaCriterio[];
+  const minhasUltimas = (recentes ?? []) as Monitoria[];
 
   // Os totais saem do próprio ranking, que já vem agregado pelo banco. Antes
   // havia uma quarta consulta trazendo as monitorias inteiras do mês — cerca de
@@ -86,7 +97,6 @@ export default async function Painel() {
       zeradas: v.zeradas,
     }));
 
-  const ehOperador = perfil.papel === 'operador';
 
   return (
     <div className="space-y-6">
@@ -98,11 +108,11 @@ export default async function Painel() {
           <p className="text-sm text-slate-500">Referência: {mesExtenso(mes)}</p>
         </div>
         <Link
-          href="/relatorios"
-          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm
+          href={ehOperador ? '/monitorias' : '/relatorios'}
+          className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
                      font-medium text-slate-700 hover:bg-slate-50"
         >
-          Ver relatórios
+          {ehOperador ? 'Ver minhas monitorias' : 'Ver relatórios'}
         </Link>
       </div>
 
@@ -146,56 +156,115 @@ export default async function Painel() {
       )}
 
       <div className="grid gap-6 lg:grid-cols-5">
-        <Cartao
-          titulo={ehOperador ? 'Minhas monitorias do mês' : 'Ranking do mês'}
-          className="lg:col-span-3"
-          acao={
-            <Link href="/relatorios/ranking" className="text-xs font-medium text-marca-700 hover:underline">
-              relatório completo →
-            </Link>
-          }
-        >
-          {linhas.length === 0 ? (
-            <Vazio>Nenhuma monitoria neste mês.</Vazio>
-          ) : (
-            <Tabela>
-              <thead>
-                <tr>
-                  <Th className="w-10">#</Th>
-                  <Th>Operador</Th>
-                  <Th className="text-right">Monitorias</Th>
-                  <Th className="text-right">Zeradas</Th>
-                  <Th className="text-right">Nota média</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {linhas.map((l, i) => (
-                  <tr key={l.operador_id} className="hover:bg-slate-50">
-                    <Td className="tabular-nums text-slate-400">{i + 1}</Td>
-                    <Td className="font-medium text-slate-900">{l.operador}</Td>
-                    <Td className="text-right tabular-nums">{l.total_monitorias}</Td>
-                    <Td className={`text-right tabular-nums ${l.zeradas ? 'text-rose-700 font-semibold' : 'text-slate-400'}`}>
-                      {l.zeradas || '—'}
-                    </Td>
-                    <Td className="text-right"><EtiquetaNota valor={Number(l.nota_media)} /></Td>
+        {/* Para o operador, o ranking mostraria uma linha só — ele mesmo. No
+            lugar dele vão as últimas avaliações, que é o que ele quer ver. */}
+        {ehOperador ? (
+          <Cartao
+            titulo="Minhas últimas monitorias"
+            className="lg:col-span-3"
+            acao={
+              <Link href="/monitorias"
+                className="text-xs font-medium text-marca-700 dark:text-marca-400 hover:underline">
+                ver todas →
+              </Link>
+            }
+          >
+            {minhasUltimas.length === 0 ? (
+              <Vazio>Nenhuma monitoria registrada ainda.</Vazio>
+            ) : (
+              <Tabela>
+                <thead>
+                  <tr>
+                    <Th>Data</Th>
+                    <Th>Protocolo</Th>
+                    <Th className="text-center">Semana</Th>
+                    <Th className="text-right">Nota</Th>
+                    <Th />
                   </tr>
-                ))}
-              </tbody>
-            </Tabela>
-          )}
-        </Cartao>
+                </thead>
+                <tbody>
+                  {minhasUltimas.map((m) => (
+                    <tr key={m.id} className="hover:bg-slate-50">
+                      <Td className="whitespace-nowrap tabular-nums">
+                        {formatarData(m.data_atendimento)}
+                      </Td>
+                      <Td className="whitespace-nowrap font-mono text-xs">{m.protocolo}</Td>
+                      <Td className="text-center tabular-nums">{m.semana_mes}ª</Td>
+                      <Td className="text-right">
+                        <EtiquetaNota valor={Number(m.nota_final)} zerado={m.zerado} />
+                      </Td>
+                      <Td>
+                        <Link href={`/monitorias/${m.id}`}
+                          className="whitespace-nowrap text-xs font-medium text-marca-700
+                                     dark:text-marca-400 hover:underline">
+                          abrir →
+                        </Link>
+                      </Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Tabela>
+            )}
+          </Cartao>
+        ) : (
+          <Cartao
+            titulo="Ranking do mês"
+            className="lg:col-span-3"
+            acao={
+              <Link href="/relatorios/ranking"
+                className="text-xs font-medium text-marca-700 dark:text-marca-400 hover:underline">
+                relatório completo →
+              </Link>
+            }
+          >
+            {linhas.length === 0 ? (
+              <Vazio>Nenhuma monitoria neste mês.</Vazio>
+            ) : (
+              <Tabela>
+                <thead>
+                  <tr>
+                    <Th className="w-10">#</Th>
+                    <Th>Operador</Th>
+                    <Th className="text-right">Monitorias</Th>
+                    <Th className="text-right">Zeradas</Th>
+                    <Th className="text-right">Nota média</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {linhas.map((l, i) => (
+                    <tr key={l.operador_id} className="hover:bg-slate-50">
+                      <Td className="tabular-nums text-slate-400">{i + 1}</Td>
+                      <Td className="font-medium text-slate-900">{l.operador}</Td>
+                      <Td className="text-right tabular-nums">{l.total_monitorias}</Td>
+                      <Td className={`text-right tabular-nums ${
+                        l.zeradas ? 'text-rose-700 font-semibold' : 'text-slate-400'}`}>
+                        {l.zeradas || '—'}
+                      </Td>
+                      <Td className="text-right"><EtiquetaNota valor={Number(l.nota_media)} /></Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Tabela>
+            )}
+          </Cartao>
+        )}
 
         <Cartao
-          titulo="Onde o time mais perde nota"
+          titulo={ehOperador ? 'Meus pontos de atenção' : 'Critérios de maior impacto na nota'}
           className="lg:col-span-2"
-          acao={
-            <Link href="/relatorios/criterios" className="text-xs font-medium text-marca-700 hover:underline">
+          acao={ehOperador ? undefined : (
+            <Link href="/relatorios/criterios"
+              className="text-xs font-medium text-marca-700 dark:text-marca-400 hover:underline">
               detalhar →
             </Link>
-          }
+          )}
         >
           {piores.length === 0 ? (
-            <Vazio>Nenhum critério reprovado no mês. 🎉</Vazio>
+            <Vazio>
+              {ehOperador
+                ? 'Nenhum critério reprovado no mês. Continue assim.'
+                : 'Nenhum critério reprovado no mês.'}
+            </Vazio>
           ) : (
             <ul className="space-y-3">
               {piores.map((c) => (

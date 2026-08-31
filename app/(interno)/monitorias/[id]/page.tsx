@@ -176,13 +176,17 @@ export default async function DetalheMonitoria({
       )}
 
       <div className="flex flex-wrap gap-2">
-        <Link
-          href={`/relatorios/feedback?operador=${m.operador_id}&mes=${m.mes_referencia}`}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm
-                     font-medium text-slate-700 hover:bg-slate-50"
-        >
-          Folha de feedback do mês
-        </Link>
+        {/* A folha de feedback é um relatório do time, restrito a quem enxerga
+            o time — para o operador o botão levaria a uma página bloqueada. */}
+        {perfil.papel !== 'operador' && (
+          <Link
+            href={`/relatorios/feedback?operador=${m.operador_id}&mes=${m.mes_referencia}`}
+            className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
+                       font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Folha de feedback do mês
+          </Link>
+        )}
         {perfil.papel === 'admin' && (
           <Link
             href={`/monitorias/${m.id}/editar`}

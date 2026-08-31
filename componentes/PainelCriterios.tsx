@@ -234,7 +234,7 @@ export default function PainelCriterios({ criterios }: { criterios: Criterio[] }
         </label>
         <button
           type="submit" disabled={!novo.nome.trim() || !novo.peso || ocupado}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm
+          className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
                      font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
         >
           Adicionar
@@ -255,7 +255,7 @@ export default function PainelCriterios({ criterios }: { criterios: Criterio[] }
                 </span>
                 <button
                   type="button" disabled={ocupado} onClick={() => alternarAtivo(c)}
-                  className="text-xs text-marca-700 hover:underline"
+                  className="text-xs text-marca-700 dark:text-marca-400 hover:underline"
                 >
                   voltar ao formulário
                 </button>

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
+import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
 import { Cartao, EtiquetaNota, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import { mesExtenso, mesCurto, nota, percentual } from '@/lib/formatar';
 import type { LinhaRanking } from '@/lib/tipos';
@@ -11,7 +11,7 @@ export default async function RelatorioRanking({
 }: {
   searchParams: Promise<{ mes?: string }>;
 }) {
-  await exigirPerfil();
+  await exigirGestor();
   const { mes: mesEscolhido } = await searchParams;
   const db = await criarClienteServidor();
 
@@ -56,15 +56,15 @@ export default async function RelatorioRanking({
 
         <form className="flex items-center gap-2">
           <select name="mes" defaultValue={mes}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm">
+            className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm">
             {meses.map((m) => <option key={m} value={m}>{mesExtenso(m)}</option>)}
           </select>
-          <button className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm
+          <button className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
                              font-medium text-slate-700 hover:bg-slate-50">
             Ver
           </button>
           <Link href={`/api/exportar?formato=csv&relatorio=ranking&mes=${mes}`}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm
+            className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
                        font-medium text-slate-700 hover:bg-slate-50">
             CSV
           </Link>
@@ -97,7 +97,7 @@ export default async function RelatorioRanking({
                     <Td className="tabular-nums text-slate-400">{i + 1}</Td>
                     <Td className="font-medium text-slate-900">
                       <Link href={`/relatorios/feedback?operador=${l.operador_id}&mes=${mes}`}
-                        className="hover:text-marca-700 hover:underline">
+                        className="hover:text-marca-700 dark:text-marca-400 hover:underline">
                         {l.operador}
                       </Link>
                     </Td>

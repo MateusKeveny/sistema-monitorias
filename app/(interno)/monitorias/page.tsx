@@ -56,7 +56,7 @@ export default async function ListaMonitorias({
   const mesesUnicos = [...new Set(((meses ?? []) as { mes_referencia: string }[])
     .map((m) => m.mes_referencia))];
 
-  const estilo = `rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm
+  const estilo = `rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
                   outline-none focus:border-marca-600`;
 
   return (
@@ -72,7 +72,7 @@ export default async function ListaMonitorias({
 
         <div className="flex flex-wrap gap-2">
           <Link href="/api/exportar?formato=xlsx"
-            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm
+            className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
                        font-medium text-slate-700 hover:bg-slate-50">
             Exportar Excel
           </Link>
@@ -107,7 +107,7 @@ export default async function ListaMonitorias({
         </select>
 
         <button type="submit"
-          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm
+          className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
                      font-medium text-slate-700 hover:bg-slate-50">
           Filtrar
         </button>
@@ -151,7 +151,7 @@ export default async function ListaMonitorias({
                   </Td>
                   <Td>
                     <Link href={`/monitorias/${m.id}`}
-                      className="whitespace-nowrap text-xs font-medium text-marca-700 hover:underline">
+                      className="whitespace-nowrap text-xs font-medium text-marca-700 dark:text-marca-400 hover:underline">
                       abrir →
                     </Link>
                   </Td>
@@ -166,7 +166,7 @@ export default async function ListaMonitorias({
         <nav className="flex items-center justify-between gap-4">
           {pagina > 1 ? (
             <Link href={linkPagina(pagina - 1)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm
+              className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
                          font-medium text-slate-700 hover:bg-slate-50">
               ← Anteriores
             </Link>
@@ -178,7 +178,7 @@ export default async function ListaMonitorias({
 
           {pagina < ultimaPagina ? (
             <Link href={linkPagina(pagina + 1)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm
+              className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
                          font-medium text-slate-700 hover:bg-slate-50">
               Próximas →
             </Link>

@@ -9,7 +9,7 @@ export function Cartao({
   className?: string;
 }) {
   return (
-    <section className={`rounded-xl border border-slate-200 bg-white shadow-sm ${className}`}>
+    <section className={`rounded-xl border border-slate-200 bg-superficie shadow-sm ${className}`}>
       {(titulo || acao) && (
         <header className="flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-3">
           {titulo && <h2 className="text-sm font-semibold text-slate-800">{titulo}</h2>}
@@ -36,7 +36,7 @@ export function Indicador({
     ruim: 'text-rose-700',
   };
   return (
-    <div className="rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+    <div className="rounded-xl border border-slate-200 bg-superficie px-5 py-4 shadow-sm">
       <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{rotulo}</p>
       <p className={`mt-1 text-2xl font-semibold tabular-nums ${tons[tom]}`}>{valor}</p>
       {detalhe && <p className="mt-0.5 text-xs text-slate-500">{detalhe}</p>}
