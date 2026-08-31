@@ -14,7 +14,8 @@
     "exportar": "node --env-file=.env.local scripts/gerar-exportacao.js",
     "cf:build": "opennextjs-cloudflare build",
     "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
+    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "papel": "node --env-file=.env.local scripts/definir-papel.js"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.5",
