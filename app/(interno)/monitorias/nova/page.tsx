@@ -10,7 +10,7 @@ export default async function NovaMonitoria() {
 
   const [{ data: criterios }, { data: operadores }, { data: canais }] = await Promise.all([
     db.from('criterios').select('*').eq('ativo', true).order('ordem'),
-    db.from('operadores').select('*').eq('ativo', true).order('nome'),
+    db.from('pessoas').select('*').eq('avaliado', true).eq('ativo', true).order('nome'),
     db.from('canais').select('*').eq('ativo', true).order('nome'),
   ]);
 

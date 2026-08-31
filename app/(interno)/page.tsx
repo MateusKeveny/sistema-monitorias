@@ -73,7 +73,7 @@ export default async function Painel({
         : db.from('vw_monitorias').select('operador_id, semana_mes').eq('mes_referencia', mes),
       ehOperador
         ? Promise.resolve({ data: null })
-        : db.from('operadores').select('id, nome').eq('ativo', true).order('nome'),
+        : db.from('pessoas').select('id, nome').eq('avaliado', true).eq('ativo', true).order('nome'),
       // Fila de exclusões: só o gestor decide, então só ele carrega.
       perfil.papel === 'gestor'
         ? db.from('solicitacoes_exclusao')

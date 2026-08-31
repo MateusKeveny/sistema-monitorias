@@ -1,22 +1,34 @@
 export type PapelUsuario = 'gestor' | 'qualidade' | 'operador';
 
-export type Perfil = {
+/**
+ * Uma pessoa, uma linha.
+ *
+ * Antes havia duas tabelas — `operadores`, de quem é avaliado, e `perfis`, de
+ * quem entra no sistema — com nome e e-mail repetidos nas duas. Agora as duas
+ * coisas são campos da mesma pessoa: `avaliado` diz se ela entra nas
+ * monitorias e `auth_id` diz se ela tem login. Desativar tira tudo de uma vez,
+ * sem precisar lembrar em quantos lugares ela existe.
+ */
+export type Pessoa = {
   id: string;
+  /** Usuário do Supabase correspondente. Nulo em quem é avaliado e não acessa. */
+  auth_id: string | null;
   nome: string;
-  email: string;
+  email: string | null;
+  /** Nome usado no Huggy — consumido pelo painel de performance. */
+  nome_huggy: string | null;
   papel: PapelUsuario;
-  operador_id: string | null;
+  avaliado: boolean;
   ativo: boolean;
   /** false enquanto a pessoa não trocar a senha inicial no primeiro acesso. */
   senha_definida: boolean;
 };
 
-export type Operador = {
-  id: string;
-  nome: string;
-  email: string | null;
-  ativo: boolean;
-};
+/** Quem está logado: uma pessoa com login. */
+export type Perfil = Pessoa;
+
+/** Quem pode ser avaliado: uma pessoa com `avaliado`. */
+export type Operador = Pessoa;
 
 export type Canal = { id: string; nome: string; ativo: boolean };
 

@@ -45,7 +45,8 @@ if (ANON === CHAVE) {
 // ------------------------------------------------------------------ banco
 const db = createClient(URL, CHAVE, { auth: { persistSession: false } });
 
-const TABELAS = ['operadores', 'canais', 'criterios', 'perfis', 'monitorias', 'monitoria_itens'];
+const TABELAS = ['pessoas', 'canais', 'criterios', 'monitorias', 'monitoria_itens',
+  'monitoria_alteracoes', 'solicitacoes_exclusao', 'monitorias_excluidas'];
 const VIEWS = ['vw_monitorias', 'vw_ranking_mensal', 'vw_criterios_reprovados',
   'vw_feedback_individual'];
 

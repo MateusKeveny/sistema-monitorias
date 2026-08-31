@@ -17,7 +17,7 @@ export default async function FolhaFeedback({
   const db = await criarClienteServidor();
 
   const [{ data: operadores }, { data: mesesBrutos }] = await Promise.all([
-    db.from('operadores').select('id, nome').eq('ativo', true).order('nome'),
+    db.from('pessoas').select('id, nome').eq('avaliado', true).eq('ativo', true).order('nome'),
     db.from('vw_monitorias').select('mes_referencia').order('mes_referencia', { ascending: false }),
   ]);
 

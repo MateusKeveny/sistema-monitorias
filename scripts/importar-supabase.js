@@ -77,8 +77,8 @@ async function main() {
   // Une quem está em Parâmetros com quem realmente aparece nas monitorias.
   const nomesOperadores = new Set(dados.parametros.operadores);
   for (const m of dados.monitorias) if (m.operador) nomesOperadores.add(m.operador);
-  const operadores = [...nomesOperadores].map((nome) => ({ nome, ativo: true }));
-  conferir(await db.from('operadores').upsert(operadores, { onConflict: 'nome' }), 'operadores');
+  const operadores = [...nomesOperadores].map((nome) => ({ nome, avaliado: true, ativo: true }));
+  conferir(await db.from('pessoas').upsert(operadores, { onConflict: 'nome' }), 'pessoas');
   console.log(`  operadores: ${operadores.length}`);
 
   // Recarrega os IDs gerados pelo banco.
@@ -87,7 +87,7 @@ async function main() {
     if (error) { console.error(tabela, error.message); process.exit(1); }
     return new Map(data.map((r) => [r.nome, r.id]));
   };
-  const idOperador = await mapa('operadores');
+  const idOperador = await mapa('pessoas');
   const idCanal = await mapa('canais');
   const idCriterio = await mapa('criterios');
 

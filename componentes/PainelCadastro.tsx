@@ -13,20 +13,14 @@ type Registro = { id: string; nome: string; email?: string | null; ativo: boolea
  * atualiza tudo que já foi lançado, sem reprocessar nada.
  */
 export default function PainelCadastro({
-  titulo, subtitulo, tabela, registros, temEmail = false, dica, acessoPorOperador,
+  titulo, subtitulo, tabela, registros, temEmail = false, dica,
 }: {
   titulo: string;
   subtitulo?: string;
-  tabela: 'operadores' | 'canais';
+  tabela: 'canais';
   registros: Registro[];
   temEmail?: boolean;
   dica?: string;
-  /**
-   * id do operador -> e-mail de quem entra no sistema por ele.
-   * Serve para mostrar, aqui, quem tem login — a pergunta que leva alguém a
-   * procurar o mesmo nome na aba de Acessos e não encontrar.
-   */
-  acessoPorOperador?: Record<string, string>;
 }) {
   const router = useRouter();
   const [rascunho, setRascunho] = useState<Record<string, { nome: string; email: string }>>(
@@ -162,7 +156,6 @@ export default function PainelCadastro({
             <tr>
               <Th>Nome</Th>
               {temEmail && <Th className="w-72">E-mail</Th>}
-              {acessoPorOperador && <Th className="w-36">Entra no sistema</Th>}
               <Th className="w-24 text-center">Ativo</Th>
               <Th className="w-28" />
             </tr>
@@ -191,16 +184,7 @@ export default function PainelCadastro({
                       />
                     </Td>
                   )}
-                  {acessoPorOperador && (
-                    <Td>
-                      {acessoPorOperador[r.id] ? (
-                        <span className="text-xs text-emerald-700">sim</span>
-                      ) : (
-                        <span className="text-xs text-slate-400">sem login</span>
-                      )}
-                    </Td>
-                  )}
-                  <Td className="text-center">
+                                    <Td className="text-center">
                     <input
                       type="checkbox" checked={r.ativo} disabled={ocupado}
                       onChange={() => alternarAtivo(r)}

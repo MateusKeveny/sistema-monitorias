@@ -9,6 +9,29 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 4.2.0
+
+**Uma tabela de pessoas no lugar de duas.**
+
+Havia `operadores`, de quem é avaliado, e `perfis`, de quem entra no sistema, com
+nome e e-mail repetidos e uma coluna ligando as duas. Quem cadastrava um operador
+esperava que ele virasse um acesso, e não virava.
+
+Agora é uma linha por pessoa, com dois campos independentes: `avaliado` diz se ela
+entra nas monitorias e `auth_id` diz se ela tem login. Desativar encerra o acesso
+de uma vez, sem procurar em dois lugares — que era o pedido.
+
+- Configurações passa a ter um painel **Pessoas** no lugar de Operadores e Acessos.
+- Criar a conta no Supabase com um e-mail já cadastrado **liga sozinho** à pessoa;
+  antes virava registro separado, que era como a duplicação começava.
+- A tabela ganha `nome_huggy`, hoje só existente em `atendentes`, para o painel de
+  performance ler a mesma pessoa em vez de manter uma terceira cópia.
+- Os ids de `operadores` foram reaproveitados, então as 52 monitorias seguiram
+  apontando para o mesmo lugar. Conferido: 52 monitorias, 988 itens, nenhuma órfã.
+- `npm run perfis` vira `npm run vincular`.
+
+Migração `11`.
+
 ## 4.1.1
 
 - Registro recém-cadastrado em Configurações aparecia como linha em branco até

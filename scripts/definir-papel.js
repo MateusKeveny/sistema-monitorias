@@ -23,16 +23,14 @@ const PAPEIS = ['gestor', 'qualidade', 'operador'];
 const [email, papel, operador] = process.argv.slice(2);
 
 async function listar() {
-  const [{ data: perfis }, { data: ops }] = await Promise.all([
-    db.from('perfis').select('nome, email, papel, operador_id, ativo').order('papel').order('email'),
-    db.from('operadores').select('id, nome'),
-  ]);
-  const nomeDe = new Map((ops ?? []).map((o) => [o.id, o.nome]));
-  console.table((perfis ?? []).map((p) => ({
-    email: p.email,
-    papel: p.papel,
-    operador: p.operador_id ? nomeDe.get(p.operador_id) : '—',
-    ativo: p.ativo ? 'sim' : 'NÃO',
+  const { data: pessoas } = await db.from('pessoas')
+    .select('nome, email, papel, avaliado, ativo, auth_id').order('papel').order('nome');
+  console.table((pessoas ?? []).map((p) => ({
+    nome: p.nome,
+    email: p.email ?? '—',
+    papel: p.auth_id ? p.papel : '(sem login)',
+    avaliada: p.avaliado ? 'sim' : '—',
+    ativa: p.ativo ? 'sim' : 'NÃO',
   })));
 }
 
@@ -44,30 +42,26 @@ async function listar() {
     process.exit(1);
   }
 
-  const { data: perfil } = await db.from('perfis').select('id, nome').eq('email', email).maybeSingle();
-  if (!perfil) {
-    console.error(`Não existe perfil para ${email}.`);
-    console.error('Crie o usuário no Supabase (Authentication → Users → Add user,');
-    console.error('marcando "Auto Confirm User") e rode: npm run perfis');
+  const { data: pessoa } = await db.from('pessoas')
+    .select('id, nome, auth_id').eq('email', email).maybeSingle();
+  if (!pessoa) {
+    console.error(`Não existe pessoa com o e-mail ${email}.`);
+    console.error('Cadastre em Configurações > Pessoas, ou crie a conta no Supabase.');
     process.exit(1);
   }
 
-  const campos = { papel, operador_id: null };
-
-  if (papel === 'operador') {
-    if (!operador) {
-      console.error('Para operador, informe o nome do cadastro a vincular.');
-      console.error('Sem vínculo a pessoa entra e não vê monitoria nenhuma.');
-      process.exit(1);
-    }
-    const { data: o } = await db.from('operadores').select('id').eq('nome', operador).maybeSingle();
-    if (!o) { console.error(`Não existe operador chamado "${operador}".`); process.exit(1); }
-    campos.operador_id = o.id;
+  if (!pessoa.auth_id) {
+    console.error(`${pessoa.nome} não tem login: o papel não teria efeito.`);
+    console.error('Crie a conta no Supabase com este e-mail — o vínculo é automático.');
+    process.exit(1);
   }
 
-  const { error } = await db.from('perfis').update(campos).eq('id', perfil.id);
+  const campos = { papel };
+
+  const { error } = await db.from('pessoas').update(campos).eq('id', pessoa.id);
   if (error) { console.error('Falhou:', error.message); process.exit(1); }
 
-  console.log(`${email} agora é ${papel}${operador ? ` vinculado a ${operador}` : ''}.\n`);
+  console.log(`${email} agora é ${papel}.
+`);
   await listar();
 })();

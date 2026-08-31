@@ -45,10 +45,12 @@ export const obterPerfil = cache(async (): Promise<Perfil | null> => {
   const { data: { user } } = await db.auth.getUser();
   if (!user) return null;
 
+  // A pessoa é encontrada pelo usuário do Supabase, não pelo id: uma pessoa
+  // pode existir sem login, e o id dela é próprio.
   const { data } = await db
-    .from('perfis')
-    .select('id, nome, email, papel, operador_id, ativo, senha_definida')
-    .eq('id', user.id)
+    .from('pessoas')
+    .select('id, auth_id, nome, email, nome_huggy, papel, avaliado, ativo, senha_definida')
+    .eq('auth_id', user.id)
     .maybeSingle();
 
   return (data as Perfil | null) ?? null;

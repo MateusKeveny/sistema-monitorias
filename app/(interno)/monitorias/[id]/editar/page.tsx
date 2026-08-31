@@ -26,7 +26,7 @@ export default async function EditarMonitoria({
     // Traz também critérios inativos que esta monitoria já respondeu, senão a
     // edição apagaria do formulário uma resposta que existe no banco.
     db.from('criterios').select('*').order('ordem'),
-    db.from('operadores').select('*').eq('ativo', true).order('nome'),
+    db.from('pessoas').select('*').eq('avaliado', true).eq('ativo', true).order('nome'),
     db.from('canais').select('*').eq('ativo', true).order('nome'),
   ]);
 

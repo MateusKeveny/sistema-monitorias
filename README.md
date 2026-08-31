@@ -24,11 +24,16 @@ online, três níveis de acesso e relatórios prontos.
 
 ### Perfis de acesso
 
-| Perfil | Enxerga | Monitora | Pesos e cadastros | Acessos | Exclui |
+| Cargo | Vê | Monitora | Pesos e cadastros | Acessos | Exclui |
 |---|---|---|---|---|---|
 | **Gestor** | tudo | sim | sim | sim | direto |
 | **Qualidade** | tudo | lança e edita | não | não | solicita, gestor aprova |
 | **Operador** | só as próprias | não | não | não | não |
+
+Pessoas ficam numa tabela só. `avaliado` diz quem entra nas monitorias e `auth_id`
+diz quem tem login — os dois são independentes, porque há quem seja avaliado sem
+acessar o sistema e quem acesse sem ser avaliado. Desativar a pessoa encerra o
+acesso de uma vez, sem procurar em dois lugares.
 
 A exclusão pedida pela Qualidade fica pendente até um gestor decidir, e a monitoria
 continua valendo nos relatórios enquanto isso. Quem decide o caminho é o banco, pelo
@@ -69,12 +74,12 @@ Estes passos envolvem criar conta e senha, então **precisam ser feitos por voc�
 
 ### 2. Criar as tabelas
 
-No painel do Supabase, abra **SQL Editor** e rode os três arquivos **nesta ordem**,
-um de cada vez, colando o conteúdo e clicando em *Run*:
+No painel do Supabase, abra **SQL Editor** e rode os arquivos de `supabase/` **em
+ordem numérica**, um de cada vez, colando o conteúdo e clicando em *Run*.
 
-1. `supabase/01-schema.sql` — tabelas, triggers e o cálculo da nota
-2. `supabase/02-seguranca.sql` — as políticas de acesso dos 3 perfis
-3. `supabase/03-relatorios.sql` — as views que alimentam os relatórios
+Cada arquivo é uma migração e a ordem importa: `01` a `03` criam o esquema, e os
+seguintes o modificam. Num banco novo, todos precisam ser aplicados na sequência.
+Todos podem ser rodados mais de uma vez sem estragar nada.
 
 ### 3. Configurar as chaves
 
@@ -118,17 +123,22 @@ npm run dev
 
 Abra <http://localhost:3000>.
 
-### 6. Criar o primeiro usuário admin
+### 6. Criar o primeiro gestor
 
-1. No Supabase: **Authentication → Users → Add user**, com seu e-mail e uma senha.
-2. Entre no sistema com essa conta uma vez (isso cria o perfil).
-3. De volta ao Supabase, **SQL Editor**:
+1. No Supabase: **Authentication → Users → Add user**, com seu e-mail e uma senha,
+   marcando *Auto Confirm User*.
+2. Ligue a conta à pessoa e defina o papel:
 
-```sql
-update public.perfis set papel = 'admin' where email = 'seu.email@igreenenergy.com.br';
+```bash
+npm run vincular
+npm run papel -- seu.email@igreenenergy.com.br gestor
 ```
 
-A partir daí você libera todos os demais pela tela **Configurações**, sem mexer em SQL.
+`vincular` liga contas do Supabase às pessoas pelo e-mail — o gatilho do banco já
+faz isso em contas novas, e o comando cobre o que ficou para trás. `papel` sem
+argumentos lista todo mundo.
+
+A partir daí você libera os demais pela tela **Configurações**, sem linha de comando.
 
 ---
 
