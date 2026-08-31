@@ -170,10 +170,13 @@ npm run cf:deploy
 
 Ao final, o wrangler mostra a URL (`https://monitorias.SEU-SUBDOMINIO.workers.dev`).
 
-### Último passo, obrigatório
+### Sobre a URL no Supabase
 
-No Supabase, **Authentication → URL Configuration**, coloque essa URL em *Site URL*
-e em *Redirect URLs*. Sem isso o login não completa em produção.
+O login por e-mail e senha **não** exige configurar nada: não há redirecionamento
+no fluxo. O campo *Site URL* / *Redirect URLs* (em **Authentication → URL
+Configuration**) só passa a ser necessário se um dia forem habilitados link mágico,
+"esqueci minha senha", confirmação por e-mail ou login social — aí sim a URL de
+produção precisa estar cadastrada lá.
 
 > **Nota sobre Windows:** o OpenNext avisa que não é totalmente compatível com Windows
 > e recomenda WSL. O build funciona aqui, mas se der erro `EPERM` ao apagar `.open-next`,
