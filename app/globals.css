@@ -20,9 +20,15 @@
   /* Fundo dos cartões e da página. São as únicas cores estruturais que
      precisaram virar token próprio — o resto se resolve na paleta abaixo. */
   --color-superficie: #ffffff;
-  /* Cor média da arte de fundo clara: é o que se vê enquanto a imagem carrega,
-     e o que fica se ela falhar. */
-  --color-pagina: #c3d2c2;
+  /* Cor média da arte de fundo: é o que se vê enquanto a imagem carrega e o
+     que fica se ela falhar. */
+  --color-pagina: #005d0c;
+
+  /* Texto que fica sobre a arte de fundo, fora dos cartões — títulos de página,
+     legendas e paginação. Nos dois temas o fundo é escuro (verde vivo ou preto),
+     então esse texto é claro em ambos. Dentro dos cartões vale a escala normal. */
+  --color-sobre-fundo: #ffffff;
+  --color-sobre-fundo-suave: #d8ead9;
 }
 
 /* ---------------------------------------------------------------------------
@@ -97,12 +103,14 @@ html, body {
    tabelas têm fundo sólido por cima, de modo que a arte aparece nas margens e
    nos vãos — nunca atrás dos números.
 
-   As duas artes vêm do material de apresentação da IGreen e foram clareadas
-   ou escurecidas até o mesmo grau de discrição: presentes o suficiente para
-   marcar a identidade, apagadas o suficiente para não disputar com o conteúdo
-   de uma tela usada o dia inteiro. */
+   As duas artes vêm do material de apresentação da IGreen, em tamanho real.
+   No tema claro há um véu verde-escuro por cima: a arte tem áreas bem claras,
+   e sem ele o texto branco de título perderia contraste conforme a posição
+   do degradê. O véu é leve o bastante para o verde continuar vivo. */
 body {
-  background-image: url('/fundo-claro.webp');
+  background-image:
+    linear-gradient(rgba(2, 48, 14, 0.28), rgba(2, 48, 14, 0.28)),
+    url('/fundo-claro.webp');
   background-size: cover;
   background-position: center left;
   background-attachment: fixed;

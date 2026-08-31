@@ -60,11 +60,11 @@ export default async function RelatorioCriterios({
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <Link href="/relatorios" className="text-sm text-slate-500 hover:underline">
+          <Link href="/relatorios" className="text-sm text-sobre-fundo-suave hover:underline">
             ← Relatórios
           </Link>
-          <h1 className="mt-1 text-xl font-semibold text-slate-900">Critérios mais reprovados</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="mt-1 text-xl font-semibold text-sobre-fundo">Critérios mais reprovados</h1>
+          <p className="text-sm text-sobre-fundo-suave">
             {mes === 'todos' ? 'Todo o período' : mesRotulo(mes)} ·
             {' '}{avaliacoes} atendimentos avaliados por critério
           </p>

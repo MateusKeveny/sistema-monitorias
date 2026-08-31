@@ -63,8 +63,8 @@ export default async function ListaMonitorias({
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">Monitorias</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="text-xl font-semibold text-sobre-fundo">Monitorias</h1>
+          <p className="text-sm text-sobre-fundo-suave">
             {total} registro{total === 1 ? '' : 's'}
             {ultimaPagina > 1 && ` · página ${pagina} de ${ultimaPagina}`}
           </p>
@@ -172,7 +172,7 @@ export default async function ListaMonitorias({
             </Link>
           ) : <span />}
 
-          <span className="text-sm text-slate-500">
+          <span className="text-sm text-sobre-fundo-suave">
             {inicio + 1}–{Math.min(inicio + POR_PAGINA, total)} de {total}
           </span>
 

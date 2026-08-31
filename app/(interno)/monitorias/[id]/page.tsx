@@ -66,20 +66,20 @@ export default async function DetalheMonitoria({
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <Link href="/monitorias" className="text-sm text-slate-500 hover:underline">
+          <Link href="/monitorias" className="text-sm text-sobre-fundo-suave hover:underline">
             ← Monitorias
           </Link>
-          <h1 className="mt-1 text-xl font-semibold text-slate-900">
+          <h1 className="mt-1 text-xl font-semibold text-sobre-fundo">
             Monitoria {m.protocolo}
           </h1>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-sobre-fundo-suave">
             {m.operador} · {formatarData(m.data_atendimento)}
           </p>
         </div>
 
         <div className="text-right">
-          <p className="text-xs uppercase tracking-wide text-slate-500">Nota final</p>
-          <p className="text-3xl font-semibold tabular-nums text-slate-900">
+          <p className="text-xs uppercase tracking-wide text-sobre-fundo-suave">Nota final</p>
+          <p className="text-3xl font-semibold tabular-nums text-sobre-fundo">
             {nota(Number(m.nota_final))}
           </p>
           {m.zerado && (

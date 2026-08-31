@@ -31,8 +31,8 @@ export default async function Relatorios() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900">Relatórios</h1>
-        <p className="text-sm text-slate-500">
+        <h1 className="text-xl font-semibold text-sobre-fundo">Relatórios</h1>
+        <p className="text-sm text-sobre-fundo-suave">
           Todos respeitam seu nível de acesso: operadores enxergam apenas os próprios números.
         </p>
       </div>

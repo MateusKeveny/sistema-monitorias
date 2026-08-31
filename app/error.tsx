@@ -7,7 +7,7 @@
 export default function Erro({ reset }: { error: Error; reset: () => void }) {
   return (
     <main className="flex min-h-screen items-center justify-center px-6">
-      <div className="max-w-md text-center">
+      <div className="max-w-md rounded-2xl border border-slate-200 bg-superficie p-8 text-center shadow-xl">
         <h1 className="text-xl font-semibold text-slate-900">Algo deu errado</h1>
         <p className="mt-2 text-sm leading-relaxed text-slate-600">
           Não conseguimos carregar esta página. Se o problema continuar, avise a

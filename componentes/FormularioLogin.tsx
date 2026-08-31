@@ -40,7 +40,7 @@ export default function FormularioLogin({
   }
 
   return (
-    <form onSubmit={entrar} className="w-full max-w-sm space-y-5">
+    <form onSubmit={entrar} className="w-full max-w-sm space-y-5 rounded-2xl border border-slate-200 bg-superficie p-8 shadow-xl">
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">Monitorias de Qualidade</h1>
         <p className="mt-1 text-sm text-slate-500">Entre com seu e-mail corporativo.</p>

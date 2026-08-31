@@ -53,10 +53,10 @@ export default async function FolhaFeedback({
     return (
       <div className="space-y-6">
         <div>
-          <Link href="/relatorios" className="text-sm text-slate-500 hover:underline">
+          <Link href="/relatorios" className="text-sm text-sobre-fundo-suave hover:underline">
             ← Relatórios
           </Link>
-          <h1 className="mt-1 text-xl font-semibold text-slate-900">Folha de feedback individual</h1>
+          <h1 className="mt-1 text-xl font-semibold text-sobre-fundo">Folha de feedback individual</h1>
         </div>
         {seletor}
         <Cartao><Vazio>Escolha o operador e o mês para gerar a folha.</Vazio></Cartao>
@@ -105,10 +105,10 @@ export default async function FolhaFeedback({
     <div className="space-y-6">
       <div className="sem-impressao flex flex-wrap items-end justify-between gap-3">
         <div>
-          <Link href="/relatorios" className="text-sm text-slate-500 hover:underline">
+          <Link href="/relatorios" className="text-sm text-sobre-fundo-suave hover:underline">
             ← Relatórios
           </Link>
-          <h1 className="mt-1 text-xl font-semibold text-slate-900">Folha de feedback individual</h1>
+          <h1 className="mt-1 text-xl font-semibold text-sobre-fundo">Folha de feedback individual</h1>
         </div>
         <div className="flex items-center gap-2">
           {seletor}

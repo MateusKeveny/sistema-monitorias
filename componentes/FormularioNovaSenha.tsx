@@ -51,7 +51,7 @@ export default function FormularioNovaSenha({ nome }: { nome: string }) {
   }
 
   return (
-    <form onSubmit={definir} className="w-full max-w-sm space-y-5">
+    <form onSubmit={definir} className="w-full max-w-sm space-y-5 rounded-2xl border border-slate-200 bg-superficie p-8 shadow-xl">
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">Defina sua senha</h1>
         <p className="mt-1 text-sm text-slate-500">

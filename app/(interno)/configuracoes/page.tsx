@@ -21,8 +21,8 @@ export default async function Configuracoes() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900">Configurações</h1>
-        <p className="text-sm text-slate-500">
+        <h1 className="text-xl font-semibold text-sobre-fundo">Configurações</h1>
+        <p className="text-sm text-sobre-fundo-suave">
           Nomes e pesos dos critérios, cadastro de operadores e canais, e liberação de acesso.
         </p>
       </div>

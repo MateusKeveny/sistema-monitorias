@@ -106,10 +106,10 @@ export default async function Painel({
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">
+          <h1 className="text-xl font-semibold text-sobre-fundo">
             {ehOperador ? 'Meu desempenho' : 'Painel de qualidade'}
           </h1>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-sobre-fundo-suave">
             Referência: {mesRotulo(mes)}
             {mes !== meses[0] && ' · mês anterior ao atual'}
           </p>
@@ -120,7 +120,7 @@ export default async function Painel({
               reflete o que está na tela e pode ser compartilhado. */}
           {meses.length > 1 && (
             <form className="flex items-center gap-2">
-              <label htmlFor="mes" className="text-sm text-slate-500">Mês</label>
+              <label htmlFor="mes" className="text-sm text-sobre-fundo-suave">Mês</label>
               <select
                 id="mes" name="mes" defaultValue={mes}
                 className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm

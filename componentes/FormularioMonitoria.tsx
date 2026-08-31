@@ -200,10 +200,10 @@ export default function FormularioMonitoria({
   return (
     <form onSubmit={salvar} className="space-y-6 pb-24">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900">
+        <h1 className="text-xl font-semibold text-sobre-fundo">
           {editando ? `Editar monitoria ${emEdicao!.protocolo}` : 'Nova monitoria'}
         </h1>
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-sobre-fundo-suave">
           {editando
             ? 'Toda alteração fica registrada no histórico da monitoria, com autor e data.'
             : 'A nota é calculada automaticamente pelos pesos dos critérios.'}

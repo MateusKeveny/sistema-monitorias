@@ -45,11 +45,11 @@ export default async function RelatorioRanking({
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <Link href="/relatorios" className="text-sm text-slate-500 hover:underline">
+          <Link href="/relatorios" className="text-sm text-sobre-fundo-suave hover:underline">
             ← Relatórios
           </Link>
-          <h1 className="mt-1 text-xl font-semibold text-slate-900">Ranking mensal por operador</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="mt-1 text-xl font-semibold text-sobre-fundo">Ranking mensal por operador</h1>
+          <p className="text-sm text-sobre-fundo-suave">
             {mesRotulo(mes)} · {totalMonitorias} monitorias · média geral {nota(mediaGeral)}
           </p>
         </div>
