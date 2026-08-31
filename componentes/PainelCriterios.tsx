@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { Cartao, Tabela, Th, Td } from '@/componentes/ui';
@@ -27,6 +27,30 @@ export default function PainelCriterios({ criterios }: { criterios: Criterio[] }
     () => Object.fromEntries(criterios.map((c) => [c.id, {
       nome: c.nome, peso: Number(c.peso),
     }])));
+
+  /**
+   * Mantém o rascunho em dia com a lista do servidor. O estado inicial só roda
+   * na primeira montagem: sem isto, um critério recém-criado aparecia como
+   * linha em branco até a página ser recarregada à força.
+   */
+  useEffect(() => {
+    setRascunho((atual) => {
+      const proximo = { ...atual };
+      let mudou = false;
+
+      for (const c of criterios) {
+        if (!proximo[c.id]) {
+          proximo[c.id] = { nome: c.nome, peso: Number(c.peso) };
+          mudou = true;
+        }
+      }
+      for (const id of Object.keys(proximo)) {
+        if (!criterios.some((c) => c.id === id)) { delete proximo[id]; mudou = true; }
+      }
+
+      return mudou ? proximo : atual;
+    });
+  }, [criterios]);
   const [novo, setNovo] = useState({ nome: '', peso: '' });
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);

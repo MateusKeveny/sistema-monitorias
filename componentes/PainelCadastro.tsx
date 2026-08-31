@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { Cartao, Tabela, Th, Td, Vazio } from '@/componentes/ui';
@@ -13,19 +13,53 @@ type Registro = { id: string; nome: string; email?: string | null; ativo: boolea
  * atualiza tudo que já foi lançado, sem reprocessar nada.
  */
 export default function PainelCadastro({
-  titulo, tabela, registros, temEmail = false, dica,
+  titulo, subtitulo, tabela, registros, temEmail = false, dica, acessoPorOperador,
 }: {
   titulo: string;
+  subtitulo?: string;
   tabela: 'operadores' | 'canais';
   registros: Registro[];
   temEmail?: boolean;
   dica?: string;
+  /**
+   * id do operador -> e-mail de quem entra no sistema por ele.
+   * Serve para mostrar, aqui, quem tem login — a pergunta que leva alguém a
+   * procurar o mesmo nome na aba de Acessos e não encontrar.
+   */
+  acessoPorOperador?: Record<string, string>;
 }) {
   const router = useRouter();
   const [rascunho, setRascunho] = useState<Record<string, { nome: string; email: string }>>(
     () => Object.fromEntries(registros.map((r) => [r.id, {
       nome: r.nome, email: r.email ?? '',
     }])));
+
+  /**
+   * Mantém o rascunho em dia com a lista que vem do servidor.
+   *
+   * O estado inicial só roda na primeira montagem. Sem isto, um registro
+   * recém-criado chegava na lista sem entrada no rascunho e aparecia como
+   * linha em branco, até a página ser recarregada à força. Edições em
+   * andamento são preservadas: só entram os que faltam e saem os que sumiram.
+   */
+  useEffect(() => {
+    setRascunho((atual) => {
+      const proximo = { ...atual };
+      let mudou = false;
+
+      for (const r of registros) {
+        if (!proximo[r.id]) {
+          proximo[r.id] = { nome: r.nome, email: r.email ?? '' };
+          mudou = true;
+        }
+      }
+      for (const id of Object.keys(proximo)) {
+        if (!registros.some((r) => r.id === id)) { delete proximo[id]; mudou = true; }
+      }
+
+      return mudou ? proximo : atual;
+    });
+  }, [registros]);
   const [novo, setNovo] = useState({ nome: '', email: '' });
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -108,6 +142,9 @@ export default function PainelCadastro({
         </button>
       }
     >
+      {subtitulo && (
+        <p className="mb-3 text-sm leading-relaxed text-slate-500">{subtitulo}</p>
+      )}
       {erro && (
         <p className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800
                       ring-1 ring-rose-600/20">{erro}</p>
@@ -125,6 +162,7 @@ export default function PainelCadastro({
             <tr>
               <Th>Nome</Th>
               {temEmail && <Th className="w-72">E-mail</Th>}
+              {acessoPorOperador && <Th className="w-36">Entra no sistema</Th>}
               <Th className="w-24 text-center">Ativo</Th>
               <Th className="w-28" />
             </tr>
@@ -151,6 +189,15 @@ export default function PainelCadastro({
                         onChange={(e) => setRascunho((s) => ({
                           ...s, [r.id]: { ...s[r.id], email: e.target.value } }))}
                       />
+                    </Td>
+                  )}
+                  {acessoPorOperador && (
+                    <Td>
+                      {acessoPorOperador[r.id] ? (
+                        <span className="text-xs text-emerald-700">sim</span>
+                      ) : (
+                        <span className="text-xs text-slate-400">sem login</span>
+                      )}
                     </Td>
                   )}
                   <Td className="text-center">

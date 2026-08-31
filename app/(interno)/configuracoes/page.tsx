@@ -18,12 +18,22 @@ export default async function Configuracoes() {
       db.from('canais').select('*').order('nome'),
     ]);
 
+  // Quem é avaliado e quem entra no sistema são cadastros diferentes: há
+  // operador sem login e há login que não é operador. O painel de Operadores
+  // mostra esta ligação para a diferença ficar visível na tela, e não só no
+  // modelo de dados.
+  const acessoPorOperador = Object.fromEntries(
+    ((perfis ?? []) as Perfil[])
+      .filter((p) => p.operador_id)
+      .map((p) => [p.operador_id as string, p.email]),
+  );
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-semibold text-sobre-fundo">Configurações</h1>
         <p className="text-sm text-sobre-fundo-suave">
-          Nomes e pesos dos critérios, cadastro de operadores e canais, e liberação de acesso.
+          Critérios e pesos, cadastros e liberação de acesso.
         </p>
       </div>
 
@@ -32,9 +42,13 @@ export default async function Configuracoes() {
       <div className="grid gap-6 xl:grid-cols-2">
         <PainelCadastro
           titulo="Operadores"
+          subtitulo={'Quem é avaliado nas monitorias. Cadastrar alguém aqui não cria login — '
+            + 'para a pessoa entrar no sistema ela precisa de conta e de um papel em '
+            + 'Acessos, logo abaixo.'}
           tabela="operadores"
           registros={(operadores ?? []) as Operador[]}
           temEmail
+          acessoPorOperador={acessoPorOperador}
           dica={'Estes são os nomes que aparecem nos relatórios. Se o nome da planilha '
             + 'estiver diferente do nome real da pessoa, corrija aqui: as monitorias já '
             + 'lançadas apontam para o registro, não para o texto, então o histórico inteiro '
@@ -43,6 +57,7 @@ export default async function Configuracoes() {
 
         <PainelCadastro
           titulo="Canais de atendimento"
+          subtitulo="Por onde o atendimento chegou. Vira opção no formulário de monitoria."
           tabela="canais"
           registros={(canais ?? []) as Canal[]}
         />

@@ -36,6 +36,11 @@ export default function PainelUsuarios({
 
   return (
     <Cartao titulo={`Acessos (${perfis.length})`}>
+      <p className="mb-3 text-sm leading-relaxed text-slate-500">
+        Quem entra no sistema. É lista diferente da de Operadores: aqui aparece só quem tem
+        conta criada no Supabase, e um gestor pode ter acesso sem ser avaliado. Para ligar as
+        duas, escolha o operador na coluna <strong>Operador vinculado</strong>.
+      </p>
       {erro && (
         <p className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800
                       ring-1 ring-rose-600/20">{erro}</p>

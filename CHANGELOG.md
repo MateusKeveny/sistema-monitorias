@@ -9,6 +9,16 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 4.1.1
+
+- Registro recém-cadastrado em Configurações aparecia como linha em branco até
+  a página ser recarregada à força. O rascunho dos campos era montado só na
+  primeira montagem do componente, então o id novo chegava sem entrada. Valia
+  para operadores, canais e critérios.
+- Operadores e Acessos são cadastros diferentes — há operador sem login e login
+  que não é operador — mas a tela não dizia isso. Cada painel ganha uma linha
+  explicando o que é, e Operadores passa a mostrar quem tem login.
+
 ## 4.1.0
 
 - Contador no menu quando há exclusões aguardando decisão do gestor. O quadro
