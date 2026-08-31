@@ -26,15 +26,15 @@ const PALETAS = {
     caixaTexto: '#0f172a',
   },
   escuro: {
-    grade: '#2f3a52',
-    eixo: '#8b98b0',
-    eixoSecundario: '#6b7a99',
-    barra: '#44506d',
+    grade: '#2f3233',
+    eixo: '#8f9394',
+    eixoSecundario: '#6d7172',
+    barra: '#414445',
     zeradas: '#9f1239',
     linha: '#34d399',
-    caixaFundo: '#131c2e',
-    caixaBorda: '#2f3a52',
-    caixaTexto: '#f4f7fb',
+    caixaFundo: '#17191a',
+    caixaBorda: '#2f3233',
+    caixaTexto: '#f6f8f8',
   },
 } as const;
 

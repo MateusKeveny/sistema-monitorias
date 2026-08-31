@@ -186,18 +186,30 @@ produção precisa estar cadastrada lá.
 
 ---
 
-## Fundo do tema escuro
+## Fundos da marca
 
-`public/fundo-escuro.webp` é a arte da marca usada como plano de fundo quando o
-tema escuro está ativo. O original (JPG de 4000×2250 e 1,1 MB) foi reduzido para
-2400px em WebP e ficou em **13 KB** — 98,8% menor, sem diferença visível, porque
-a imagem é um degradê escuro e suave.
+Cada tema tem sua arte, vinda do material de apresentação da IGreen:
+
+| Arquivo | Tema | Origem | Peso |
+|---|---|---|---|
+| `public/fundo-claro.webp` | claro | arte verde, clareada e dessaturada | 9,6 KB |
+| `public/fundo-escuro.webp` | escuro | arte preta, só redimensionada | 13,3 KB |
+
+Os originais tinham 4000×2250 e cerca de 1 MB cada. Em WebP a 2400px caíram
+para ~10 KB — mais de 98% menores, sem diferença visível, porque são degradês
+suaves, que é o caso em que esse formato rende melhor.
+
+A arte verde original é saturada demais para servir de fundo a uma tela de
+trabalho: texto e tabelas por cima ficariam cansativos. Ela foi composta com
+branco a 72% e dessaturada, até chegar ao mesmo grau de discrição do fundo
+escuro — presente para marcar a identidade, apagada para não disputar com o
+conteúdo.
 
 A imagem fica presa à janela (`background-attachment: fixed`) e os cartões e
 tabelas têm fundo sólido por cima, então a arte aparece nas margens e nos vãos,
 nunca atrás dos números. Na impressão ela é desligada.
 
-Para trocar por outra arte:
+Para trocar as artes:
 
 ```bash
 npm i -D sharp

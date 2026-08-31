@@ -20,7 +20,9 @@
   /* Fundo dos cartões e da página. São as únicas cores estruturais que
      precisaram virar token próprio — o resto se resolve na paleta abaixo. */
   --color-superficie: #ffffff;
-  --color-pagina: #f8fafc;
+  /* Cor média da arte de fundo clara: é o que se vê enquanto a imagem carrega,
+     e o que fica se ela falhar. */
+  --color-pagina: #c3d2c2;
 }
 
 /* ---------------------------------------------------------------------------
@@ -36,19 +38,21 @@
    e o branco puro, porque o texto sobre eles é branco nos dois temas.
 --------------------------------------------------------------------------- */
 .dark {
-  --color-superficie: #131c2e;
-  --color-pagina: #0b1120;
+  /* Cinzas neutros, sem o azul que a escala slate tem por padrão: a arte de
+     fundo é preto neutro, e superfícies azuladas por cima dela destoavam. */
+  --color-superficie: #17191a;
+  --color-pagina: #0a0b0b;
 
-  --color-slate-50:  #1b2437;
-  --color-slate-100: #273046;
-  --color-slate-200: #2f3a52;
-  --color-slate-300: #3f4b66;
-  --color-slate-400: #6b7a99;
-  --color-slate-500: #94a3b8;
-  --color-slate-600: #b6c2d4;
-  --color-slate-700: #d4dce8;
-  --color-slate-800: #e8eef6;
-  --color-slate-900: #f4f7fb;
+  --color-slate-50:  #1e2021;
+  --color-slate-100: #26292a;
+  --color-slate-200: #2f3233;
+  --color-slate-300: #414445;
+  --color-slate-400: #6d7172;
+  --color-slate-500: #979b9c;
+  --color-slate-600: #babebf;
+  --color-slate-700: #d8dbdc;
+  --color-slate-800: #ebeeee;
+  --color-slate-900: #f6f8f8;
 
   --color-emerald-50:  #06281f;
   --color-emerald-100: #06301f;
@@ -87,17 +91,26 @@ html, body {
   color: var(--color-slate-900);
 }
 
-/* Fundo da marca, só no tema escuro.
+/* Fundo da marca, uma arte por tema.
    `fixed` mantém a imagem parada enquanto a página rola, então ela se comporta
    como plano de fundo da janela e não como parte do documento. Os cartões e
    tabelas têm fundo sólido por cima, de modo que a arte aparece nas margens e
-   nos vãos — nunca atrás dos números. */
-.dark body {
-  background-image: url('/fundo-escuro.webp');
+   nos vãos — nunca atrás dos números.
+
+   As duas artes vêm do material de apresentação da IGreen e foram clareadas
+   ou escurecidas até o mesmo grau de discrição: presentes o suficiente para
+   marcar a identidade, apagadas o suficiente para não disputar com o conteúdo
+   de uma tela usada o dia inteiro. */
+body {
+  background-image: url('/fundo-claro.webp');
   background-size: cover;
   background-position: center left;
   background-attachment: fixed;
   background-repeat: no-repeat;
+}
+
+.dark body {
+  background-image: url('/fundo-escuro.webp');
 }
 
 /* Campos de formulário precisam de fundo próprio. Sem isso ficam transparentes
