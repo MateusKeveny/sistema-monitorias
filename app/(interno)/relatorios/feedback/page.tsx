@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
 import { Cartao, Vazio } from '@/componentes/ui';
 import BotaoImprimir from '@/componentes/BotaoImprimir';
-import { mesExtenso, data as formatarData, nota, percentual } from '@/lib/formatar';
+import { mesRotulo, data as formatarData, nota, percentual } from '@/lib/formatar';
 import type { LinhaFeedback, Operador } from '@/lib/tipos';
 
 export const dynamic = 'force-dynamic';
@@ -40,7 +40,7 @@ export default async function FolhaFeedback({
       </select>
       <select name="mes" defaultValue={mes}
         className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm">
-        {meses.map((m) => <option key={m} value={m}>{mesExtenso(m)}</option>)}
+        {meses.map((m) => <option key={m} value={m}>{mesRotulo(m)}</option>)}
       </select>
       <button className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
                          font-medium text-slate-700 hover:bg-slate-50">
@@ -117,7 +117,7 @@ export default async function FolhaFeedback({
       </div>
 
       {monitorias.length === 0 ? (
-        <Cartao><Vazio>Sem monitorias para {nomeOperador} em {mesExtenso(mes)}.</Vazio></Cartao>
+        <Cartao><Vazio>Sem monitorias para {nomeOperador} em {mesRotulo(mes)}.</Vazio></Cartao>
       ) : (
         <article className="rounded-xl border border-slate-200 bg-superficie p-8 shadow-sm print:border-0 print:p-0 print:shadow-none">
           <header className="border-b border-slate-200 pb-4">
@@ -125,7 +125,7 @@ export default async function FolhaFeedback({
               Monitoria de qualidade de atendimento · C-SAT
             </p>
             <h2 className="mt-1 text-2xl font-semibold text-slate-900">{nomeOperador}</h2>
-            <p className="text-sm text-slate-500">{mesExtenso(mes)}</p>
+            <p className="text-sm text-slate-500">{mesRotulo(mes)}</p>
           </header>
 
           <div className="grid gap-4 border-b border-slate-200 py-5 sm:grid-cols-4">

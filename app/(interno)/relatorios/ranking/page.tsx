@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
 import { Cartao, EtiquetaNota, Tabela, Th, Td, Vazio } from '@/componentes/ui';
-import { mesExtenso, mesCurto, nota, percentual } from '@/lib/formatar';
+import { mesRotulo, mesCurto, nota, percentual } from '@/lib/formatar';
 import type { LinhaRanking } from '@/lib/tipos';
 
 export const dynamic = 'force-dynamic';
@@ -50,14 +50,14 @@ export default async function RelatorioRanking({
           </Link>
           <h1 className="mt-1 text-xl font-semibold text-slate-900">Ranking mensal por operador</h1>
           <p className="text-sm text-slate-500">
-            {mesExtenso(mes)} · {totalMonitorias} monitorias · média geral {nota(mediaGeral)}
+            {mesRotulo(mes)} · {totalMonitorias} monitorias · média geral {nota(mediaGeral)}
           </p>
         </div>
 
         <form className="flex items-center gap-2">
           <select name="mes" defaultValue={mes}
             className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm">
-            {meses.map((m) => <option key={m} value={m}>{mesExtenso(m)}</option>)}
+            {meses.map((m) => <option key={m} value={m}>{mesRotulo(m)}</option>)}
           </select>
           <button className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
                              font-medium text-slate-700 hover:bg-slate-50">

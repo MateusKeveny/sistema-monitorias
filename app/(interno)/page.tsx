@@ -2,28 +2,33 @@ import Link from 'next/link';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { Cartao, Indicador, EtiquetaNota, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import EvolucaoMensal from '@/componentes/EvolucaoMensal';
-import { nota, mesExtenso, mesCurto, percentual, data as formatarData } from '@/lib/formatar';
+import { nota, mesRotulo, mesCurto, percentual, data as formatarData } from '@/lib/formatar';
 import type { LinhaRanking, LinhaCriterio, Monitoria } from '@/lib/tipos';
 
 export const dynamic = 'force-dynamic';
 
-export default async function Painel() {
+export default async function Painel({
+  searchParams,
+}: {
+  searchParams: Promise<{ mes?: string }>;
+}) {
   const perfil = await exigirPerfil();
+  const escolhido = (await searchParams).mes;
   const db = await criarClienteServidor();
 
-  // O painel mostra o último mês que tem dados — não o mês do calendário,
-  // que pode estar vazio no começo.
-  const { data: ultima } = await db
-    .from('vw_monitorias')
-    .select('mes_referencia')
-    .order('data_atendimento', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  // O ranking completo é pequeno — uma linha por operador por mês — e resolve
+  // três coisas de uma vez: a lista de meses do seletor, os números do mês
+  // escolhido e a série do gráfico. Evita uma consulta só para descobrir qual
+  // é o último mês com dados.
+  const { data: todoRanking } = await db.from('vw_ranking_mensal').select('*');
+  const ranking = (todoRanking ?? []) as LinhaRanking[];
+
+  const meses = [...new Set(ranking.map((l) => l.mes_referencia))].sort().reverse();
 
   // Um operador sem monitorias e um sistema recém-instalado chegam aqui pelo
   // mesmo caminho, mas precisam de mensagens diferentes: instrução de
   // instalação não é assunto de quem está sendo avaliado.
-  if (!ultima) {
+  if (meses.length === 0) {
     return perfil.papel === 'operador' ? (
       <Cartao titulo="Nenhuma monitoria por enquanto">
         <Vazio>
@@ -43,28 +48,26 @@ export default async function Painel() {
     );
   }
 
-  const mes = ultima.mes_referencia as string;
-
+  // Mês pedido na URL, se existir de fato; senão o mais recente com dados.
+  const mes = escolhido && meses.includes(escolhido) ? escolhido : meses[0];
   const ehOperador = perfil.papel === 'operador';
 
-  const [{ data: ranking }, { data: criterios }, { data: evolucao }, { data: recentes }] =
-    await Promise.all([
-      db.from('vw_ranking_mensal').select('*').eq('mes_referencia', mes)
-        .order('nota_media', { ascending: false }),
-      // A view respeita a RLS: para um operador estes já são os critérios que
-      // ele próprio reprovou, não os do time.
-      db.from('vw_criterios_reprovados').select('*').eq('mes_referencia', mes)
-        .gt('reprovacoes', 0)
-        .order('pontos_perdidos', { ascending: false })
-        .limit(ehOperador ? 3 : 6),
-      db.from('vw_ranking_mensal').select('mes_referencia, total_monitorias, nota_media, zeradas'),
-      ehOperador
-        ? db.from('vw_monitorias').select('*')
-            .order('data_atendimento', { ascending: false }).limit(6)
-        : Promise.resolve({ data: null }),
-    ]);
+  const [{ data: criterios }, { data: recentes }] = await Promise.all([
+    // A view respeita a RLS: para um operador estes já são os critérios que
+    // ele próprio reprovou, não os do time.
+    db.from('vw_criterios_reprovados').select('*').eq('mes_referencia', mes)
+      .gt('reprovacoes', 0)
+      .order('pontos_perdidos', { ascending: false })
+      .limit(ehOperador ? 3 : 6),
+    ehOperador
+      ? db.from('vw_monitorias').select('*').eq('mes_referencia', mes)
+          .order('data_atendimento', { ascending: false }).limit(6)
+      : Promise.resolve({ data: null }),
+  ]);
 
-  const linhas = (ranking ?? []) as LinhaRanking[];
+  const linhas = ranking
+    .filter((l) => l.mes_referencia === mes)
+    .sort((a, b) => Number(b.nota_media) - Number(a.nota_media));
   const piores = (criterios ?? []) as LinhaCriterio[];
   const minhasUltimas = (recentes ?? []) as Monitoria[];
 
@@ -79,9 +82,10 @@ export default async function Painel() {
   const impecaveis = linhas.reduce((s, l) => s + l.impecaveis, 0);
   const abaixo = linhas.filter((l) => Number(l.nota_media) < 0.85).length;
 
-  // Série mensal consolidada para o gráfico.
+  // Série mensal consolidada para o gráfico — sempre todo o período, mesmo
+  // quando o resto da tela está filtrado por um mês.
   const porMes = new Map<string, { soma: number; qtd: number; zeradas: number }>();
-  for (const l of (evolucao ?? []) as LinhaRanking[]) {
+  for (const l of ranking) {
     const atual = porMes.get(l.mes_referencia) ?? { soma: 0, qtd: 0, zeradas: 0 };
     atual.soma += Number(l.nota_media) * l.total_monitorias;
     atual.qtd += l.total_monitorias;
@@ -105,15 +109,43 @@ export default async function Painel() {
           <h1 className="text-xl font-semibold text-slate-900">
             {ehOperador ? 'Meu desempenho' : 'Painel de qualidade'}
           </h1>
-          <p className="text-sm text-slate-500">Referência: {mesExtenso(mes)}</p>
+          <p className="text-sm text-slate-500">
+            Referência: {mesRotulo(mes)}
+            {mes !== meses[0] && ' · mês anterior ao atual'}
+          </p>
         </div>
-        <Link
-          href={ehOperador ? '/monitorias' : '/relatorios'}
-          className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
-                     font-medium text-slate-700 hover:bg-slate-50"
-        >
-          {ehOperador ? 'Ver minhas monitorias' : 'Ver relatórios'}
-        </Link>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Sem JavaScript: trocar o mês é uma navegação, então o endereço
+              reflete o que está na tela e pode ser compartilhado. */}
+          {meses.length > 1 && (
+            <form className="flex items-center gap-2">
+              <label htmlFor="mes" className="text-sm text-slate-500">Mês</label>
+              <select
+                id="mes" name="mes" defaultValue={mes}
+                className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
+                           outline-none focus:border-marca-600"
+              >
+                {meses.map((m) => <option key={m} value={m}>{mesRotulo(m)}</option>)}
+              </select>
+              <button
+                type="submit"
+                className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
+                           font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Ver
+              </button>
+            </form>
+          )}
+
+          <Link
+            href={ehOperador ? '/monitorias' : '/relatorios'}
+            className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
+                       font-medium text-slate-700 hover:bg-slate-50"
+          >
+            {ehOperador ? 'Ver minhas monitorias' : 'Ver relatórios'}
+          </Link>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

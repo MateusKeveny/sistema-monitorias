@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
 import { Cartao, Tabela, Th, Td, Vazio, Indicador } from '@/componentes/ui';
-import { mesExtenso, percentual, nota } from '@/lib/formatar';
+import { mesRotulo, percentual, nota } from '@/lib/formatar';
 import type { LinhaCriterio } from '@/lib/tipos';
 
 export const dynamic = 'force-dynamic';
@@ -65,7 +65,7 @@ export default async function RelatorioCriterios({
           </Link>
           <h1 className="mt-1 text-xl font-semibold text-slate-900">Critérios mais reprovados</h1>
           <p className="text-sm text-slate-500">
-            {mes === 'todos' ? 'Todo o período' : mesExtenso(mes)} ·
+            {mes === 'todos' ? 'Todo o período' : mesRotulo(mes)} ·
             {' '}{avaliacoes} atendimentos avaliados por critério
           </p>
         </div>
@@ -74,7 +74,7 @@ export default async function RelatorioCriterios({
           <select name="mes" defaultValue={mes}
             className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm">
             <option value="todos">Todo o período</option>
-            {meses.map((m) => <option key={m} value={m}>{mesExtenso(m)}</option>)}
+            {meses.map((m) => <option key={m} value={m}>{mesRotulo(m)}</option>)}
           </select>
           <button className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
                              font-medium text-slate-700 hover:bg-slate-50">

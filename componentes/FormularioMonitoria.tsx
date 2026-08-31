@@ -6,7 +6,7 @@ import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { Cartao } from '@/componentes/ui';
 import {
   nota as formatarNota, faixa, percentual,
-  semanaDoCiclo, mesDeCompetencia, mesExtenso,
+  semanaDoCiclo, mesDeCompetencia, mesRotulo,
 } from '@/lib/formatar';
 import type { Canal, Criterio, Operador } from '@/lib/tipos';
 
@@ -246,7 +246,7 @@ export default function FormularioMonitoria({
             <p className={`${campo} bg-slate-50 text-slate-700`}>
               {semana}ª Semana
               <span className="ml-2 text-xs text-slate-500">
-                · competência {mesExtenso(competencia)}
+                · competência {mesRotulo(competencia)}
               </span>
             </p>
           </div>

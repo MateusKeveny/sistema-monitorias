@@ -22,12 +22,16 @@ export const dataHora = (iso: string | null | undefined) => {
     + ` às ${p(d.getHours())}:${p(d.getMinutes())}`;
 };
 
-const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
-  'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
-export const mesExtenso = (iso: string) => {
+/**
+ * Rótulo padrão de mês em todo o sistema: "Agosto/2026".
+ * É sempre o mês de competência, no ciclo de 26 a 25.
+ */
+export const mesRotulo = (iso: string) => {
   const [a, m] = iso.slice(0, 10).split('-');
-  return `${MESES[Number(m) - 1]} de ${a}`;
+  return `${MESES[Number(m) - 1]}/${a}`;
 };
 
 export const mesCurto = (iso: string) => {

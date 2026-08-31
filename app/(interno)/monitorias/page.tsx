@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { Cartao, EtiquetaNota, Tabela, Th, Td, Vazio } from '@/componentes/ui';
-import { data as formatarData, mesExtenso } from '@/lib/formatar';
+import { data as formatarData, mesRotulo } from '@/lib/formatar';
 import type { Monitoria, Operador } from '@/lib/tipos';
 
 export const dynamic = 'force-dynamic';
@@ -98,7 +98,7 @@ export default async function ListaMonitorias({
 
         <select name="mes" defaultValue={filtros.mes ?? ''} className={estilo}>
           <option value="">Todos os meses</option>
-          {mesesUnicos.map((m) => <option key={m} value={m}>{mesExtenso(m)}</option>)}
+          {mesesUnicos.map((m) => <option key={m} value={m}>{mesRotulo(m)}</option>)}
         </select>
 
         <select name="zeradas" defaultValue={filtros.zeradas ?? ''} className={estilo}>
