@@ -87,6 +87,21 @@ html, body {
   color: var(--color-slate-900);
 }
 
+/* A lista que abre num <select> é desenhada pelo navegador, fora do alcance das
+   classes do componente: ela herda a cor do texto (clara, no tema escuro) mas
+   mantém o fundo branco padrão, e o resultado é texto claro sobre branco.
+   Pintar as <option> explicitamente é o que resolve. */
+.dark select option,
+.dark select optgroup {
+  background-color: var(--color-superficie);
+  color: var(--color-slate-900);
+}
+
+/* O seletor de data também traz ícone e calendário próprios do navegador. */
+.dark input[type='date']::-webkit-calendar-picker-indicator {
+  filter: invert(1) opacity(0.6);
+}
+
 /* A folha de feedback sai sempre em papel branco, independente do tema. */
 @media print {
   .sem-impressao { display: none !important; }
