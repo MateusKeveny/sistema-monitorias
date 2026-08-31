@@ -87,6 +87,30 @@ html, body {
   color: var(--color-slate-900);
 }
 
+/* Fundo da marca, só no tema escuro.
+   `fixed` mantém a imagem parada enquanto a página rola, então ela se comporta
+   como plano de fundo da janela e não como parte do documento. Os cartões e
+   tabelas têm fundo sólido por cima, de modo que a arte aparece nas margens e
+   nos vãos — nunca atrás dos números. */
+.dark body {
+  background-image: url('/fundo-escuro.webp');
+  background-size: cover;
+  background-position: center left;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+}
+
+/* Campos de formulário precisam de fundo próprio. Sem isso ficam transparentes
+   e deixam passar o que estiver atrás — o que só apareceu quando o tema escuro
+   ganhou imagem de fundo, com a logo atravessando os campos.
+   Continua valendo para os dois temas; utilitário aplicado no componente
+   (bg-superficie, disabled:bg-slate-50) tem precedência e sobrescreve. */
+input:not([type='checkbox']):not([type='radio']),
+select,
+textarea {
+  background-color: var(--color-superficie);
+}
+
 /* A lista que abre num <select> é desenhada pelo navegador, fora do alcance das
    classes do componente: ela herda a cor do texto (clara, no tema escuro) mas
    mantém o fundo branco padrão, e o resultado é texto claro sobre branco.
@@ -106,7 +130,11 @@ html, body {
 @media print {
   .sem-impressao { display: none !important; }
   .pagina-impressa { break-after: page; }
-  html, body { background: #fff !important; color: #0f172a !important; }
+  html, body {
+    background: #fff !important;
+    background-image: none !important;
+    color: #0f172a !important;
+  }
   main { padding: 0 !important; }
   a[href]::after { content: none !important; }
 }

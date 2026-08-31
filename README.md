@@ -186,6 +186,28 @@ produção precisa estar cadastrada lá.
 
 ---
 
+## Fundo do tema escuro
+
+`public/fundo-escuro.webp` é a arte da marca usada como plano de fundo quando o
+tema escuro está ativo. O original (JPG de 4000×2250 e 1,1 MB) foi reduzido para
+2400px em WebP e ficou em **13 KB** — 98,8% menor, sem diferença visível, porque
+a imagem é um degradê escuro e suave.
+
+A imagem fica presa à janela (`background-attachment: fixed`) e os cartões e
+tabelas têm fundo sólido por cima, então a arte aparece nas margens e nos vãos,
+nunca atrás dos números. Na impressão ela é desligada.
+
+Para trocar por outra arte:
+
+```bash
+npm i -D sharp
+node -e "require('sharp')('ORIGEM.jpg').resize({width:2400}).webp({quality:72}).toFile('public/fundo-escuro.webp')"
+npm remove sharp
+```
+
+O `sharp` entra só para a conversão e sai em seguida: é dependência nativa
+pesada e não faz parte da aplicação.
+
 ## Estrutura do projeto
 
 ```
