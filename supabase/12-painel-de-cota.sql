@@ -41,7 +41,16 @@ update public.pessoas p
 -- 2. Ponte por id nas tabelas que já têm dado
 -- ---------------------------------------------------------------------------
 alter table public.atendimentos
-  add column if not exists pessoa_id uuid references public.pessoas (id) on delete restrict;
+  add column if not exists pessoa_id uuid references public.pessoas (id) on delete restrict,
+  -- De onde a linha veio. As avaliações que já estão aqui entraram por macro
+  -- do Excel, e não há registro de qual arquivo nem de quando — ficam nulas, o
+  -- que é a resposta honesta. Daqui em diante toda importação se identifica:
+  -- num sistema que remunera, a diferença entre "o número está certo" e "o
+  -- número está certo e eu provo de onde saiu" é o que sustenta uma conversa
+  -- com o outro departamento seis meses depois.
+  add column if not exists origem_arquivo text,
+  add column if not exists importado_por uuid references public.pessoas (id) on delete set null,
+  add column if not exists importado_em timestamptz;
 
 update public.atendimentos a
    set pessoa_id = p.id
