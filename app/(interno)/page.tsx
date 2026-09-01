@@ -55,7 +55,7 @@ export default async function Painel({
   const ehOperador = perfil.papel === 'operador';
 
   const [{ data: criterios }, { data: recentes }, { data: porSemana }, { data: ativos },
-         { data: solicitacoes }] =
+         { data: solicitacoes, error: erroSolicitacoes }] =
     await Promise.all([
       // A view respeita a RLS: para um operador estes já são os critérios que
       // ele próprio reprovou, não os do time.
@@ -76,13 +76,16 @@ export default async function Painel({
         : db.from('pessoas').select('id, nome').eq('avaliado', true).eq('ativo', true).order('nome'),
       // Fila de exclusões: só o gestor decide, então só ele carrega.
       perfil.papel === 'gestor'
+        // O nome do operador precisa da chave estrangeira explícita: monitorias
+        // aponta duas vezes para pessoas — quem foi avaliado e quem monitorou —
+        // e sem dizer qual, a consulta não sabe qual seguir.
         ? db.from('solicitacoes_exclusao')
             .select('id, motivo, solicitada_por_nome, solicitada_em,'
               + ' monitoria:monitorias(id, protocolo, data_atendimento, nota_final,'
-              + ' operadores(nome))')
+              + ' operador:pessoas!monitorias_operador_id_fkey(nome))')
             .eq('status', 'pendente')
             .order('solicitada_em')
-        : Promise.resolve({ data: null }),
+        : Promise.resolve({ data: null, error: null }),
     ]);
 
   const linhas = ranking
@@ -106,12 +109,19 @@ export default async function Painel({
     semanas: contagem.get(o.id) ?? [0, 0, 0, 0],
   }));
 
+  // Consulta que falha devolve data nulo, o que aqui pareceria "nenhuma
+  // pendência" — foi assim que uma consulta quebrada passou despercebida,
+  // enquanto o contador no menu, que não usa junção, seguia mostrando o número.
+  if (erroSolicitacoes) {
+    console.error('Falha ao carregar solicitações de exclusão:', erroSolicitacoes.message);
+  }
+
   // A consulta traz o operador aninhado; a tela quer o nome direto.
   type SolicitacaoBruta = {
     id: string; motivo: string; solicitada_por_nome: string | null; solicitada_em: string;
     monitoria: {
       id: string; protocolo: string; data_atendimento: string; nota_final: number;
-      operadores: { nome: string } | null;
+      operador: { nome: string } | null;
     } | null;
   };
   const pendentes: Solicitacao[] = ((solicitacoes ?? []) as unknown as SolicitacaoBruta[])
@@ -125,7 +135,7 @@ export default async function Painel({
         protocolo: s.monitoria.protocolo,
         data_atendimento: s.monitoria.data_atendimento,
         nota_final: s.monitoria.nota_final,
-        operador: s.monitoria.operadores?.nome ?? '—',
+        operador: s.monitoria.operador?.nome ?? '—',
       },
     }));
 
@@ -214,7 +224,17 @@ export default async function Painel({
         </div>
       </div>
 
-      {perfil.papel === 'gestor' && <SolicitacoesDeExclusao pendentes={pendentes} />}
+      {perfil.papel === 'gestor' && (
+        erroSolicitacoes ? (
+          <Cartao titulo="Exclusões aguardando sua decisão">
+            <p className="text-sm text-rose-800">
+              Não foi possível carregar a fila: {erroSolicitacoes.message}
+            </p>
+          </Cartao>
+        ) : (
+          <SolicitacoesDeExclusao pendentes={pendentes} />
+        )
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Indicador

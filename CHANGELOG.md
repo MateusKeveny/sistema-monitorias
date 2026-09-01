@@ -9,6 +9,15 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 4.3.1
+
+- A fila de exclusões aparecia vazia para o gestor mesmo com solicitação
+  pendente: a consulta ainda pedia a tabela `operadores`, removida na
+  unificação, e falhava por inteiro. O contador no menu seguia certo porque é
+  uma contagem simples, sem junção — o que fez o defeito parecer coisa da tela.
+- A consulta descartava o erro e lia só os dados, então uma falha virava
+  "nenhuma pendência". Agora o erro é registrado e mostrado no lugar da fila.
+
 ## 4.3.0
 
 - `npm run acesso` cria o acesso de uma pessoa com a senha padrão e obriga a
