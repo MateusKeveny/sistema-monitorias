@@ -136,8 +136,9 @@ média passa de 85%, zero quando não passa. O teste é estritamente maior, e a
 média é sobre as monitorias que existirem — não sobre quatro fixas. Confirmado
 na planilha de julho: média 0,99 rende 74,25, não 75.
 
-**Diretores e Executivos** são dois blocos distintos, cada um com suas próprias
-três faixas de tempo de resposta.
+**Diretores** tem bloco próprio: o atendimento mais três faixas de tempo de
+resposta, todos lançados à mão. O bloco de executivos existia na planilha e
+saiu — a medição não existe mais.
 
 ---
 
