@@ -13,14 +13,47 @@ export const data = (iso: string | null | undefined) => {
   return `${d}/${m}/${a}`;
 };
 
+/**
+ * Fuso da operação.
+ *
+ * As páginas são renderizadas no servidor, que roda em UTC — sem dizer o fuso,
+ * todo horário aparecia três horas adiantado. Também vale no navegador: fixar o
+ * fuso evita que a mesma tela mostre horários diferentes para quem estiver
+ * viajando ou com o relógio do computador em outro lugar.
+ */
+const FUSO = 'America/Sao_Paulo';
+
+const partes = (d: Date, opcoes: Intl.DateTimeFormatOptions) =>
+  new Intl.DateTimeFormat('pt-BR', { timeZone: FUSO, ...opcoes }).formatToParts(d);
+
+const pegar = (p: Intl.DateTimeFormatPart[], tipo: string) =>
+  p.find((x) => x.type === tipo)?.value ?? '';
+
 /** 31/08/2026 às 14:07 — usado no histórico de alterações. */
 export const dataHora = (iso: string | null | undefined) => {
   if (!iso) return '—';
   const d = new Date(iso);
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`
-    + ` às ${p(d.getHours())}:${p(d.getMinutes())}`;
+  if (Number.isNaN(d.getTime())) return '—';
+
+  const p = partes(d, {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  });
+  return `${pegar(p, 'day')}/${pegar(p, 'month')}/${pegar(p, 'year')}`
+    + ` às ${pegar(p, 'hour')}:${pegar(p, 'minute')}`;
 };
+
+/**
+ * Hoje no fuso da operação, como 'AAAA-MM-DD'.
+ *
+ * `toISOString()` devolve a data em UTC: depois das 21h, ela já virou o dia
+ * seguinte — o que fazia o formulário sugerir a data errada, e com ela a semana
+ * e a competência erradas.
+ */
+export function hojeNoBrasil(): string {
+  const p = partes(new Date(), { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return `${pegar(p, 'year')}-${pegar(p, 'month')}-${pegar(p, 'day')}`;
+}
 
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];

@@ -4,7 +4,7 @@ import { Cartao, Indicador, EtiquetaNota, Tabela, Th, Td, Vazio } from '@/compon
 import EvolucaoMensal from '@/componentes/EvolucaoMensal';
 import CoberturaDoCiclo from '@/componentes/CoberturaDoCiclo';
 import SolicitacoesDeExclusao, { type Solicitacao } from '@/componentes/SolicitacoesDeExclusao';
-import { nota, mesRotulo, mesCurto, percentual, data as formatarData } from '@/lib/formatar';
+import { nota, mesRotulo, mesCurto, percentual, data as formatarData, hojeNoBrasil } from '@/lib/formatar';
 import type { LinhaRanking, LinhaCriterio, Monitoria } from '@/lib/tipos';
 
 export const dynamic = 'force-dynamic';
@@ -143,7 +143,7 @@ export default async function Painel({
   // nos dias 02, 10, 18 e 25 do mês de competência. Num ciclo em andamento,
   // cobrar semana que ainda não aconteceu apontaria falha onde não há.
   const fimDasSemanas = [2, 10, 18, 25];
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = hojeNoBrasil();
   const semanasEncerradas = fimDasSemanas.filter(
     (dia) => `${mes.slice(0, 8)}${String(dia).padStart(2, '0')}` < hoje).length;
 

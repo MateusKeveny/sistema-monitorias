@@ -9,6 +9,20 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 4.4.1
+
+Horários em GMT-3, o fuso da operação.
+
+- As páginas são renderizadas no servidor, que roda em UTC, então todo horário
+  de histórico aparecia três horas adiantado.
+- Junto vinha um defeito maior: a data sugerida no formulário também vinha de
+  UTC. Depois das 21h a data já era a do dia seguinte, e como semana e
+  competência derivam dela, uma monitoria lançada às 22h de 25/08 caía na 1ª
+  semana de setembro em vez da 4ª de agosto.
+- O fuso passa a ser fixo em `America/Sao_Paulo`, e não o do servidor ou o do
+  computador de quem acessa — assim a mesma tela mostra o mesmo horário para
+  todos.
+
 ## 4.4.0
 
 Histórico das decisões de exclusão, que ficavam gravadas sem nenhuma tela lendo.

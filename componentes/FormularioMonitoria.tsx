@@ -6,13 +6,11 @@ import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { Cartao } from '@/componentes/ui';
 import {
   nota as formatarNota, faixa, percentual,
-  semanaDoCiclo, mesDeCompetencia, mesRotulo,
+  semanaDoCiclo, mesDeCompetencia, mesRotulo, hojeNoBrasil,
 } from '@/lib/formatar';
 import type { Canal, Criterio, Operador } from '@/lib/tipos';
 
 type Resposta = { conforme: boolean | null; observacao: string };
-
-const hoje = () => new Date().toISOString().slice(0, 10);
 
 const rotuloCampo = 'mb-1 block text-sm font-medium text-slate-700';
 const campo = `w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none
@@ -47,7 +45,7 @@ export default function FormularioMonitoria({
   const editando = Boolean(emEdicao);
 
   const [protocolo, setProtocolo] = useState(emEdicao?.protocolo ?? '');
-  const [dataAtendimento, setDataAtendimento] = useState(emEdicao?.data_atendimento ?? hoje());
+  const [dataAtendimento, setDataAtendimento] = useState(emEdicao?.data_atendimento ?? hojeNoBrasil());
   const [operadorId, setOperadorId] = useState(emEdicao?.operador_id ?? '');
   const [canalId, setCanalId] = useState(emEdicao?.canal_id ?? canais[0]?.id ?? '');
   const [tempo, setTempo] = useState(
