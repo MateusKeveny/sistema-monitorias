@@ -39,7 +39,7 @@ Nada foi recriado do zero:
 | Tabela | Situação | O que mudou |
 |---|---|---|
 | `regras` | 33 linhas, completa | ganhou políticas de acesso |
-| `atendimentos` | 4.027 linhas | ganhou `pessoa_id` e políticas conhecidas |
+| `atendimentos` | 4.027 linhas | vira histórico; o dado migra para `avaliacoes` |
 | `cotas` | 12 linhas | vira histórico, só leitura |
 | `volume_semanal` | vazia | refeita com `pessoa_id` e competência em `date` |
 | `lancamentos` | vazia | idem, mais rastro de autor |
@@ -59,14 +59,51 @@ administração funcionar como a de critérios do monitorias.
 de `atendimentos`: a base só guarda atendimento que gerou avaliação, e a
 diferença é real (102 finalizados contra 98 avaliações na 1ª semana da Allana).
 
-**`atendimentos`** — as avaliações. Notas `-1` e `0` são inválidas: fora da
-contagem e fora do denominador do C-SAT.
+**`avaliacoes`** — as avaliações de **todos os canais**, distinguidos pela
+coluna `origem`: `huggy` e `diretores`. Notas `-1` e `0` são inválidas: ficam
+gravadas, mas fora da contagem e fora do denominador do C-SAT.
+
+Uma tabela só, e não uma por canal, porque as regras são as mesmas — as cinco
+faixas de C-SAT e os cinco pesos de nota valem para os dois. Duas tabelas
+significariam a regra escrita duas vezes, que é justamente o defeito da
+planilha: lá os blocos aparecem duplicados e um deles saiu desalinhado sem
+ninguém notar.
+
+**O que a faixa de C-SAT multiplica muda por canal, de propósito:**
+
+| Canal | Multiplica | Por quê |
+|---|---|---|
+| `huggy` | finalizados do relatório de volume | a base só tem quem avaliou; contá-la subestimaria (102 finalizados contra 98 avaliações) |
+| `diretores` | a contagem da própria base | não existe relatório de volume separado para esse canal |
+
+A medição de **executivos** deixou de existir e sai de circulação pelo campo
+`ativo` das regras, não por `delete`: fechamentos antigos referenciam essas
+chaves, e apagá-las quebraria o histórico do que foi entregue.
 
 **`monitorias`** — já pronta, ligada por `pessoas.id`, escala 0 a 1.
 
 **`lancamentos`** — o que não existe em sistema nenhum e o gestor digita:
-diretores, executivos, faixas de tempo de resposta, demandas extras e o "zera o
-dia". Cada linha guarda quem lançou e quando.
+diretores, faixas de tempo de resposta, transferências, demandas extras. Cada
+linha guarda quem lançou e quando.
+
+Duas regras não são `quantidade × peso` e sim valor digitado, marcadas com
+`valor_manual`: **Atestado**, cujo desconto é decidido conforme a quantidade de
+faltas, e **Inconsistência de atendimentos** — o "zera o dia", que na planilha é
+texto sem fórmula nenhuma por trás.
+
+**Conferência.** Todo atendimento a diretores levou algum tempo para ser
+respondido, então as três faixas de tempo somadas têm que dar o total de
+atendimentos — em julho batem exatamente (602 e 602). A view
+`vw_lancamentos_a_conferir` lista quando não bate, para a tela avisar. Avisa,
+não bloqueia. Sem isso, digitar 500 numa faixa e esquecer 102 custa 306 pontos
+que não são creditados, com a cota fechando menor e com aparência normal.
+
+**A meta é uma só.** Fica no grupo `config` da tabela `regras` e vale para
+todos: alterá-la é um `update` numa linha, e todo mundo passa a ser medido pelo
+novo valor no mesmo instante. Guardá-la por pessoa permitiria metas divergentes
+sem ninguém perceber — e como ela é o denominador do "quanto falta", duas
+pessoas com o mesmo desempenho apareceriam com atingimentos diferentes. Ciclos
+já fechados não são afetados: o fechamento grava a meta que valia no dia.
 
 ---
 
