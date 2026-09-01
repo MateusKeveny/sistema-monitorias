@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/componentes/Link';
 import { criarClienteServidor, exigirVisaoDoTime } from '@/lib/supabase/servidor';
 import { Cartao, Vazio } from '@/componentes/ui';
 import BotaoImprimir from '@/componentes/BotaoImprimir';

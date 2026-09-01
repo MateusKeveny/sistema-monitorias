@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/componentes/Link';
 import { notFound } from 'next/navigation';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { Cartao, EtiquetaNota, Vazio } from '@/componentes/ui';

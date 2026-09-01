@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/componentes/Link';
 import { criarClienteServidor, exigirVisaoDoTime } from '@/lib/supabase/servidor';
 import { Cartao, EtiquetaNota, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import { mesRotulo, mesCurto, nota, percentual } from '@/lib/formatar';

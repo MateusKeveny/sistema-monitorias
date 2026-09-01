@@ -1,7 +1,7 @@
-import Link from 'next/link';
+import Link from '@/componentes/Link';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { Cartao, Indicador, EtiquetaNota, Tabela, Th, Td, Vazio } from '@/componentes/ui';
-import EvolucaoMensal from '@/componentes/EvolucaoMensal';
+import EvolucaoMensal from '@/componentes/GraficoEvolucao';
 import CoberturaDoCiclo from '@/componentes/CoberturaDoCiclo';
 import SolicitacoesDeExclusao, { type Solicitacao } from '@/componentes/SolicitacoesDeExclusao';
 import { nota, mesRotulo, mesCurto, percentual, data as formatarData, hojeNoBrasil } from '@/lib/formatar';

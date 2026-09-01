@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/componentes/Link';
 
 export default function NaoEncontrada() {
   return (

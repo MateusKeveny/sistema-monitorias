@@ -9,6 +9,36 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 4.5.0
+
+Corrige a queda do sistema com erro 1102 (*Worker exceeded resource limits*).
+
+Em 01/09/2026, após uma exclusão de monitoria, o sistema inteiro passou a
+responder erro para quem estava logado. A exclusão em si funcionou e nada foi
+perdido — o problema era de capacidade, e a exclusão só disparou a rajada que
+o revelou.
+
+- **Causa.** O `next/link` pré-carrega todo link visível na tela. Como toda
+  página aqui é dinâmica e atrás de login, cada pré-carregamento é uma
+  renderização completa no servidor, com consulta ao banco junto. O menu tem 5
+  links e a lista de monitorias tem 1 por linha: abrir a lista disparava dezenas
+  de renderizações de páginas que ninguém pediu. Nos registros do Worker, **233
+  das 239 chamadas (97%) eram pré-carregamento**, gastando 4,8 s de CPU. O
+  Worker tem 10 ms de CPU por chamada; a rajada estourava o limite e derrubava
+  junto a página que a pessoa realmente tinha aberto.
+- **Correção.** Todo link do sistema passa por `componentes/Link.tsx`, que
+  desliga o pré-carregamento por padrão. Não se perde velocidade: pré-carregar
+  página dinâmica não guarda o conteúdo, só adianta um trabalho que seria
+  refeito na navegação de qualquer jeito.
+- **Alívio extra.** O gráfico do Painel (Recharts) era desenhado no servidor e
+  descartado no navegador, porque a paleta depende do tema, que só existe lá.
+  Agora ele carrega direto no navegador. O Painel caiu de 120 kB para 3,6 kB de
+  código renderizado, e de 295 kB para 178 kB no primeiro carregamento.
+
+Segue de pé a recomendação de migrar o Worker para o plano pago: 10 ms de CPU
+por chamada é pouco para renderização no servidor, e esta correção dá folga,
+não garantia.
+
 ## 4.4.1
 
 Horários em GMT-3, o fuso da operação.

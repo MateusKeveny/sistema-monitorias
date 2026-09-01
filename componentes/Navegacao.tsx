@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/componentes/Link';
 import { usePathname, useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import BotaoTema from '@/componentes/BotaoTema';

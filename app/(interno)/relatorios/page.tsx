@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/componentes/Link';
 import { exigirVisaoDoTime } from '@/lib/supabase/servidor';
 
 const RELATORIOS = [
