@@ -9,6 +9,28 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 4.6.0
+
+Ponto de verificação para monitoramento externo, em `/api/saude`.
+
+A queda de 01/09 só foi percebida porque alguém estava usando o sistema na
+hora. Fora do horário, ela poderia durar horas sem ninguém saber.
+
+- A Cloudflare não oferece alerta de erro de Worker no plano gratuito, e os
+  registros de execução só existem ao vivo, sem retenção. O aviso precisa vir
+  de um monitor externo.
+- Um monitor apontado para a página de login não serviria: durante toda a pane
+  o login respondeu 200, e só as telas de dentro falhavam. Olhar a porta da
+  frente não diz se a casa está de pé.
+- Por isso `/api/saude` faz uma consulta real ao banco e verifica o caminho
+  inteiro: o Worker executou, alcançou o Supabase e recebeu resposta. Responde
+  `200` com estado, versão e tempo de resposta, ou `503` com o motivo.
+- Não devolve nenhum dado do sistema — a RLS já entrega lista vazia para quem
+  não está logado, e é esse o comportamento esperado.
+- O endereço fica fora do `middleware`. Passando por ele seria redirecionado ao
+  login e devolveria `200` mesmo com o sistema fora do ar, ou seja, o monitor
+  diria que está tudo bem no meio da pane.
+
 ## 4.5.0
 
 Corrige a queda do sistema com erro 1102 (*Worker exceeded resource limits*).
