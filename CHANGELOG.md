@@ -9,6 +9,18 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 4.4.0
+
+Histórico das decisões de exclusão, que ficavam gravadas sem nenhuma tela lendo.
+
+- O detalhe da monitoria mostra os **pedidos de exclusão** feitos para ela, com
+  motivo, quem pediu, quem decidiu, quando e a observação da recusa. Uma recusa
+  saía da fila do gestor e não deixava nada visível.
+- Tela **Monitorias excluídas**, acessível pela lista, com o que foi apagado, por
+  quem e por quê. Sem ela a aprovação sumia da vista: aprovar apaga a monitoria e
+  leva junto o pedido, porque a solicitação aponta para ela em cascata — o
+  registro sobrevive em `monitorias_excluidas`, que nenhuma tela lia.
+
 ## 4.3.1
 
 - A fila de exclusões aparecia vazia para o gestor mesmo com solicitação

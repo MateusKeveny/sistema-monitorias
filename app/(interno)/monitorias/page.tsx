@@ -131,6 +131,13 @@ export default async function ListaMonitorias({
             Exportar Excel
           </Link>
           {perfil.papel !== 'operador' && (
+            <Link href="/monitorias/excluidas"
+              className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
+                         font-medium text-slate-700 hover:bg-slate-50">
+              Excluídas
+            </Link>
+          )}
+          {perfil.papel !== 'operador' && (
             <Link href="/monitorias/nova"
               className="rounded-lg bg-marca-600 px-3 py-1.5 text-sm font-semibold text-white
                          hover:bg-marca-700">

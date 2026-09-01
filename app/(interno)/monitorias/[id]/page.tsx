@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { Cartao, EtiquetaNota, Vazio } from '@/componentes/ui';
 import BotaoExcluirMonitoria from '@/componentes/BotaoExcluirMonitoria';
+import PedidosDeExclusao, { type PedidoDeExclusao } from '@/componentes/PedidosDeExclusao';
 import { data as formatarData, dataHora, duracao, percentual, nota } from '@/lib/formatar';
 import type { Monitoria } from '@/lib/tipos';
 
@@ -32,21 +33,29 @@ export default async function DetalheMonitoria({
   const { id } = await params;
   const db = await criarClienteServidor();
 
-  const [{ data: monitoria }, { data: itens }, { data: historico }] = await Promise.all([
-    db.from('vw_monitorias').select('*').eq('id', id).maybeSingle(),
-    db.from('monitoria_itens')
-      .select('conforme, observacao, criterios(nome, ordem, peso)')
-      .eq('monitoria_id', id),
-    db.from('monitoria_alteracoes')
-      .select('id, autor_nome, alterado_em, campo, valor_anterior, valor_novo')
-      .eq('monitoria_id', id)
-      .order('alterado_em', { ascending: false }),
-  ]);
+  const [{ data: monitoria }, { data: itens }, { data: historico }, { data: pedidos }] =
+    await Promise.all([
+      db.from('vw_monitorias').select('*').eq('id', id).maybeSingle(),
+      db.from('monitoria_itens')
+        .select('conforme, observacao, criterios(nome, ordem, peso)')
+        .eq('monitoria_id', id),
+      db.from('monitoria_alteracoes')
+        .select('id, autor_nome, alterado_em, campo, valor_anterior, valor_novo')
+        .eq('monitoria_id', id)
+        .order('alterado_em', { ascending: false }),
+      // A RLS já restringe a quem enxerga o time; o operador recebe lista vazia.
+      db.from('solicitacoes_exclusao')
+        .select('id, motivo, status, solicitada_por_nome, solicitada_em,'
+          + ' decidida_por_nome, decidida_em, observacao_decisao')
+        .eq('monitoria_id', id)
+        .order('solicitada_em', { ascending: false }),
+    ]);
 
   if (!monitoria) notFound();
   const m = monitoria as Monitoria;
 
   const alteracoes = (historico ?? []) as Alteracao[];
+  const pedidosDeExclusao = (pedidos ?? []) as unknown as PedidoDeExclusao[];
 
   const avaliados = ((itens ?? []) as unknown as Item[])
     .filter((i) => i.criterios)
@@ -175,6 +184,8 @@ export default async function DetalheMonitoria({
           </ul>
         </Cartao>
       )}
+
+      <PedidosDeExclusao pedidos={pedidosDeExclusao} />
 
       <div className="flex flex-wrap gap-2">
         {/* A folha de feedback é um relatório do time, restrito a quem enxerga
