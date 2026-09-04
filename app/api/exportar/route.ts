@@ -93,13 +93,36 @@ export async function GET(requisicao: NextRequest) {
   const relatorio = p.get('relatorio') ?? 'monitorias';
   const mes = p.get('mes');
 
-  /** Lê uma view inteira, opcionalmente restrita a um mês. */
+  /**
+   * Lê uma view inteira, opcionalmente restrita a um mês.
+   *
+   * Em páginas, porque o PostgREST devolve no máximo 1.000 linhas por consulta
+   * e não avisa quando corta. A aba de critérios tem cerca de 19 linhas por
+   * monitoria, então passou de 1.000 com 53 monitorias — o arquivo vinha
+   * truncado desde então, com aparência de completo.
+   *
+   * A ordenação precisa ser TOTAL, ou seja, terminar em colunas que não
+   * empatam. Com empate, o banco fica livre para devolver linhas empatadas em
+   * qualquer ordem, e aí duas páginas seguidas podem repetir uma linha e pular
+   * outra — perda silenciosa de novo, agora no meio do arquivo.
+   */
   async function ler(view: string, ordem: [string, boolean][]) {
-    let q = db.from(view).select('*');
-    if (mes) q = q.eq('mes_referencia', mes);
-    for (const [coluna, ascendente] of ordem) q = q.order(coluna, { ascending: ascendente });
-    const { data } = await q;
-    return (data ?? []) as Record<string, unknown>[];
+    const PAGINA = 1000;
+    const tudo: Record<string, unknown>[] = [];
+
+    for (let de = 0; ; de += PAGINA) {
+      let q = db.from(view).select('*');
+      if (mes) q = q.eq('mes_referencia', mes);
+      for (const [coluna, ascendente] of ordem) q = q.order(coluna, { ascending: ascendente });
+      q = q.range(de, de + PAGINA - 1);
+
+      const { data, error } = await q;
+      if (error) throw new Error(`Falha ao ler ${view}: ${error.message}`);
+
+      const pagina = (data ?? []) as Record<string, unknown>[];
+      tudo.push(...pagina);
+      if (pagina.length < PAGINA) return tudo;
+    }
   }
 
   const sufixo = mes ? '-' + mes.slice(0, 7) : '';
@@ -118,11 +141,11 @@ export async function GET(requisicao: NextRequest) {
 
     const linhas =
       relatorio === 'ranking'
-        ? await ler('vw_ranking_mensal', [['mes_referencia', false], ['nota_media', false]])
+        ? await ler('vw_ranking_mensal', [['mes_referencia', false], ['nota_media', false], ['operador_id', true]])
         : relatorio === 'semanal'
           ? agruparPorSemana(
-              await ler('vw_monitorias', [['data_atendimento', true]])) as unknown as Record<string, unknown>[]
-          : await ler('vw_monitorias', [['data_atendimento', false]]);
+              await ler('vw_monitorias', [['data_atendimento', true], ['id', true]])) as unknown as Record<string, unknown>[]
+          : await ler('vw_monitorias', [['data_atendimento', false], ['id', true]]);
 
     const escapar = (v: unknown) => {
       const s = v == null ? '' : String(v);
@@ -145,8 +168,8 @@ export async function GET(requisicao: NextRequest) {
 
   // ------------------------------------------------------------------ XLSX
   const [monitorias, detalhes] = await Promise.all([
-    ler('vw_monitorias', [['data_atendimento', false]]),
-    ler('vw_feedback_individual', [['data_atendimento', true], ['criterio_ordem', true]]),
+    ler('vw_monitorias', [['data_atendimento', false], ['id', true]]),
+    ler('vw_feedback_individual', [['data_atendimento', true], ['monitoria_id', true], ['criterio_ordem', true]]),
   ]);
 
   const simNao = (linhas: Record<string, unknown>[], campo: string) =>

@@ -9,6 +9,20 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 4.11.1
+
+Corrige a exportação, que vinha cortada em 1.000 linhas.
+
+- O PostgREST devolve no máximo **1.000 linhas por consulta e não avisa quando
+  corta**. A aba de critérios tem cerca de 19 linhas por monitoria, então
+  passou desse teto com 53 monitorias — o arquivo vinha truncado desde então,
+  com aparência de completo.
+- Medido hoje: `vw_feedback_individual` tem **2.299 linhas** e a exportação
+  entregava **1.000**. Faltavam 56% dos critérios em todo arquivo gerado.
+- A leitura passa a ser paginada, e a ordenação de cada consulta termina em
+  colunas que não empatam. Sem isso, duas páginas seguidas poderiam repetir uma
+  linha e pular outra — a mesma perda silenciosa, agora no meio do arquivo.
+
 ## 4.11.0
 
 Nova aba **Por semana** na exportação: uma linha por operador e semana.
