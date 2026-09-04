@@ -215,11 +215,34 @@ da equipe a parte automática é que domina.
 
 ---
 
+## Onde parei
+
+**Nada foi executado no banco.** As migrações 12 e 13 estão escritas e
+conferidas (delimitadores, parênteses e existência das colunas), mas nunca
+rodaram — a sintaxe só o Supabase confirma.
+
+O painel foi pausado aqui em 01/09/2026 para um ajuste no sistema de
+monitorias. Ponto de retorno: a tag `painel-cota-modelo`.
+
 ## Em aberto
 
-1. Conferir se `nome_huggy` chegou completo em `pessoas` e então apagar
+**Decisões que faltam do gestor**
+
+1. O complemento sobre `lancamentos`, agora que o conteúdo de `regras` está
+   documentado.
+2. Como a avaliação de **diretores** entra no sistema: arquivo importado ou
+   digitação em tela. Não muda a tabela, só a tela.
+
+**Passos técnicos, na ordem**
+
+3. Rodar `12-painel-de-cota.sql` e depois `13-calculo-da-cota.sql`.
+4. Conferir se `nome_huggy` chegou completo em `pessoas` e então apagar
    `atendentes` (a linha está comentada no fim da migração 12).
-2. Destino da tabela `cotas`, cujo `dados_tabela` é um blob JSON que não dá
-   para auditar. Provavelmente vira histórico e sai de uso.
-3. O layout atualizado do relatório, que o Mateus vai encaminhar. Não muda o
-   SQL: categorias são dados, não estrutura.
+5. Construir o importador do relatório semanal do Huggy. É ele que destrava a
+   cota completa: sem `volume_semanal` não há linha de Huggy, de C-SAT nem de
+   TME.
+6. Reimportar as avaliações com procedência, comparar com `atendimentos` — é aí
+   que a diferença de 16 registros entre planilha e banco aparece — e só então
+   apagar a tabela antiga.
+7. As telas: extrato semanal, lançamento manual com a conferência das faixas de
+   tempo, e o relatório do ciclo.
