@@ -270,10 +270,11 @@ export default async function ListaMonitorias({
                     </Link>
                   </Td>
                   <Td className="whitespace-nowrap tabular-nums">{formatarData(m.data_atendimento)}</Td>
-                  {/* Acima da camada de clique para continuar selecionável: é o
-                      número que se copia para procurar o atendimento no Huggy. */}
-                  <Td className="relative z-10 whitespace-nowrap text-center font-mono text-xs">
-                    <span className="cursor-text select-all">{m.protocolo}</span>
+                  {/* Sem tratamento especial: a linha inteira se comporta igual,
+                      e só o código é o link. Para copiar o protocolo, o detalhe
+                      da monitoria. */}
+                  <Td className="whitespace-nowrap text-center font-mono text-xs">
+                    {m.protocolo}
                   </Td>
                   <Td className="whitespace-nowrap font-medium text-slate-900">{m.operador}</Td>
                   <Td className="whitespace-nowrap text-slate-500">{m.canal ?? '—'}</Td>

@@ -9,6 +9,21 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 4.9.0
+
+Aviso de data no futuro ao lançar ou editar monitoria.
+
+- Data futura quase sempre é erro de digitação, e é um erro que **não
+  aparece**: a monitoria cai numa competência que ainda não chegou, some dos
+  relatórios do mês e reaparece meses depois. Aconteceu duas vezes, uma delas
+  lançada em setembro com data de dezembro.
+- O formulário avisa e diz em qual competência a monitoria vai contar.
+  **Avisa, não bloqueia** — pode haver caso legítimo, e travar o lançamento
+  atrapalharia mais do que ajudaria.
+- Na lista, o protocolo perde o tratamento especial que o mantinha
+  selecionável: a linha inteira passa a se comportar igual, e só o código é o
+  link. Para copiar o protocolo, o detalhe da monitoria.
+
 ## 4.8.0
 
 Cada monitoria ganha um código, e a lista ganha busca.

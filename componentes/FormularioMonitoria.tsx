@@ -7,6 +7,7 @@ import { Cartao } from '@/componentes/ui';
 import {
   nota as formatarNota, faixa, percentual,
   semanaDoCiclo, mesDeCompetencia, mesRotulo, hojeNoBrasil,
+  data as formatarDataBR,
 } from '@/lib/formatar';
 import type { Canal, Criterio, Operador } from '@/lib/tipos';
 
@@ -244,6 +245,23 @@ export default function FormularioMonitoria({
             : 'A nota é calculada automaticamente pelos pesos dos critérios.'}
         </p>
       </div>
+
+      {/* Data no futuro quase sempre é erro de digitação — e é um erro que não
+          aparece: a monitoria cai numa competência que ainda não chegou, some
+          dos relatórios do mês e reaparece meses depois. Já aconteceu duas
+          vezes, uma delas lançada em setembro com data de dezembro.
+
+          Avisa, não bloqueia: pode haver caso legítimo, e travar o lançamento
+          atrapalharia mais do que ajudaria. */}
+      {dataAtendimento > hojeNoBrasil() && (
+        <p className="rounded-xl bg-amber-50 px-5 py-4 text-sm text-amber-900
+                      ring-1 ring-amber-600/20">
+          <strong>Data no futuro.</strong> O atendimento está em{' '}
+          {formatarDataBR(dataAtendimento)}, que ainda não aconteceu. A monitoria vai
+          contar em {mesRotulo(competencia)} e não aparece nos relatórios até lá —
+          confira a data antes de salvar.
+        </p>
+      )}
 
       {semanaCheia && !editando && (
         <p className="rounded-xl bg-amber-50 px-5 py-4 text-sm text-amber-900
