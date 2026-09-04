@@ -4,10 +4,79 @@ import { gerarXlsx, type Aba } from '@/lib/xlsx-escrever';
 
 export const dynamic = 'force-dynamic';
 
+type LinhaSemana = {
+  competencia: string;
+  operador: string;
+  semana_mes: number;
+  nota_1: number | null;
+  nota_2: number | null;
+  nota_3: number | null;
+  nota_4: number | null;
+  quantidade: number;
+  media: number | null;
+};
+
+/**
+ * Uma linha por operador e semana, com a nota de cada monitoria.
+ *
+ * É o insumo do cálculo da cota, onde a monitoria entra pela média da semana.
+ * Por isso a média é sobre as monitorias que existirem, e não sobre quatro
+ * fixas: uma semana com duas monitorias tem a média das duas, e não das duas
+ * mais dois zeros. A diferença muda a pontuação inteira.
+ *
+ * O agrupamento é por `operador_id`, nunca pelo nome: dois homônimos viariam
+ * uma linha só, com as notas embaralhadas entre eles.
+ */
+function agruparPorSemana(linhas: Record<string, unknown>[]): LinhaSemana[] {
+  const grupos = new Map<string, { linha: LinhaSemana; notas: number[] }>();
+
+  for (const m of linhas) {
+    const chave = `${m.mes_referencia}|${m.operador_id}|${m.semana_mes}`;
+    let g = grupos.get(chave);
+    if (!g) {
+      g = {
+        linha: {
+          competencia: String(m.mes_referencia ?? '').slice(0, 7),
+          operador: String(m.operador ?? ''),
+          semana_mes: Number(m.semana_mes),
+          nota_1: null, nota_2: null, nota_3: null, nota_4: null,
+          quantidade: 0, media: null,
+        },
+        notas: [],
+      };
+      grupos.set(chave, g);
+    }
+
+    if (m.nota_final == null) continue;
+    const nota = Number(m.nota_final);
+
+    const numero = Number(m.numero_monitoria);
+    if (numero >= 1 && numero <= 4) {
+      g.linha[`nota_${numero}` as 'nota_1' | 'nota_2' | 'nota_3' | 'nota_4'] = nota;
+    }
+    g.notas.push(nota);
+    g.linha.quantidade++;
+  }
+
+  for (const { linha, notas } of grupos.values()) {
+    linha.media = notas.length
+      ? Number((notas.reduce((s, n) => s + n, 0) / notas.length).toFixed(4))
+      : null;
+  }
+
+  return [...grupos.values()]
+    .map((g) => g.linha)
+    .sort((a, b) =>
+      b.competencia.localeCompare(a.competencia)
+      || a.operador.localeCompare(b.operador, 'pt-BR')
+      || a.semana_mes - b.semana_mes);
+}
+
 /**
  * Exportação dos dados.
- *   /api/exportar?formato=xlsx                    -> pasta com 2 abas (monitorias + critérios)
+ *   /api/exportar?formato=xlsx                    -> pasta com 3 abas
  *   /api/exportar?formato=csv&relatorio=ranking   -> ranking mensal em CSV
+ *   /api/exportar?formato=csv&relatorio=semanal   -> operador x semana, com as notas
  *   /api/exportar?formato=csv                     -> monitorias em CSV
  * Aceita &mes=AAAA-MM-01 para filtrar.
  *
@@ -37,16 +106,23 @@ export async function GET(requisicao: NextRequest) {
 
   // ------------------------------------------------------------------- CSV
   if (formato === 'csv') {
-    const ehRanking = relatorio === 'ranking';
-    const colunas = ehRanking
-      ? ['mes_referencia', 'operador', 'total_monitorias', 'nota_media',
-         'nota_minima', 'nota_maxima', 'zeradas', 'impecaveis']
-      : ['protocolo', 'data_atendimento', 'operador', 'canal', 'semana_mes',
-         'numero_monitoria', 'nota_final', 'zerado', 'parecer'];
+    const colunas =
+      relatorio === 'ranking'
+        ? ['mes_referencia', 'operador', 'total_monitorias', 'nota_media',
+           'nota_minima', 'nota_maxima', 'zeradas', 'impecaveis']
+        : relatorio === 'semanal'
+          ? ['competencia', 'operador', 'semana_mes',
+             'nota_1', 'nota_2', 'nota_3', 'nota_4', 'quantidade', 'media']
+          : ['codigo', 'protocolo', 'data_atendimento', 'operador', 'canal',
+             'semana_mes', 'numero_monitoria', 'nota_final', 'zerado', 'parecer'];
 
-    const linhas = ehRanking
-      ? await ler('vw_ranking_mensal', [['mes_referencia', false], ['nota_media', false]])
-      : await ler('vw_monitorias', [['data_atendimento', false]]);
+    const linhas =
+      relatorio === 'ranking'
+        ? await ler('vw_ranking_mensal', [['mes_referencia', false], ['nota_media', false]])
+        : relatorio === 'semanal'
+          ? agruparPorSemana(
+              await ler('vw_monitorias', [['data_atendimento', true]])) as unknown as Record<string, unknown>[]
+          : await ler('vw_monitorias', [['data_atendimento', false]]);
 
     const escapar = (v: unknown) => {
       const s = v == null ? '' : String(v);
@@ -80,6 +156,7 @@ export async function GET(requisicao: NextRequest) {
     {
       nome: 'Monitorias',
       colunas: [
+        { cabecalho: 'Código', chave: 'codigo', largura: 9, formato: 'numero' },
         { cabecalho: 'Protocolo', chave: 'protocolo', largura: 16 },
         { cabecalho: 'Data', chave: 'data_atendimento', largura: 12 },
         { cabecalho: 'Operador', chave: 'operador', largura: 22 },
@@ -107,6 +184,29 @@ export async function GET(requisicao: NextRequest) {
         { cabecalho: 'Observação', chave: 'observacao', largura: 60, formato: 'quebra' },
       ],
       linhas: simNao(detalhes, 'conforme'),
+    },
+    {
+      // A média vem calculada porque é ela que entra na cota — deixar para o
+      // Excel significaria a mesma conta escrita em cada arquivo, e divergindo
+      // no dia em que alguém arrastar a fórmula uma linha a mais.
+      //
+      // Os pontos NÃO são calculados aqui de propósito. A regra da monitoria
+      // (75 × média, quando passa de 85%) pertence ao cadastro de regras do
+      // painel de cota, e repeti-la neste arquivo criaria uma segunda
+      // definição para o mesmo número.
+      nome: 'Por semana',
+      colunas: [
+        { cabecalho: 'Competência', chave: 'competencia', largura: 13 },
+        { cabecalho: 'Operador', chave: 'operador', largura: 22 },
+        { cabecalho: 'Semana', chave: 'semana_mes', largura: 9, formato: 'numero' },
+        { cabecalho: '1ª', chave: 'nota_1', largura: 9, formato: 'percentual' },
+        { cabecalho: '2ª', chave: 'nota_2', largura: 9, formato: 'percentual' },
+        { cabecalho: '3ª', chave: 'nota_3', largura: 9, formato: 'percentual' },
+        { cabecalho: '4ª', chave: 'nota_4', largura: 9, formato: 'percentual' },
+        { cabecalho: 'Qtde', chave: 'quantidade', largura: 8, formato: 'numero' },
+        { cabecalho: 'Média', chave: 'media', largura: 11, formato: 'percentual' },
+      ],
+      linhas: agruparPorSemana(monitorias) as unknown as Record<string, unknown>[],
     },
   ];
 

@@ -9,6 +9,27 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 4.11.0
+
+Nova aba **Por semana** na exportação: uma linha por operador e semana.
+
+- Colunas: competência, operador, semana, a nota da 1ª, 2ª, 3ª e 4ª monitoria,
+  quantidade e média. É o insumo do cálculo da cota, onde a monitoria entra
+  pela média da semana.
+- A média é sobre as monitorias **que existirem**, e não sobre quatro fixas:
+  uma semana com duas monitorias tem a média das duas, e não das duas mais
+  dois zeros. A diferença muda a pontuação inteira.
+- O agrupamento é por identificador do operador, nunca pelo nome — dois
+  homônimos virariam uma linha só, com as notas embaralhadas.
+- Também em CSV, por `?formato=csv&relatorio=semanal`.
+- O **código da monitoria** passa a constar na aba Monitorias e no CSV, para
+  chegar ao registro a partir do arquivo.
+
+Os pontos não são calculados aqui de propósito: a regra da monitoria
+(75 × média, quando passa de 85%) pertence ao cadastro de regras do painel de
+cota, e repeti-la neste arquivo criaria uma segunda definição para o mesmo
+número.
+
 ## 4.10.0
 
 A troca de senha passa a ser registrada pelo banco.
