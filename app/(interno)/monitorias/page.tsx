@@ -209,15 +209,34 @@ export default async function ListaMonitorias({
                     </Link>
                   </Th>
                 ))}
+                {/* A coluna "abrir" saiu: a linha inteira é o link agora, e
+                    duas coisas clicáveis para o mesmo destino confundem. */}
                 <Th>Parecer</Th>
-                <Th />
               </tr>
             </thead>
             <tbody>
               {monitorias.map((m) => (
-                <tr key={m.id} className="hover:bg-slate-50">
+                /* A linha inteira abre a monitoria, e o protocolo é o link
+                   visível — é por ele que se procura um atendimento.
+
+                   O clique vem de um link de verdade, esticado sobre a linha
+                   por um `::after`, e não de um `onClick`. Assim ctrl+clique,
+                   botão do meio e "abrir em nova aba" continuam funcionando, e
+                   o teclado alcança a linha pela tabulação normal. Um
+                   manipulador de clique perderia as quatro coisas. */
+                <tr key={m.id} className="relative cursor-pointer hover:bg-slate-50
+                                          has-[a:focus-visible]:bg-slate-100">
                   <Td className="whitespace-nowrap tabular-nums">{formatarData(m.data_atendimento)}</Td>
-                  <Td className="whitespace-nowrap text-center font-mono text-xs">{m.protocolo}</Td>
+                  <Td className="whitespace-nowrap text-center font-mono text-xs">
+                    <Link
+                      href={`/monitorias/${m.id}`}
+                      aria-label={`Abrir monitoria ${m.protocolo}, de ${m.operador}`}
+                      className="font-medium text-marca-700 after:absolute after:inset-0
+                                 hover:underline focus:outline-none dark:text-marca-400"
+                    >
+                      {m.protocolo}
+                    </Link>
+                  </Td>
                   <Td className="whitespace-nowrap font-medium text-slate-900">{m.operador}</Td>
                   <Td className="whitespace-nowrap text-slate-500">{m.canal ?? '—'}</Td>
                   <Td className="text-center tabular-nums">{m.semana_mes}ª</Td>
@@ -227,12 +246,6 @@ export default async function ListaMonitorias({
                   </Td>
                   <Td className="max-w-md">
                     <span className="line-clamp-2 text-xs text-slate-500">{m.parecer ?? '—'}</span>
-                  </Td>
-                  <Td>
-                    <Link href={`/monitorias/${m.id}`}
-                      className="whitespace-nowrap text-xs font-medium text-marca-700 dark:text-marca-400 hover:underline">
-                      abrir →
-                    </Link>
                   </Td>
                 </tr>
               ))}
