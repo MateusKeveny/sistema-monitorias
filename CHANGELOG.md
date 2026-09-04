@@ -9,6 +9,26 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 4.8.0
+
+Cada monitoria ganha um código, e a lista ganha busca.
+
+- O código aparece como **#0042** e é o link da linha. O `id` é um UUID, bom
+  para o banco e impossível de ditar por telefone; o protocolo é do
+  atendimento, não da monitoria, e se repete quando dois monitores avaliam o
+  mesmo atendimento. O código identifica a monitoria e mais nada.
+- **Campo de busca** na lista, por código ou por protocolo. O `#` e os zeros à
+  esquerda são só apresentação: "#0042", "0042" e "42" chegam ao mesmo
+  registro.
+- O **protocolo volta a ser selecionável** — ele fica acima da camada de
+  clique, porque é o número que se copia para procurar o atendimento no Huggy.
+- A coluna de código é ordenável, e o código aparece também no detalhe e na
+  lista de excluídas.
+
+As 79 monitorias existentes foram numeradas pela ordem em que aconteceram, e o
+código sobrevive à exclusão: perguntar "o que houve com a #0037" continua tendo
+resposta depois de ela ser apagada.
+
 ## 4.7.0
 
 A linha da lista de monitorias abre o registro.

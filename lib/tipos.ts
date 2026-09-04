@@ -42,6 +42,8 @@ export type Criterio = {
 
 export type Monitoria = {
   id: string;
+  /** Número curto e único da monitoria, para citar e para buscar. */
+  codigo: number;
   protocolo: string;
   data_atendimento: string;
   mes_referencia: string;

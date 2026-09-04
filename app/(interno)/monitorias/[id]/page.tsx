@@ -4,7 +4,7 @@ import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { Cartao, EtiquetaNota, Vazio } from '@/componentes/ui';
 import BotaoExcluirMonitoria from '@/componentes/BotaoExcluirMonitoria';
 import PedidosDeExclusao, { type PedidoDeExclusao } from '@/componentes/PedidosDeExclusao';
-import { data as formatarData, dataHora, duracao, percentual, nota } from '@/lib/formatar';
+import { data as formatarData, dataHora, duracao, percentual, nota, codigoMonitoria } from '@/lib/formatar';
 import type { Monitoria } from '@/lib/tipos';
 
 export const dynamic = 'force-dynamic';
@@ -63,6 +63,7 @@ export default async function DetalheMonitoria({
   const reprovados = avaliados.filter((i) => !i.conforme);
 
   const ficha: [string, string][] = [
+    ['Código', codigoMonitoria(m.codigo)],
     ['Protocolo', m.protocolo],
     ['Data do atendimento', formatarData(m.data_atendimento)],
     ['Operador(a)', m.operador],
@@ -80,7 +81,7 @@ export default async function DetalheMonitoria({
             ← Monitorias
           </Link>
           <h1 className="mt-1 text-xl font-semibold text-sobre-fundo">
-            Monitoria {m.protocolo}
+            Monitoria {codigoMonitoria(m.codigo)}
           </h1>
           <p className="text-sm text-sobre-fundo-suave">
             {m.operador} · {formatarData(m.data_atendimento)}

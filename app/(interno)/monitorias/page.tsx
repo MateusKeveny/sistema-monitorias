@@ -1,14 +1,14 @@
 import Link from '@/componentes/Link';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { Cartao, EtiquetaNota, Tabela, Th, Td, Vazio } from '@/componentes/ui';
-import { data as formatarData, mesRotulo } from '@/lib/formatar';
+import { data as formatarData, mesRotulo, codigoMonitoria } from '@/lib/formatar';
 import type { Monitoria, Operador } from '@/lib/tipos';
 
 export const dynamic = 'force-dynamic';
 
 type Busca = {
   operador?: string; mes?: string; zeradas?: string; pagina?: string;
-  ordenar?: string; direcao?: string;
+  ordenar?: string; direcao?: string; busca?: string;
 };
 
 const POR_PAGINA = 100;
@@ -22,6 +22,7 @@ const POR_PAGINA = 100;
  * primeiro clique — data começa da mais recente, nome começa de A.
  */
 const ORDENAVEIS = {
+  codigo: { crescentePadrao: false },
   data_atendimento: { crescentePadrao: false },
   protocolo: { crescentePadrao: true },
   operador: { crescentePadrao: true },
@@ -66,6 +67,25 @@ export default async function ListaMonitorias({
   if (filtros.mes) consulta = consulta.eq('mes_referencia', filtros.mes);
   if (filtros.zeradas === 'sim') consulta = consulta.eq('zerado', true);
 
+  /**
+   * Busca por código da monitoria ou protocolo do atendimento.
+   *
+   * O termo é limpo antes de entrar no filtro: vírgula, ponto e parênteses são
+   * sintaxe para o PostgREST, e um termo com esses caracteres não faria uma
+   * busca — mudaria a consulta. Sobram letras, números, espaço e hífen, que é
+   * tudo que protocolo e código podem ter.
+   *
+   * O `#` e os zeros à esquerda são só apresentação, então "#0042", "0042" e
+   * "42" chegam todos na mesma monitoria.
+   */
+  const termo = (filtros.busca ?? '').trim().replace(/[^A-Za-z0-9 \-#]/g, '');
+  if (termo) {
+    const numero = Number(termo.replace(/^#/, ''));
+    const alternativas = [`protocolo.ilike.*${termo.replace(/^#/, '')}*`];
+    if (Number.isSafeInteger(numero) && numero > 0) alternativas.push(`codigo.eq.${numero}`);
+    consulta = consulta.or(alternativas.join(','));
+  }
+
   const [{ data: lista, count }, { data: operadores }, { data: meses }] = await Promise.all([
     consulta,
     db.from('pessoas').select('id, nome').eq('avaliado', true).eq('ativo', true).order('nome'),
@@ -83,6 +103,7 @@ export default async function ListaMonitorias({
     if (atual.operador) p.set('operador', atual.operador);
     if (atual.mes) p.set('mes', atual.mes);
     if (atual.zeradas) p.set('zeradas', atual.zeradas);
+    if (atual.busca) p.set('busca', atual.busca);
     if (atual.ordenar) p.set('ordenar', atual.ordenar);
     if (atual.direcao) p.set('direcao', atual.direcao);
     if (atual.pagina && atual.pagina !== '1') p.set('pagina', atual.pagina);
@@ -152,6 +173,17 @@ export default async function ListaMonitorias({
         <input type="hidden" name="ordenar" value={ordenar} />
         <input type="hidden" name="direcao" value={crescente ? 'asc' : 'desc'} />
 
+        {/* Vem primeiro porque é o caminho mais curto até um registro: quem
+            sabe o número não precisa de filtro nenhum. */}
+        <input
+          type="search"
+          name="busca"
+          defaultValue={filtros.busca ?? ''}
+          placeholder="Código ou protocolo"
+          aria-label="Buscar por código da monitoria ou protocolo do atendimento"
+          className={`${estilo} w-48`}
+        />
+
         {perfil.papel !== 'operador' && (
           <select name="operador" defaultValue={filtros.operador ?? ''} className={estilo}>
             <option value="">Todos os operadores</option>
@@ -189,6 +221,7 @@ export default async function ListaMonitorias({
             <thead>
               <tr>
                 {([
+                  ['codigo', 'Código', ''],
                   ['data_atendimento', 'Data', ''],
                   ['protocolo', 'Protocolo', 'text-center'],
                   ['operador', 'Operador', ''],
@@ -216,8 +249,8 @@ export default async function ListaMonitorias({
             </thead>
             <tbody>
               {monitorias.map((m) => (
-                /* A linha inteira abre a monitoria, e o protocolo é o link
-                   visível — é por ele que se procura um atendimento.
+                /* A linha inteira abre a monitoria, e o código é o link
+                   visível — é por ele que se identifica um registro.
 
                    O clique vem de um link de verdade, esticado sobre a linha
                    por um `::after`, e não de um `onClick`. Assim ctrl+clique,
@@ -226,16 +259,21 @@ export default async function ListaMonitorias({
                    manipulador de clique perderia as quatro coisas. */
                 <tr key={m.id} className="relative cursor-pointer hover:bg-slate-50
                                           has-[a:focus-visible]:bg-slate-100">
-                  <Td className="whitespace-nowrap tabular-nums">{formatarData(m.data_atendimento)}</Td>
-                  <Td className="whitespace-nowrap text-center font-mono text-xs">
+                  <Td className="whitespace-nowrap font-mono tabular-nums">
                     <Link
                       href={`/monitorias/${m.id}`}
-                      aria-label={`Abrir monitoria ${m.protocolo}, de ${m.operador}`}
+                      aria-label={`Abrir monitoria ${codigoMonitoria(m.codigo)}, de ${m.operador}`}
                       className="font-medium text-marca-700 after:absolute after:inset-0
                                  hover:underline focus:outline-none dark:text-marca-400"
                     >
-                      {m.protocolo}
+                      {codigoMonitoria(m.codigo)}
                     </Link>
+                  </Td>
+                  <Td className="whitespace-nowrap tabular-nums">{formatarData(m.data_atendimento)}</Td>
+                  {/* Acima da camada de clique para continuar selecionável: é o
+                      número que se copia para procurar o atendimento no Huggy. */}
+                  <Td className="relative z-10 whitespace-nowrap text-center font-mono text-xs">
+                    <span className="cursor-text select-all">{m.protocolo}</span>
                   </Td>
                   <Td className="whitespace-nowrap font-medium text-slate-900">{m.operador}</Td>
                   <Td className="whitespace-nowrap text-slate-500">{m.canal ?? '—'}</Td>

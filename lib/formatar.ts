@@ -7,6 +7,17 @@ export const nota = (v: number | null | undefined) =>
 
 export const percentual = nota;
 
+/**
+ * Código da monitoria: #0042.
+ *
+ * O banco guarda o número puro; o zero à esquerda e o # são só apresentação.
+ * Quatro casas porque o volume é de cerca de 200 monitorias por ano — passa
+ * bem de mil antes de precisar de uma quinta, e até lá o alinhamento da coluna
+ * se mantém.
+ */
+export const codigoMonitoria = (n: number | null | undefined) =>
+  n == null ? '—' : '#' + String(n).padStart(4, '0');
+
 export const data = (iso: string | null | undefined) => {
   if (!iso) return '—';
   const [a, m, d] = iso.slice(0, 10).split('-');

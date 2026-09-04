@@ -1,12 +1,13 @@
 import Link from '@/componentes/Link';
 import { criarClienteServidor, exigirVisaoDoTime } from '@/lib/supabase/servidor';
 import { Cartao, EtiquetaNota, Tabela, Th, Td, Vazio } from '@/componentes/ui';
-import { data as formatarData, dataHora } from '@/lib/formatar';
+import { data as formatarData, dataHora, codigoMonitoria } from '@/lib/formatar';
 
 export const dynamic = 'force-dynamic';
 
 type Excluida = {
   id: string;
+  codigo: number | null;
   protocolo: string | null;
   data_atendimento: string | null;
   operador_nome: string | null;
@@ -64,6 +65,7 @@ export default async function MonitoriasExcluidas() {
             <Tabela>
               <thead>
                 <tr>
+                  <Th>Código</Th>
                   <Th>Excluída em</Th>
                   <Th className="text-center">Protocolo</Th>
                   <Th>Operador</Th>
@@ -76,6 +78,9 @@ export default async function MonitoriasExcluidas() {
               <tbody>
                 {excluidas.map((e) => (
                   <tr key={e.id} className="hover:bg-slate-50">
+                    <Td className="whitespace-nowrap font-mono tabular-nums text-slate-500">
+                      {codigoMonitoria(e.codigo)}
+                    </Td>
                     <Td className="whitespace-nowrap tabular-nums">{dataHora(e.excluida_em)}</Td>
                     <Td className="whitespace-nowrap text-center font-mono text-xs">
                       {e.protocolo ?? '—'}
