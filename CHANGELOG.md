@@ -9,6 +9,26 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 4.10.0
+
+A troca de senha passa a ser registrada pelo banco.
+
+- Antes, quem marcava a senha como trocada era uma chamada feita pela tela
+  logo depois do `updateUser`. Ela marcava **sem conferir nada**: qualquer
+  pessoa logada podia chamar a função direto pela API e sair da troca
+  obrigatória com a senha padrão intacta, com o sistema achando que já havia
+  trocado.
+- Agora a marca vem de um gatilho em `auth.users`, disparado só quando a senha
+  muda de fato. A decisão sai da tela e vai para o banco.
+- A função antiga fica sem permissão de execução. Conferido de fora: passou de
+  `204` para `401 permission denied`.
+
+Não é falha de invasão — quem chamava já estava dentro, e nenhum dado ficava
+exposto. É a trava que existe para tirar de circulação a senha padrão, que é
+conhecida e adivinhável, e que podia ser contornada justamente por quem tem
+interesse em não trocá-la. Por isso a versão sobe no segundo número, e não no
+primeiro.
+
 ## 4.9.1
 
 A versão sobe para a barra de navegação, sob o nome do sistema.
