@@ -36,15 +36,13 @@ export default function FormularioNovaSenha({ nome }: { nome: string }) {
       return;
     }
 
-    // Só depois de a senha ser trocada de fato é que o perfil é marcado.
-    // A função no banco só altera esta coluna, e só na linha de quem chamou.
-    const { error: erroMarca } = await db.rpc('marcar_senha_definida');
-    if (erroMarca) {
-      setErro(`Senha alterada, mas o registro falhou: ${erroMarca.message}. `
-        + 'Recarregue a página — se a tela reaparecer, avise a Qualidade.');
-      setEnviando(false);
-      return;
-    }
+    // Quem marca `senha_definida` é o banco, por gatilho na troca da senha.
+    //
+    // Antes essa marca vinha daqui, de uma chamada logo depois do update — e
+    // por isso podia ser feita sem trocar senha nenhuma: bastava chamar a
+    // função direto pela API para sair da troca obrigatória mantendo a senha
+    // padrão. A trava existe justamente para tirar a senha padrão de
+    // circulação, então não podia depender de quem tem interesse em burlá-la.
 
     router.push('/');
     router.refresh();
