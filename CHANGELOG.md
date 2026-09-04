@@ -9,6 +9,21 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 4.7.0
+
+A linha da lista de monitorias abre o registro.
+
+- O **protocolo vira o link visível** — é por ele que se procura um
+  atendimento — e a área de clique se estende por toda a linha.
+- O clique é de um link de verdade, esticado sobre a linha por um `::after`, e
+  não de um `onClick`. Com isso ctrl+clique, botão do meio e "abrir em nova
+  aba" continuam funcionando, e o teclado alcança a linha pela tabulação
+  normal. Um manipulador de clique perderia as quatro coisas.
+- A coluna **"abrir →"** saiu: duas coisas clicáveis para o mesmo destino
+  confundem mais do que ajudam.
+
+A permissão de edição não mudou — gestor e qualidade seguem editando.
+
 ## 4.6.0
 
 Ponto de verificação para monitoramento externo, em `/api/saude`.
