@@ -20,11 +20,19 @@ const ITENS: Item[] = [
 ];
 
 export default function Navegacao({
-  perfil, pendentes = 0,
+  perfil, pendentes = 0, versao,
 }: {
   perfil: Perfil;
   /** Exclusões esperando decisão do gestor. Zero esconde o contador. */
   pendentes?: number;
+  /**
+   * Versão em uso, vinda do servidor.
+   *
+   * Chega por propriedade, e não por import do package.json, porque este é um
+   * componente de navegador: importar aqui levaria o arquivo inteiro para o
+   * pacote enviado ao usuário, só para exibir cinco caracteres.
+   */
+  versao?: string;
 }) {
   const caminho = usePathname();
   const router = useRouter();
@@ -41,8 +49,21 @@ export default function Navegacao({
   return (
     <header className="sem-impressao sticky top-0 z-20 border-b border-slate-200 bg-superficie">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-6 py-3">
-        <span className="text-sm font-bold tracking-tight text-marca-700 dark:text-marca-400">
-          Monitorias de Qualidade
+        {/* A versão fica sob o nome do sistema, apagada de propósito: serve
+            para quem reporta um problema dizer em qual versão viu, sem
+            competir com o menu. */}
+        <span className="flex flex-col justify-center leading-none">
+          <span className="text-sm font-bold tracking-tight text-marca-700 dark:text-marca-400">
+            Monitorias de Qualidade
+          </span>
+          {versao && (
+            <span
+              aria-label={`Versão ${versao}`}
+              className="mt-1 select-none text-[10px] tabular-nums text-slate-400/60"
+            >
+              v{versao}
+            </span>
+          )}
         </span>
 
         <nav className="flex flex-1 flex-wrap items-center gap-1">

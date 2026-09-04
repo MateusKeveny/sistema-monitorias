@@ -9,6 +9,21 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 4.9.1
+
+A versão sobe para a barra de navegação, sob o nome do sistema.
+
+- No rodapé ela era invisível na prática: 10px, cinza a 50%, num canto que
+  ninguém olha — e no modo escuro sumia de vez.
+- Deixa de aparecer nas telas de login e de definir senha, que não têm barra.
+  Quem precisar do número antes de entrar tem o `/api/saude`.
+- A versão chega à navegação por propriedade, e não por `import` do
+  package.json: a navegação é componente de navegador, e importar ali levaria
+  o arquivo inteiro para o pacote enviado ao usuário só para exibir cinco
+  caracteres.
+- De quebra, some o aviso de build sobre importação nomeada do package.json,
+  que aparecia em toda compilação.
+
 ## 4.9.0
 
 Aviso de data no futuro ao lançar ou editar monitoria.

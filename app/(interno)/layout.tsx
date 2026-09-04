@@ -1,4 +1,5 @@
 import Navegacao from '@/componentes/Navegacao';
+import pacote from '@/package.json';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 
 export default async function LayoutInterno({ children }: { children: React.ReactNode }) {
@@ -20,7 +21,7 @@ export default async function LayoutInterno({ children }: { children: React.Reac
 
   return (
     <>
-      <Navegacao perfil={perfil} pendentes={pendentes} />
+      <Navegacao perfil={perfil} pendentes={pendentes} versao={pacote.version} />
       <main className="mx-auto max-w-7xl px-6 py-8">{children}</main>
     </>
   );

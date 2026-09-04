@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { version } from '@/package.json';
+import pacote from '@/package.json';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,14 +36,14 @@ export async function GET() {
     if (error) throw new Error(error.message);
 
     return Response.json(
-      { estado: 'ok', versao: version, ms: Date.now() - inicio },
+      { estado: 'ok', versao: pacote.version, ms: Date.now() - inicio },
       { headers: { 'cache-control': 'no-store' } },
     );
   } catch (erro) {
     return Response.json(
       {
         estado: 'falha',
-        versao: version,
+        versao: pacote.version,
         ms: Date.now() - inicio,
         detalhe: erro instanceof Error ? erro.message : 'erro desconhecido',
       },

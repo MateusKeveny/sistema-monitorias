@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import { version } from '@/package.json';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -32,19 +31,13 @@ export default function LayoutRaiz({ children }: { children: React.ReactNode }) 
       <head>
         <script dangerouslySetInnerHTML={{ __html: APLICAR_TEMA }} />
       </head>
+      {/* A versão em uso não fica mais aqui: subiu para a barra de navegação,
+          sob o nome do sistema. No rodapé ela era invisível na prática — 10px
+          e cinza a 50% num canto que ninguém olha. Com isso ela deixa de
+          aparecer nas telas de login e de definir senha, que não têm barra;
+          quem precisar do número antes de entrar tem `/api/saude`. */}
       <body className="min-h-screen antialiased">
         {children}
-
-        {/* Versão em uso. Discreta de propósito: serve para quem reporta um
-            problema dizer em qual versão viu, sem competir com o conteúdo.
-            `pointer-events-none` garante que nunca atrapalhe um clique. */}
-        <span
-          aria-label={`Versão ${version}`}
-          className="sem-impressao pointer-events-none fixed bottom-2 right-3 z-50
-                     select-none text-[10px] tabular-nums text-slate-400/50"
-        >
-          v{version}
-        </span>
       </body>
     </html>
   );
