@@ -1,6 +1,12 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "monitorias",
+  // O nome vira o endereço: <nome>.<subdomínio da conta>.workers.dev.
+  //
+  // Trocar aqui NÃO renomeia o Worker existente: a Cloudflare cria um novo com
+  // o nome novo e o antigo continua no ar servindo o endereço velho. Isso dá
+  // uma janela de transição, mas o antigo precisa ser apagado depois — senão
+  // ficam dois sistemas idênticos apontando para o mesmo banco.
+  "name": "painel-monitorias",
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-08-01",
   // nodejs_compat dá ao Worker as APIs de Node que o Next.js usa.
