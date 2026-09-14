@@ -344,6 +344,25 @@ if (fs.existsSync(PLANO)) {
 
 // -------------------------------------------------------------------- gravação
 
+/*
+ * Recusa rodar duas vezes.
+ *
+ * O banco não impede protocolo repetido — dois monitores podem avaliar o mesmo
+ * atendimento —, então uma segunda execução gravaria as 132 monitorias de novo,
+ * em duplicata, com códigos novos e sem erro nenhum. A importação foi
+ * concluída em 14/09/2026; se algum protocolo do plano já existir, para aqui.
+ */
+{
+  const { data: existentes, error } = await db.from('monitorias')
+    .select('protocolo').in('protocolo', monitorias.map((m) => m.protocolo));
+  if (error) { console.error('Falha ao conferir duplicidade:', error.message); process.exit(1); }
+  if (existentes.length) {
+    console.error(`\n*** ${existentes.length} protocolos deste arquivo já estão no banco. ***`);
+    console.error('A importação já foi feita. Rodar de novo duplicaria as monitorias.');
+    process.exit(1);
+  }
+}
+
 console.log('\n--- gravando ---');
 let ok = 0;
 for (const m of monitorias) {
