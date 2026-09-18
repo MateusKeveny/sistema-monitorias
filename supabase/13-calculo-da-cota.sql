@@ -104,17 +104,24 @@ create or replace view public.vw_tme_equipe with (security_invoker = false) as
 -- ---------------------------------------------------------------------------
 -- O extrato
 --
--- As faixas são resolvidas pela própria tabela `regras`, em intervalos
--- semiabertos [mínimo, máximo). Mexer num peso ou acrescentar uma categoria é
--- `update`/`insert`, nunca alteração de código.
+-- Em duas etapas, de propósito:
+--
+--   1. `vw_extrato_quantidades` diz O QUE aconteceu: qual regra se aplica e em
+--      que quantidade. As faixas (TME, C-SAT, notas) são resolvidas aqui, pela
+--      tabela `regras`, em intervalos semiabertos [mínimo, máximo) — faixa é
+--      igual para todos os cargos.
+--   2. `vw_extrato_cota` diz QUANTO VALE: busca o peso no cargo que a pessoa
+--      tinha naquela competência. Regra sem peso no cargo não pontua.
+--
+-- Separar assim garante que o peso é lido num lugar só. Com o peso repetido em
+-- cada bloco, bastaria esquecer um para aquele bloco usar o valor errado.
 -- ---------------------------------------------------------------------------
-create or replace view public.vw_extrato_cota with (security_invoker = true) as
+create or replace view public.vw_extrato_quantidades with (security_invoker = true) as
 
-  -- Atendimentos do Huggy: 4 pontos por finalizado.
+  -- Atendimentos do Huggy: por finalizado.
   select v.pessoa_id, v.mes_competencia, v.semana, 'huggy'::text as origem,
-         r.chave as regra, r.rotulo, r.grupo, r.ordem,
-         v.finalizados::numeric as quantidade, r.peso,
-         round(v.finalizados * r.peso, 4) as cota
+         r.chave as regra, v.finalizados::numeric as quantidade,
+         null::numeric as pontos_manuais
     from public.volume_semanal v
     join public.regras r on r.chave = 'huggy_atendimento' and r.ativo
 
@@ -122,9 +129,7 @@ create or replace view public.vw_extrato_cota with (security_invoker = true) as
 
   -- TME: a faixa vem da equipe, a quantidade é a do indivíduo.
   select v.pessoa_id, v.mes_competencia, v.semana, 'huggy',
-         r.chave, r.rotulo, r.grupo, r.ordem,
-         v.finalizados::numeric, r.peso,
-         round(v.finalizados * r.peso, 4)
+         r.chave, v.finalizados::numeric, null
     from public.volume_semanal v
     join public.vw_tme_equipe t
       on t.mes_competencia = v.mes_competencia and t.semana = v.semana
@@ -138,9 +143,7 @@ create or replace view public.vw_extrato_cota with (security_invoker = true) as
   -- C-SAT: uma regra, os dois canais. A faixa vem do C-SAT do canal e
   -- multiplica a base daquele canal.
   select b.pessoa_id, b.mes_competencia, b.semana, b.origem,
-         r.chave, r.rotulo, r.grupo, r.ordem,
-         b.quantidade, r.peso,
-         round(b.quantidade * r.peso, 4)
+         r.chave, b.quantidade, null
     from public.vw_base_do_csat b
     join public.vw_csat_semanal c
       on c.pessoa_id = b.pessoa_id and c.origem = b.origem
@@ -154,62 +157,96 @@ create or replace view public.vw_extrato_cota with (security_invoker = true) as
 
   -- Notas 1 a 5, também para os dois canais.
   select a.pessoa_id, a.mes_competencia, a.semana, a.origem,
-         r.chave, r.rotulo, r.grupo, r.ordem,
-         count(*)::numeric, r.peso,
-         round(count(*) * r.peso, 4)
+         r.chave, count(*)::numeric, null
     from public.vw_avaliacoes_validas a
     join public.regras r
       on r.grupo = 'nota' and r.ativo and r.faixa_min = a.nota
-   group by a.pessoa_id, a.mes_competencia, a.semana, a.origem,
-            r.chave, r.rotulo, r.grupo, r.ordem, r.peso
+   group by a.pessoa_id, a.mes_competencia, a.semana, a.origem, r.chave
 
   union all
 
-  -- Monitoria: a única regra que não é quantidade × peso.
-  -- `75 × média` quando a média passa de 85%, zero quando não passa. O teste é
-  -- estritamente maior: exatamente 0,85 não pontua. A média é sobre as
-  -- monitorias que existirem na semana, não sobre quatro fixas.
+  -- Monitoria: a quantidade é a MÉDIA da semana. Se ela pontua ou não é
+  -- decidido na etapa 2 (ver lá). A média é sobre as monitorias que existirem
+  -- na semana, não sobre quatro fixas.
   select m.operador_id, m.mes_referencia, m.semana_mes, null,
-         r.chave, r.rotulo, r.grupo, r.ordem,
-         round(avg(m.nota_final), 4), r.peso,
-         case when avg(m.nota_final) > r.faixa_min
-              then round(avg(m.nota_final) * r.peso, 4) else 0 end
+         r.chave, round(avg(m.nota_final), 4), null
     from public.monitorias m
     join public.regras r on r.chave = 'monitoria' and r.ativo
-   group by m.operador_id, m.mes_referencia, m.semana_mes,
-            r.chave, r.rotulo, r.grupo, r.ordem, r.peso, r.faixa_min
+   group by m.operador_id, m.mes_referencia, m.semana_mes, r.chave
 
   union all
 
-  -- Lançamentos manuais. Quando a regra é de valor manual — "Atestado", cujo
-  -- desconto depende da quantidade de faltas, e "Inconsistência de
-  -- atendimentos", o "zera o dia" que na planilha é texto sem fórmula — vale o
-  -- valor digitado, não a multiplicação.
+  -- Lançamentos manuais.
   select l.pessoa_id, l.mes_competencia, l.semana, null,
-         r.chave, r.rotulo, r.grupo, r.ordem,
-         l.quantidade, r.peso,
-         coalesce(l.pontos_manuais, round(l.quantidade * r.peso, 4))
+         r.chave, l.quantidade, l.pontos_manuais
     from public.lancamentos l
     join public.regras r on r.chave = l.regra and r.ativo;
+
+create or replace view public.vw_extrato_cota with (security_invoker = true) as
+  select q.pessoa_id, q.mes_competencia, q.semana, q.origem,
+         q.regra, r.rotulo, r.grupo, r.ordem,
+         c.id   as cargo_id,
+         c.nome as cargo,
+         q.quantidade,
+         pc.peso,
+         case
+           -- Valor digitado pelo gestor vence a multiplicação: "Atestado", cujo
+           -- desconto depende das faltas, e "Inconsistência de atendimentos",
+           -- o "zera o dia" que na planilha é texto sem fórmula.
+           when q.pontos_manuais is not null then q.pontos_manuais
+           -- Monitoria: `peso × média` quando a média passa do mínimo (85%),
+           -- zero quando não passa. Estritamente maior: 0,85 não pontua.
+           when r.grupo = 'monitoria' then
+             case when q.quantidade > r.faixa_min
+                  then round(q.quantidade * pc.peso, 4) else 0 end
+           else round(q.quantidade * pc.peso, 4)
+         end as cota
+    from public.vw_extrato_quantidades q
+    join public.regras r on r.chave = q.regra
+    join public.cargos c
+      on c.id = public.cargo_na_competencia(q.pessoa_id, q.mes_competencia)
+    join public.pesos_por_cargo pc
+      on pc.cargo_id = c.id and pc.regra = q.regra and pc.ativo;
+
+-- ---------------------------------------------------------------------------
+-- Quem tem dado no mês e está sem cargo
+--
+-- Pessoa sem cargo não tem peso, e sem peso o extrato dela sai VAZIO — sem
+-- erro. É exatamente o zero silencioso que este redesenho existe para
+-- eliminar, então a tela lista esta view como alerta antes do fechamento.
+-- ---------------------------------------------------------------------------
+create or replace view public.vw_sem_cargo with (security_invoker = true) as
+  select distinct d.pessoa_id, p.nome, d.mes_competencia
+    from (
+      select pessoa_id, mes_competencia from public.volume_semanal
+      union select pessoa_id, mes_competencia from public.vw_avaliacoes_validas
+      union select pessoa_id, mes_competencia from public.lancamentos
+      union select operador_id, mes_referencia from public.monitorias
+    ) d
+    join public.pessoas p on p.id = d.pessoa_id
+   where public.cargo_na_competencia(d.pessoa_id, d.mes_competencia) is null;
 
 -- ---------------------------------------------------------------------------
 -- A cota do mês é a soma do extrato. Não existe segundo cálculo.
 --
--- A meta é única e global: alterar a linha `meta` em `regras` muda o
--- atingimento de todo mundo no mesmo instante.
+-- A meta é uma por cargo: alterar a linha `meta` de um cargo em
+-- `pesos_por_cargo` muda o atingimento de todos daquele cargo no mesmo
+-- instante.
 -- ---------------------------------------------------------------------------
 create or replace view public.vw_cota_mensal with (security_invoker = true) as
   select
     e.pessoa_id,
-    p.nome                      as pessoa,
+    p.nome                           as pessoa,
     e.mes_competencia,
-    sum(e.cota)                 as resultado,
-    (select peso from public.regras where chave = 'meta') as meta,
-    round(sum(e.cota) / nullif((select peso from public.regras where chave = 'meta'), 0), 6)
-                                as atingimento
+    e.cargo,
+    sum(e.cota)                      as resultado,
+    pm.peso                          as meta,
+    round(sum(e.cota) / nullif(pm.peso, 0), 6) as atingimento
   from public.vw_extrato_cota e
   join public.pessoas p on p.id = e.pessoa_id
-  group by e.pessoa_id, p.nome, e.mes_competencia;
+  left join public.pesos_por_cargo pm
+    on pm.cargo_id = e.cargo_id and pm.regra = 'meta' and pm.ativo
+  group by e.pessoa_id, p.nome, e.mes_competencia, e.cargo, pm.peso;
 
 -- ---------------------------------------------------------------------------
 -- Conferência dos lançamentos manuais
@@ -275,6 +312,7 @@ create table if not exists public.fechamentos_cota (
   pessoa_id        uuid not null references public.pessoas (id) on delete restrict,
   pessoa_nome      text,
   mes_competencia  date not null,
+  cargo            text,
   resultado        numeric(14,4) not null,
   meta             numeric(14,4),
   fechado_por      uuid references public.pessoas (id) on delete set null,
@@ -324,10 +362,10 @@ begin
          select pessoa_id from public.fechamentos_cota where mes_competencia = p_mes)
   loop
     insert into public.fechamentos_cota
-      (pessoa_id, pessoa_nome, mes_competencia, resultado, meta,
+      (pessoa_id, pessoa_nome, mes_competencia, cargo, resultado, meta,
        fechado_por, fechado_por_nome)
     values
-      (v_p.pessoa_id, v_p.pessoa, p_mes, v_p.resultado, v_p.meta,
+      (v_p.pessoa_id, v_p.pessoa, p_mes, v_p.cargo, v_p.resultado, v_p.meta,
        public.pessoa_atual(), coalesce(v_nome, 'sistema'))
     returning id into v_id;
 

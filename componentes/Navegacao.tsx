@@ -5,24 +5,37 @@ import { usePathname, useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import BotaoTema from '@/componentes/BotaoTema';
 import { NOMES_PAPEL, type Perfil } from '@/lib/tipos';
+import { NOME_SISTEMA, type Sistema } from '@/lib/sistema';
 
 type Item = { href: string; rotulo: string; papeis: Perfil['papel'][] };
 
 // O operador não tem "Relatórios": todos eles são recortes do time, e o que é
 // dele já está em "Monitorias" e no painel. Menu com item que não acrescenta
 // nada é ruído.
-const ITENS: Item[] = [
-  { href: '/', rotulo: 'Painel', papeis: ['gestor', 'qualidade', 'operador'] },
-  { href: '/monitorias', rotulo: 'Monitorias', papeis: ['gestor', 'qualidade', 'operador'] },
-  { href: '/monitorias/nova', rotulo: 'Nova monitoria', papeis: ['gestor', 'qualidade'] },
-  { href: '/relatorios', rotulo: 'Relatórios', papeis: ['gestor', 'qualidade'] },
-  { href: '/configuracoes', rotulo: 'Configurações', papeis: ['gestor'] },
-];
+const ITENS: Record<Sistema, Item[]> = {
+  monitorias: [
+    { href: '/', rotulo: 'Painel', papeis: ['gestor', 'qualidade', 'operador'] },
+    { href: '/monitorias', rotulo: 'Monitorias', papeis: ['gestor', 'qualidade', 'operador'] },
+    { href: '/monitorias/nova', rotulo: 'Nova monitoria', papeis: ['gestor', 'qualidade'] },
+    { href: '/relatorios', rotulo: 'Relatórios', papeis: ['gestor', 'qualidade'] },
+    { href: '/configuracoes', rotulo: 'Configurações', papeis: ['gestor'] },
+  ],
+  cota: [
+    { href: '/cota', rotulo: 'Início', papeis: ['gestor', 'qualidade', 'operador'] },
+    { href: '/cota/extrato', rotulo: 'Extrato', papeis: ['gestor', 'qualidade', 'operador'] },
+    { href: '/cota/lancamentos', rotulo: 'Lançamentos', papeis: ['gestor'] },
+    { href: '/cota/importar', rotulo: 'Importar', papeis: ['gestor'] },
+    { href: '/cota/fechamento', rotulo: 'Fechamento', papeis: ['gestor'] },
+    { href: '/cota/configuracao', rotulo: 'Configuração', papeis: ['gestor'] },
+  ],
+};
 
 export default function Navegacao({
-  perfil, pendentes = 0, versao,
+  perfil, pendentes = 0, sistema, versao,
 }: {
   perfil: Perfil;
+  /** Qual dos dois sites está sendo servido (ver lib/sistema.ts). */
+  sistema: Sistema;
   /** Exclusões esperando decisão do gestor. Zero esconde o contador. */
   pendentes?: number;
   /**
@@ -43,8 +56,10 @@ export default function Navegacao({
     router.refresh();
   }
 
+  // A raiz de cada sistema só fica ativa nela mesma, senão acenderia junto com
+  // todas as páginas de dentro.
   const ativo = (href: string) =>
-    href === '/' ? caminho === '/' : caminho.startsWith(href);
+    href === '/' || href === '/cota' ? caminho === href : caminho.startsWith(href);
 
   return (
     <header className="sem-impressao sticky top-0 z-20 border-b border-slate-200 bg-superficie">
@@ -54,7 +69,7 @@ export default function Navegacao({
             competir com o menu. */}
         <span className="flex flex-col justify-center leading-none">
           <span className="text-sm font-bold tracking-tight text-marca-700 dark:text-marca-400">
-            Monitorias de Qualidade
+            {NOME_SISTEMA[sistema]}
           </span>
           {versao && (
             <span
@@ -67,7 +82,7 @@ export default function Navegacao({
         </span>
 
         <nav className="flex flex-1 flex-wrap items-center gap-1">
-          {ITENS.filter((i) => i.papeis.includes(perfil.papel)).map((item) => (
+          {ITENS[sistema].filter((i) => i.papeis.includes(perfil.papel)).map((item) => (
             <Link
               key={item.href}
               href={item.href}

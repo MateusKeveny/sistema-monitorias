@@ -1,4 +1,6 @@
 import FormularioLogin from '@/componentes/FormularioLogin';
+import { NOME_SISTEMA } from '@/lib/sistema';
+import { sistemaAtual } from '@/lib/sistema-servidor';
 
 const MENSAGENS: Record<string, string> = {
   'perfil-ausente': 'Seu usuário existe, mas ainda não tem perfil liberado. Fale com a Qualidade.',
@@ -20,6 +22,7 @@ export default async function PaginaLogin({
   return (
     <main className="flex min-h-screen items-center justify-center px-6">
       <FormularioLogin
+        titulo={NOME_SISTEMA[await sistemaAtual()]}
         aviso={erro ? MENSAGENS[erro] ?? null : null}
         proximo={proximo && proximo.startsWith('/') ? proximo : '/'}
       />

@@ -1,10 +1,17 @@
 import type { Metadata } from 'next';
+import { NOME_SISTEMA } from '@/lib/sistema';
+import { sistemaAtual } from '@/lib/sistema-servidor';
 import './globals.css';
 
-export const metadata: Metadata = {
-  title: 'Monitorias de Qualidade — IGreen',
-  description: 'Sistema de monitorias de qualidade de atendimento (C-SAT)',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const sistema = await sistemaAtual();
+  return {
+    title: `${NOME_SISTEMA[sistema]} — IGreen`,
+    description: sistema === 'cota'
+      ? 'Acompanhamento de cota por cargo'
+      : 'Sistema de monitorias de qualidade de atendimento (C-SAT)',
+  };
+}
 
 /**
  * Aplica o tema antes da primeira pintura.

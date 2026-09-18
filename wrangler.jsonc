@@ -19,5 +19,17 @@
   },
   "observability": {
     "enabled": true
+  },
+  // Segundo site, com o mesmo código: o Painel de Performance (cota).
+  // `opennextjs-cloudflare deploy --env performance` publica neste Worker.
+  // Qual sistema cada site mostra é decidido pelo endereço (lib/sistema.ts),
+  // então o nome abaixo precisa começar com "painel-performance".
+  "env": {
+    "performance": {
+      "name": "painel-performance",
+      "observability": {
+        "enabled": true
+      }
+    }
   }
 }

@@ -8,8 +8,10 @@ const campo = `w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outli
                focus:border-marca-600 focus:ring-2 focus:ring-marca-100`;
 
 export default function FormularioLogin({
-  aviso, proximo,
+  titulo, aviso, proximo,
 }: {
+  /** Nome do sistema deste endereço (monitorias ou performance). */
+  titulo: string;
   aviso: string | null;
   proximo: string;
 }) {
@@ -42,7 +44,7 @@ export default function FormularioLogin({
   return (
     <form onSubmit={entrar} className="w-full max-w-sm space-y-5 rounded-2xl border border-slate-200 bg-superficie p-8 shadow-xl">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Monitorias de Qualidade</h1>
+        <h1 className="text-2xl font-semibold text-slate-900">{titulo}</h1>
         <p className="mt-1 text-sm text-slate-500">Entre com seu e-mail corporativo.</p>
       </div>
 

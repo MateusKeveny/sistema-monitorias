@@ -36,12 +36,12 @@ update public.pessoas p
 
 -- A meta NÃO fica aqui, de propósito.
 --
--- Ela é uma regra única, no grupo `config` da tabela `regras`, e vale para
--- todos. Guardá-la por pessoa permitiria metas divergentes sem ninguém
--- perceber — e como a meta é o denominador do "quanto falta", duas pessoas com
--- o mesmo desempenho apareceriam com atingimentos diferentes. Alterar a meta é
--- um `update` numa linha, e todo mundo passa a ser medido pelo novo valor no
--- mesmo instante.
+-- Ela é uma regra (`meta`, grupo `config`) e, como toda regra, tem valor POR
+-- CARGO — ver seção 6. Guardá-la por pessoa permitiria metas divergentes sem
+-- ninguém perceber: duas pessoas do mesmo cargo com o mesmo desempenho
+-- apareceriam com atingimentos diferentes. Alterar a meta de um cargo é um
+-- `update` numa linha, e todos daquele cargo passam a ser medidos pelo novo
+-- valor no mesmo instante.
 --
 -- Os ciclos já fechados não são afetados: o fechamento guarda a meta que
 -- valia no dia, junto do resultado.
@@ -67,6 +67,9 @@ create table if not exists public.avaliacoes (
   protocolo      text,
   nota           smallint,
   tabulacao      text,
+  -- Campo aberto. As avaliações de diretores são digitadas pelo gestor, sem
+  -- relatório de origem, e aqui fica o contexto que ele quiser registrar.
+  observacao     text,
   -- De onde a linha veio. As avaliações herdadas entraram por macro do Excel,
   -- sem registro de arquivo nem de data, e ficam nulas — que é a resposta
   -- honesta. Num sistema que remunera, a diferença entre "o número está certo"
@@ -200,7 +203,87 @@ update public.regras set ativo = false
                  'executivos_ate_1h', 'executivos_acima_1h');
 
 -- ---------------------------------------------------------------------------
--- 6. Permissões
+-- 6. Cargos
+--
+-- A regra (o que é, o grupo, as faixas) é uma só; o PESO depende do cargo. Um
+-- Atendente Júnior e um Analista podem ganhar pontos diferentes pelo mesmo
+-- atendimento, ter metas diferentes, ou um cargo pode nem pontuar numa regra.
+--
+--   regras           — o catálogo: chave, rótulo, grupo, faixas. O `peso` que
+--                      fica lá passa a ser só o valor sugerido ao criar cargo.
+--   pesos_por_cargo  — quanto cada regra vale em cada cargo. Sem linha, ou com
+--                      `ativo = false`, a regra não pontua naquele cargo.
+--   cargos_da_pessoa — o cargo de cada pessoa A PARTIR de uma competência.
+--                      É histórico, não um campo em `pessoas`: quem é promovido
+--                      em outubro precisa continuar com os pesos de Júnior em
+--                      setembro, senão reabrir o extrato de setembro mostraria
+--                      um número diferente do que foi entregue.
+--
+-- Tudo configurável pela plataforma: são linhas, não código.
+-- ---------------------------------------------------------------------------
+create table if not exists public.cargos (
+  id        smallint generated always as identity primary key,
+  nome      text not null unique,
+  ordem     smallint not null default 0,
+  ativo     boolean not null default true,
+  criado_em timestamptz not null default now()
+);
+
+create table if not exists public.pesos_por_cargo (
+  cargo_id      smallint not null references public.cargos (id) on delete restrict,
+  regra         text not null references public.regras (chave) on delete restrict,
+  peso          numeric(12,4) not null,
+  ativo         boolean not null default true,
+  atualizado_em timestamptz not null default now(),
+  primary key (cargo_id, regra)
+);
+
+create table if not exists public.cargos_da_pessoa (
+  pessoa_id uuid not null references public.pessoas (id) on delete cascade,
+  -- Sempre dia 1: é a competência, no mesmo formato de `mes_competencia`.
+  desde     date not null check (extract(day from desde) = 1),
+  cargo_id  smallint not null references public.cargos (id) on delete restrict,
+  primary key (pessoa_id, desde)
+);
+
+-- O cargo que valia para a pessoa naquela competência.
+create or replace function public.cargo_na_competencia(p_pessoa uuid, p_mes date)
+returns smallint language sql stable set search_path = public as $$
+  select cargo_id from public.cargos_da_pessoa
+   where pessoa_id = p_pessoa and desde <= p_mes
+   order by desde desc
+   limit 1;
+$$;
+
+-- Ponto de partida: o cargo "Atendente Júnior" — o que é avaliado em todas as
+-- regras — com os pesos de hoje, e todos os avaliados nele desde janeiro. É o
+-- que a planilha já aplica. Os demais cargos são configurados pela plataforma
+-- e cada pessoa é movida para o seu. Pode rodar de novo sem duplicar.
+--
+-- (Na primeira execução, em 14/09/2026, o cargo nasceu como "Atendente" e foi
+-- renomeado depois. O `update` abaixo cobre quem rodar esta versão por cima.)
+update public.cargos set nome = 'Atendente Júnior' where nome = 'Atendente';
+
+insert into public.cargos (nome, ordem)
+values ('Atendente Júnior', 1)
+on conflict (nome) do nothing;
+
+insert into public.pesos_por_cargo (cargo_id, regra, peso, ativo)
+select c.id, r.chave, r.peso, r.ativo
+  from public.cargos c
+ cross join public.regras r
+ where c.nome = 'Atendente Júnior'
+on conflict (cargo_id, regra) do nothing;
+
+insert into public.cargos_da_pessoa (pessoa_id, desde, cargo_id)
+select p.id, date '2026-01-01', c.id
+  from public.pessoas p
+  join public.cargos c on c.nome = 'Atendente Júnior'
+ where p.avaliado
+on conflict (pessoa_id, desde) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- 7. Permissões
 --
 -- Reaproveita as guardas do monitorias: `pessoa_atual()`, `ve_o_time()`,
 -- `eh_gestor()`. Nada de lista de e-mails no código — hoje o painel decide
@@ -220,6 +303,32 @@ create policy regras_leitura on public.regras
 
 drop policy if exists regras_gestor on public.regras;
 create policy regras_gestor on public.regras
+  for all using (public.eh_gestor()) with check (public.eh_gestor());
+
+-- Cargos e pesos: todos leem (o operador vê quanto vale cada ponto), só o
+-- gestor configura. O cargo de cada pessoa segue a regra das demais tabelas.
+alter table public.cargos enable row level security;
+drop policy if exists cargos_leitura on public.cargos;
+create policy cargos_leitura on public.cargos
+  for select using (public.papel_atual() is not null);
+drop policy if exists cargos_gestor on public.cargos;
+create policy cargos_gestor on public.cargos
+  for all using (public.eh_gestor()) with check (public.eh_gestor());
+
+alter table public.pesos_por_cargo enable row level security;
+drop policy if exists pesos_leitura on public.pesos_por_cargo;
+create policy pesos_leitura on public.pesos_por_cargo
+  for select using (public.papel_atual() is not null);
+drop policy if exists pesos_gestor on public.pesos_por_cargo;
+create policy pesos_gestor on public.pesos_por_cargo
+  for all using (public.eh_gestor()) with check (public.eh_gestor());
+
+alter table public.cargos_da_pessoa enable row level security;
+drop policy if exists cargos_pessoa_leitura on public.cargos_da_pessoa;
+create policy cargos_pessoa_leitura on public.cargos_da_pessoa
+  for select using (public.ve_o_time() or pessoa_id = public.pessoa_atual());
+drop policy if exists cargos_pessoa_gestor on public.cargos_da_pessoa;
+create policy cargos_pessoa_gestor on public.cargos_da_pessoa
   for all using (public.eh_gestor()) with check (public.eh_gestor());
 
 alter table public.avaliacoes enable row level security;
@@ -269,7 +378,7 @@ create policy cotas_historico on public.cotas
   for select using (public.ve_o_time());
 
 -- ---------------------------------------------------------------------------
--- 7. `atendentes` ficou redundante
+-- 8. `atendentes` ficou redundante
 --
 -- `pessoas` já tem e-mail, nome e agora `nome_huggy`. Confira antes de apagar:
 --

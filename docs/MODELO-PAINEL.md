@@ -224,25 +224,75 @@ rodaram — a sintaxe só o Supabase confirma.
 O painel foi pausado aqui em 01/09/2026 para um ajuste no sistema de
 monitorias. Ponto de retorno: a tag `painel-cota-modelo`.
 
+Retomado em 14/09/2026. Decisões do gestor nessa data:
+
+- **Regras por cargo, configuráveis na plataforma.** O catálogo de regras é
+  um só (rótulo, grupo, faixas). O peso e a meta ficam em `pesos_por_cargo`,
+  e o cargo de cada pessoa em `cargos_da_pessoa`, com vigência por
+  competência, para que uma promoção não altere meses anteriores. As
+  migrações partem de um cargo "Atendente" com os pesos atuais e todos os
+  avaliados nele. Os demais cargos (Júnior, Pleno, Analista...) são criados
+  pela plataforma.
+- **Avaliações de diretores por lançamento manual**, em `avaliacoes` com
+  `origem = 'diretores'` e o campo aberto `observacao`.
+- **Os três cargos** (migração 17):
+  - *Atendente Júnior* — todas as regras. Todos os avaliados.
+  - *Atendente Pleno* (Suyara Martins) — média dos resultados mensais dos
+    Júniors × 1,2, mais as demandas extras que forem cadastradas. Ex.: Allana
+    4.500, Bruno 4.000, Rafael 5.000 → 4.500 × 1,2 = 5.400. A média entra
+    como uma linha do extrato, para o fechamento guardar a conta e não só o
+    total. Só entra na média quem pontuou no mês.
+  - *Analista* (Matheus Camargo) — lançamentos manuais: tratativas de chamados
+    (20), SLA ≤ 2 dias (5), SLA > 2 dias (−5). Meta 5.000. As faixas de SLA
+    são conferidas contra o total de chamados, como as de diretores.
+- **"Recebe por média" é configuração do cargo** (migração 18): em
+  `cargos_referencia`, cada cargo escolhe quais cargos compõem a sua média;
+  o multiplicador é o peso de `media_da_equipe`. Pleno = média dos Júniors;
+  *Gestor* = média de Júnior e Analista × 1,5 (o Pleno não compõe a média do
+  Gestor no cenário atual). A seleção é por cargo, não por pessoa. As médias são
+  encadeadas — a do Gestor usa o resultado completo do Pleno — e configuração
+  circular é bloqueada por gatilho.
+
 ## Em aberto
-
-**Decisões que faltam do gestor**
-
-1. O complemento sobre `lancamentos`, agora que o conteúdo de `regras` está
-   documentado.
-2. Como a avaliação de **diretores** entra no sistema: arquivo importado ou
-   digitação em tela. Não muda a tabela, só a tela.
 
 **Passos técnicos, na ordem**
 
-3. Rodar `12-painel-de-cota.sql` e depois `13-calculo-da-cota.sql`.
-4. Conferir se `nome_huggy` chegou completo em `pessoas` e então apagar
+1. Rodar `12-painel-de-cota.sql` e depois `13-calculo-da-cota.sql`.
+2. Conferir se `nome_huggy` chegou completo em `pessoas` e então apagar
    `atendentes` (a linha está comentada no fim da migração 12).
-5. Construir o importador do relatório semanal do Huggy. É ele que destrava a
+3. Construir o importador do relatório semanal do Huggy. É ele que destrava a
    cota completa: sem `volume_semanal` não há linha de Huggy, de C-SAT nem de
    TME.
-6. Reimportar as avaliações com procedência, comparar com `atendimentos` — é aí
+4. Reimportar as avaliações com procedência, comparar com `atendimentos` — é aí
    que a diferença de 16 registros entre planilha e banco aparece — e só então
    apagar a tabela antiga.
-7. As telas: extrato semanal, lançamento manual com a conferência das faixas de
-   tempo, e o relatório do ciclo.
+5. As telas. **Feitas na v4.12.0:** cargos e pesos, cargo de cada pessoa
+   (em Configurações) e lançamentos manuais com avaliações de diretores e
+   conferência das faixas (em "Lançamentos de cota"). **Faltam:** extrato
+   semanal, fechamento e relatório do ciclo.
+
+## Decisões de 16/09/2026
+
+- **Hub substituiu o Huggy em 03/09/2026.** Importação em Performance →
+  Importar (migração 19). Setor Expansao → origem `huggy`; Diretores-Expansao
+  → origem `diretores`. Entram só notas 1 a 5; data + protocolo repetidos são
+  ignorados; pessoa sem "Nome no Hub" fica de fora com aviso, sem bloquear.
+  Volume de finalizados continua manual.
+- **C-SAT** = notas 4 e 5 ÷ notas 1 a 5, por pessoa, semana (pela data da
+  avaliação) e canal. Na tela inicial do operador há seletor de canal, que abre
+  no canal com mais avaliações.
+- **Média da equipe** inclui todos que têm avaliação no canal, gestores
+  inclusive — decisão do gestor.
+
+## Situação em 18/09/2026 (Performance 0.11.0)
+
+Pronto e publicado em `painel-performance.expansao.workers.dev`: importação do
+Hub, volume e lançamentos por canal, configuração de cargos, telas iniciais do
+operador e do gestor, extrato (semanas × mês, blocos por canal, composição da
+média), fechamento com correção e histórico (migração 22) e exportação em dois
+formatos — detalhado e resumo no layout de `Cota expansão.xlsx`.
+
+Em andamento: o gestor está conferindo os números contra a planilha antiga.
+
+Antes de divulgar: trocar senhas ainda padrão, monitor do Performance no
+Better Stack, versão 1.0.0.

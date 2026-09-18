@@ -1,5 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
-import pacote from '@/package.json';
+import { VERSAO_COTA, VERSAO_MONITORIAS } from '@/lib/versoes';
+import { sistemaDoHost } from '@/lib/sistema';
+
+// `versao` continua sendo a das monitorias, que é o que o monitoramento já lê.
+const versoes = { versao: VERSAO_MONITORIAS, versoes: { monitorias: VERSAO_MONITORIAS, cota: VERSAO_COTA } };
 
 export const dynamic = 'force-dynamic';
 
@@ -20,8 +24,9 @@ export const dynamic = 'force-dynamic';
  * Deliberadamente não devolve nenhum dado do sistema: só estado, versão e
  * tempo de resposta, que são inofensivos para quem estiver olhando de fora.
  */
-export async function GET() {
+export async function GET(requisicao: Request) {
   const inicio = Date.now();
+  const sistema = sistemaDoHost(requisicao.headers.get('host'));
 
   try {
     // Cliente simples, sem cookie de sessão: a verificação não pode depender
@@ -36,14 +41,15 @@ export async function GET() {
     if (error) throw new Error(error.message);
 
     return Response.json(
-      { estado: 'ok', versao: pacote.version, ms: Date.now() - inicio },
+      { estado: 'ok', sistema, ...versoes, ms: Date.now() - inicio },
       { headers: { 'cache-control': 'no-store' } },
     );
   } catch (erro) {
     return Response.json(
       {
         estado: 'falha',
-        versao: pacote.version,
+        sistema,
+        ...versoes,
         ms: Date.now() - inicio,
         detalhe: erro instanceof Error ? erro.message : 'erro desconhecido',
       },

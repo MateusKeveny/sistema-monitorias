@@ -1,11 +1,24 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { INICIO_COTA, caminhoForaDoSistema, sistemaDoHost } from '@/lib/sistema';
 
 /**
  * Renova o cookie de sessão a cada navegação e barra o acesso
  * às páginas internas de quem não está logado.
  */
 export async function middleware(requisicao: NextRequest) {
+  const caminho = requisicao.nextUrl.pathname;
+
+  // Cada site mostra só o seu sistema. Vem antes da sessão: é só comparação de
+  // texto, e poupa uma ida ao Supabase para quem caiu no endereço errado.
+  const sistema = sistemaDoHost(requisicao.headers.get('host'));
+  if (caminhoForaDoSistema(sistema, caminho)) {
+    const destino = requisicao.nextUrl.clone();
+    destino.pathname = sistema === 'cota' ? INICIO_COTA : '/';
+    destino.search = '';
+    return NextResponse.redirect(destino);
+  }
+
   let resposta = NextResponse.next({ request: requisicao });
 
   const db = createServerClient(
@@ -24,7 +37,6 @@ export async function middleware(requisicao: NextRequest) {
   );
 
   const { data: { user } } = await db.auth.getUser();
-  const caminho = requisicao.nextUrl.pathname;
   const publica = caminho.startsWith('/login') || caminho.startsWith('/auth');
 
   if (!user && !publica) {

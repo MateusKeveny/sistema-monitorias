@@ -17,6 +17,8 @@ export type Pessoa = {
   email: string | null;
   /** Nome usado no Huggy — consumido pelo painel de performance. */
   nome_huggy: string | null;
+  /** Nome usado no Hub, que substituiu o Huggy em 03/09/2026. */
+  nome_hub?: string | null;
   papel: PapelUsuario;
   avaliado: boolean;
   ativo: boolean;
@@ -105,6 +107,76 @@ export type LinhaFeedback = {
   conforme: boolean;
   observacao: string | null;
 };
+
+// ---------------------------------------------------------------------------
+// Painel de cota
+// ---------------------------------------------------------------------------
+
+export type Cargo = { id: number; nome: string; ordem: number; ativo: boolean };
+
+/** Catálogo: o que pontua. Quanto vale fica em `PesoCargo`. */
+export type RegraCota = {
+  chave: string;
+  grupo: string;
+  rotulo: string;
+  /** Valor sugerido ao criar cargo; o que vale é o peso do cargo. */
+  peso: number;
+  faixa_min: number | null;
+  faixa_max: number | null;
+  ordem: number;
+  /** Entra por lançamento manual. */
+  manual: boolean;
+  /** O gestor digita os pontos em vez de quantidade × peso. */
+  valor_manual: boolean;
+  ativo: boolean;
+};
+
+export type PesoCargo = { cargo_id: number; regra: string; peso: number; ativo: boolean };
+
+/** `cargo_id` recebe a média de quem está em `referencia_id`. */
+export type ReferenciaCargo = { cargo_id: number; referencia_id: number };
+
+/** Cargo da pessoa a partir de uma competência (`desde`, sempre dia 1). */
+export type CargoDaPessoa = { pessoa_id: string; desde: string; cargo_id: number };
+
+export type Lancamento = {
+  id: number;
+  pessoa_id: string;
+  mes_competencia: string;
+  /** Nulo = lançamento do mês inteiro. */
+  semana: number | null;
+  /** 'huggy' = Expansão · 'diretores' = Diretores-Expansão. */
+  canal: 'huggy' | 'diretores';
+  regra: string;
+  quantidade: number;
+  pontos_manuais: number | null;
+  observacao: string | null;
+  lancado_por_nome: string | null;
+  criado_em: string;
+};
+
+export type AvaliacaoDiretores = {
+  id: string;
+  pessoa_id: string;
+  data: string;
+  protocolo: string | null;
+  nota: number | null;
+  observacao: string | null;
+  criado_em: string;
+};
+
+export type ConferenciaLancamento = {
+  pessoa_id: string;
+  mes_competencia: string;
+  bloco: string;
+  atendimentos: number;
+  soma_das_faixas: number;
+  diferenca: number;
+};
+
+/** Chaves de regra com tratamento especial nas telas. */
+export const REGRA_META = 'meta';
+export const REGRA_MEDIA = 'media_da_equipe';
 
 export const NOMES_PAPEL: Record<PapelUsuario, string> = {
   gestor: 'Gestor',
