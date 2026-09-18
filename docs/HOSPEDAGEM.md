@@ -144,17 +144,39 @@ trocar o valor exige gerar o build de novo.
 
 ## 6. Banco de dados
 
-**Recomendação: manter o Supabase e migrar só a aplicação.** O banco não tem o
-limite de processamento da Cloudflare, e o Supabase também cuida do **login**
-(usuários, senhas, sessões). Tirar o banco do Supabase exige substituir o
-sistema de login, o que é um projeto à parte.
+A IGreen pretende levar **também o banco** para servidor interno. O destino
+define o tamanho do trabalho:
 
-Se a IGreen quiser o banco também interno:
+| Destino | O que muda no código | Esforço |
+|---|---|---|
+| **Supabase *self-hosted*** (instalado nos servidores da IGreen, via Docker) | Nada. Troca só o endereço e as chaves no `.env.local`, e o build é gerado de novo | Baixo |
+| **PostgreSQL comum**, sem Supabase | O sistema depende de três peças do Supabase: o **login** (usuários e senhas), a **API automática** pela qual o site lê e grava, e as **permissões por usuário** (`auth.uid()` nas regras do banco). Tudo isso teria de ser reescrito | Alto — projeto à parte |
 
-- é um PostgreSQL comum, mas o login (esquema `auth` do Supabase) teria de ser
-  substituído;
-- o Supabase pode ser instalado internamente (versão *self-hosted* via Docker),
-  o que preserva o login sem mudar código — é o caminho mais curto nesse caso.
+**Recomendação: Supabase self-hosted.** É PostgreSQL por baixo, roda na
+infraestrutura da IGreen e não tem nenhum dos limites atuais.
+
+### Como migrar os dados
+
+1. **Acesso ao banco atual.** A cópia usa a conexão direta com o PostgreSQL,
+   não as chaves da aplicação: supabase.com → projeto → **Project Settings →
+   Database → Connection string**. A senha do banco pode ser redefinida nessa
+   tela. Endereço e senha são **secretos** e vão por canal seguro.
+2. **Copiar o banco inteiro, incluindo o esquema `auth`.** É nele que ficam
+   os usuários e as senhas (criptografadas). Sem ele, todo mundo teria de criar
+   senha de novo. Seguir o guia oficial do Supabase de *backup e restauração
+   pela linha de comando*, que separa papéis, estrutura e dados.
+3. **Chaves novas.** O banco novo gera URL e chaves próprias. Atualizar o
+   `.env.local` das duas instâncias e **gerar o build de novo** — as variáveis
+   `NEXT_PUBLIC_*` ficam embutidas no build.
+4. **Janela sem uso.** O que for gravado no banco atual depois da cópia não
+   chega ao novo. Combinar a virada para um momento sem lançamentos, de
+   preferência logo depois de um fechamento de ciclo.
+5. **Conferir.** `/api/saude` das duas instâncias respondendo `"estado":"ok"`,
+   login de um usuário de cada papel e o extrato de um mês já fechado igual ao
+   de antes.
+
+Os dois sistemas usam **o mesmo banco** e precisam continuar juntos: a
+migração leva os dois de uma vez.
 
 ### Estrutura
 
@@ -165,8 +187,8 @@ As migrações estão em `supabase/`, numeradas na ordem em que foram aplicadas
   não usar junto com elas.
 - Uma instalação do zero em outro banco **não é trivial**: a migração 12
   aproveita tabelas de um sistema anterior (`atendimentos`, `atendentes`).
-  Para mudar de banco, o caminho seguro é **copiar o banco atual** (dump do
-  PostgreSQL), e não rodar as migrações do zero.
+  Por isso a migração é por **cópia do banco atual**, como descrito acima, e
+  não rodando as migrações do zero.
 
 ### Segurança dos dados
 
