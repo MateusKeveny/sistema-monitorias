@@ -41,16 +41,12 @@ export default function PagamentoDoMes({
 
   const primeira = linhas[0];
   const semValor = primeira.valor_por_ponto == null;
-  const total = linhas.reduce((a, l) => a + Number(l.valor ?? 0), 0);
   const comDireito = linhas.filter((l) => l.recebe_bonus && l.mes_inteiro);
 
+  // Sem soma dos valores, por decisão do gestor: o total do mês não é
+  // conferido aqui e um número somado na tela vira número citado em reunião.
   return (
-    <Cartao
-      titulo={titulo}
-      acao={!semValor
-        ? <span className="text-xs text-slate-500">total {reais(total)}</span>
-        : undefined}
-    >
+    <Cartao titulo={titulo}>
       {semValor ? (
         <p className={`mb-4 rounded-lg px-3 py-2 text-sm ring-1 ${
           atrasado(competencia)

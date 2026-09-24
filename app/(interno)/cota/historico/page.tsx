@@ -125,21 +125,28 @@ export default async function Historico({
             key={m.id}
             titulo={mesRotulo(m.mes_competencia)}
             acao={
-              <span className="flex flex-wrap items-baseline gap-x-3 text-sm">
-                <span className="font-semibold tabular-nums text-slate-900">
-                  {num(Number(m.resultado), 0)} pts
-                </span>
-                {m.meta && (
-                  <span className="text-xs text-slate-500">
-                    {percentual(Number(m.resultado) / Number(m.meta))} da meta
+              <span className="flex flex-col items-end gap-0.5 text-sm">
+                <span className="flex flex-wrap items-baseline justify-end gap-x-3">
+                  <span className="font-semibold tabular-nums text-slate-900">
+                    {num(Number(m.resultado), 0)} pts
                   </span>
-                )}
-                {pago && !pago.atingiu_meta && (
-                  <span className="text-xs text-slate-500">abaixo da meta</span>
-                )}
+                  {m.meta && (
+                    <span className="text-xs text-slate-500">
+                      {percentual(Number(m.resultado) / Number(m.meta))} da meta
+                    </span>
+                  )}
+                  {pago && !pago.atingiu_meta && (
+                    <span className="text-xs text-slate-500">abaixo da meta</span>
+                  )}
+                  {pago?.atingiu_meta && pago.valor != null && (
+                    <span className="font-semibold tabular-nums text-marca-700 dark:text-marca-400">
+                      {reais(pago.valor)}
+                    </span>
+                  )}
+                </span>
                 {pago?.atingiu_meta && pago.valor != null && (
-                  <span className="font-semibold tabular-nums text-marca-700 dark:text-marca-400">
-                    {reais(pago.valor)}
+                  <span className="text-right text-[11px] text-slate-500 opacity-60">
+                    *Valores aproximados. Os valores reais são encaminhados via Teams.
                   </span>
                 )}
               </span>
