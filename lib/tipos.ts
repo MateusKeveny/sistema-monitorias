@@ -222,3 +222,51 @@ export const NOMES_PAPEL: Record<PapelUsuario, string> = {
   qualidade: 'Qualidade',
   operador: 'Operador',
 };
+
+/** Valor por ponto de uma competência, informado pelo gestor. */
+export type ValorDaCota = {
+  mes_competencia: string;
+  valor_por_ponto: number;
+  percentual_bonus: number;
+  observacao: string | null;
+  definido_por_nome: string | null;
+  definido_em: string;
+  atualizado_em: string | null;
+};
+
+/** Correção de um valor já definido: só existe com motivo. */
+export type AlteracaoDeValor = {
+  id: number;
+  mes_competencia: string;
+  valor_antes: number | null;
+  valor_depois: number | null;
+  motivo: string;
+  alterado_por_nome: string | null;
+  alterado_em: string;
+};
+
+/**
+ * O que a pessoa recebe numa competência fechada.
+ *
+ * Sai do fechamento, não do extrato ao vivo: o que se paga é o que foi
+ * enviado.
+ */
+export type PagamentoMensal = {
+  pessoa_id: string;
+  pessoa_nome: string;
+  mes_competencia: string;
+  cargo: string | null;
+  resultado: number;
+  meta: number | null;
+  mes_inteiro: boolean;
+  recebe_bonus: boolean;
+  media_base: number | null;
+  bonus_liberado: boolean;
+  quantos_faltaram: number;
+  valor_por_ponto: number | null;
+  percentual_bonus: number;
+  bonus: number;
+  pontos_pagos: number;
+  /** Nulo enquanto o valor por ponto do mês não for informado. */
+  valor: number | null;
+};

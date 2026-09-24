@@ -2,6 +2,11 @@ import Link from '@/componentes/Link';
 import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
 import BotaoFecharCiclo from '@/componentes/BotaoFecharCiclo';
 import AjusteDeFechamento from '@/componentes/AjusteDeFechamento';
+import ValorDaCota from '@/componentes/ValorDaCota';
+import PagamentoDoMes from '@/componentes/PagamentoDoMes';
+import type {
+  AlteracaoDeValor, PagamentoMensal, ValorDaCota as ValorDaCotaTipo,
+} from '@/lib/tipos';
 import { Cartao, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import { dataHora, hojeNoBrasil, mesDeCompetencia, mesRotulo, percentual } from '@/lib/formatar';
 
@@ -39,7 +44,8 @@ export default async function Fechamento({
   const competencia = /^\d{4}-\d{2}$/.test(mes ?? '') ? `${mes}-01` : mesDeCompetencia(hojeNoBrasil());
 
   const db = await criarClienteServidor();
-  const [abertos, fechados, semCargo, conferir, alteracoes] = await Promise.all([
+  const [abertos, fechados, semCargo, conferir, alteracoes, valor, pagamento, correcoes]
+    = await Promise.all([
     db.from('vw_cota_mensal').select('pessoa_id, pessoa, cargo, resultado, meta')
       .eq('mes_competencia', competencia).order('resultado', { ascending: false }),
     db.from('fechamentos_cota')
@@ -50,6 +56,11 @@ export default async function Fechamento({
     db.from('fechamento_alteracoes')
       .select('id, pessoa_nome, campo, valor_anterior, valor_novo, motivo, autor_nome, criado_em')
       .eq('mes_competencia', competencia).order('criado_em', { ascending: false }),
+    db.from('valores_da_cota').select('*').eq('mes_competencia', competencia).maybeSingle(),
+    db.from('vw_pagamento_mensal').select('*')
+      .eq('mes_competencia', competencia).order('valor', { ascending: false, nullsFirst: false }),
+    db.from('valores_alteracoes').select('*')
+      .eq('mes_competencia', competencia).order('alterado_em', { ascending: false }),
   ]);
 
   const lista = (abertos.data ?? []) as Aberto[];
@@ -156,6 +167,20 @@ export default async function Fechamento({
             </tbody>
           </Tabela>
         </Cartao>
+      )}
+
+      {congelados.length > 0 && (
+        <>
+          <ValorDaCota
+            competencia={competencia}
+            valor={(valor.data ?? null) as ValorDaCotaTipo | null}
+            alteracoes={(correcoes.data ?? []) as AlteracaoDeValor[]}
+          />
+          <PagamentoDoMes
+            competencia={competencia}
+            linhas={(pagamento.data ?? []) as PagamentoMensal[]}
+          />
+        </>
       )}
 
       <Cartao
