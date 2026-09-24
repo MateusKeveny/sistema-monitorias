@@ -1,7 +1,7 @@
 # Hospedagem — Monitorias de Qualidade e Painel de Performance
 
 Documento para a equipe de TI avaliar a migração para servidores internos da
-IGreen. Situação em 18/09/2026.
+IGreen. Situação em 24/09/2026.
 
 ---
 
@@ -14,7 +14,7 @@ sistema.
 | Sistema | Endereço atual | Versão | Para que serve |
 |---|---|---|---|
 | Monitorias de Qualidade | `painel-monitorias.expansao.workers.dev` | 4.11.2 | Avaliação de qualidade (C-SAT) dos atendimentos |
-| Painel de Performance | `painel-performance.expansao.workers.dev` | 0.11.0 | Cota de pontos por cargo: importação, lançamentos, extrato, fechamento e exportação |
+| Painel de Performance | `painel-performance.expansao.workers.dev` | 1.4.0 | Cota de pontos por cargo: importação, lançamentos, extrato, fechamento, exportação e cadastro de atendentes |
 
 Qual sistema cada publicação mostra é decidido em `lib/sistema.ts`:
 
@@ -181,7 +181,7 @@ migração leva os dois de uma vez.
 ### Estrutura
 
 As migrações estão em `supabase/`, numeradas na ordem em que foram aplicadas
-(01 a 22). O banco de produção já está com **todas aplicadas**.
+(01 a 23). O banco de produção já está com **todas aplicadas**.
 
 - `00-instalar-tudo.sql` é um atalho antigo que junta as primeiras migrações;
   não usar junto com elas.
@@ -204,7 +204,7 @@ As migrações estão em `supabase/`, numeradas na ordem em que foram aplicadas
 `GET /api/saude` consulta o banco de verdade e responde:
 
 ```json
-{"estado":"ok","sistema":"cota","versao":"4.11.2","versoes":{"monitorias":"4.11.2","cota":"0.11.0"},"ms":95}
+{"estado":"ok","sistema":"cota","versao":"4.11.2","versoes":{"monitorias":"4.11.2","cota":"1.4.0"},"ms":95}
 ```
 
 - `200` com `"estado":"ok"`: aplicação e banco funcionando;

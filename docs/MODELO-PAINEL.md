@@ -296,3 +296,105 @@ Em andamento: o gestor está conferindo os números contra a planilha antiga.
 
 Antes de divulgar: trocar senhas ainda padrão, monitor do Performance no
 Better Stack, versão 1.0.0.
+
+## Situação em 24/09/2026 (Performance 1.4.0)
+
+**Contraprova concluída.** O gestor conferiu setembro contra a planilha antiga,
+célula a célula, nos dois canais ("C-SAT Huggy" = Expansão, "C-SAT Executivos"
+= Diretores-Expansão). Todos os números individuais bateram. As duas únicas
+diferenças foram de critério e de fórmula, não de cálculo:
+
+- a **média da equipe** da planilha é a média simples das porcentagens,
+  ignorando quem está em 0%; a do painel é agregada (soma de positivas ÷ soma
+  de avaliações), que pondera por volume. A da planilha reproduz exatamente as
+  cinco linhas do Huggy. Nenhuma das duas afeta pagamento — a faixa que pontua
+  usa o C-SAT individual;
+- duas células do "Geral" dos Executivos (semana 11/09–18/09 e Mensal) não
+  seguem nem a regra da própria planilha. Provável erro de intervalo na
+  fórmula.
+
+**Métricas configuráveis pela tela** (0.13.0). Em Configuração: editar o nome
+de cada métrica, os limites das faixas — TME em minutos e C-SAT em %, com a
+conversão na tela, porque o banco guarda segundos e fração —, ligar e desligar,
+e criar métrica nova. Métrica nova é sempre de **lançamento manual**: as
+automáticas saem de cálculo no banco e não têm como nascer de um cadastro de
+tela. O nome do cargo também é editável, menos o do cargo de base, que é
+reconhecido pelo nome e serve de referência para os demais.
+
+**Exportação corrigida** (0.14.1). Ela nunca baixava: `/api/cota/exportar`
+começa com `/api` e o middleware a tratava como caminho de outro sistema,
+redirecionando para a tela inicial antes de executar a rota. As rotas de API da
+cota passaram a constar entre os caminhos do sistema.
+
+**Entrada, saída e registro de quem sai** (0.15.0, migração 23). A chave
+`ativo` misturava estar na operação e ter login, e não tinha data — sem data o
+painel não distingue um mês inteiro de um mês pela metade. Agora:
+
+- `pessoas.admitido_em` e `pessoas.desligado_em`. Em branco = já estava antes
+  do painel existir;
+- **mês parcial não compõe a média do cargo**, dos dois lados — quem sai e quem
+  é admitido no meio da competência. O extrato da pessoa continua intacto;
+- a tabela `saidas` guarda a foto do dia da saída: ficha cadastral e a cota de
+  cada competência. Ela existe porque o extrato é vivo — quando as avaliações
+  de quem saiu são reatribuídas, o mês dele esvazia e não sobra prova;
+- `registrar_saida` grava a data, a foto e encerra o acesso num passo só;
+  `reverter_saida` devolve o acesso e mantém o registro, marcado como revertido;
+- a tela **Atendentes** mora só no Performance; o efeito vale nos dois sistemas,
+  porque o cadastro é o mesmo banco e toda página interna barra quem está sem
+  acesso.
+
+### O caso que originou a regra
+
+Bruno Aguiar, desligado em 11/09/2026. Setembro fechou com uma semana
+trabalhada (964,75) e esse mês parcial derrubou a média dos Juniores de
+3.351,36 para 3.053,03 — menos 358 na Suyara (Pleno) e menos 447 no Gestor.
+Resolver com `ativo` estaria errado: tiraria o Bruno também de **agosto**, mês
+que ele trabalhou inteiro e em que ficou acima da média (1.346,50 contra
+1.139,74). Daí a regra ser por data, e não por chave liga/desliga.
+
+Por decisão do gestor, as **114 avaliações** dele em setembro foram
+reatribuídas a Ibson, João, Rayssa e Rafael, sob duas travas: nenhuma faixa de
+C-SAT semanal podia cair e ninguém podia terminar o mês com menos ponto. As
+positivas entram primeiro e abrem folga para as notas baixas caberem; a
+divisão saiu em 29/29/28/28 e nada sobrou. Cada linha movida ficou com a
+observação "Reatribuído de Bruno Aguiar (desligado) em 24/09/2026", que permite
+auditar e desfazer. O volume de finalizados foi redistribuído pelo gestor na
+tela de Lançamentos.
+
+**Telas de Lançamentos e Configuração** passaram a mostrar quem foi desligado:
+em Lançamentos, só no mês em que ainda tem dado; em Configuração, sempre, por
+último e com etiqueta. Sem isso não havia como acertar o volume de quem sai no
+meio da competência — que é justamente quando o acerto é preciso.
+
+Antes de divulgar, continua valendo: trocar senhas ainda padrão, monitor do
+Performance no Better Stack, versão 1.0.0.
+
+### Versionamento
+
+Revisto em 24/09/2026. A numeração anterior da cota (0.x) contava publicações,
+não entregas: três versões — 0.12.0, 0.13.0 e 0.14.0 — foram ao ar sem commit
+correspondente, ou seja, houve código em produção com número que não existia no
+repositório.
+
+Recontada pelo que foi de fato entregue, a partir da estreia em produção:
+
+| Entrega | Tipo | Versão |
+|---|---|---|
+| Estreia em produção: importação, lançamentos, extrato, fechamento, exportação (18/09) | — | 1.0.0 |
+| Métricas editáveis e nome do cargo | recurso | 1.1.0 |
+| Criação de métricas pela tela | recurso | 1.2.0 |
+| Desligados nas telas de Lançamentos e Configuração | recurso | 1.3.0 |
+| Correção da exportação (middleware) | correção | 1.3.1 |
+| Painel de Atendentes e regra de mês parcial | recurso | **1.4.0** |
+
+A regra de mês parcial **não** alterou competência alguma já calculada —
+julho (190,88), agosto (1.139,74) e setembro (3.886,57) seguem iguais —, por
+isso é MINOR e não MAJOR.
+
+Regra daqui em diante, para os dois sistemas:
+
+- **MAJOR** — muda regra de cálculo que altera pontuação de competência já
+  calculada, ou obriga a refazer um envio;
+- **MINOR** — recurso novo;
+- **PATCH** — correção, sem mudar número de ninguém;
+- **commit e tag antes do deploy**, sempre.
