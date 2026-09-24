@@ -73,7 +73,10 @@ create or replace view public.vw_pagamento_mensal with (security_invoker = true)
   )
   select
     pessoa_id, pessoa_nome, mes_competencia, cargo, resultado, meta,
-    mes_inteiro, recebe_bonus, media_base, bonus_liberado, quantos_faltaram,
+    mes_inteiro, recebe_bonus, media_base, bonus_liberado,
+    -- A view anterior trazia este número de um count(), que é bigint: trocar o
+    -- tipo de coluna existente é recusado pelo 'create or replace view'.
+    quantos_faltaram::bigint as quantos_faltaram,
     valor_por_ponto, percentual_bonus, bonus,
     resultado + bonus as pontos_pagos,
     -- Abaixo da meta não se calcula valor: é para isso que a meta existe.
