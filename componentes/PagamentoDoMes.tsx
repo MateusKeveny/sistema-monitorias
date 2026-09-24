@@ -100,13 +100,18 @@ export default function PagamentoDoMes({
                 {Number(l.bonus) > 0 ? `+${pontos(l.bonus)}` : '—'}
               </Td>
               <Td className="text-right font-semibold tabular-nums">{pontos(l.pontos_pagos)}</Td>
-              <Td className="text-right font-semibold tabular-nums">{reais(l.valor)}</Td>
+              <Td className="text-right font-semibold tabular-nums">
+                {l.atingiu_meta
+                  ? reais(l.valor)
+                  : <span className="text-xs font-normal text-slate-400">abaixo da meta</span>}
+              </Td>
             </tr>
           ))}
         </tbody>
       </Tabela>
 
       <p className="mt-4 text-xs text-slate-500">
+        Quem fecha abaixo da meta não recebe — é para isso que a meta existe.
         O bônus é {Math.round(Number(primeira.percentual_bonus) * 10000) / 100}% da média do cargo
         de referência e só sai quando <strong>todos</strong> os que têm direito batem a meta. Pleno
         e Gestor não recebem: já são remunerados pela média multiplicada. Quem trabalhou a

@@ -266,6 +266,8 @@ export type PagamentoMensal = {
   valor_por_ponto: number | null;
   percentual_bonus: number;
   bonus: number;
+  /** Abaixo da meta não se calcula valor: é para isso que a meta existe. */
+  atingiu_meta: boolean;
   pontos_pagos: number;
   /** Nulo enquanto o valor por ponto do mês não for informado. */
   valor: number | null;

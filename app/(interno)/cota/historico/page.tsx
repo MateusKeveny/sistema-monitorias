@@ -134,7 +134,10 @@ export default async function Historico({
                     {percentual(Number(m.resultado) / Number(m.meta))} da meta
                   </span>
                 )}
-                {pago?.valor != null && (
+                {pago && !pago.atingiu_meta && (
+                  <span className="text-xs text-slate-500">abaixo da meta</span>
+                )}
+                {pago?.atingiu_meta && pago.valor != null && (
                   <span className="font-semibold tabular-nums text-marca-700 dark:text-marca-400">
                     {reais(pago.valor)}
                   </span>
@@ -147,7 +150,7 @@ export default async function Historico({
               {pago && Number(pago.bonus) > 0 && (
                 <> · bônus de equipe <strong>+{num(Number(pago.bonus))}</strong> pts</>
               )}
-              {pago && pago.valor == null && <> · valor por ponto ainda não informado</>}
+              {pago?.atingiu_meta && pago.valor == null && <> · valor por ponto ainda não informado</>}
             </p>
 
             <div className="space-y-4">
