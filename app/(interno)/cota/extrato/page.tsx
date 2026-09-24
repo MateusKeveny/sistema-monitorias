@@ -29,6 +29,8 @@ const NOME_CANAL: Record<string, string> = {
   geral: 'Monitoria e lançamentos',
 };
 
+const reais = (v: number, casas = 2) =>
+  Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: casas });
 const num = (v: number, casas = 2) => Number(v).toLocaleString('pt-BR', { maximumFractionDigits: casas });
 const chaveCanal = (o: Canal | null) => o ?? 'geral';
 const nomeCurto = (nome: string) => nome.trim().split(' ').slice(0, 2).join(' ');
@@ -64,7 +66,7 @@ export default async function Extrato({
   const pessoaId = veOTime && pessoaPedida && lista.some((p) => p.id === pessoaPedida)
     ? pessoaPedida : perfil.id;
 
-  const [extrato, cota, csat, faixasCsat, fechamento] = await Promise.all([
+  const [extrato, cota, csat, faixasCsat, fechamento, pago] = await Promise.all([
     db.from('vw_extrato_cota')
       .select('semana, origem, regra, rotulo, grupo, ordem, cargo_id, quantidade, peso, cota')
       .eq('pessoa_id', pessoaId).eq('mes_competencia', competencia)
@@ -77,12 +79,20 @@ export default async function Extrato({
       .eq('grupo', 'csat').eq('ativo', true).order('ordem'),
     db.from('fechamentos_cota').select('id, cargo, resultado, meta')
       .eq('pessoa_id', pessoaId).eq('mes_competencia', competencia).maybeSingle(),
+    // Só existe em competência fechada: o valor sai do que foi entregue.
+    db.from('vw_pagamento_mensal')
+      .select('atingiu_meta, bonus, pontos_pagos, valor_por_ponto, valor')
+      .eq('pessoa_id', pessoaId).eq('mes_competencia', competencia).maybeSingle(),
   ]);
 
   // Competência fechada mostra o que foi congelado, não o cálculo de hoje.
   // Sem isto o mesmo mês aparece com dois números — agosto/2026 chegou a
   // mostrar 330 pts aqui e 7.050 no histórico, depois de a planilha do
   // cálculo externo ser importada.
+  const pagamento = pago.data as
+    { atingiu_meta: boolean; bonus: number; pontos_pagos: number;
+      valor_por_ponto: number | null; valor: number | null } | null;
+
   const congelado = fechamento.data as
     { id: string; cargo: string | null; resultado: number; meta: number | null } | null;
 
@@ -289,6 +299,38 @@ export default async function Extrato({
                     </div>
                   )}
                 </div>
+
+                {pagamento && (
+                  <div className="mt-4 border-t border-slate-100 pt-3">
+                    {pagamento.atingiu_meta ? (
+                      pagamento.valor == null ? (
+                        <p className="text-sm text-slate-600">
+                          Valor por ponto desta competência ainda não informado.
+                        </p>
+                      ) : (
+                        <>
+                          <p className="text-2xl font-semibold tabular-nums text-marca-700
+                                        dark:text-marca-400">
+                            {reais(pagamento.valor)}
+                          </p>
+                          <p className="mt-0.5 text-xs text-slate-500">
+                            {num(Number(pagamento.pontos_pagos))} pts
+                            {Number(pagamento.bonus) > 0
+                              && ` (${num(Number(resultado))} + ${num(Number(pagamento.bonus))} de bônus de equipe)`}
+                            {' × '}{reais(Number(pagamento.valor_por_ponto), 6)} por ponto
+                          </p>
+                          <p className="mt-1 text-[11px] text-slate-500 opacity-60">
+                            *Valores aproximados. Os valores reais são encaminhados via Teams.
+                          </p>
+                        </>
+                      )
+                    ) : (
+                      <p className="text-sm text-slate-600">
+                        Abaixo da meta: esta competência não gera valor.
+                      </p>
+                    )}
+                  </div>
+                )}
               </Cartao>
             )}
 
