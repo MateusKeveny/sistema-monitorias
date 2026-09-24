@@ -166,6 +166,7 @@ function EditorDoCargo({
   }));
 
   const media = pesoDe.get(REGRA_MEDIA);
+  const [nome, setNome] = useState(cargo.nome);
   const [rascunho, setRascunho] = useState<Rascunho>(inicial);
   const [meta, setMeta] = useState(String(pesoDe.get(REGRA_META)?.peso ?? ''));
   const [recebeMedia, setRecebeMedia] = useState(Boolean(media?.ativo));
@@ -178,8 +179,21 @@ function EditorDoCargo({
   const ehBase = cargo.nome === CARGO_BASE;
 
   async function salvar() {
+    const nomeNovo = nome.trim();
     const metaNum = Number(meta);
     const multNum = Number(multiplicador);
+    if (!nomeNovo) { setErro('Informe o nome do cargo.'); return; }
+    // O cargo de base é reconhecido pelo nome (ver CARGO_BASE): renomeá-lo
+    // faria a tela passar a oferecer "recebe por média" a ele, e o cargo que
+    // serve de referência para todos os outros deixaria de ser identificado.
+    if (ehBase && nomeNovo !== cargo.nome) {
+      setErro(`"${CARGO_BASE}" é o cargo de referência dos demais e não pode ser renomeado aqui.`);
+      return;
+    }
+    if (cargos.some((c) => c.id !== cargo.id
+      && c.nome.trim().toLowerCase() === nomeNovo.toLowerCase())) {
+      setErro(`Já existe um cargo chamado "${nomeNovo}".`); return;
+    }
     if (!Number.isFinite(metaNum) || metaNum <= 0) { setErro('Informe uma meta maior que zero.'); return; }
     if (recebeMedia && (!Number.isFinite(multNum) || multNum <= 0)) {
       setErro('Informe um multiplicador maior que zero.'); return;
@@ -196,6 +210,16 @@ function EditorDoCargo({
     setOcupado(true); setErro(null); setAviso(null);
     const db = criarClienteNavegador();
     const agora = new Date().toISOString();
+
+    if (nomeNovo !== cargo.nome) {
+      const { error } = await db.from('cargos').update({ nome: nomeNovo }).eq('id', cargo.id);
+      if (error) {
+        setOcupado(false);
+        setErro(/duplicate|unique/i.test(error.message)
+          ? `Já existe um cargo chamado "${nomeNovo}".` : error.message);
+        return;
+      }
+    }
 
     const linhas = [
       ...Object.entries(rascunho).map(([regra, d]) => ({
@@ -236,7 +260,7 @@ function EditorDoCargo({
     }
 
     setOcupado(false);
-    setAviso(`${cargo.nome} salvo. Meses já fechados não mudam.`);
+    setAviso(`${nomeNovo} salvo. Meses já fechados não mudam.`);
     router.refresh();
   }
 
@@ -255,6 +279,15 @@ function EditorDoCargo({
       )}
 
       <div className="flex flex-wrap items-end gap-6">
+        <label className="min-w-56">
+          <span className="mb-1 block text-xs font-medium text-slate-600">Nome do cargo</span>
+          <input
+            value={nome} disabled={ocupado || ehBase} className={`${entrada} w-full`}
+            title={ehBase ? `"${CARGO_BASE}" é o cargo de referência e não pode ser renomeado.` : undefined}
+            onChange={(e) => setNome(e.target.value)}
+          />
+        </label>
+
         <label>
           <span className="mb-1 block text-xs font-medium text-slate-600">Meta do mês (pontos)</span>
           <input

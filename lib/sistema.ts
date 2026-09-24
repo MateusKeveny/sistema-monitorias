@@ -26,8 +26,17 @@ export const ENDERECO_MONITORIAS = 'https://painel-monitorias.expansao.workers.d
 /** Página inicial do site de cota. */
 export const INICIO_COTA = '/cota';
 
+/**
+ * Caminhos que só existem no site de cota: as telas e as rotas de API delas.
+ *
+ * `/api/cota` precisa estar aqui. Sem ele, o download da exportação era
+ * redirecionado para a tela inicial e o arquivo nunca chegava a ser gerado —
+ * a rota é de API, mas mora no mesmo sistema das telas.
+ */
+const EXCLUSIVOS_DA_COTA = ['/cota', '/api/cota'];
+
 /** Caminhos que o site de cota atende; todo o resto é das monitorias. */
-const CAMINHOS_COTA = ['/cota', '/login', '/auth', '/definir-senha'];
+const CAMINHOS_COTA = [...EXCLUSIVOS_DA_COTA, '/login', '/auth', '/definir-senha'];
 
 export function sistemaDoHost(host: string | null | undefined): Sistema {
   if (host?.toLowerCase().startsWith('painel-performance.')) return 'cota';
@@ -42,5 +51,5 @@ const dentro = (caminho: string, base: string) =>
 export function caminhoForaDoSistema(sistema: Sistema, caminho: string): boolean {
   return sistema === 'cota'
     ? !CAMINHOS_COTA.some((base) => dentro(caminho, base))
-    : dentro(caminho, '/cota');
+    : EXCLUSIVOS_DA_COTA.some((base) => dentro(caminho, base));
 }

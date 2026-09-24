@@ -89,8 +89,14 @@ export default function PainelCargosDaPessoa({
             const atual = vigente(p.id);
             const d = rascunho[p.id] ?? { cargo: '', mes: competenciaAtual.slice(0, 7) };
             return (
-              <tr key={p.id}>
-                <Td className="font-medium text-slate-800">{p.nome}</Td>
+              <tr key={p.id} className={p.ativo ? '' : 'opacity-60'}>
+                <Td className="font-medium text-slate-800">
+                  {p.nome}
+                  {!p.ativo && (
+                    <span className="ml-2 rounded px-1.5 py-0.5 text-[11px] font-medium
+                                     text-slate-600 ring-1 ring-slate-300">desligado</span>
+                  )}
+                </Td>
                 <Td><NomeHub pessoa={p} /></Td>
                 <Td>
                   {atual

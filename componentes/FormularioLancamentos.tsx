@@ -134,7 +134,9 @@ function NovoLancamento({
           <select value={f.pessoa} onChange={(e) => setF((s) => ({ ...s, pessoa: e.target.value, regra: '' }))}
                   disabled={ocupado} className={entrada} required>
             <option value="">Selecione…</option>
-            {pessoas.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+            {pessoas.map((p) => (
+              <option key={p.id} value={p.id}>{p.nome}{p.ativo ? '' : ' · desligado'}</option>
+            ))}
           </select>
         </label>
         <label>
@@ -277,7 +279,9 @@ function AvaliacoesDiretores({ inicio, fim, pessoas, diretores }: Props) {
           <span className={rotuloCampo}>Pessoa</span>
           <select value={f.pessoa} onChange={set('pessoa')} disabled={ocupado} className={entrada} required>
             <option value="">Selecione…</option>
-            {pessoas.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+            {pessoas.map((p) => (
+              <option key={p.id} value={p.id}>{p.nome}{p.ativo ? '' : ' · desligado'}</option>
+            ))}
           </select>
         </label>
         <label>

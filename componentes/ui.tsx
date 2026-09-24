@@ -79,9 +79,10 @@ export const Th = ({ children, className = '' }:
   </th>
 );
 
-export const Td = ({ children, className = '' }:
-  { children?: React.ReactNode; className?: string }) => (
-  <td className={`border-b border-slate-100 px-4 py-2.5 align-top text-slate-700 ${className}`}>
+export const Td = ({ children, className = '', colSpan }:
+  { children?: React.ReactNode; className?: string; colSpan?: number }) => (
+  <td colSpan={colSpan}
+      className={`border-b border-slate-100 px-4 py-2.5 align-top text-slate-700 ${className}`}>
     {children}
   </td>
 );

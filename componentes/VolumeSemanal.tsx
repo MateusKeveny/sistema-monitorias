@@ -167,7 +167,9 @@ export default function VolumeSemanal({
                 const d = rascunho[p.id];
                 return (
                   <tr key={p.id}>
-                    <Td className="font-medium text-slate-800">{p.nome}</Td>
+                    <Td className="font-medium text-slate-800">
+                      {p.nome}{!p.ativo && <span className="ml-2 text-xs text-slate-500">· desligado</span>}
+                    </Td>
                     <Td className="text-right">
                       <input inputMode="numeric" value={d.finalizados} disabled={ocupado}
                              aria-label={`Finalizados de ${p.nome}`}

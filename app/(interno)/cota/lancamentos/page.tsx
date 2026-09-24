@@ -32,7 +32,7 @@ export default async function LancamentosDeCota({
 
   const db = await criarClienteServidor();
   const [pessoas, regras, pesos, historico, lancamentos, diretores, conferencia, volumes] = await Promise.all([
-    db.from('pessoas').select('*').eq('ativo', true).order('nome'),
+    db.from('pessoas').select('*').order('nome'),
     db.from('regras').select('*').eq('manual', true).eq('ativo', true).order('ordem'),
     db.from('pesos_por_cargo').select('cargo_id, regra, peso, ativo').eq('ativo', true),
     db.from('cargos_da_pessoa').select('*'),
@@ -46,6 +46,16 @@ export default async function LancamentosDeCota({
       .eq('mes_competencia', competencia).eq('canal', canal),
   ]);
 
+  // Quem foi desligado some da lista — menos no mês em que ainda tem dado.
+  // Sem isso não há como corrigir o volume nem lançar o acerto de quem saiu no
+  // meio da competência, que é justamente quando o acerto é necessário.
+  const comDadoNoMes = new Set([
+    ...((lancamentos.data ?? []) as Lancamento[]).map((l) => l.pessoa_id),
+    ...((volumes.data ?? []) as LinhaVolume[]).map((v) => v.pessoa_id),
+  ]);
+  const listaPessoas = ((pessoas.data ?? []) as Pessoa[])
+    .filter((p) => p.ativo || comDadoNoMes.has(p.id));
+
   // Volume só para quem pontua por finalizado neste canal, no cargo vigente.
   const listaHistorico = (historico.data ?? []) as CargoDaPessoa[];
   const cargoDe = (id: string) => listaHistorico
@@ -53,7 +63,7 @@ export default async function LancamentosDeCota({
     .sort((a, b) => b.desde.localeCompare(a.desde))[0]?.cargo_id;
   const cargosComAtendimento = new Set(((pesos.data ?? []) as PesoCargo[])
     .filter((p) => p.regra === (canal === 'huggy' ? 'huggy_atendimento' : 'diretores_atendimento')).map((p) => p.cargo_id));
-  const pessoasDoVolume = ((pessoas.data ?? []) as Pessoa[])
+  const pessoasDoVolume = listaPessoas
     .filter((p) => { const c = cargoDe(p.id); return c != null && cargosComAtendimento.has(c); });
 
   return (
