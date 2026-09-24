@@ -64,7 +64,7 @@ export default async function Extrato({
   const pessoaId = veOTime && pessoaPedida && lista.some((p) => p.id === pessoaPedida)
     ? pessoaPedida : perfil.id;
 
-  const [extrato, cota, csat, faixasCsat] = await Promise.all([
+  const [extrato, cota, csat, faixasCsat, fechamento] = await Promise.all([
     db.from('vw_extrato_cota')
       .select('semana, origem, regra, rotulo, grupo, ordem, cargo_id, quantidade, peso, cota')
       .eq('pessoa_id', pessoaId).eq('mes_competencia', competencia)
@@ -75,13 +75,36 @@ export default async function Extrato({
       .eq('pessoa_id', pessoaId).eq('mes_competencia', competencia),
     db.from('regras').select('chave, rotulo, faixa_min, faixa_max, ordem')
       .eq('grupo', 'csat').eq('ativo', true).order('ordem'),
+    db.from('fechamentos_cota').select('id, cargo, resultado, meta')
+      .eq('pessoa_id', pessoaId).eq('mes_competencia', competencia).maybeSingle(),
   ]);
 
-  const linhas = (extrato.data ?? []) as Linha[];
+  // Competência fechada mostra o que foi congelado, não o cálculo de hoje.
+  // Sem isto o mesmo mês aparece com dois números — agosto/2026 chegou a
+  // mostrar 330 pts aqui e 7.050 no histórico, depois de a planilha do
+  // cálculo externo ser importada.
+  const congelado = fechamento.data as
+    { id: string; cargo: string | null; resultado: number; meta: number | null } | null;
+
+  const { data: linhasFechadas } = congelado
+    ? await db.from('fechamento_linhas')
+      .select('semana, origem, regra, rotulo, grupo, ordem, quantidade, peso, cota')
+      .eq('fechamento_id', congelado.id).order('semana', { nullsFirst: false }).order('ordem')
+    : { data: null };
+
+  const aoVivo = (extrato.data ?? []) as Linha[];
+  const linhas: Linha[] = linhasFechadas
+    ? (linhasFechadas as Omit<Linha, 'cargo_id'>[])
+      .map((l) => ({ ...l, cargo_id: aoVivo[0]?.cargo_id }))
+    : aoVivo;
   const faixas = (faixasCsat.data ?? []) as Faixa[];
   const semanal = (csat.data ?? []) as CsatSemana[];
-  const resultado = cota.data ? Number(cota.data.resultado) : null;
-  const meta = cota.data?.meta != null ? Number(cota.data.meta) : null;
+  const resultado = congelado
+    ? Number(congelado.resultado)
+    : cota.data ? Number(cota.data.resultado) : null;
+  const meta = congelado
+    ? (congelado.meta == null ? null : Number(congelado.meta))
+    : cota.data?.meta != null ? Number(cota.data.meta) : null;
 
   // Peso de cada faixa no cargo da pessoa, para mostrar também as faixas que
   // ela não atingiu no resumo do mês.
@@ -156,8 +179,14 @@ export default async function Extrato({
           <h1 className="text-xl font-semibold text-sobre-fundo">Extrato</h1>
           <p className="text-sm text-sobre-fundo-suave">
             {cota.data?.pessoa ?? perfil.nome} · {mesRotulo(competencia)}
-            {cota.data?.cargo ? ` · ${cota.data.cargo}` : ''}
+            {congelado?.cargo ?? cota.data?.cargo ? ` · ${congelado?.cargo ?? cota.data?.cargo}` : ''}
           </p>
+          {congelado && (
+            <p className="mt-1 inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5
+                          text-xs font-medium text-slate-600 ring-1 ring-slate-300">
+              Competência fechada · valores congelados no fechamento
+            </p>
+          )}
         </div>
 
         <form className="flex flex-wrap items-end gap-2">
