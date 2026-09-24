@@ -26,6 +26,7 @@ const ITENS: Record<Sistema, Item[]> = {
     { href: '/cota/lancamentos', rotulo: 'Lançamentos', papeis: ['gestor'] },
     { href: '/cota/importar', rotulo: 'Importar', papeis: ['gestor'] },
     { href: '/cota/fechamento', rotulo: 'Fechamento', papeis: ['gestor'] },
+    { href: '/cota/atendentes', rotulo: 'Atendentes', papeis: ['gestor'] },
     { href: '/cota/configuracao', rotulo: 'Configuração', papeis: ['gestor'] },
   ],
 };

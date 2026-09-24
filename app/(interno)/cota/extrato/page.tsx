@@ -99,14 +99,18 @@ export default async function Extrato({
     const [referencias, cargos, resultados] = await Promise.all([
       db.from('cargos_referencia').select('referencia_id').eq('cargo_id', cargoId),
       db.from('cargos').select('id, nome'),
-      db.from('vw_cota_mensal').select('pessoa, cargo, resultado').eq('mes_competencia', competencia),
+      db.from('vw_cota_mensal').select('pessoa, cargo, resultado, compoe_media')
+        .eq('mes_competencia', competencia),
     ]);
     const nomesReferencia = new Set(((referencias.data ?? []) as { referencia_id: number }[])
       .map((r) => ((cargos.data ?? []) as { id: number; nome: string }[])
         .find((c) => c.id === r.referencia_id)?.nome)
       .filter(Boolean) as string[]);
-    composicao = ((resultados.data ?? []) as { pessoa: string; cargo: string | null; resultado: number }[])
-      .filter((r) => r.cargo && nomesReferencia.has(r.cargo))
+    composicao = ((resultados.data ?? []) as
+      { pessoa: string; cargo: string | null; resultado: number; compoe_media: boolean }[])
+      // Quem trabalhou a competência pela metade não entra na média (migração
+      // 23) e por isso não aparece aqui: listá-lo faria a conta não fechar.
+      .filter((r) => r.compoe_media && r.cargo && nomesReferencia.has(r.cargo))
       .map((r) => ({ ...r, resultado: Number(r.resultado) }))
       .sort((a, b) => b.resultado - a.resultado);
   }

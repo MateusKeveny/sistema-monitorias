@@ -24,6 +24,45 @@ export type Pessoa = {
   ativo: boolean;
   /** false enquanto a pessoa não trocar a senha inicial no primeiro acesso. */
   senha_definida: boolean;
+  /** Entrada na operação. Nulo = já estava antes do painel existir. */
+  admitido_em?: string | null;
+  /** Saída da operação. Nulo = continua na equipe. */
+  desligado_em?: string | null;
+};
+
+/** Resumo da cota de uma competência, congelado no dia da saída. */
+export type CotaDaSaida = {
+  competencia: string;
+  cargo: string | null;
+  resultado: number;
+  meta: number | null;
+  atingimento: number | null;
+};
+
+/**
+ * O que fica guardado de quem saiu.
+ *
+ * O extrato é vivo: se as avaliações de quem saiu forem reatribuídas, o mês
+ * dele esvazia. Esta é a foto do dia da saída, que nada depois altera.
+ */
+export type Saida = {
+  id: string;
+  pessoa_id: string;
+  pessoa_nome: string;
+  data: string;
+  motivo: string | null;
+  ficha: {
+    email?: string | null;
+    papel?: string | null;
+    nome_huggy?: string | null;
+    nome_hub?: string | null;
+    admitido_em?: string | null;
+    cargos?: { desde: string; cargo: string }[];
+  };
+  cota: CotaDaSaida[];
+  registrado_por_nome: string | null;
+  registrado_em: string;
+  revertida_em: string | null;
 };
 
 /** Quem está logado: uma pessoa com login. */

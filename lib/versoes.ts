@@ -14,4 +14,4 @@ import pacote from '@/package.json';
 export const VERSAO_MONITORIAS: string = pacote.version;
 
 /** 0.x enquanto o painel de cota não for divulgado à equipe. */
-export const VERSAO_COTA = '0.14.1';
+export const VERSAO_COTA = '0.15.0';
