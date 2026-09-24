@@ -12,11 +12,10 @@
 -- inteiro, o que muda é só o pagamento.
 -- ============================================================================
 
--- Derruba antes de recriar: `create or replace` não aceita coluna nova no
--- meio da lista, e `atingiu_meta` entra antes de `pontos_pagos`.
-drop view if exists public.vw_pagamento_mensal;
-
-create view public.vw_pagamento_mensal with (security_invoker = true) as
+-- A coluna nova entra no FIM da lista: `create or replace view` recusa coluna
+-- nova no meio, e derrubar a view a cada ajuste é convite a esquecer uma
+-- permissão pelo caminho.
+create or replace view public.vw_pagamento_mensal with (security_invoker = true) as
   with fechado as (
     select f.pessoa_id, f.pessoa_nome, f.mes_competencia, f.resultado, f.meta,
            public.cargo_na_competencia(f.pessoa_id, f.mes_competencia) as cargo_id,
@@ -63,12 +62,13 @@ create view public.vw_pagamento_mensal with (security_invoker = true) as
   select
     pessoa_id, pessoa_nome, mes_competencia, cargo, resultado, meta,
     mes_inteiro, recebe_bonus, media_base, bonus_liberado, quantos_faltaram,
-    valor_por_ponto, percentual_bonus, bonus, atingiu_meta,
+    valor_por_ponto, percentual_bonus, bonus,
     resultado + bonus as pontos_pagos,
     -- Abaixo da meta não se calcula valor: é para isso que a meta existe.
     case
       when not atingiu_meta          then 0
       when valor_por_ponto is null   then null
       else round((resultado + bonus) * valor_por_ponto, 2)
-    end as valor
+    end as valor,
+    atingiu_meta
   from conta;
