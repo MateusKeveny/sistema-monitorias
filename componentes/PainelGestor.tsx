@@ -203,28 +203,49 @@ export default async function PainelGestor({ competencia, canal }: { competencia
                       </tbody>
                     </table>
                   </div>,
-                  <ul key="p" className="space-y-2 text-xs">
-                    {csatPorPessoa.map((p) => (
-                      <li key={p.id} className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="w-28 truncate text-slate-700">{nome.get(p.id)}</span>
-                          <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
-                            <span className={`block h-full rounded-full ${p.csat >= META_CSAT ? 'bg-emerald-500' : p.csat >= 0.85 ? 'bg-amber-400' : 'bg-rose-500'}`}
-                                  style={{ width: pct(p.csat, 1) }} />
-                          </span>
-                          <span className="w-12 text-right font-semibold tabular-nums text-slate-800">{percentual(p.csat)}</span>
-                          <span className="w-10 text-right tabular-nums text-slate-400">{p.avaliacoes}</span>
-                        </div>
-                        <Semanas
-                          valores={semanasDe(p.id, (l) => {
-                            const [pos, tot] = soma(l);
-                            return tot ? pos / tot : null;
-                          })}
-                          formatar={(v) => percentual(v)}
-                        />
-                      </li>
-                    ))}
-                  </ul>,
+                  // Uma linha por pessoa: nome, as quatro semanas e o mês. A
+                  // cor já diz a faixa, então dispensa barra; e a contagem de
+                  // avaliações some — ela pertence à visão por semana, onde o
+                  // tamanho da amostra importa.
+                  <div key="p" className="text-xs">
+                    <div className="flex items-center gap-2 pb-1 text-[10px] uppercase
+                                    tracking-wide text-slate-400">
+                      <span className="flex-1" />
+                      {[1, 2, 3, 4].map((s) => (
+                        <span key={s} className="w-11 text-center">{s}ª</span>
+                      ))}
+                      <span className="w-12 text-right">Mês</span>
+                    </div>
+
+                    <ul className="divide-y divide-slate-100">
+                      {csatPorPessoa.map((p) => {
+                        const semanas = semanasDe(p.id, (l) => {
+                          const [pos, tot] = soma(l);
+                          return tot ? pos / tot : null;
+                        });
+                        return (
+                          <li key={p.id} className="flex items-center gap-2 py-1.5">
+                            <span className="flex-1 truncate text-slate-700">{nome.get(p.id)}</span>
+                            {semanas.map((v, i) => (
+                              <span key={i} title={`${i + 1}ª semana`}
+                                    className={`w-11 rounded px-1 py-0.5 text-center tabular-nums ${
+                                      v == null ? 'text-slate-300'
+                                        : v >= META_CSAT ? 'bg-emerald-50 text-emerald-700'
+                                          : v >= 0.85 ? 'bg-amber-50 text-amber-700'
+                                            : 'bg-rose-50 text-rose-700'}`}>
+                                {v == null ? '·' : percentual(v)}
+                              </span>
+                            ))}
+                            <span className={`w-12 text-right font-semibold tabular-nums ${
+                              p.csat >= META_CSAT ? 'text-emerald-700'
+                                : p.csat >= 0.85 ? 'text-amber-700' : 'text-rose-700'}`}>
+                              {percentual(p.csat)}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>,
                 ]}
               />
             )}
