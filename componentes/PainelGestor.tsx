@@ -4,7 +4,7 @@ import GraficoSemanal from '@/componentes/GraficoSemanal';
 import { Cartao, Vazio } from '@/componentes/ui';
 import GraficoCsat, { type PontoCsat } from '@/componentes/GraficoCsat';
 import { criarClienteServidor } from '@/lib/supabase/servidor';
-import { percentual } from '@/lib/formatar';
+import { corDoCsat, percentual } from '@/lib/formatar';
 
 type Canal = 'huggy' | 'diretores';
 const CANAIS: { chave: Canal; rotulo: string }[] = [
@@ -191,10 +191,7 @@ export default async function PainelGestor({ competencia, canal }: { competencia
                           return (
                             <tr key={s} className="border-t border-slate-100">
                               <td className="py-1 text-slate-700">{s}ª</td>
-                              <td className={`py-1 text-right font-semibold tabular-nums ${
-                                valor == null ? 'text-slate-300'
-                                  : valor >= META_CSAT ? 'text-emerald-700'
-                                    : valor >= 0.85 ? 'text-amber-700' : 'text-rose-700'}`}>
+                              <td className={`py-1 text-right font-semibold tabular-nums ${corDoCsat(valor)}`}>
                                 {valor == null ? '—' : percentual(valor)}
                               </td>
                               <td className="py-1 text-right tabular-nums text-slate-500">
@@ -242,17 +239,11 @@ export default async function PainelGestor({ competencia, canal }: { competencia
                             <span className="flex-1 truncate text-slate-700">{nome.get(p.id)}</span>
                             {semanas.map((v, i) => (
                               <span key={i} title={`${i + 1}ª semana`}
-                                    className={`w-11 rounded px-1 py-0.5 text-center tabular-nums ${
-                                      v == null ? 'text-slate-300'
-                                        : v >= META_CSAT ? 'bg-emerald-50 text-emerald-700'
-                                          : v >= 0.85 ? 'bg-amber-50 text-amber-700'
-                                            : 'bg-rose-50 text-rose-700'}`}>
+                                    className={`w-11 rounded px-1 py-0.5 text-center tabular-nums ${corDoCsat(v, true)}`}>
                                 {v == null ? '·' : percentual(v)}
                               </span>
                             ))}
-                            <span className={`w-12 text-right font-semibold tabular-nums ${
-                              p.csat >= META_CSAT ? 'text-emerald-700'
-                                : p.csat >= 0.85 ? 'text-amber-700' : 'text-rose-700'}`}>
+                            <span className={`w-12 text-right font-semibold tabular-nums ${corDoCsat(p.csat)}`}>
                               {percentual(p.csat)}
                             </span>
                           </li>

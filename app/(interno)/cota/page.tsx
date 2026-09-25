@@ -4,7 +4,7 @@ import { Cartao, EtiquetaNota, Vazio } from '@/componentes/ui';
 import Relogio from '@/componentes/Relogio';
 import AlternadorCanal from '@/componentes/AlternadorCanal';
 import GraficoCsat, { type PontoCsat } from '@/componentes/GraficoCsat';
-import { codigoMonitoria, data as formatarData, hojeNoBrasil, mesDeCompetencia, mesRotulo, percentual } from '@/lib/formatar';
+import { corDoCsat, codigoMonitoria, data as formatarData, hojeNoBrasil, mesDeCompetencia, mesRotulo, percentual } from '@/lib/formatar';
 import { ENDERECO_MONITORIAS } from '@/lib/sistema';
 
 export const dynamic = 'force-dynamic';
@@ -137,7 +137,9 @@ export default async function InicioCota({
       <div className="space-y-2">
         {csatMes != null && (
           <p className="text-sm text-slate-600">
-            No mês: <span className="text-lg font-semibold tabular-nums text-slate-900">{percentual(csatMes)}</span>
+            No mês: <span className={`text-lg font-semibold tabular-nums ${corDoCsat(csatMes)}`}>
+              {percentual(csatMes)}
+            </span>
           </p>
         )}
         <GraficoCsat pontos={pontosCsat} meta={META_CSAT} />

@@ -102,6 +102,28 @@ export function faixa(v: number | null | undefined): 'otimo' | 'bom' | 'atencao'
   return 'critico';
 }
 
+/**
+ * Cor do C-SAT, por decisão do gestor em 25/09/2026.
+ *
+ * Três degraus, não quatro: verde a partir de 90%, um verde-amarelado entre
+ * 85% e 90% — a transição, para quem está quase lá não parecer problema — e
+ * vermelho abaixo de 85%. A meta continua sendo 95%; o que muda aqui é a
+ * leitura visual.
+ */
+export function corDoCsat(v: number | null | undefined, fundo = false): string {
+  if (v == null) return 'text-slate-300';
+  if (v >= 0.90) return fundo ? 'bg-emerald-50 text-emerald-700' : 'text-emerald-700';
+  if (v >= 0.85) return fundo ? 'bg-lime-50 text-lime-700' : 'text-lime-700';
+  return fundo ? 'bg-rose-50 text-rose-700' : 'text-rose-700';
+}
+
+/** A mesma escala, para preencher barra. */
+export function barraDoCsat(v: number): string {
+  if (v >= 0.90) return 'bg-emerald-500';
+  if (v >= 0.85) return 'bg-lime-500';
+  return 'bg-rose-500';
+}
+
 export const CORES_FAIXA: Record<string, string> = {
   otimo: 'bg-emerald-100 text-emerald-800 ring-emerald-600/20',
   bom: 'bg-sky-100 text-sky-800 ring-sky-600/20',
