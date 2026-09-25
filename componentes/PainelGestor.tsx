@@ -133,10 +133,6 @@ export default async function PainelGestor({ competencia, canal }: { competencia
       return lancados.length ? lancados.reduce((a, b) => a + b, 0) / lancados.length : null;
     });
 
-    /** Uma medida por semana, para a pessoa — usado na visão por atendente. */
-    const semanasDe = (id: string, medir: (l: Csat[]) => number | null) =>
-      [1, 2, 3, 4].map((s) => medir(csatCanal.filter((c) => c.pessoa_id === id && c.semana === s)));
-
     const tmeSemanalDe = (id: string) => [1, 2, 3, 4].map((s) => {
       const v = volTodos.find((x) => x.pessoa_id === id && x.semana === s);
       return v && (v.tme_seg ?? 0) > 0 ? v.tme_seg! : null;
@@ -230,20 +226,29 @@ export default async function PainelGestor({ competencia, canal }: { competencia
 
                     <ul className="divide-y divide-slate-100">
                       {csatPorPessoa.map((p) => {
-                        const semanas = semanasDe(p.id, (l) => {
-                          const [pos, tot] = soma(l);
-                          return tot ? pos / tot : null;
+                        // O tamanho da amostra fica no título de cada semana:
+                        // 100% de uma avaliação e 100% de vinte aparecem
+                        // iguais, e é daí que vem a impressão de que o mês
+                        // "não bate" com a média das semanas.
+                        const semanas = [1, 2, 3, 4].map((s) => {
+                          const [pos, tot] = soma(csatCanal.filter(
+                            (c) => c.pessoa_id === p.id && c.semana === s));
+                          return { valor: tot ? pos / tot : null, pos, tot };
                         });
                         return (
                           <li key={p.id} className="flex items-center gap-2 py-1.5">
                             <span className="flex-1 truncate text-slate-700">{nome.get(p.id)}</span>
-                            {semanas.map((v, i) => (
-                              <span key={i} title={`${i + 1}ª semana`}
-                                    className={`w-11 rounded px-1 py-0.5 text-center tabular-nums ${corDoCsat(v, true)}`}>
-                                {v == null ? '·' : percentual(v)}
+                            {semanas.map((s, i) => (
+                              <span key={i}
+                                    title={s.tot
+                                      ? `${i + 1}ª semana: ${s.pos} de ${s.tot} ${s.tot === 1 ? 'avaliação' : 'avaliações'}`
+                                      : `${i + 1}ª semana: sem avaliação`}
+                                    className={`w-11 cursor-help rounded px-1 py-0.5 text-center tabular-nums ${corDoCsat(s.valor, true)}`}>
+                                {s.valor == null ? '·' : percentual(s.valor)}
                               </span>
                             ))}
-                            <span className={`w-12 text-right font-semibold tabular-nums ${corDoCsat(p.csat)}`}>
+                            <span title={`No mês: ${p.avaliacoes} ${p.avaliacoes === 1 ? 'avaliação' : 'avaliações'}`}
+                                  className={`w-12 cursor-help text-right font-semibold tabular-nums ${corDoCsat(p.csat)}`}>
                               {percentual(p.csat)}
                             </span>
                           </li>
