@@ -2,6 +2,8 @@ import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
 import PainelCargos from '@/componentes/PainelCargos';
 import PainelCargosDaPessoa from '@/componentes/PainelCargosDaPessoa';
 import PainelRegras from '@/componentes/PainelRegras';
+import PainelExibicao from '@/componentes/PainelExibicao';
+import AbasLaterais from '@/componentes/AbasLaterais';
 import type { Cargo, CargoDaPessoa, PesoCargo, Pessoa, ReferenciaCargo, RegraCota } from '@/lib/tipos';
 
 export const dynamic = 'force-dynamic';
@@ -29,23 +31,50 @@ export default async function ConfiguracaoDaCota() {
       <div>
         <h1 className="text-xl font-semibold text-sobre-fundo">Configuração</h1>
         <p className="text-sm text-sobre-fundo-suave">
-          Cargos, pesos, metas, métricas e o cargo de cada pessoa.
+          Cargos, pesos, metas, métricas, o cargo de cada pessoa e o que a tela inicial mostra.
         </p>
       </div>
 
-      <PainelCargos
-        cargos={(cargos ?? []) as Cargo[]}
-        regras={(regras ?? []) as RegraCota[]}
-        pesos={(pesos ?? []) as PesoCargo[]}
-        referencias={(referencias ?? []) as ReferenciaCargo[]}
-      />
-
-      <PainelRegras regras={(regras ?? []) as RegraCota[]} />
-
-      <PainelCargosDaPessoa
-        pessoas={(pessoas ?? []) as Pessoa[]}
-        cargos={(cargos ?? []) as Cargo[]}
-        historico={(historico ?? []) as CargoDaPessoa[]}
+      <AbasLaterais
+        abas={[
+          {
+            chave: 'cargos',
+            rotulo: 'Cargos e pesos',
+            descricao: 'Quanto vale cada métrica, a meta e as médias',
+            painel: (
+              <PainelCargos
+                cargos={(cargos ?? []) as Cargo[]}
+                regras={(regras ?? []) as RegraCota[]}
+                pesos={(pesos ?? []) as PesoCargo[]}
+                referencias={(referencias ?? []) as ReferenciaCargo[]}
+              />
+            ),
+          },
+          {
+            chave: 'metricas',
+            rotulo: 'Métricas',
+            descricao: 'Nome, faixas e criação de métrica manual',
+            painel: <PainelRegras regras={(regras ?? []) as RegraCota[]} />,
+          },
+          {
+            chave: 'pessoas',
+            rotulo: 'Cargo das pessoas',
+            descricao: 'Desde quando cada uma está em cada cargo',
+            painel: (
+              <PainelCargosDaPessoa
+                pessoas={(pessoas ?? []) as Pessoa[]}
+                cargos={(cargos ?? []) as Cargo[]}
+                historico={(historico ?? []) as CargoDaPessoa[]}
+              />
+            ),
+          },
+          {
+            chave: 'exibicao',
+            rotulo: 'Exibição e contagem',
+            descricao: 'Quem aparece e quem entra nas médias da tela inicial',
+            painel: <PainelExibicao pessoas={(pessoas ?? []) as Pessoa[]} />,
+          },
+        ]}
       />
     </div>
   );

@@ -28,6 +28,10 @@ export type Pessoa = {
   admitido_em?: string | null;
   /** Saída da operação. Nulo = continua na equipe. */
   desligado_em?: string | null;
+  /** Aparece nas listas da tela inicial do gestor. Não afeta cálculo. */
+  exibir_no_painel?: boolean;
+  /** Entra nas médias de C-SAT, TME e volume da tela inicial. Não afeta a cota. */
+  conta_nas_medias?: boolean;
 };
 
 /** Resumo da cota de uma competência, congelado no dia da saída. */

@@ -46,7 +46,7 @@ export default async function PainelGestor({ competencia, canal }: { competencia
   const db = await criarClienteServidor();
 
   const [pessoas, csat, volume, criterios, cota] = await Promise.all([
-    db.from('pessoas').select('id, nome'),
+    db.from('pessoas').select('id, nome, exibir_no_painel, conta_nas_medias'),
     db.from('vw_csat_semanal').select('pessoa_id, origem, semana, avaliacoes, positivas')
       .eq('mes_competencia', competencia),
     db.from('volume_semanal').select('pessoa_id, canal, semana, finalizados, tme_seg')
@@ -60,10 +60,18 @@ export default async function PainelGestor({ competencia, canal }: { competencia
 
   const nome = new Map((pessoas.data ?? []).map((p) => [p.id as string, nomeCurto(p.nome as string)]));
 
+  // Duas decisões separadas, configuradas em Configuração → Exibição e
+  // contagem: aparecer nas listas e entrar nas médias. Nenhuma delas muda
+  // pontuação, extrato ou pagamento — só o que esta tela mostra e soma.
+  const exibe = new Set((pessoas.data ?? [])
+    .filter((p) => p.exibir_no_painel !== false).map((p) => p.id as string));
+  const conta = new Set((pessoas.data ?? [])
+    .filter((p) => p.conta_nas_medias !== false).map((p) => p.id as string));
+
   // ---------- Monitoria e cota ----------
   const lista = (criterios.data ?? []) as Criterio[];
   const maiorReprov = Math.max(1, ...lista.map((c) => c.reprovacoes));
-  const cotas = (cota.data ?? []) as Cota[];
+  const cotas = ((cota.data ?? []) as Cota[]).filter((c) => exibe.has(c.pessoa_id));
 
 
   // C-SAT, volume e TME dos dois canais vêm prontos; o botão só alterna.
@@ -71,21 +79,27 @@ export default async function PainelGestor({ competencia, canal }: { competencia
     const rotuloCanal = CANAIS.find((c) => c.chave === canal)!.rotulo;
     // ---------- C-SAT ----------
     const csatCanal = ((csat.data ?? []) as Csat[]).filter((c) => c.origem === canal);
+    // O que soma e o que se lista são conjuntos diferentes: ver a linha de
+    // alguém não obriga a contá-lo na média da equipe, nem o contrário.
+    const csatSomado = csatCanal.filter((c) => conta.has(c.pessoa_id));
+    const csatListado = csatCanal.filter((c) => exibe.has(c.pessoa_id));
     const soma = (l: Csat[]) => l.reduce((a, c) => [a[0] + c.positivas, a[1] + c.avaliacoes], [0, 0]);
     const pontosCsat: PontoCsat[] = [1, 2, 3, 4].map((s) => {
-      const [pos, tot] = soma(csatCanal.filter((c) => c.semana === s));
+      const [pos, tot] = soma(csatSomado.filter((c) => c.semana === s));
       return { semana: s, pessoa: tot ? pos / tot : null, equipe: null };
     });
-    const [posMes, totMes] = soma(csatCanal);
-    const csatPorPessoa = [...new Set(csatCanal.map((c) => c.pessoa_id))].map((id) => {
-      const [pos, tot] = soma(csatCanal.filter((c) => c.pessoa_id === id));
+    const [posMes, totMes] = soma(csatSomado);
+    const csatPorPessoa = [...new Set(csatListado.map((c) => c.pessoa_id))].map((id) => {
+      const [pos, tot] = soma(csatListado.filter((c) => c.pessoa_id === id));
       return { id, csat: pos / tot, avaliacoes: tot };
     }).sort((a, b) => b.csat - a.csat);
-  
+
     // ---------- Volume ----------
-    const volCanal = ((volume.data ?? []) as Volume[]).filter((v) => v.canal === canal);
-    const volumePorPessoa = [...new Set(volCanal.map((v) => v.pessoa_id))].map((id) => {
-      const semanas = [1, 2, 3, 4].map((s) => volCanal.find((v) => v.pessoa_id === id && v.semana === s)?.finalizados ?? 0);
+    const volTodos = ((volume.data ?? []) as Volume[]).filter((v) => v.canal === canal);
+    const volCanal = volTodos.filter((v) => conta.has(v.pessoa_id));
+    const volListado = volTodos.filter((v) => exibe.has(v.pessoa_id));
+    const volumePorPessoa = [...new Set(volListado.map((v) => v.pessoa_id))].map((id) => {
+      const semanas = [1, 2, 3, 4].map((s) => volTodos.find((v) => v.pessoa_id === id && v.semana === s)?.finalizados ?? 0);
       return { id, semanas, total: semanas.reduce((a, b) => a + b, 0) };
     }).sort((a, b) => b.total - a.total);
     const maiorVolume = Math.max(1, ...volumePorPessoa.map((v) => v.total));
@@ -94,8 +108,8 @@ export default async function PainelGestor({ competencia, canal }: { competencia
   
     // ---------- TME ----------
     // Por pessoa: média das semanas ponderada pelos finalizados.
-    const tmePorPessoa = [...new Set(volCanal.map((v) => v.pessoa_id))].map((id) => {
-      const linhas = volCanal.filter((v) => v.pessoa_id === id && (v.tme_seg ?? 0) > 0);
+    const tmePorPessoa = [...new Set(volListado.map((v) => v.pessoa_id))].map((id) => {
+      const linhas = volTodos.filter((v) => v.pessoa_id === id && (v.tme_seg ?? 0) > 0);
       const peso = linhas.reduce((a, v) => a + Math.max(1, v.finalizados), 0);
       const tme = peso ? linhas.reduce((a, v) => a + (v.tme_seg ?? 0) * Math.max(1, v.finalizados), 0) / peso : null;
       return { id, tme };
@@ -124,7 +138,7 @@ export default async function PainelGestor({ competencia, canal }: { competencia
       [1, 2, 3, 4].map((s) => medir(csatCanal.filter((c) => c.pessoa_id === id && c.semana === s)));
 
     const tmeSemanalDe = (id: string) => [1, 2, 3, 4].map((s) => {
-      const v = volCanal.find((x) => x.pessoa_id === id && x.semana === s);
+      const v = volTodos.find((x) => x.pessoa_id === id && x.semana === s);
       return v && (v.tme_seg ?? 0) > 0 ? v.tme_seg! : null;
     });
 
@@ -172,7 +186,7 @@ export default async function PainelGestor({ competencia, canal }: { competencia
                       </thead>
                       <tbody>
                         {[1, 2, 3, 4].map((s) => {
-                          const [pos, tot] = soma(csatCanal.filter((c) => c.semana === s));
+                          const [pos, tot] = soma(csatSomado.filter((c) => c.semana === s));
                           const valor = tot ? pos / tot : null;
                           return (
                             <tr key={s} className="border-t border-slate-100">
