@@ -119,11 +119,6 @@ export default async function PainelGestor({ competencia, canal }: { competencia
       return lancados.length ? lancados.reduce((a, b) => a + b, 0) / lancados.length : null;
     });
 
-    const csatPorSemana = [1, 2, 3, 4].map((s) => {
-      const [pos, tot] = soma(csatCanal.filter((c) => c.semana === s));
-      return tot ? pos / tot : null;
-    });
-
     /** Uma medida por semana, para a pessoa — usado na visão por atendente. */
     const semanasDe = (id: string, medir: (l: Csat[]) => number | null) =>
       [1, 2, 3, 4].map((s) => medir(csatCanal.filter((c) => c.pessoa_id === id && c.semana === s)));
@@ -160,15 +155,53 @@ export default async function PainelGestor({ competencia, canal }: { competencia
               <AlternadorDeVisao
                 rotulos={['Por semana', 'Por atendente']}
                 paineis={[
+                  // A linha já mostra a evolução; repetir em barras não
+                  // acrescenta nada. O que falta é o tamanho da amostra de
+                  // cada semana: 100% de duas avaliações não é 100% de
+                  // duzentas.
                   <div key="s" className="space-y-3">
                     <GraficoCsat pontos={pontosCsat} meta={META_CSAT} rotulo="Equipe" />
-                    <GraficoSemanal
-                      valores={csatPorSemana}
-                      formatar={(v) => percentual(v)}
-                      media={totMes ? posMes / totMes : null}
-                      referencias={[{ valor: META_CSAT, rotulo: 'meta 95%' }]}
-                      cor="bg-emerald-500"
-                    />
+                    <table className="w-full border-t border-slate-100 pt-2 text-xs">
+                      <thead>
+                        <tr className="text-left text-[11px] uppercase tracking-wide text-slate-500">
+                          <th className="py-1 font-semibold">Semana</th>
+                          <th className="py-1 text-right font-semibold">C-SAT</th>
+                          <th className="py-1 text-right font-semibold">Positivas</th>
+                          <th className="py-1 text-right font-semibold">Avaliações</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[1, 2, 3, 4].map((s) => {
+                          const [pos, tot] = soma(csatCanal.filter((c) => c.semana === s));
+                          const valor = tot ? pos / tot : null;
+                          return (
+                            <tr key={s} className="border-t border-slate-100">
+                              <td className="py-1 text-slate-700">{s}ª</td>
+                              <td className={`py-1 text-right font-semibold tabular-nums ${
+                                valor == null ? 'text-slate-300'
+                                  : valor >= META_CSAT ? 'text-emerald-700'
+                                    : valor >= 0.85 ? 'text-amber-700' : 'text-rose-700'}`}>
+                                {valor == null ? '—' : percentual(valor)}
+                              </td>
+                              <td className="py-1 text-right tabular-nums text-slate-500">
+                                {tot ? inteiro(pos) : '—'}
+                              </td>
+                              <td className="py-1 text-right tabular-nums text-slate-500">
+                                {tot ? inteiro(tot) : '—'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        <tr className="border-t border-slate-200">
+                          <td className="py-1 font-semibold text-slate-700">Mês</td>
+                          <td className="py-1 text-right font-semibold tabular-nums text-slate-800">
+                            {percentual(posMes / totMes)}
+                          </td>
+                          <td className="py-1 text-right tabular-nums text-slate-500">{inteiro(posMes)}</td>
+                          <td className="py-1 text-right tabular-nums text-slate-500">{inteiro(totMes)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>,
                   <ul key="p" className="space-y-2 text-xs">
                     {csatPorPessoa.map((p) => (
