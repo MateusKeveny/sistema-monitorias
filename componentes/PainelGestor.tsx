@@ -1,4 +1,6 @@
 import AlternadorCanal from '@/componentes/AlternadorCanal';
+import AlternadorDeVisao from '@/componentes/AlternadorDeVisao';
+import GraficoSemanal from '@/componentes/GraficoSemanal';
 import { Cartao, Vazio } from '@/componentes/ui';
 import GraficoCsat, { type PontoCsat } from '@/componentes/GraficoCsat';
 import { criarClienteServidor } from '@/lib/supabase/servidor';
@@ -104,6 +106,47 @@ export default async function PainelGestor({ competencia, canal }: { competencia
     const maiorTme = Math.max(1, tmeEquipe ?? 0, ...tmePorPessoa.map((t) => t.tme), canal === 'diretores' ? 1800 : 0);
     // Referências das faixas de Diretores (15 e 30 min).
     const faixasTme = canal === 'diretores' ? [900, 1800] : [];
+
+    // ---------- As mesmas medidas, semana a semana ----------
+    // A média do mês esconde a semana ruim: quatro semanas de 30 min e uma de
+    // 1h20 saem como "38 min" e ninguém vê o dia em que a fila estourou.
+    const volumePorSemana = [1, 2, 3, 4].map((s) =>
+      volCanal.filter((v) => v.semana === s).reduce((a, v) => a + v.finalizados, 0) || null);
+
+    const tmePorSemana = [1, 2, 3, 4].map((s) => {
+      // Média simples dos TMEs lançados, como a regra da faixa usa.
+      const lancados = volCanal.filter((v) => v.semana === s).map((v) => v.tme_seg ?? 0).filter((t) => t > 0);
+      return lancados.length ? lancados.reduce((a, b) => a + b, 0) / lancados.length : null;
+    });
+
+    const csatPorSemana = [1, 2, 3, 4].map((s) => {
+      const [pos, tot] = soma(csatCanal.filter((c) => c.semana === s));
+      return tot ? pos / tot : null;
+    });
+
+    /** Uma medida por semana, para a pessoa — usado na visão por atendente. */
+    const semanasDe = (id: string, medir: (l: Csat[]) => number | null) =>
+      [1, 2, 3, 4].map((s) => medir(csatCanal.filter((c) => c.pessoa_id === id && c.semana === s)));
+
+    const tmeSemanalDe = (id: string) => [1, 2, 3, 4].map((s) => {
+      const v = volCanal.find((x) => x.pessoa_id === id && x.semana === s);
+      return v && (v.tme_seg ?? 0) > 0 ? v.tme_seg! : null;
+    });
+
+    /** Quatro caixinhas com o valor de cada semana. */
+    const Semanas = ({ valores, formatar }: {
+      valores: (number | null)[]; formatar: (v: number) => string;
+    }) => (
+      <div className="flex gap-1">
+        {valores.map((v, i) => (
+          <span key={i} title={`${i + 1}ª semana`}
+                className={`flex-1 rounded px-1 py-0.5 text-center text-[10px] tabular-nums ${
+                  v == null ? 'bg-slate-50 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+            {v == null ? '—' : formatar(v)}
+          </span>
+        ))}
+      </div>
+    );
   
   
     return (
@@ -114,22 +157,43 @@ export default async function PainelGestor({ competencia, canal }: { competencia
             acao={totMes > 0 && <span className="text-lg font-semibold tabular-nums text-slate-900">{percentual(posMes / totMes)}</span>}
           >
             {totMes === 0 ? <Vazio>Sem avaliações neste canal.</Vazio> : (
-              <div className="space-y-4">
-                <GraficoCsat pontos={pontosCsat} meta={META_CSAT} rotulo="Equipe" />
-                <ul className="space-y-1.5 border-t border-slate-100 pt-3 text-xs">
-                  {csatPorPessoa.map((p) => (
-                    <li key={p.id} className="flex items-center gap-2">
-                      <span className="w-28 truncate text-slate-700">{nome.get(p.id)}</span>
-                      <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
-                        <span className={`block h-full rounded-full ${p.csat >= META_CSAT ? 'bg-emerald-500' : p.csat >= 0.85 ? 'bg-amber-400' : 'bg-rose-500'}`}
-                              style={{ width: pct(p.csat, 1) }} />
-                      </span>
-                      <span className="w-12 text-right font-semibold tabular-nums text-slate-800">{percentual(p.csat)}</span>
-                      <span className="w-10 text-right tabular-nums text-slate-400">{p.avaliacoes}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              <AlternadorDeVisao
+                rotulos={['Por semana', 'Por atendente']}
+                paineis={[
+                  <div key="s" className="space-y-3">
+                    <GraficoCsat pontos={pontosCsat} meta={META_CSAT} rotulo="Equipe" />
+                    <GraficoSemanal
+                      valores={csatPorSemana}
+                      formatar={(v) => percentual(v)}
+                      media={totMes ? posMes / totMes : null}
+                      referencias={[{ valor: META_CSAT, rotulo: 'meta 95%' }]}
+                      cor="bg-emerald-500"
+                    />
+                  </div>,
+                  <ul key="p" className="space-y-2 text-xs">
+                    {csatPorPessoa.map((p) => (
+                      <li key={p.id} className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="w-28 truncate text-slate-700">{nome.get(p.id)}</span>
+                          <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                            <span className={`block h-full rounded-full ${p.csat >= META_CSAT ? 'bg-emerald-500' : p.csat >= 0.85 ? 'bg-amber-400' : 'bg-rose-500'}`}
+                                  style={{ width: pct(p.csat, 1) }} />
+                          </span>
+                          <span className="w-12 text-right font-semibold tabular-nums text-slate-800">{percentual(p.csat)}</span>
+                          <span className="w-10 text-right tabular-nums text-slate-400">{p.avaliacoes}</span>
+                        </div>
+                        <Semanas
+                          valores={semanasDe(p.id, (l) => {
+                            const [pos, tot] = soma(l);
+                            return tot ? pos / tot : null;
+                          })}
+                          formatar={(v) => percentual(v)}
+                        />
+                      </li>
+                    ))}
+                  </ul>,
+                ]}
+              />
             )}
           </Cartao>
   
@@ -143,7 +207,21 @@ export default async function PainelGestor({ competencia, canal }: { competencia
             )}
           >
             {volumePorPessoa.length === 0 ? <Vazio>Nenhum volume lançado neste canal.</Vazio> : (
-              <div className="space-y-3">
+              <AlternadorDeVisao
+                rotulos={['Por semana', 'Por atendente']}
+                paineis={[
+                  <GraficoSemanal
+                    key="s"
+                    valores={volumePorSemana}
+                    formatar={(v) => inteiro(v)}
+                    media={volumePorSemana.filter((v): v is number => v != null).length
+                      ? volumePorSemana.filter((v): v is number => v != null)
+                        .reduce((a, b) => a + b, 0)
+                        / volumePorSemana.filter((v) => v != null).length
+                      : null}
+                    cor="bg-marca-600"
+                  />,
+                  <div key="p" className="space-y-3">
                 <ul className="space-y-2.5 text-xs">
                   {volumePorPessoa.map((p) => (
                     <li key={p.id} className="space-y-1">
@@ -168,7 +246,9 @@ export default async function PainelGestor({ competencia, canal }: { competencia
                   ))}
                   <span className="flex items-center gap-1"><span className="inline-block h-3 w-px bg-slate-900/50" />média {inteiro(mediaVolume)}</span>
                 </div>
-              </div>
+                  </div>,
+                ]}
+              />
             )}
           </Cartao>
   
@@ -178,7 +258,19 @@ export default async function PainelGestor({ competencia, canal }: { competencia
             acao={tmeEquipe != null && <span className="text-lg font-semibold tabular-nums text-slate-900">{tempo(tmeEquipe)}</span>}
           >
             {tmePorPessoa.length === 0 ? <Vazio>Nenhum TME lançado neste canal.</Vazio> : (
-              <div className="space-y-3">
+              <AlternadorDeVisao
+                rotulos={['Por semana', 'Por atendente']}
+                paineis={[
+                  <GraficoSemanal
+                    key="s"
+                    valores={tmePorSemana}
+                    formatar={(v) => tempo(v)}
+                    media={tmeEquipe}
+                    piorEMaior
+                    referencias={faixasTme.map((f) => ({ valor: f, rotulo: `${f / 60} min` }))}
+                    cor="bg-sky-500"
+                  />,
+                  <div key="p" className="space-y-3">
                 <ul className="space-y-2.5 text-xs">
                   {tmePorPessoa.map((p) => {
                     const acima = tmeEquipe != null && p.tme > tmeEquipe;
@@ -199,6 +291,7 @@ export default async function PainelGestor({ competencia, canal }: { competencia
                             <span className="absolute inset-y-0 w-0.5 bg-slate-900/60" style={{ left: pct(tmeEquipe, maiorTme) }} />
                           )}
                         </div>
+                        <Semanas valores={tmeSemanalDe(p.id)} formatar={(v) => tempo(v)} />
                       </li>
                     );
                   })}
@@ -210,7 +303,9 @@ export default async function PainelGestor({ competencia, canal }: { competencia
                     <span className="flex items-center gap-1"><span className="inline-block h-3 w-px bg-amber-500/70" />faixas 15 e 30 min</span>
                   )}
                 </div>
-              </div>
+                  </div>,
+                ]}
+              />
             )}
           </Cartao>
         </div>
