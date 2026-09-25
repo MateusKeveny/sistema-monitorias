@@ -83,7 +83,9 @@ function NovoLancamento({
   const cargo = f.pessoa ? cargoDe(f.pessoa) : null;
   // Só as regras que pontuam no cargo da pessoa escolhida.
   const pesoNoCargo = new Map(pesos.filter((p) => p.cargo_id === cargo).map((p) => [p.regra, Number(p.peso)]));
-  const disponiveis = regras.filter((r) => pesoNoCargo.has(r.chave));
+  // O presencial sai daqui: quem registra agora é o próprio operador, na tela
+  // de Atendimento presencial. Mantê-lo nos dois lugares contaria em dobro.
+  const disponiveis = regras.filter((r) => pesoNoCargo.has(r.chave) && r.chave !== 'presencial');
   const regra = regras.find((r) => r.chave === f.regra) ?? null;
   const nomePessoa = new Map(pessoas.map((p) => [p.id, p.nome]));
   const rotuloRegra = new Map(regras.map((r) => [r.chave, r.rotulo]));

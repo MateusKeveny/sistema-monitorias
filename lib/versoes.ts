@@ -30,4 +30,4 @@ export const VERSAO_MONITORIAS: string = pacote.version;
  * publicações, não entregas. Recontada pelo que foi de fato entregue desde a
  * estreia em produção (1.0.0, em 18/09/2026), a cota está em 1.4.0.
  */
-export const VERSAO_COTA = '1.10.0';
+export const VERSAO_COTA = '1.11.0';

@@ -217,6 +217,15 @@ export type ConferenciaLancamento = {
   diferenca: number;
 };
 
+/**
+ * Quando o atendimento presencial passou a ser registrado pelo operador.
+ *
+ * Antes disso o presencial era lançamento manual do gestor, e setembro/2026
+ * já foi lançado assim: registrar o mesmo atendimento aqui contaria em dobro.
+ * A mesma data está na view do extrato, no banco.
+ */
+export const INICIO_PRESENCIAL = '2026-09-26';
+
 /** Chaves de regra com tratamento especial nas telas. */
 export const REGRA_META = 'meta';
 export const REGRA_MEDIA = 'media_da_equipe';
@@ -275,4 +284,24 @@ export type PagamentoMensal = {
   pontos_pagos: number;
   /** Nulo enquanto o valor por ponto do mês não for informado. */
   valor: number | null;
+};
+
+/**
+ * Atendimento presencial, registrado por quem atendeu.
+ *
+ * Cada linha vale um atendimento no extrato; a semana sai da data, pelo ciclo
+ * 26→25, como no resto do sistema.
+ */
+export type Presencial = {
+  id: string;
+  pessoa_id: string;
+  pessoa_nome: string;
+  data: string;
+  cliente_id: string | null;
+  cliente_nome: string;
+  demanda: string;
+  observacao: string | null;
+  mes_competencia: string;
+  semana: number | null;
+  criado_em: string;
 };
