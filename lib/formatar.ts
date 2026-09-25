@@ -111,10 +111,23 @@ export function faixa(v: number | null | undefined): 'otimo' | 'bom' | 'atencao'
  * leitura visual.
  */
 export function corDoCsat(v: number | null | undefined, fundo = false): string {
-  if (v == null) return 'text-slate-300';
-  if (v >= 0.90) return fundo ? 'bg-emerald-50 text-emerald-700' : 'text-emerald-700';
-  if (v >= 0.85) return fundo ? 'bg-lime-50 text-lime-700' : 'text-lime-700';
-  return fundo ? 'bg-rose-50 text-rose-700' : 'text-rose-700';
+  if (v == null) return 'text-slate-400';
+  // Fundo translúcido em vez de tom claro fixo: no tema escuro um `bg-*-50`
+  // vira quase branco e a etiqueta salta da tela, que foi como a transição
+  // ficou estranha na primeira versão.
+  if (v >= 0.90) {
+    return fundo
+      ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+      : 'text-emerald-700 dark:text-emerald-300';
+  }
+  if (v >= 0.85) {
+    return fundo
+      ? 'bg-lime-500/15 text-lime-700 dark:text-lime-300'
+      : 'text-lime-700 dark:text-lime-300';
+  }
+  return fundo
+    ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300'
+    : 'text-rose-700 dark:text-rose-300';
 }
 
 /** A mesma escala, para preencher barra. */
