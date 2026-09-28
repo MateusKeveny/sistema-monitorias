@@ -7,8 +7,9 @@ import PagamentoDoMes from '@/componentes/PagamentoDoMes';
 import type {
   AlteracaoDeValor, PagamentoMensal, ValorDaCota as ValorDaCotaTipo,
 } from '@/lib/tipos';
-import { Cartao, Tabela, Th, Td, Vazio } from '@/componentes/ui';
-import { dataHora, hojeNoBrasil, mesDeCompetencia, mesRotulo, percentual } from '@/lib/formatar';
+import { Atingimento, Cartao, Tabela, Th, Td, Vazio } from '@/componentes/ui';
+import { dataHora, mesRotulo } from '@/lib/formatar';
+import { resolverCompetencia } from '@/lib/competencia';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,7 +42,7 @@ export default async function Fechamento({
 }) {
   await exigirGestor();
   const { mes } = await searchParams;
-  const competencia = /^\d{4}-\d{2}$/.test(mes ?? '') ? `${mes}-01` : mesDeCompetencia(hojeNoBrasil());
+  const { competencia } = await resolverCompetencia(mes);
 
   const db = await criarClienteServidor();
   const [abertos, fechados, semCargo, conferir, alteracoes, valor, pagamento, correcoes]
@@ -145,8 +146,8 @@ export default async function Fechamento({
                   <Td className="text-xs text-slate-500">{f.cargo ?? '—'}</Td>
                   <Td className="text-right font-semibold tabular-nums">{num(f.resultado)}</Td>
                   <Td className="text-right tabular-nums text-slate-500">{f.meta ? num(f.meta) : '—'}</Td>
-                  <Td className="text-right tabular-nums">
-                    {f.meta ? percentual(Number(f.resultado) / Number(f.meta)) : '—'}
+                  <Td className="text-right">
+                    {f.meta ? <Atingimento valor={Number(f.resultado) / Number(f.meta)} /> : '—'}
                   </Td>
                   <Td>
                     <Link href={`/cota/extrato?pessoa=${f.pessoa_id}&mes=${competencia.slice(0, 7)}`}
@@ -211,8 +212,8 @@ export default async function Fechamento({
                     <Td className="text-xs text-slate-500">{p.cargo ?? '—'}</Td>
                     <Td className="text-right font-semibold tabular-nums">{num(p.resultado)}</Td>
                     <Td className="text-right tabular-nums text-slate-500">{p.meta ? num(p.meta) : '—'}</Td>
-                    <Td className="text-right tabular-nums">
-                      {p.meta ? percentual(Number(p.resultado) / Number(p.meta)) : '—'}
+                    <Td className="text-right">
+                      {p.meta ? <Atingimento valor={Number(p.resultado) / Number(p.meta)} /> : '—'}
                     </Td>
                     <Td>
                       <Link href={`/cota/extrato?pessoa=${p.pessoa_id}&mes=${competencia.slice(0, 7)}`}

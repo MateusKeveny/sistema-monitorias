@@ -1,4 +1,4 @@
-import { CORES_FAIXA, faixa, nota as formatarNota } from '@/lib/formatar';
+import { CORES_FAIXA, faixa, nota as formatarNota, percentual } from '@/lib/formatar';
 
 export function Cartao({
   titulo, acao, children, className = '',
@@ -41,6 +41,51 @@ export function Indicador({
       <p className={`mt-1 text-2xl font-semibold tabular-nums ${tons[tom]}`}>{valor}</p>
       {detalhe && <p className="mt-0.5 text-xs text-slate-500">{detalhe}</p>}
     </div>
+  );
+}
+
+/**
+ * Atingimento da meta em barra, com a meta marcada.
+ *
+ * A meta é a porta do pagamento — abaixo dela não se calcula valor, e um só
+ * com direito abaixo derruba o bônus de todos —, então a barra existe para
+ * responder "passou ou não passou". Por isso:
+ *   - a meta é um traço fixo na barra, não o fim dela; a barra vai além, e
+ *     152% e 118% deixam de parecer iguais;
+ *   - abaixo da meta a barra muda de cor, e o texto diz, para não depender só
+ *     da cor.
+ *
+ * `escala` é o atingimento que enche a barra inteira. Numa tabela, passe o
+ * mesmo valor para todas as linhas, senão as barras não se comparam.
+ */
+export function BarraDeMeta({ atingimento, escala = 1.5 }: { atingimento: number; escala?: number }) {
+  const fim = Math.max(1.1, escala);
+  const bateu = atingimento >= 1;
+  const largura = (v: number) => `${Math.max(0, Math.min(100, (v / fim) * 100))}%`;
+  return (
+    <div className="flex items-center gap-3">
+      <span className="relative h-2 flex-1 rounded-full bg-slate-100">
+        <span className={`absolute inset-y-0 left-0 rounded-full ${bateu ? 'bg-emerald-500' : 'bg-amber-500'}`}
+              style={{ width: largura(atingimento) }} />
+        <span aria-hidden title="Meta"
+              className="absolute -inset-y-1 w-0.5 rounded-full bg-slate-500"
+              style={{ left: largura(1) }} />
+      </span>
+      <Atingimento valor={atingimento} className="w-24" />
+    </div>
+  );
+}
+
+/** Percentual da meta; abaixo dela, em destaque e dito por escrito. */
+export function Atingimento({ valor, className = '' }: { valor: number; className?: string }) {
+  const bateu = valor >= 1;
+  return (
+    <span className={`inline-flex items-baseline justify-end gap-1.5 text-right tabular-nums ${className}`}>
+      {!bateu && <span className="text-xs font-normal text-amber-700">abaixo</span>}
+      <span className={`text-xs font-semibold ${bateu ? 'text-slate-700' : 'text-amber-700'}`}>
+        {percentual(valor)}
+      </span>
+    </span>
   );
 }
 

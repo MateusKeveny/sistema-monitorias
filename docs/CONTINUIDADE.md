@@ -11,13 +11,27 @@ Escrito em 28/09/2026. Para o modelo de dados completo, ver
 
 | | |
 |---|---|
-| Publicado | Performance **1.12.0** · Monitorias **4.11.2** (deploy de 28/09/2026) |
+| Publicado | Performance **1.13.0** · Monitorias **4.11.2** (deploy de 28/09/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
 | Migrações no banco | 01 a 29, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
 
-A 1.12.0 (seletor de competência na tela inicial) foi ao ar em 28/09/2026, a
-partir do commit da tag `cota-v1.12.0`.
+### Revisão de design (28/09/2026)
+
+Três versões, cada uma publicada e conferida antes da próxima:
+
+- **1.13.0** (publicada): meta visível na barra de atingimento, com frase do
+  bônus de equipe; cota no topo da tela inicial; cabeçalho agrupado
+  (Registrar, Administrar) e fixo só em tela larga; competência em aberto
+  como padrão.
+- **1.14.0**: resumo do mês no topo do extrato (total, meta, atingimento,
+  valor).
+- **1.15.0**: acabamento — cores com significado (TME, critérios), relógio,
+  rótulos em maiúsculas, contraste do tema claro, e um visual mais fluido
+  (menos caixas, transições só em ação da pessoa, esqueletos de
+  carregamento). Mostrar prévia visual antes de codificar.
+
+Visão de celular fica fora da revisão, por decisão do gestor.
 
 ---
 
@@ -68,6 +82,12 @@ Desde a migração 29, o extrato conta o registro a partir de **26/08/2026**
 (competência de setembro, importada da planilha). Quem acessa o banco direto
 pelo SQL Editor não passa pela trava de prazo; pelo site, nada mudou. Registro
 anterior a 26/09 só o gestor apaga.
+
+**Competência que a tela abre** (1.13.0, `lib/competencia.ts`). Início,
+Extrato e Fechamento abrem no mês anterior enquanto ele não foi fechado **e**
+o mês novo não tem volume, avaliação, lançamento ou monitoria. Presencial não
+conta como dado: o operador registra desde o dia 26. Lançamentos e Presencial
+seguem abrindo no mês do calendário. Mês escolhido no seletor vale sempre.
 
 **Cor do C-SAT**: verde a partir de 90%, verde-amarelado de 85% a 90%,
 vermelho abaixo. A meta continua 95%.

@@ -1,9 +1,10 @@
 import PainelGestor from '@/componentes/PainelGestor';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
-import { Cartao, EtiquetaNota, Vazio } from '@/componentes/ui';
+import { BarraDeMeta, Cartao, EtiquetaNota, Vazio } from '@/componentes/ui';
 import Relogio from '@/componentes/Relogio';
 import PainelAtendente from '@/componentes/PainelAtendente';
-import { corDoCsat, codigoMonitoria, data as formatarData, hojeNoBrasil, mesDeCompetencia, mesRotulo, percentual } from '@/lib/formatar';
+import { codigoMonitoria, data as formatarData, mesRotulo, percentual } from '@/lib/formatar';
+import { resolverCompetencia } from '@/lib/competencia';
 import { ENDERECO_MONITORIAS } from '@/lib/sistema';
 
 export const dynamic = 'force-dynamic';
@@ -48,9 +49,20 @@ export default async function InicioCota({
 }) {
   const perfil = await exigirPerfil();
   const { canal: canalPedido, mes } = await searchParams;
-  const mesAtual = mesDeCompetencia(hojeNoBrasil());
-  const competencia = /^\d{4}-\d{2}$/.test(mes ?? '') ? `${mes}-01` : mesAtual;
-  const outroMes = competencia !== mesAtual;
+  const { competencia, atual, emAberto } = await resolverCompetencia(mes);
+  const outroMes = competencia !== atual;
+
+  /**
+   * Por que a tela não está no mês de hoje. Aberta sozinha na anterior, diz
+   * que é o mês em aberto; escolhida pela pessoa, só avisa que é outro mês.
+   */
+  const AvisoDoMes = () => emAberto ? (
+    <span className="ml-2 text-amber-700 dark:text-amber-400">
+      em aberto · {mesRotulo(atual)} ainda sem lançamentos
+    </span>
+  ) : outroMes ? (
+    <span className="ml-2 text-amber-700 dark:text-amber-400">competência anterior</span>
+  ) : null;
 
   /**
    * Seletor de competência.
@@ -84,7 +96,7 @@ export default async function InicioCota({
             </h1>
             <p className="text-sm text-sobre-fundo-suave">
               {mesRotulo(competencia)} · Visão da equipe
-              {outroMes && <span className="ml-2 text-amber-700 dark:text-amber-400">competência anterior</span>}
+              <AvisoDoMes />
             </p>
           </div>
           <div className="flex flex-wrap items-end gap-4">
@@ -133,7 +145,7 @@ export default async function InicioCota({
           </h1>
           <p className="text-sm text-sobre-fundo-suave">
             {mesRotulo(competencia)}{cota.data?.cargo ? ` · ${cota.data.cargo}` : ''}
-            {outroMes && <span className="ml-2 text-amber-700 dark:text-amber-400">competência anterior</span>}
+            <AvisoDoMes />
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-4">
@@ -154,11 +166,9 @@ export default async function InicioCota({
               </p>
               {meta != null && (
                 <>
-                  <div className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className="h-full rounded-full bg-marca-600"
-                      style={{ width: `${Math.min(100, Math.max(0, (resultado / meta) * 100))}%` }}
-                    />
+                  <div className="mt-4">
+                    <BarraDeMeta atingimento={resultado / meta}
+                                 escala={Math.max(1.25, resultado / meta)} />
                   </div>
                   <p className="mt-2 text-sm text-slate-600">
                     {percentual(resultado / meta)} da meta de {pontos(meta)} pts

@@ -1,7 +1,7 @@
 import AlternadorCanal from '@/componentes/AlternadorCanal';
 import AlternadorDeVisao from '@/componentes/AlternadorDeVisao';
 import GraficoSemanal from '@/componentes/GraficoSemanal';
-import { Cartao, Vazio } from '@/componentes/ui';
+import { BarraDeMeta, Cartao, Vazio } from '@/componentes/ui';
 import GraficoCsat, { type PontoCsat } from '@/componentes/GraficoCsat';
 import { criarClienteServidor } from '@/lib/supabase/servidor';
 import { corDoCsat, percentual } from '@/lib/formatar';
@@ -18,7 +18,10 @@ const pct = (v: number, max: number) => `${Math.max(0, Math.min(100, (v / max) *
 type Csat = { pessoa_id: string; origem: Canal; semana: number; avaliacoes: number; positivas: number };
 type Volume = { pessoa_id: string; canal: Canal; semana: number; finalizados: number; tme_seg: number | null };
 type Criterio = { criterio: string; avaliacoes: number; reprovacoes: number; taxa_reprovacao: number };
-type Cota = { pessoa_id: string; pessoa: string; cargo: string | null; resultado: number; meta: number | null };
+type Cota = {
+  pessoa_id: string; pessoa: string; cargo: string | null; resultado: number; meta: number | null;
+  compoe_media: boolean | null;
+};
 
 const inteiro = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
 const nomeCurto = (nome: string) => nome.trim().split(/\s+/).slice(0, 2).join(' ');
@@ -45,7 +48,7 @@ export default async function PainelGestor({ competencia, canal }: { competencia
   // `canal` é só o canal que abre primeiro.
   const db = await criarClienteServidor();
 
-  const [pessoas, csat, volume, criterios, cota] = await Promise.all([
+  const [pessoas, csat, volume, criterios, cota, cargos] = await Promise.all([
     db.from('pessoas').select('id, nome, exibir_no_painel, conta_nas_medias'),
     db.from('vw_csat_semanal').select('pessoa_id, origem, semana, avaliacoes, positivas')
       .eq('mes_competencia', competencia),
@@ -54,8 +57,9 @@ export default async function PainelGestor({ competencia, canal }: { competencia
     db.from('vw_criterios_reprovados').select('criterio, avaliacoes, reprovacoes, taxa_reprovacao')
       .eq('mes_referencia', competencia).gt('reprovacoes', 0)
       .order('reprovacoes', { ascending: false }).limit(8),
-    db.from('vw_cota_mensal').select('pessoa_id, pessoa, cargo, resultado, meta')
+    db.from('vw_cota_mensal').select('pessoa_id, pessoa, cargo, resultado, meta, compoe_media')
       .eq('mes_competencia', competencia).order('resultado', { ascending: false }),
+    db.from('cargos').select('nome, recebe_bonus'),
   ]);
 
   const nome = new Map((pessoas.data ?? []).map((p) => [p.id as string, nomeCurto(p.nome as string)]));
@@ -71,7 +75,18 @@ export default async function PainelGestor({ competencia, canal }: { competencia
   // ---------- Monitoria e cota ----------
   const lista = (criterios.data ?? []) as Criterio[];
   const maiorReprov = Math.max(1, ...lista.map((c) => c.reprovacoes));
-  const cotas = ((cota.data ?? []) as Cota[]).filter((c) => exibe.has(c.pessoa_id));
+  const todasAsCotas = (cota.data ?? []) as Cota[];
+  const cotas = todasAsCotas.filter((c) => exibe.has(c.pessoa_id));
+  // A barra de todo mundo na mesma escala, senão não se comparam.
+  const escalaCota = Math.max(1.25, ...cotas.map((c) => (c.meta ? Number(c.resultado) / Number(c.meta) : 0)));
+
+  // Bônus de equipe: mesma regra do pagamento (bonus_da_competencia) — cargo
+  // com direito e mês inteiro na operação. Conta todo mundo, não só quem
+  // aparece na lista: esconder alguém da tela não muda o bônus.
+  const comBonus = new Set((cargos.data ?? []).filter((c) => c.recebe_bonus).map((c) => c.nome as string));
+  const comDireito = todasAsCotas.filter((c) =>
+    c.cargo != null && comBonus.has(c.cargo) && c.compoe_media !== false && c.meta);
+  const abaixo = comDireito.filter((c) => Number(c.resultado) < Number(c.meta));
 
 
   // C-SAT, volume e TME dos dois canais vêm prontos; o botão só alterna.
@@ -379,41 +394,31 @@ export default async function PainelGestor({ competencia, canal }: { competencia
 
   return (
     <div className="space-y-6">
-      <AlternadorCanal inicial={canal} paineis={{ huggy: quadros('huggy'), diretores: quadros('diretores') }} />
-
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Critérios de monitoria */}
-        <Cartao titulo="Critérios mais reprovados em monitoria">
-          {lista.length === 0 ? <Vazio>Nenhuma reprovação nesta competência.</Vazio> : (
-            <ul className="space-y-2.5 text-xs">
-              {lista.map((c) => (
-                <li key={c.criterio} className="space-y-1">
-                  <div className="flex justify-between gap-3">
-                    <span className="text-slate-700">{c.criterio}</span>
-                    <span className="shrink-0 tabular-nums text-slate-500">
-                      <strong className="text-slate-800">{c.reprovacoes}</strong> de {c.avaliacoes} · {percentual(Number(c.taxa_reprovacao))}
-                    </span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded bg-slate-100">
-                    <span className="block h-full rounded bg-rose-400" style={{ width: pct(c.reprovacoes, maiorReprov) }} />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Cartao>
-
-        {/* Cota */}
-        <Cartao titulo="Pontuação de cota" className="lg:col-span-2">
-          {cotas.length === 0 ? <Vazio>Sem pontuação nesta competência.</Vazio> : (
-            <div className="-mx-5 -my-5 overflow-x-auto">
+      {/* Cota primeiro: é o que o gestor acompanha para fechar o mês. */}
+      <Cartao titulo="Pontuação de cota">
+        {cotas.length === 0 ? <Vazio>Sem pontuação nesta competência.</Vazio> : (
+          <div className="space-y-4">
+            {comDireito.length > 0 && (
+              <p className={`rounded-lg px-3 py-2 text-sm ${abaixo.length
+                ? 'bg-amber-50 text-amber-900' : 'bg-emerald-50 text-emerald-800'}`}>
+                {abaixo.length === 0
+                  ? `Os ${comDireito.length} com direito ao bônus de equipe estão na meta.`
+                  : <>
+                      <strong>{abaixo.length} de {comDireito.length}</strong> com direito ao bônus
+                      {abaixo.length === 1 ? ' está' : ' estão'} abaixo da meta
+                      ({abaixo.map((c) => nomeCurto(c.pessoa)).join(', ')}).
+                      Basta um abaixo para o bônus de equipe não sair.
+                    </>}
+              </p>
+            )}
+            <div className="-mx-5 -mb-5 overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
-                    <th className="px-4 py-2.5 font-semibold">Pessoa</th>
-                    <th className="px-4 py-2.5 font-semibold">Cargo</th>
-                    <th className="px-4 py-2.5 text-right font-semibold">Pontos</th>
-                    <th className="w-2/5 px-4 py-2.5 font-semibold">Atingimento</th>
+                  <tr className="border-t border-slate-100 text-left text-xs text-slate-500">
+                    <th className="px-5 py-2.5 font-medium">Pessoa</th>
+                    <th className="px-4 py-2.5 font-medium">Cargo</th>
+                    <th className="px-4 py-2.5 text-right font-medium">Pontos</th>
+                    <th className="w-1/2 px-5 py-2.5 font-medium">Atingimento da meta</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -421,19 +426,13 @@ export default async function PainelGestor({ competencia, canal }: { competencia
                     const ating = c.meta ? Number(c.resultado) / Number(c.meta) : null;
                     return (
                       <tr key={`${c.pessoa_id}-${c.cargo}`} className="border-t border-slate-100">
-                        <td className="px-4 py-2 font-medium text-slate-800">{nomeCurto(c.pessoa)}</td>
+                        <td className="px-5 py-2 font-medium text-slate-800">{nomeCurto(c.pessoa)}</td>
                         <td className="px-4 py-2 text-xs text-slate-500">{c.cargo ?? '—'}</td>
                         <td className="px-4 py-2 text-right font-semibold tabular-nums text-slate-800">{inteiro(Number(c.resultado))}</td>
-                        <td className="px-4 py-2">
-                          {ating == null ? <span className="text-xs text-slate-400">sem meta</span> : (
-                            <div className="flex items-center gap-2">
-                              <span className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
-                                <span className={`block h-full rounded-full ${ating >= 1 ? 'bg-emerald-500' : 'bg-marca-600'}`}
-                                      style={{ width: pct(ating, 1) }} />
-                              </span>
-                              <span className="w-12 text-right text-xs font-semibold tabular-nums text-slate-700">{percentual(ating)}</span>
-                            </div>
-                          )}
+                        <td className="px-5 py-2">
+                          {ating == null
+                            ? <span className="text-xs text-slate-400">sem meta</span>
+                            : <BarraDeMeta atingimento={ating} escala={escalaCota} />}
                         </td>
                       </tr>
                     );
@@ -441,9 +440,32 @@ export default async function PainelGestor({ competencia, canal }: { competencia
                 </tbody>
               </table>
             </div>
-          )}
-        </Cartao>
-      </div>
+          </div>
+        )}
+      </Cartao>
+
+      <AlternadorCanal inicial={canal} paineis={{ huggy: quadros('huggy'), diretores: quadros('diretores') }} />
+
+      {/* Critérios de monitoria */}
+      <Cartao titulo="Critérios mais reprovados em monitoria">
+        {lista.length === 0 ? <Vazio>Nenhuma reprovação nesta competência.</Vazio> : (
+          <ul className="grid gap-x-8 gap-y-2.5 text-xs md:grid-cols-2">
+            {lista.map((c) => (
+              <li key={c.criterio} className="space-y-1">
+                <div className="flex justify-between gap-3">
+                  <span className="text-slate-700">{c.criterio}</span>
+                  <span className="shrink-0 tabular-nums text-slate-500">
+                    <strong className="text-slate-800">{c.reprovacoes}</strong> de {c.avaliacoes} · {percentual(Number(c.taxa_reprovacao))}
+                  </span>
+                </div>
+                <div className="h-2 overflow-hidden rounded bg-slate-100">
+                  <span className="block h-full rounded bg-rose-400" style={{ width: pct(c.reprovacoes, maiorReprov) }} />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Cartao>
     </div>
   );
 }

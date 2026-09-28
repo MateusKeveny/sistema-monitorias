@@ -1,6 +1,7 @@
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { Cartao, Vazio } from '@/componentes/ui';
-import { hojeNoBrasil, mesDeCompetencia, mesRotulo, percentual } from '@/lib/formatar';
+import { mesRotulo, percentual } from '@/lib/formatar';
+import { resolverCompetencia } from '@/lib/competencia';
 import type { Pessoa } from '@/lib/tipos';
 
 export const dynamic = 'force-dynamic';
@@ -53,7 +54,7 @@ export default async function Extrato({
 }) {
   const perfil = await exigirPerfil();
   const { mes, pessoa: pessoaPedida } = await searchParams;
-  const competencia = /^\d{4}-\d{2}$/.test(mes ?? '') ? `${mes}-01` : mesDeCompetencia(hojeNoBrasil());
+  const { competencia, atual, emAberto } = await resolverCompetencia(mes);
   const veOTime = perfil.papel !== 'operador';
 
   const db = await criarClienteServidor();
@@ -190,6 +191,11 @@ export default async function Extrato({
           <p className="text-sm text-sobre-fundo-suave">
             {cota.data?.pessoa ?? perfil.nome} · {mesRotulo(competencia)}
             {congelado?.cargo ?? cota.data?.cargo ? ` · ${congelado?.cargo ?? cota.data?.cargo}` : ''}
+            {emAberto && (
+              <span className="ml-2 text-amber-700 dark:text-amber-400">
+                em aberto · {mesRotulo(atual)} ainda sem lançamentos
+              </span>
+            )}
           </p>
           {congelado && (
             <p className="mt-1 inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5
