@@ -11,7 +11,7 @@ Escrito em 28/09/2026. Para o modelo de dados completo, ver
 
 | | |
 |---|---|
-| Publicado | Performance **1.15.0** · Monitorias **4.11.2** (deploy de 28/09/2026) |
+| Publicado | Performance **1.16.0** · Monitorias **4.11.2** (deploy de 28/09/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
 | Migrações no banco | 01 a 29, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
@@ -38,15 +38,27 @@ Três versões, cada uma publicada e conferida antes da próxima:
   linha nas semanas (`GraficoDeLinha`). Projeção só no mês corrente, pelo
   ritmo das semanas com volume lançado. Escala única de cor: verde da marca =
   bom/na meta, âmbar = atenção, rosa = ruim, cinza = sem julgamento.
-- **1.16.0**: históricos de Volume, C-SAT e TME — atalho em cada destaque
+- **1.16.0** (publicada, em teste com os operadores): a tela inicial do
+  operador no mesmo formato de acompanhamento (`PainelAtendente`). "Como
+  chegar à meta" no topo (quanto falta, quantos atendimentos, ganho do
+  próximo degrau de C-SAT, critérios da última monitoria); cinco destaques —
+  Minha meta, Meu C-SAT, Meus atendimentos, Meu TME, Minha monitoria —
+  comparados com a própria pessoa no mês anterior; projeção pessoal no mês
+  corrente. Nada de colega nem de fechamento; da equipe, só as médias de
+  C-SAT e TME que o banco já entrega ao operador (por isso a referência do
+  volume é a média da própria pessoa). Removidos AlternadorCanal,
+  AlternadorDeVisao, GraficoCsat e GraficoSemanal, sem uso.
+- **1.17.0**: o estilo novo nas telas de consulta — Extrato, Histórico
+  (evolução mês a mês em linha), Fechamento (pendências do fechamento no
+  topo).
+- **1.18.0**: telas de registro e administração — Lançamentos, Importar,
+  Presencial, Atendentes, Configuração (topo padrão, superfície única, sem
+  maiúsculas).
+- **1.19.0**: históricos de Volume, C-SAT e TME — atalho em cada destaque
   levando a uma página de comparação por mês (total, contra o mês anterior,
   média, por atendente). Só gestor e Pleno. O Pleno hoje só enxerga a própria
   linha, então precisa da migração 30 (consulta liberada para gestor e Pleno,
   como `bonus_da_competencia`).
-- **Tela dos operadores**: replicar a ideia de acompanhamento para eles
-  (quanto falta para a meta, projeção pessoal, evolução contra o mês
-  anterior, última monitoria), sem nada da equipe nem do fechamento. Fazer
-  prévia antes.
 
 Visão de celular fica fora da revisão, por decisão do gestor.
 

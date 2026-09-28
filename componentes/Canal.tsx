@@ -14,7 +14,7 @@ const Contexto = createContext<[Canal, (c: Canal) => void]>(['huggy', () => {}])
  * canal está espalhado: a faixa de destaques, o C-SAT por atendente e o
  * detalhe semana a semana. Cada pedaço usa `NoCanal`; o conteúdo dos dois
  * canais já vem pronto do servidor e a troca só mostra um e esconde o outro —
- * o mesmo princípio do AlternadorCanal, sem recalcular a cota.
+ * sem ir ao servidor, para não recalcular a cota a cada clique.
  */
 export function ProvedorDeCanal({ inicial, children }: { inicial: Canal; children: ReactNode }) {
   const [canal, setCanal] = useState<Canal>(inicial);

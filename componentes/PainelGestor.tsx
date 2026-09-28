@@ -199,7 +199,7 @@ export default async function PainelGestor({ competencia, atual }: { competencia
   /** "▲ 7% vs agosto", verde quando melhora e rosa quando piora. */
   const Comparacao = ({ texto, melhor }: { texto: string | null; melhor: boolean }) => texto ? (
     <p className="mt-0.5 text-xs text-slate-500">
-      <b className={`font-semibold ${melhor ? 'text-marca-700 dark:text-marca-400' : 'text-rose-700'}`}>{texto}</b> {vs}
+      <b className={`font-semibold ${melhor ? 'text-marca-700 dark:text-marca-400' : 'text-rose-700'}`}>{texto}</b> {texto === 'igual' ? `a ${nomeDoMes(anterior)}` : vs}
     </p>
   ) : null;
   const seta = (d: number) => (d >= 0 ? '▲' : '▼');
@@ -459,7 +459,7 @@ export default async function PainelGestor({ competencia, atual }: { competencia
           </p>
           <Comparacao melhor={naMeta - (naMetaAntes ?? naMeta) >= 0}
                       texto={naMetaAntes == null || comDireito.length === 0 ? null
-                        : naMeta === naMetaAntes ? '= mesmo' : `${seta(naMeta - naMetaAntes)} ${Math.abs(naMeta - naMetaAntes)}`} />
+                        : naMeta === naMetaAntes ? 'igual' : `${seta(naMeta - naMetaAntes)} ${Math.abs(naMeta - naMetaAntes)}`} />
           {projetar && comDireito.length > 0 && (
             <p className="mt-0.5 text-xs text-slate-600">
               Projeção: <b className={naMetaProjetado === comDireito.length ? 'text-marca-700 dark:text-marca-400' : 'text-amber-700'}>
