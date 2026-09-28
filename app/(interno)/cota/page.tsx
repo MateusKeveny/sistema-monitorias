@@ -44,24 +44,53 @@ const CANAIS: { chave: Canal; rotulo: string }[] = [
 export default async function InicioCota({
   searchParams,
 }: {
-  searchParams: Promise<{ canal?: string }>;
+  searchParams: Promise<{ canal?: string; mes?: string }>;
 }) {
   const perfil = await exigirPerfil();
-  const { canal: canalPedido } = await searchParams;
-  const competencia = mesDeCompetencia(hojeNoBrasil());
+  const { canal: canalPedido, mes } = await searchParams;
+  const mesAtual = mesDeCompetencia(hojeNoBrasil());
+  const competencia = /^\d{4}-\d{2}$/.test(mes ?? '') ? `${mes}-01` : mesAtual;
+  const outroMes = competencia !== mesAtual;
+
+  /**
+   * Seletor de competência.
+   *
+   * O canal vai junto num campo escondido: trocar o mês não deve devolver a
+   * pessoa ao canal que ela não estava olhando.
+   */
+  const SeletorDeMes = () => (
+    <form className="flex items-end gap-2">
+      {canalPedido && <input type="hidden" name="canal" value={canalPedido} />}
+      <label>
+        <span className="mb-1 block text-xs font-medium text-slate-600">Competência</span>
+        <input type="month" name="mes" defaultValue={competencia.slice(0, 7)}
+               className="rounded-md border border-slate-300 px-2 py-1 text-sm" />
+      </label>
+      <button className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5
+                         text-sm font-medium text-slate-700 hover:bg-slate-50">
+        Abrir
+      </button>
+    </form>
+  );
 
   // Gestor: mesmo cabeçalho, com a visão da equipe no lugar da própria cota.
   if (perfil.papel === 'gestor') {
     return (
       <div className="space-y-6">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold text-sobre-fundo">
               {saudacao()}, {nomeCurto(perfil.nome)}
             </h1>
-            <p className="text-sm text-sobre-fundo-suave">{mesRotulo(competencia)} · Visão da equipe</p>
+            <p className="text-sm text-sobre-fundo-suave">
+              {mesRotulo(competencia)} · Visão da equipe
+              {outroMes && <span className="ml-2 text-amber-700 dark:text-amber-400">competência anterior</span>}
+            </p>
           </div>
-          <Relogio />
+          <div className="flex flex-wrap items-end gap-4">
+            <SeletorDeMes />
+            <Relogio />
+          </div>
         </div>
         <PainelGestor competencia={competencia} canal={canalPedido === 'diretores' ? 'diretores' : 'huggy'} />
       </div>
@@ -97,16 +126,20 @@ export default async function InicioCota({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-sobre-fundo">
             {saudacao()}, {nomeCurto(perfil.nome)}
           </h1>
           <p className="text-sm text-sobre-fundo-suave">
             {mesRotulo(competencia)}{cota.data?.cargo ? ` · ${cota.data.cargo}` : ''}
+            {outroMes && <span className="ml-2 text-amber-700 dark:text-amber-400">competência anterior</span>}
           </p>
         </div>
-        <Relogio />
+        <div className="flex flex-wrap items-end gap-4">
+          <SeletorDeMes />
+          <Relogio />
+        </div>
       </div>
 
       <div className="grid gap-6">
