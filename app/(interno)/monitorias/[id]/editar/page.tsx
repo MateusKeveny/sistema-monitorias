@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { criarClienteServidor, exigirMonitor } from '@/lib/supabase/servidor';
 import FormularioMonitoria, { type MonitoriaEmEdicao } from '@/componentes/FormularioMonitoria';
+import { mesAbertoDasMonitorias } from '@/lib/mes-aberto';
 import type { Canal, Criterio, Operador } from '@/lib/tipos';
 
 export const dynamic = 'force-dynamic';
@@ -51,6 +52,7 @@ export default async function EditarMonitoria({
       criterios={relevantes}
       operadores={(operadores ?? []) as Operador[]}
       canais={(canais ?? []) as Canal[]}
+      mesAberto={await mesAbertoDasMonitorias()}
       emEdicao={emEdicao}
     />
   );

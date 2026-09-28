@@ -3,6 +3,7 @@ import { criarClienteServidor, exigirVisaoDoTime } from '@/lib/supabase/servidor
 import { Cartao, EtiquetaNota, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import { mesRotulo, mesCurto, nota, percentual } from '@/lib/formatar';
 import type { LinhaRanking } from '@/lib/tipos';
+import { ateOMesAberto, mesAbertoDasMonitorias } from '@/lib/mes-aberto';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +23,8 @@ export default async function RelatorioRanking({
     .order('nota_media', { ascending: false });
 
   const linhas = (tudo ?? []) as LinhaRanking[];
-  const meses = [...new Set(linhas.map((l) => l.mes_referencia))];
+  // Só até o mês aberto (migração 30): o seguinte libera com o fechamento da cota.
+  const meses = ateOMesAberto([...new Set(linhas.map((l) => l.mes_referencia))], await mesAbertoDasMonitorias());
   const mes = mesEscolhido && meses.includes(mesEscolhido) ? mesEscolhido : meses[0];
   const doMes = linhas.filter((l) => l.mes_referencia === mes);
 

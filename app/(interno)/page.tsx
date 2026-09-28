@@ -4,7 +4,8 @@ import { Cartao, Indicador, EtiquetaNota, Tabela, Th, Td, Vazio } from '@/compon
 import EvolucaoMensal from '@/componentes/GraficoEvolucao';
 import CoberturaDoCiclo from '@/componentes/CoberturaDoCiclo';
 import SolicitacoesDeExclusao, { type Solicitacao } from '@/componentes/SolicitacoesDeExclusao';
-import { nota, mesRotulo, mesCurto, percentual, data as formatarData, hojeNoBrasil } from '@/lib/formatar';
+import { nota, mesRotulo, mesCurto, percentual, data as formatarData, hojeNoBrasil, mesDeCompetencia } from '@/lib/formatar';
+import { ateOMesAberto, mesAbertoDasMonitorias } from '@/lib/mes-aberto';
 import type { LinhaRanking, LinhaCriterio, Monitoria } from '@/lib/tipos';
 
 export const dynamic = 'force-dynamic';
@@ -25,7 +26,12 @@ export default async function Painel({
   const { data: todoRanking } = await db.from('vw_ranking_mensal').select('*');
   const ranking = (todoRanking ?? []) as LinhaRanking[];
 
-  const meses = [...new Set(ranking.map((l) => l.mes_referencia))].sort().reverse();
+  // Só até o mês aberto: o seguinte aparece quando a cota do aberto for
+  // fechada (migração 30). Monitoria lançada antes da trava num mês ainda
+  // fechado fica guardada, fora da seleção.
+  const aberto = await mesAbertoDasMonitorias();
+  const meses = ateOMesAberto([...new Set(ranking.map((l) => l.mes_referencia))].sort().reverse(), aberto);
+  const proximoBloqueado = mesDeCompetencia(hojeNoBrasil()) > aberto;
 
   // Um operador sem monitorias e um sistema recém-instalado chegam aqui pelo
   // mesmo caminho, mas precisam de mensagens diferentes: instrução de
@@ -189,6 +195,12 @@ export default async function Painel({
             Referência: {mesRotulo(mes)}
             {mes !== meses[0] && ' · mês anterior ao atual'}
           </p>
+          {/* Para quem lança e acompanha: por que o mês novo ainda não aparece. */}
+          {proximoBloqueado && !ehOperador && (
+            <p className="mt-1 text-xs font-medium text-amber-300">
+              {mesRotulo(aberto)} em aberto · o mês seguinte libera depois do fechamento da cota de {mesRotulo(aberto)}
+            </p>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">

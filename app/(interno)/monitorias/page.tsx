@@ -3,6 +3,7 @@ import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { Cartao, EtiquetaNota, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import { data as formatarData, mesRotulo, codigoMonitoria } from '@/lib/formatar';
 import type { Monitoria, Operador } from '@/lib/tipos';
+import { ateOMesAberto, mesAbertoDasMonitorias } from '@/lib/mes-aberto';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,6 +64,10 @@ export default async function ListaMonitorias({
     .order('id')
     .range(inicio, inicio + POR_PAGINA - 1);
 
+  // Só até o mês aberto (migração 30): monitoria de mês ainda não liberado
+  // fica guardada, fora da lista, até a cota do aberto ser fechada.
+  const aberto = await mesAbertoDasMonitorias();
+  consulta = consulta.lte('mes_referencia', aberto);
   if (filtros.operador) consulta = consulta.eq('operador_id', filtros.operador);
   if (filtros.mes) consulta = consulta.eq('mes_referencia', filtros.mes);
   if (filtros.zeradas === 'sim') consulta = consulta.eq('zerado', true);
@@ -128,8 +133,8 @@ export default async function ListaMonitorias({
 
   const seta = (coluna: ColunaOrdenavel) =>
     ordenar !== coluna ? '' : crescente ? ' ↑' : ' ↓';
-  const mesesUnicos = [...new Set(((meses ?? []) as { mes_referencia: string }[])
-    .map((m) => m.mes_referencia))];
+  const mesesUnicos = ateOMesAberto([...new Set(((meses ?? []) as { mes_referencia: string }[])
+    .map((m) => m.mes_referencia))], aberto);
 
   const estilo = `rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
                   outline-none focus:border-marca-600`;

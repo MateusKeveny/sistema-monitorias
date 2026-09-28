@@ -3,6 +3,7 @@ import { criarClienteServidor, exigirVisaoDoTime } from '@/lib/supabase/servidor
 import { Cartao, Tabela, Th, Td, Vazio, Indicador } from '@/componentes/ui';
 import { mesRotulo, percentual, nota } from '@/lib/formatar';
 import type { LinhaCriterio } from '@/lib/tipos';
+import { ateOMesAberto, mesAbertoDasMonitorias } from '@/lib/mes-aberto';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +22,8 @@ export default async function RelatorioCriterios({
     .order('mes_referencia', { ascending: false });
 
   const todas = (data ?? []) as LinhaCriterio[];
-  const meses = [...new Set(todas.map((l) => l.mes_referencia))];
+  // Só até o mês aberto (migração 30): o seguinte libera com o fechamento da cota.
+  const meses = ateOMesAberto([...new Set(todas.map((l) => l.mes_referencia))], await mesAbertoDasMonitorias());
   const mes = mesEscolhido === 'todos'
     ? 'todos'
     : (mesEscolhido && meses.includes(mesEscolhido) ? mesEscolhido : meses[0]);

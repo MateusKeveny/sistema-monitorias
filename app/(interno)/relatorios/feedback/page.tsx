@@ -4,6 +4,7 @@ import { Cartao, Vazio } from '@/componentes/ui';
 import BotaoImprimir from '@/componentes/BotaoImprimir';
 import { mesRotulo, data as formatarData, nota, percentual } from '@/lib/formatar';
 import type { LinhaFeedback, Operador } from '@/lib/tipos';
+import { ateOMesAberto, mesAbertoDasMonitorias } from '@/lib/mes-aberto';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,8 +22,9 @@ export default async function FolhaFeedback({
     db.from('vw_monitorias').select('mes_referencia').order('mes_referencia', { ascending: false }),
   ]);
 
-  const meses = [...new Set(((mesesBrutos ?? []) as { mes_referencia: string }[])
-    .map((m) => m.mes_referencia))];
+  // Só até o mês aberto (migração 30): o seguinte libera com o fechamento da cota.
+  const meses = ateOMesAberto([...new Set(((mesesBrutos ?? []) as { mes_referencia: string }[])
+    .map((m) => m.mes_referencia))], await mesAbertoDasMonitorias());
 
   // Só gestor e qualidade chegam aqui (exigirVisaoDoTime), então o seletor de operador
   // é sempre exibido.

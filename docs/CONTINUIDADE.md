@@ -11,9 +11,9 @@ Escrito em 28/09/2026. Para o modelo de dados completo, ver
 
 | | |
 |---|---|
-| Publicado | Performance **1.16.0** · Monitorias **4.11.2** (deploy de 28/09/2026) |
+| Publicado | Performance **1.16.0** · Monitorias **4.12.0** (deploy de 28/09/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
-| Migrações no banco | 01 a 29, todas aplicadas |
+| Migrações no banco | 01 a 30, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
 
 ### Revisão de design (28/09/2026)
@@ -57,7 +57,7 @@ Três versões, cada uma publicada e conferida antes da próxima:
 - **1.19.0**: históricos de Volume, C-SAT e TME — atalho em cada destaque
   levando a uma página de comparação por mês (total, contra o mês anterior,
   média, por atendente). Só gestor e Pleno. O Pleno hoje só enxerga a própria
-  linha, então precisa da migração 30 (consulta liberada para gestor e Pleno,
+  linha, então precisa da migração 31 (consulta liberada para gestor e Pleno,
   como `bonus_da_competencia`).
 
 Visão de celular fica fora da revisão, por decisão do gestor.
@@ -118,7 +118,17 @@ o mês novo não tem volume, avaliação, lançamento ou monitoria. Presencial n
 conta como dado: o operador registra desde o dia 26. Lançamentos e Presencial
 seguem abrindo no mês do calendário. Mês escolhido no seletor vale sempre.
 
-**Cor do C-SAT**: verde a partir de 90%, verde-amarelado de 85% a 90%,
+**Mês aberto das Monitorias** (migração 30, Monitorias 4.12.0). O mês
+aberto é o seguinte ao último fechamento da cota (`mes_aberto_das_monitorias`).
+Enquanto setembro não for fechado no Performance, o site de Monitorias fica em
+setembro — painel, lista e relatórios não mostram outubro — e o banco recusa
+monitoria de competência posterior (gatilho `monitorias_mes_aberto`). Fechar a cota
+libera o mês seguinte sozinho. Ao aplicar, havia 1 monitoria de outubro já
+lançada: fica guardada, fora das telas e sem edição, até setembro fechar. Em
+monitoria nova a data do atendimento começa vazia: preenchida com hoje, era
+salva sem conferir.
+
+**Cor do C-SAT**: verde a partir de 90%, âmbar de 85% a 90% (era verde-amarelado até a 1.15.0),
 vermelho abaixo. A meta continua 95%.
 
 **C-SAT do mês é agregado**, não média das semanas: positivas ÷ avaliações. A

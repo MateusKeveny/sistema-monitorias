@@ -33,7 +33,7 @@ export type MonitoriaEmEdicao = {
 };
 
 export default function FormularioMonitoria({
-  perfilId, criterios, operadores, canais, emEdicao,
+  perfilId, criterios, operadores, canais, emEdicao, mesAberto,
 }: {
   perfilId: string;
   criterios: Criterio[];
@@ -41,12 +41,23 @@ export default function FormularioMonitoria({
   canais: Canal[];
   /** Ausente = lançamento novo. Presente = edição da monitoria indicada. */
   emEdicao?: MonitoriaEmEdicao;
+  /**
+   * Mês aberto para monitorias (migração 30): o seguinte só libera com o
+   * fechamento da cota. A trava de verdade é do banco; aqui a data já nasce
+   * dentro do mês aberto e o formulário avisa antes de salvar.
+   */
+  mesAberto?: string;
 }) {
   const router = useRouter();
   const editando = Boolean(emEdicao);
 
   const [protocolo, setProtocolo] = useState(emEdicao?.protocolo ?? '');
-  const [dataAtendimento, setDataAtendimento] = useState(emEdicao?.data_atendimento ?? hojeNoBrasil());
+  // Último dia do mês aberto: o ciclo vai do dia 26 ao 25.
+  const ultimoDia = mesAberto ? `${mesAberto.slice(0, 8)}25` : null;
+  // Em lançamento novo a data começa vazia, de propósito: preenchida com a data
+  // de hoje, ela era salva sem ser conferida e a monitoria caía na semana ou no
+  // mês errado. O analista informa a data do atendimento que está avaliando.
+  const [dataAtendimento, setDataAtendimento] = useState(emEdicao?.data_atendimento ?? '');
   const [operadorId, setOperadorId] = useState(emEdicao?.operador_id ?? '');
   const [canalId, setCanalId] = useState(emEdicao?.canal_id ?? canais[0]?.id ?? '');
   const [tempo, setTempo] = useState(
@@ -60,15 +71,16 @@ export default function FormularioMonitoria({
   // No ciclo 26→25 da IGreen, semana e mês de competência são função
   // determinística da data do atendimento — por isso não são digitados. O banco
   // deriva os mesmos valores no gravar; aqui é só para o monitor conferir.
-  const semana = semanaDoCiclo(dataAtendimento);
-  const competencia = mesDeCompetencia(dataAtendimento);
+  const temData = /^\d{4}-\d{2}-\d{2}$/.test(dataAtendimento);
+  const semana = temData ? semanaDoCiclo(dataAtendimento) : null;
+  const competencia = temData ? mesDeCompetencia(dataAtendimento) : null;
 
   // Quais números já foram usados naquele operador, naquela semana do ciclo.
   // O nº da monitoria deixa de ser escolhido: é o primeiro slot livre.
   const [ocupados, setOcupados] = useState<number[] | null>(null);
 
   useEffect(() => {
-    if (!operadorId) { setOcupados(null); return; }
+    if (!operadorId || !competencia || !semana) { setOcupados(null); return; }
 
     let cancelado = false;
     setOcupados(null);
@@ -141,6 +153,7 @@ export default function FormularioMonitoria({
     e.preventDefault();
     setErro(null);
 
+    if (!temData) return setErro('Informe a data do atendimento.');
     if (!operadorId) return setErro('Selecione o operador avaliado.');
     if (semanaCheia) return setErro('Esta semana já tem as 4 monitorias do operador. Escolha outra data ou outro operador.');
     if (pendentes > 0) return setErro(`Faltam ${pendentes} critério(s) sem resposta.`);
@@ -258,8 +271,17 @@ export default function FormularioMonitoria({
                       ring-1 ring-amber-600/20">
           <strong>Data no futuro.</strong> O atendimento está em{' '}
           {formatarDataBR(dataAtendimento)}, que ainda não aconteceu. A monitoria vai
-          contar em {mesRotulo(competencia)} e não aparece nos relatórios até lá —
+          contar em {competencia && mesRotulo(competencia)} e não aparece nos relatórios até lá —
           confira a data antes de salvar.
+        </p>
+      )}
+
+      {ultimoDia && dataAtendimento > ultimoDia && (
+        <p className="rounded-xl bg-amber-50 px-5 py-4 text-sm text-amber-900
+                      ring-1 ring-amber-600/20">
+          <strong>Competência ainda não liberada.</strong> Este atendimento conta em{' '}
+          {competencia && mesRotulo(competencia)}, que só abre para monitorias depois do fechamento da cota de{' '}
+          {mesRotulo(mesAberto!)}. Até lá, só dá para lançar atendimentos até {formatarDataBR(ultimoDia)}.
         </p>
       )}
 
@@ -267,7 +289,7 @@ export default function FormularioMonitoria({
         <p className="rounded-xl bg-amber-50 px-5 py-4 text-sm text-amber-900
                       ring-1 ring-amber-600/20">
           <strong>Semana concluída.</strong> Este operador já tem as {POR_SEMANA} monitorias
-          da {semana}ª semana de {mesRotulo(competencia)}. Para lançar outra, escolha uma data
+          da {semana}ª semana de {competencia && mesRotulo(competencia)}. Para lançar outra, escolha uma data
           de outra semana ou outro operador.
         </p>
       )}
@@ -282,7 +304,7 @@ export default function FormularioMonitoria({
 
           <label>
             <span className={rotuloCampo}>Data do atendimento</span>
-            <input type="date" required value={dataAtendimento}
+            <input type="date" required value={dataAtendimento} max={ultimoDia ?? undefined}
               onChange={(e) => setDataAtendimento(e.target.value)} className={campo} />
           </label>
 
@@ -306,10 +328,14 @@ export default function FormularioMonitoria({
           <div>
             <span className={rotuloCampo}>Semana do ciclo</span>
             <p className={`${campo} bg-slate-50 text-slate-700`}>
-              {semana}ª Semana
-              <span className="ml-2 text-xs text-slate-500">
-                · competência {mesRotulo(competencia)}
-              </span>
+              {semana == null || competencia == null
+                ? <span className="text-slate-400">Informe a data do atendimento</span>
+                : <>
+                    {semana}ª Semana
+                    <span className="ml-2 text-xs text-slate-500">
+                      · competência {mesRotulo(competencia)}
+                    </span>
+                  </>}
             </p>
           </div>
 
@@ -467,7 +493,7 @@ export default function FormularioMonitoria({
             </p>
           )}
 
-          <button type="submit" disabled={salvando || semanaCheia}
+          <button type="submit" disabled={salvando || semanaCheia || Boolean(ultimoDia && dataAtendimento > ultimoDia)}
             className="rounded-lg bg-marca-600 px-5 py-2.5 text-sm font-semibold text-white
                        hover:bg-marca-700 disabled:opacity-60">
             {salvando ? 'Salvando…' : editando ? 'Salvar alterações' : 'Salvar monitoria'}
