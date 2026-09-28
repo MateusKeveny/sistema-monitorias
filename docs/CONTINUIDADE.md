@@ -11,20 +11,13 @@ Escrito em 28/09/2026. Para o modelo de dados completo, ver
 
 | | |
 |---|---|
-| Publicado | Performance **1.11.0** · Monitorias **4.11.2** |
-| No código, sem publicar | **1.12.0** — seletor de competência na tela inicial |
+| Publicado | Performance **1.12.0** · Monitorias **4.11.2** (deploy de 28/09/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
-| Migrações no banco | 01 a 28, todas aplicadas |
+| Migrações no banco | 01 a 29, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
 
-### O que falta para a 1.12.0 ir ao ar
-
-O código está pronto e compila (`tsc` e `build` conferidos). Falta a sequência
-de publicação:
-
-1. `lib/versoes.ts`: `VERSAO_COTA` de `'1.11.0'` para `'1.12.0'`;
-2. commit e tag `cota-v1.12.0`, **antes** do deploy;
-3. `npm run cf:deploy`.
+A 1.12.0 (seletor de competência na tela inicial) foi ao ar em 28/09/2026, a
+partir do commit da tag `cota-v1.12.0`.
 
 ---
 
@@ -71,6 +64,11 @@ banco e na tela:
   Feriado não conta; o gestor não passa pela trava, porque é quem responde
   quando alguém perde o prazo.
 
+Desde a migração 29, o extrato conta o registro a partir de **26/08/2026**
+(competência de setembro, importada da planilha). Quem acessa o banco direto
+pelo SQL Editor não passa pela trava de prazo; pelo site, nada mudou. Registro
+anterior a 26/09 só o gestor apaga.
+
 **Cor do C-SAT**: verde a partir de 90%, verde-amarelado de 85% a 90%,
 vermelho abaixo. A meta continua 95%.
 
@@ -93,6 +91,19 @@ o valor anterior de cada um registrado em `fechamento_alteracoes`. Valor por
 ponto de agosto: R$ 0,033445. Bônus não saiu — cinco Juniores abaixo da meta.
 Seis pessoas receberam, de R$ 173,96 a R$ 269,07.
 
+**Presencial de setembro substituído pela planilha** (migração 29, 28/09).
+Os lançamentos manuais (só a quantidade por operador, 16 no total) saíram,
+com cópia em `lancamentos_substituidos`; entraram as 31 linhas da aba 09-2026
+de `Atendimentos presenciais - Expansão.xlsx`, com data, cliente e demanda.
+A estrutura está em `supabase/29-presencial-de-setembro.sql`; as linhas, com
+nome e ID de clientes, em `dados/29-presencial-de-setembro-linhas.sql`, fora
+do git.
+Mudou a quantidade de Ibson (4→6), João (0→1), Pedro (3→5) e Rayssa (0→10);
+Rafael e Suyara ficaram iguais. Setembro ainda não estava fechado. A
+contraprova de setembro não vale mais para o presencial. A linha 3 da planilha
+veio sem data e entrou como 09/09, informada pelo gestor; mesmo cliente no
+mesmo dia conta como atendimentos separados.
+
 **Bruno Aguiar**: desligado em 11/09, registrado na tela de Atendentes com a
 ficha e a cota congeladas. As 114 avaliações de setembro foram reatribuídas a
 Ibson, João, Rayssa e Rafael sob duas travas — nenhuma faixa de C-SAT podia
@@ -107,8 +118,7 @@ redistribuído pelo gestor.
 **Antes de divulgar à equipe**
 
 - trocar as senhas ainda padrão;
-- criar o monitor do Performance no Better Stack (o de Monitorias já existe);
-- publicar a 1.12.0.
+- criar o monitor do Performance no Better Stack (o de Monitorias já existe).
 
 **Trabalho em aberto**
 

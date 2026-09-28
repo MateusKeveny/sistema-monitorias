@@ -17,3 +17,6 @@ dados/
 # Diversos
 *.log
 .DS_Store
+
+# Permissões pessoais do Claude Code — valem só nesta máquina
+.claude/settings.local.json
