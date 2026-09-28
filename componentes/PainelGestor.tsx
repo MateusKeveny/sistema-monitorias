@@ -287,7 +287,7 @@ export default async function PainelGestor({ competencia, atual }: { competencia
       detalheCsat: (
         <div className="grid items-start gap-4 xl:grid-cols-[1.3fr_1fr]">
           <Painel>
-            <Secao titulo="C-SAT por semana" subtitulo="Positivas sobre avaliações. Escala de 75% a 100%.">
+            <Secao titulo="C-SAT por semana" acao={<Link href="/cota/comparativo?cat=csat" className="whitespace-nowrap rounded-full border border-slate-200 px-2.5 py-0.5 text-xs text-slate-600 hover:border-marca-600">comparar meses ›</Link>} subtitulo="Positivas sobre avaliações. Escala de 75% a 100%.">
               {agora.csatMes == null ? <Vazio>Sem avaliações neste canal.</Vazio> : (
                 <>
                   <GraficoDeLinha min={0.75} max={1} formatar={percentual}
@@ -347,7 +347,7 @@ export default async function PainelGestor({ competencia, atual }: { competencia
       detalheVol: (
         <div className="grid items-start gap-4 xl:grid-cols-[1.3fr_1fr]">
           <Painel>
-            <Secao titulo="Volume por semana" subtitulo="Finalizados de cada semana do ciclo.">
+            <Secao titulo="Volume por semana" acao={<Link href="/cota/comparativo?cat=vol" className="whitespace-nowrap rounded-full border border-slate-200 px-2.5 py-0.5 text-xs text-slate-600 hover:border-marca-600">comparar meses ›</Link>} subtitulo="Finalizados de cada semana do ciclo.">
               {!agora.volTotal ? <Vazio>Nenhum volume lançado neste canal.</Vazio> : (
                 <GraficoDeLinha formatar={inteiro}
                                 referencia={mediaVolSemanal != null ? { valor: mediaVolSemanal, rotulo: `média ${inteiro(mediaVolSemanal)}` } : undefined}
@@ -393,7 +393,7 @@ export default async function PainelGestor({ competencia, atual }: { competencia
       detalheTme: (
         <div className="grid items-start gap-4 xl:grid-cols-[1.3fr_1fr]">
           <Painel>
-            <Secao titulo="TME por semana" subtitulo="Âmbar nas semanas acima da média da equipe.">
+            <Secao titulo="TME por semana" acao={<Link href="/cota/comparativo?cat=tme" className="whitespace-nowrap rounded-full border border-slate-200 px-2.5 py-0.5 text-xs text-slate-600 hover:border-marca-600">comparar meses ›</Link>} subtitulo="Âmbar nas semanas acima da média da equipe.">
               {agora.tmeEquipe == null ? <Vazio>Nenhum TME lançado neste canal.</Vazio> : (
                 <GraficoDeLinha formatar={tempo}
                                 referencia={{ valor: agora.tmeEquipe, rotulo: `média ${tempo(agora.tmeEquipe)}` }}
@@ -473,7 +473,7 @@ export default async function PainelGestor({ competencia, atual }: { competencia
       ),
       detalhe: (
         <Painel>
-          <Secao titulo="Pontuação de cota"
+          <Secao titulo="Pontuação de cota" acao={<Link href="/cota/comparativo?cat=pts" className="whitespace-nowrap rounded-full border border-slate-200 px-2.5 py-0.5 text-xs text-slate-600 hover:border-marca-600">comparar meses ›</Link>}
                  subtitulo={`${cotas[0]?.meta ? `Meta de ${inteiro(Number(cotas[0].meta))} pontos. ` : ''}Basta um com direito abaixo da meta para o bônus de equipe não sair.`}>
             {cotas.length === 0 ? <Vazio>Sem pontuação nesta competência.</Vazio> : (
               <div className="-mx-6 overflow-x-auto sm:-mx-7">
@@ -558,7 +558,7 @@ export default async function PainelGestor({ competencia, atual }: { competencia
           {/* Critérios: cinza, porque não é bom nem ruim por si; a barra é a
               fatia das monitorias do mês, não do critério mais reprovado. */}
           <Painel>
-            <Secao titulo="Critérios mais reprovados"
+            <Secao titulo="Critérios mais reprovados" acao={<Link href="/cota/comparativo?cat=mon" className="whitespace-nowrap rounded-full border border-slate-200 px-2.5 py-0.5 text-xs text-slate-600 hover:border-marca-600">comparar meses ›</Link>}
                    subtitulo={totalMonitorias ? `Em ${totalMonitorias} monitorias no mês.` : undefined}>
               {lista.length === 0 ? <Vazio>Nenhuma reprovação nesta competência.</Vazio> : (
                 <ul className="grid gap-3 text-sm">

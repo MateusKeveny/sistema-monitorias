@@ -11,7 +11,7 @@ Escrito em 28/09/2026. Para o modelo de dados completo, ver
 
 | | |
 |---|---|
-| Publicado | Performance **1.16.0** · Monitorias **4.12.0** (deploy de 28/09/2026) |
+| Publicado | Performance **1.17.0** · Monitorias **4.12.0** (deploy de 28/09/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
 | Migrações no banco | 01 a 30, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
@@ -48,17 +48,22 @@ Três versões, cada uma publicada e conferida antes da próxima:
   C-SAT e TME que o banco já entrega ao operador (por isso a referência do
   volume é a média da própria pessoa). Removidos AlternadorCanal,
   AlternadorDeVisao, GraficoCsat e GraficoSemanal, sem uso.
-- **1.17.0**: o estilo novo nas telas de consulta — Extrato, Histórico
-  (evolução mês a mês em linha), Fechamento (pendências do fechamento no
-  topo).
-- **1.18.0**: telas de registro e administração — Lançamentos, Importar,
-  Presencial, Atendentes, Configuração (topo padrão, superfície única, sem
-  maiúsculas).
-- **1.19.0**: históricos de Volume, C-SAT e TME — atalho em cada destaque
-  levando a uma página de comparação por mês (total, contra o mês anterior,
-  média, por atendente). Só gestor e Pleno. O Pleno hoje só enxerga a própria
-  linha, então precisa da migração 31 (consulta liberada para gestor e Pleno,
-  como `bonus_da_competencia`).
+- **1.17.0** (publicada): **Comparativo entre meses** (`/cota/comparativo`),
+  no menu logo abaixo de Início. Abas por categoria — Pontuação, C-SAT,
+  Volume, TME, Monitoria —, período de 3, 6 ou 12 meses; em cada uma, resumo
+  (último mês, contra o anterior, média, melhor mês), linha dos meses e
+  tabela por atendente com os meses nas colunas. Pontuação de mês fechado sai
+  do fechamento; de mês aberto, do cálculo ao vivo. O link de cada linha leva
+  ao detalhe da categoria: histórico da cota, extrato ou as monitorias. Nova
+  tela **Monitorias do atendente** (`/cota/monitorias`) dentro do Performance,
+  no lugar do link para o site de Monitorias. Atalhos "comparar meses ›" nos
+  detalhes da tela inicial. O operador vê só a própria evolução.
+- **Próximas**: o estilo novo nas telas de consulta (Extrato, Histórico,
+  Fechamento com as pendências dele no topo); depois registro e
+  administração (Lançamentos, Importar, Presencial, Atendentes,
+  Configuração). E o **Pleno** ver a equipe no Comparativo: precisa da
+  migração 31, uma consulta liberada só para gestor e Pleno (como
+  `bonus_da_competencia`), para não abrir o acesso dele ao sistema inteiro.
 
 Visão de celular fica fora da revisão, por decisão do gestor.
 

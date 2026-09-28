@@ -6,7 +6,6 @@ import { BarraDeMeta, EtiquetaNota, Painel, Secao, Vazio } from '@/componentes/u
 import { criarClienteServidor } from '@/lib/supabase/servidor';
 import { codigoMonitoria, data as formatarData, percentual } from '@/lib/formatar';
 import { mesAnterior } from '@/lib/competencia';
-import { ENDERECO_MONITORIAS } from '@/lib/sistema';
 
 const CANAIS: { chave: Canal; rotulo: string }[] = [
   { chave: 'huggy', rotulo: 'Expansão' },
@@ -260,7 +259,7 @@ export default async function PainelAtendente({
       detalheCsat: (
         <div className="grid items-start gap-4 xl:grid-cols-[1.3fr_1fr]">
           <Painel>
-            <Secao titulo={`Seu C-SAT por semana · ${rotulo}`} subtitulo="Positivas sobre avaliações. Escala de 75% a 100%.">
+            <Secao titulo={`Seu C-SAT por semana · ${rotulo}`} acao={<Link href="/cota/comparativo?cat=csat" className="whitespace-nowrap rounded-full border border-slate-200 px-2.5 py-0.5 text-xs text-slate-600 hover:border-marca-600">comparar meses ›</Link>} subtitulo="Positivas sobre avaliações. Escala de 75% a 100%.">
               {csatMes == null ? <Vazio>Sem avaliações neste canal.</Vazio> : (
                 <GraficoDeLinha min={0.75} max={1} formatar={percentual}
                                 referencia={{ valor: META_CSAT, rotulo: 'meta 95%' }}
@@ -297,7 +296,7 @@ export default async function PainelAtendente({
       detalheVol: (
         <div className="grid items-start gap-4 xl:grid-cols-[1.3fr_1fr]">
           <Painel>
-            <Secao titulo={`Seus atendimentos por semana · ${rotulo}`} subtitulo="Finalizados, com a sua média semanal como referência.">
+            <Secao titulo={`Seus atendimentos por semana · ${rotulo}`} acao={<Link href="/cota/comparativo?cat=vol" className="whitespace-nowrap rounded-full border border-slate-200 px-2.5 py-0.5 text-xs text-slate-600 hover:border-marca-600">comparar meses ›</Link>} subtitulo="Finalizados, com a sua média semanal como referência.">
               {!volTotal ? <Vazio>Nenhum volume lançado neste canal.</Vazio> : (
                 <GraficoDeLinha formatar={(v) => num(v)}
                                 referencia={volMediaSemanal != null ? { valor: volMediaSemanal, rotulo: `sua média ${num(volMediaSemanal)}` } : undefined}
@@ -328,7 +327,7 @@ export default async function PainelAtendente({
       detalheTme: (
         <div className="grid items-start gap-4 xl:grid-cols-[1.3fr_1fr]">
           <Painel>
-            <Secao titulo={`Seu TME por semana · ${rotulo}`} subtitulo="Âmbar nas semanas acima da média da equipe.">
+            <Secao titulo={`Seu TME por semana · ${rotulo}`} acao={<Link href="/cota/comparativo?cat=tme" className="whitespace-nowrap rounded-full border border-slate-200 px-2.5 py-0.5 text-xs text-slate-600 hover:border-marca-600">comparar meses ›</Link>} subtitulo="Âmbar nas semanas acima da média da equipe.">
               {tmeMes == null ? <Vazio>Nenhum tempo lançado neste canal.</Vazio> : (
                 <GraficoDeLinha formatar={tempo}
                                 referencia={tmeEquipeMes != null ? { valor: tmeEquipeMes, rotulo: `média da equipe ${tempo(tmeEquipeMes)}` } : undefined}
@@ -417,7 +416,7 @@ export default async function PainelAtendente({
       detalhe: (
         <div className="grid items-start gap-4 xl:grid-cols-[1.1fr_1fr_1fr]">
           <Painel>
-            <Secao titulo="De onde vieram seus pontos" subtitulo="O que mais somou e o que tirou pontos no mês.">
+            <Secao titulo="De onde vieram seus pontos" acao={<Link href="/cota/comparativo?cat=pts" className="whitespace-nowrap rounded-full border border-slate-200 px-2.5 py-0.5 text-xs text-slate-600 hover:border-marca-600">comparar meses ›</Link>} subtitulo="O que mais somou e o que tirou pontos no mês.">
               {!porRegra.length ? <Vazio>Nada lançado nesta competência.</Vazio> : (
                 <ul className="space-y-2 text-sm">
                   {[...ganhos, ...perdas].map((r) => (
@@ -495,7 +494,7 @@ export default async function PainelAtendente({
       detalhe: (
         <div className="grid items-start gap-4 xl:grid-cols-[1.3fr_1fr]">
           <Painel>
-            <Secao titulo="Suas monitorias" subtitulo="As mais recentes primeiro. O protocolo abre a monitoria completa.">
+            <Secao titulo="Suas monitorias" acao={<Link href="/cota/monitorias" className="whitespace-nowrap rounded-full border border-slate-200 px-2.5 py-0.5 text-xs text-slate-600 hover:border-marca-600">ver todas ›</Link>} subtitulo="As mais recentes primeiro, com os critérios a melhorar.">
               {lista.length === 0 ? <Vazio>Nenhuma monitoria registrada.</Vazio> : (
                 <ul className="-my-2 divide-y divide-slate-100">
                   {lista.slice(0, 8).map((m) => {
@@ -503,10 +502,10 @@ export default async function PainelAtendente({
                     return (
                       <li key={m.id} className="py-3">
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                          <a href={`${ENDERECO_MONITORIAS}/monitorias/${m.id}`} target="_blank" rel="noreferrer"
-                             className="font-semibold tabular-nums text-marca-700 hover:underline dark:text-marca-400">
-                            {m.protocolo}
-                          </a>
+                          {/* Sem link para o site de Monitorias: os critérios e o
+                              parecer já estão aqui, e o histórico completo fica
+                              em "ver todas". */}
+                          <span className="font-semibold tabular-nums text-slate-800">{m.protocolo}</span>
                           <span className="tabular-nums text-slate-400/70">{codigoMonitoria(m.codigo)}</span>
                           <span className="tabular-nums text-slate-500">{formatarData(m.data_atendimento)} · {m.semana_mes}ª semana</span>
                           <span className="ml-auto"><EtiquetaNota valor={Number(m.nota_final)} zerado={m.zerado} /></span>

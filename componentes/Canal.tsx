@@ -30,16 +30,22 @@ export function ProvedorDeCanal({ inicial, children }: { inicial: Canal; childre
   return <Contexto.Provider value={[canal, escolher]}>{children}</Contexto.Provider>;
 }
 
-/** Abas de canal sobre a arte de fundo: pílula translúcida, a escolhida em superfície. */
-export function AbasDeCanal() {
+/**
+ * Abas de canal. Sobre a arte de fundo (padrão): pílula translúcida, a
+ * escolhida em superfície. Dentro de uma superfície (`naSuperficie`): pílula
+ * cinza, porque o texto claro da outra sumiria no tema claro.
+ */
+export function AbasDeCanal({ naSuperficie = false }: { naSuperficie?: boolean }) {
   const [canal, escolher] = useContext(Contexto);
   return (
-    <div role="tablist" aria-label="Canal" className="inline-flex gap-1 rounded-full bg-black/25 p-1">
+    <div role="tablist" aria-label="Canal"
+         className={`inline-flex gap-1 rounded-full p-1 ${naSuperficie ? 'bg-slate-100' : 'bg-black/25'}`}>
       {CANAIS.map(([chave, rotulo]) => (
         <button key={chave} type="button" role="tab" aria-selected={canal === chave}
                 onClick={() => escolher(chave)}
                 className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                  canal === chave ? 'bg-superficie text-slate-900 shadow-sm' : 'text-sobre-fundo-suave hover:text-sobre-fundo'}`}>
+                  canal === chave ? 'bg-superficie text-slate-900 shadow-sm'
+                    : naSuperficie ? 'text-slate-500 hover:text-slate-900' : 'text-sobre-fundo-suave hover:text-sobre-fundo'}`}>
           {rotulo}
         </button>
       ))}

@@ -10,6 +10,7 @@ import { NOMES_PAPEL, type Perfil } from '@/lib/tipos';
 /** Ícones de traço, desenhados para 20×20. Só os do Performance. */
 const ICONES: Record<string, React.ReactNode> = {
   '/cota': <path d="M3 9.5 10 4l7 5.5V16a1 1 0 0 1-1 1h-3v-4H7v4H4a1 1 0 0 1-1-1V9.5Z" />,
+  '/cota/comparativo': <path d="M3 15 8 9l3 3 6-7M13 5h4v4" />,
   '/cota/extrato': <path d="M5 3h10v14H5zM8 7h4M8 10h4M8 13h2" />,
   '/cota/historico': <path d="M3 16h14M6 13V9M10 13V5M14 13v-3" />,
   '/cota/presencial': <><circle cx="10" cy="7" r="3" /><path d="M4 17c1-3 3.5-4.5 6-4.5s5 1.5 6 4.5" /></>,

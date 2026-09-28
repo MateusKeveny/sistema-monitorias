@@ -1,5 +1,6 @@
 /**
- * As quatro semanas do ciclo em linha (1.15.0), com a referência tracejada.
+ * Uma série em linha — as quatro semanas do ciclo (1.15.0) ou os meses do
+ * Comparativo (1.17.0) —, com a referência tracejada.
  *
  * Substitui as colunas nos detalhes: a linha mostra a tendência — melhorou,
  * piorou — de uma vez, que é o que quem acompanha quer saber. Cada ponto tem
@@ -14,7 +15,7 @@ export type PontoDaLinha = { valor: number; tom?: 'bom' | 'atencao' | 'ruim' } |
 const COR = { bom: 'var(--color-marca-600)', atencao: 'var(--color-amber-500)', ruim: 'var(--color-rose-500)' };
 
 export default function GraficoDeLinha({
-  pontos, formatar, referencia, min = 0, max,
+  pontos, formatar, referencia, min = 0, max, rotulos, largura = 640,
 }: {
   pontos: PontoDaLinha[];
   formatar: (v: number) => string;
@@ -23,8 +24,12 @@ export default function GraficoDeLinha({
   /** Piso da escala. O C-SAT começa em 75%: do zero, 82% e 88% ficariam iguais. */
   min?: number;
   max?: number;
+  /** Rótulo de cada ponto no eixo; sem ele, "1ª semana", "2ª semana"... */
+  rotulos?: string[];
+  /** Largura do desenho: mais pontos pedem mais espaço entre eles. */
+  largura?: number;
 }) {
-  const L = 640, A = 220, esq = 18, dir = 18, topo = 36, base = 30;
+  const L = largura, A = 220, esq = 18, dir = 18, topo = 36, base = 30;
   const valores = pontos.filter((p): p is NonNullable<PontoDaLinha> => p != null).map((p) => p.valor);
   const teto = max ?? Math.max(1, ...valores, referencia?.valor ?? 0) * 1.15;
   const x = (i: number) => esq + (i * (L - esq - dir)) / Math.max(1, pontos.length - 1);
@@ -37,7 +42,7 @@ export default function GraficoDeLinha({
     ? `${trilha} L${x(comDado.at(-1)!.i)},${A - base} L${x(comDado[0].i)},${A - base} Z` : '';
 
   return (
-    <svg viewBox={`0 0 ${L} ${A}`} role="img" aria-label="Evolução por semana"
+    <svg viewBox={`0 0 ${L} ${A}`} role="img" aria-label={rotulos ? 'Evolução por mês' : 'Evolução por semana'}
          className="block h-auto w-full overflow-visible tabular-nums">
       {area && <path d={area} fill="var(--color-marca-600)" opacity={0.08} />}
       {referencia && (
@@ -64,7 +69,8 @@ export default function GraficoDeLinha({
           ) : (
             <text x={x(i)} y={A - base - 6} textAnchor="middle" fontSize={12} fill="var(--color-slate-400)">sem dado</text>
           )}
-          <text x={x(i)} y={A - 8} textAnchor="middle" fontSize={12} fill="var(--color-slate-500)">{i + 1}ª semana</text>
+          <text x={x(i)} y={A - 8} textAnchor="middle" fontSize={12} fill="var(--color-slate-500)"
+                fontWeight={rotulos && i === pontos.length - 1 ? 700 : 400}>{rotulos?.[i] ?? `${i + 1}ª semana`}</text>
         </g>
       ))}
     </svg>
