@@ -11,7 +11,7 @@ Escrito em 28/09/2026. Para o modelo de dados completo, ver
 
 | | |
 |---|---|
-| Publicado | Performance **1.13.0** · Monitorias **4.11.2** (deploy de 28/09/2026) |
+| Publicado | Performance **1.14.0** · Monitorias **4.11.2** (deploy de 28/09/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
 | Migrações no banco | 01 a 29, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
@@ -24,12 +24,20 @@ Três versões, cada uma publicada e conferida antes da próxima:
   bônus de equipe; cota no topo da tela inicial; cabeçalho agrupado
   (Registrar, Administrar) e fixo só em tela larga; competência em aberto
   como padrão.
-- **1.14.0**: resumo do mês no topo do extrato (total, meta, atingimento,
-  valor).
-- **1.15.0**: acabamento — cores com significado (TME, critérios), relógio,
-  rótulos em maiúsculas, contraste do tema claro, e um visual mais fluido
-  (menos caixas, transições só em ação da pessoa, esqueletos de
-  carregamento). Mostrar prévia visual antes de codificar.
+- **1.14.0** (publicada): resumo do mês no topo do extrato (total, barra de
+  meta, quanto falta, valor).
+- **1.15.0**: o visual aprovado na prévia de 28/09 — fundo iGreen mantido,
+  uma escala de cor só para todos os dados (verde da marca = bom/na meta,
+  âmbar = atenção, rosa = ruim, cinza = sem julgamento; TME deixa de ser
+  azul), uma superfície por tela em vez de uma caixa por quadro, mês trocado
+  por setas, traço que desliza no menu e nas abas, barras que se movem
+  (só transform), esqueleto de carregamento, coluna "falta / sobra", sem
+  relógio e sem rótulos em maiúsculas. A "régua da meta" foi recusada.
+- **1.16.0**: históricos de Volume, C-SAT e TME — valor lateral clicável em
+  cada indicador levando a uma página de comparação por mês (total, contra
+  o mês anterior, média, por atendente). Só gestor e Pleno. O Pleno hoje só
+  enxerga a própria linha, então precisa da migração 30 (consulta liberada
+  para gestor e Pleno, como `bonus_da_competencia`).
 
 Visão de celular fica fora da revisão, por decisão do gestor.
 

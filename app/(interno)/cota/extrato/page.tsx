@@ -1,5 +1,5 @@
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
-import { Cartao, Vazio } from '@/componentes/ui';
+import { BarraDeMeta, Cartao, Vazio } from '@/componentes/ui';
 import { mesRotulo, percentual } from '@/lib/formatar';
 import { resolverCompetencia } from '@/lib/competencia';
 import type { Pessoa } from '@/lib/tipos';
@@ -227,6 +227,65 @@ export default async function Extrato({
         </form>
       </div>
 
+      {/* O mês em uma linha, antes do detalhe: bateu a meta? quanto falta?
+          quanto vale? Ficava na coluna da direita, que em janela média desce
+          para depois de todas as semanas. */}
+      {linhas.length > 0 && resultado != null && (
+        <Cartao>
+          <div className="grid items-center gap-x-10 gap-y-4 md:grid-cols-[auto_1fr_auto]">
+            <div>
+              <p className="text-sm text-slate-500">Resultado da competência</p>
+              <p className="text-3xl font-semibold tabular-nums text-slate-900">
+                {num(resultado, 0)} <span className="text-base font-normal text-slate-500">pts</span>
+              </p>
+            </div>
+
+            {meta != null ? (
+              <div>
+                <BarraDeMeta atingimento={resultado / meta} escala={Math.max(1.25, resultado / meta)} />
+                <p className="mt-2 text-sm text-slate-600">
+                  Meta de {num(meta, 0)} pts
+                  {resultado < meta
+                    ? <> · <strong className="text-amber-700">faltam {num(meta - resultado, 0)} pts</strong></>
+                    : ` · ${num(resultado - meta, 0)} pts acima`}
+                </p>
+              </div>
+            ) : <span />}
+
+            {pagamento ? (
+              <div className="md:text-right">
+                {pagamento.atingiu_meta ? (
+                  pagamento.valor == null ? (
+                    <p className="text-sm text-slate-600">Valor por ponto ainda não informado.</p>
+                  ) : (
+                    <>
+                      <p className="text-2xl font-semibold tabular-nums text-marca-700 dark:text-marca-400">
+                        {reais(pagamento.valor)}
+                      </p>
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        {num(Number(pagamento.pontos_pagos))} pts
+                        {Number(pagamento.bonus) > 0
+                          && ` (${num(Number(resultado))} + ${num(Number(pagamento.bonus))} de bônus de equipe)`}
+                        {' × '}{reais(Number(pagamento.valor_por_ponto), 6)} por ponto
+                      </p>
+                      <p className="mt-1 text-[11px] text-slate-500 opacity-60">
+                        *Valores aproximados. Os valores reais são encaminhados via Teams.
+                      </p>
+                    </>
+                  )
+                ) : (
+                  <p className="text-sm text-slate-600">Abaixo da meta: esta competência não gera valor.</p>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-slate-500 md:text-right">
+                {congelado ? 'Valor por ponto ainda não informado.' : 'O valor sai no fechamento.'}
+              </p>
+            )}
+          </div>
+        </Cartao>
+      )}
+
       {linhas.length === 0 ? (
         <Cartao titulo="Extrato"><Vazio>Nenhum ponto nesta competência.</Vazio></Cartao>
       ) : (
@@ -285,60 +344,6 @@ export default async function Extrato({
             <h2 className="text-sm font-semibold uppercase tracking-wide text-sobre-fundo-suave">
               Somando todas as semanas do mês
             </h2>
-
-            {resultado != null && (
-              <Cartao titulo="Resultado da competência">
-                <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
-                  <p className="text-3xl font-semibold tabular-nums text-slate-900">
-                    {num(resultado, 0)} <span className="text-base font-normal text-slate-500">pts</span>
-                  </p>
-                  {meta != null && (
-                    <div className="min-w-48 flex-1">
-                      <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
-                        <div className={`h-full rounded-full ${resultado >= meta ? 'bg-emerald-500' : 'bg-marca-600'}`}
-                             style={{ width: `${Math.min(100, Math.max(0, (resultado / meta) * 100))}%` }} />
-                      </div>
-                      <p className="mt-2 text-sm text-slate-600">
-                        {percentual(resultado / meta)} da meta de {num(meta, 0)} pts
-                        {resultado < meta && ` · faltam ${num(meta - resultado, 0)} pts`}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {pagamento && (
-                  <div className="mt-4 border-t border-slate-100 pt-3">
-                    {pagamento.atingiu_meta ? (
-                      pagamento.valor == null ? (
-                        <p className="text-sm text-slate-600">
-                          Valor por ponto desta competência ainda não informado.
-                        </p>
-                      ) : (
-                        <>
-                          <p className="text-2xl font-semibold tabular-nums text-marca-700
-                                        dark:text-marca-400">
-                            {reais(pagamento.valor)}
-                          </p>
-                          <p className="mt-0.5 text-xs text-slate-500">
-                            {num(Number(pagamento.pontos_pagos))} pts
-                            {Number(pagamento.bonus) > 0
-                              && ` (${num(Number(resultado))} + ${num(Number(pagamento.bonus))} de bônus de equipe)`}
-                            {' × '}{reais(Number(pagamento.valor_por_ponto), 6)} por ponto
-                          </p>
-                          <p className="mt-1 text-[11px] text-slate-500 opacity-60">
-                            *Valores aproximados. Os valores reais são encaminhados via Teams.
-                          </p>
-                        </>
-                      )
-                    ) : (
-                      <p className="text-sm text-slate-600">
-                        Abaixo da meta: esta competência não gera valor.
-                      </p>
-                    )}
-                  </div>
-                )}
-              </Cartao>
-            )}
 
             {linhaMedia && (
               <Cartao
