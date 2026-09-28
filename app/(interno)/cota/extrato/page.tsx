@@ -174,7 +174,7 @@ export default async function Extrato({
 
   const Cabecalho = () => (
     <thead>
-      <tr className="text-left text-[11px] uppercase tracking-wide text-slate-500">
+      <tr className="text-left text-[11px] text-slate-500">
         <th className="pb-1 pr-2 font-semibold">Categoria</th>
         <th className="px-2 pb-1 text-right font-semibold">Feito</th>
         <th className="px-2 pb-1 text-right font-semibold">Pontuação</th>
@@ -292,7 +292,7 @@ export default async function Extrato({
         <div className="grid items-start gap-6 lg:grid-cols-2">
           {/* ---------------- Esquerda: semana a semana ---------------- */}
           <div className="space-y-6">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-sobre-fundo-suave">Status semanal</h2>
+            <h2 className="text-sm font-semibold text-sobre-fundo-suave">Semana a semana</h2>
 
             {semanas.map((semana) => {
               const daSemana = linhas.filter((l) => l.semana === semana);
@@ -310,11 +310,11 @@ export default async function Extrato({
                       const c = csatDe(canal === 'geral' ? null : canal as Canal, semana);
                       return (
                         <section key={canal}>
-                          <h3 className="mb-1 rounded bg-slate-100 px-2 py-1 text-xs font-semibold uppercase
-                                         tracking-wide text-slate-600">
+                          <h3 className="mb-1 rounded bg-slate-100 px-2 py-1 text-xs font-semibold
+                                         text-slate-600">
                             {NOME_CANAL[canal]}
                             {c && (
-                              <span className="ml-2 font-normal normal-case tracking-normal text-slate-500">
+                              <span className="ml-2 font-normal text-slate-500">
                                 C-SAT {percentual(Number(c.csat))} · {c.positivas} de {c.avaliacoes}
                               </span>
                             )}
@@ -340,8 +340,8 @@ export default async function Extrato({
           </div>
 
           {/* ---------------- Direita: o mês somado ---------------- */}
-          <div className="space-y-6 lg:sticky lg:top-24">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-sobre-fundo-suave">
+          <div className="space-y-6 lg:sticky lg:top-6">
+            <h2 className="text-sm font-semibold text-sobre-fundo-suave">
               Somando todas as semanas do mês
             </h2>
 
@@ -444,8 +444,8 @@ export default async function Extrato({
                       {linhasFaixa.length > 0 && (
                         <tr className="border-t border-slate-200">
                           <td colSpan={4} className="pb-1 pt-3">
-                            <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold uppercase
-                                             tracking-wide text-slate-600">
+                            <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold
+                                             text-slate-600">
                               C-SAT no mês
                             </span>
                             {csatMes != null && (

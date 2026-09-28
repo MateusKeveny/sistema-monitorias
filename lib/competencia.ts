@@ -16,7 +16,7 @@ export type Competencia = {
 };
 
 /** '2026-10-01' → '2026-09-01'. */
-function mesAnterior(competencia: string) {
+export function mesAnterior(competencia: string) {
   let ano = Number(competencia.slice(0, 4));
   let mes = Number(competencia.slice(5, 7)) - 1;
   if (mes === 0) { mes = 12; ano -= 1; }

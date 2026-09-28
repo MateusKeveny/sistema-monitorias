@@ -110,6 +110,12 @@ export function faixa(v: number | null | undefined): 'otimo' | 'bom' | 'atencao'
  * vermelho abaixo de 85%. A meta continua sendo 95%; o que muda aqui é a
  * leitura visual.
  */
+/**
+ * Cor do C-SAT na escala única do painel (1.15.0): verde = bom, âmbar =
+ * atenção, rosa = ruim. A faixa de 85% a 90% era verde-amarelada, uma cor que
+ * só existia aqui; virou âmbar, a mesma de "abaixo da meta" e de "TME acima da
+ * média".
+ */
 export function corDoCsat(v: number | null | undefined, fundo = false): string {
   if (v == null) return 'text-slate-400';
   // Fundo translúcido em vez de tom claro fixo: no tema escuro um `bg-*-50`
@@ -122,8 +128,8 @@ export function corDoCsat(v: number | null | undefined, fundo = false): string {
   }
   if (v >= 0.85) {
     return fundo
-      ? 'bg-lime-500/15 text-lime-700 dark:text-lime-300'
-      : 'text-lime-700 dark:text-lime-300';
+      ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+      : 'text-amber-700 dark:text-amber-300';
   }
   return fundo
     ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300'
@@ -133,7 +139,7 @@ export function corDoCsat(v: number | null | undefined, fundo = false): string {
 /** A mesma escala, para preencher barra. */
 export function barraDoCsat(v: number): string {
   if (v >= 0.90) return 'bg-emerald-500';
-  if (v >= 0.85) return 'bg-lime-500';
+  if (v >= 0.85) return 'bg-amber-500';
   return 'bg-rose-500';
 }
 

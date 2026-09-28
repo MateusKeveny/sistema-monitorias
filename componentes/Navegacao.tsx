@@ -1,7 +1,7 @@
 'use client';
 
 import Link from '@/componentes/Link';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import BotaoTema from '@/componentes/BotaoTema';
@@ -14,12 +14,12 @@ import { NOME_SISTEMA, type Sistema } from '@/lib/sistema';
  * topo — chegava a comer um terço da tela. Grupo com um item só visível (o
  * operador vê só o Presencial de "Registrar") vira link comum.
  */
-type Item = { href: string; rotulo: string; papeis: Perfil['papel'][]; grupo?: string };
+export type Item = { href: string; rotulo: string; papeis: Perfil['papel'][]; grupo?: string };
 
 // O operador não tem "Relatórios": todos eles são recortes do time, e o que é
 // dele já está em "Monitorias" e no painel. Menu com item que não acrescenta
 // nada é ruído.
-const ITENS: Record<Sistema, Item[]> = {
+export const ITENS: Record<Sistema, Item[]> = {
   monitorias: [
     { href: '/', rotulo: 'Painel', papeis: ['gestor', 'qualidade', 'operador'] },
     { href: '/monitorias', rotulo: 'Monitorias', papeis: ['gestor', 'qualidade', 'operador'] },
@@ -71,11 +71,33 @@ export default function Navegacao({
   const ativo = (href: string) =>
     href === '/' || href === '/cota' ? caminho === href : caminho.startsWith(href);
 
+  // No Performance (1.15.0) o item ativo é marcado por um traço que desliza
+  // até ele, em vez do fundo verde. As Monitorias ficam como estavam: são
+  // outro sistema, com versão e público próprios.
+  const deslizante = sistema === 'cota';
   const estilo = (aceso: boolean) => `rounded-lg px-3 py-1.5 text-sm font-medium transition ${
-    aceso
-      ? 'bg-marca-50 text-marca-700 dark:text-marca-400'
-      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+    deslizante
+      ? aceso ? 'text-slate-900' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+      : aceso
+        ? 'bg-marca-50 text-marca-700 dark:text-marca-400'
+        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
   }`;
+
+  // Posição do traço: medida no item ativo a cada troca de página. O
+  // cabeçalho fica montado entre as páginas, então o traço desliza de um item
+  // ao outro.
+  const menu = useRef<HTMLElement>(null);
+  const [traco, setTraco] = useState<{ x: number; y: number; w: number } | null>(null);
+  useLayoutEffect(() => {
+    if (!deslizante) return;
+    const medir = () => {
+      const el = menu.current?.querySelector<HTMLElement>('[data-ativo="true"]');
+      setTraco(el ? { x: el.offsetLeft + 12, y: el.offsetTop + el.offsetHeight + 2, w: el.offsetWidth - 24 } : null);
+    };
+    medir();
+    addEventListener('resize', medir);
+    return () => removeEventListener('resize', medir);
+  }, [caminho, deslizante]);
 
   // Na ordem da lista: cada grupo entra onde aparece o primeiro item dele.
   const visiveis = ITENS[sistema].filter((i) => i.papeis.includes(perfil.papel));
@@ -108,7 +130,13 @@ export default function Navegacao({
           )}
         </span>
 
-        <nav className="flex flex-1 flex-wrap items-center gap-1">
+        <nav ref={menu} className="relative flex flex-1 flex-wrap items-center gap-1">
+          {traco && (
+            <span aria-hidden
+                  className="pointer-events-none absolute left-0 top-0 h-0.5 rounded-full bg-marca-600
+                             transition-[transform,width] duration-300 ease-out motion-reduce:transition-none"
+                  style={{ width: traco.w, transform: `translate(${traco.x}px, ${traco.y}px)` }} />
+          )}
           {entradas.map((item) => 'itens' in item ? (
             <MenuDoGrupo key={item.grupo} rotulo={item.grupo} itens={item.itens}
                          ativo={ativo} estilo={estilo} caminho={caminho} />
@@ -116,6 +144,8 @@ export default function Navegacao({
             <Link
               key={item.href}
               href={item.href}
+              data-ativo={ativo(item.href)}
+              aria-current={ativo(item.href) ? 'page' : undefined}
               className={estilo(ativo(item.href))}
             >
               {item.rotulo}
@@ -191,7 +221,9 @@ function MenuDoGrupo({ rotulo, itens, ativo, estilo, caminho }: {
   }, [aberto]);
 
   return (
-    <div ref={raiz} className="relative">
+    // A marca de ativo fica no invólucro, filho direto do menu: é dele que o
+    // traço mede a posição (o botão mediria em relação a este invólucro).
+    <div ref={raiz} className="relative" data-ativo={itens.some((i) => ativo(i.href))}>
       <button
         ref={botao}
         type="button"

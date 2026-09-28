@@ -1,30 +1,30 @@
-import AlternadorCanal from '@/componentes/AlternadorCanal';
-import AlternadorDeVisao from '@/componentes/AlternadorDeVisao';
-import GraficoSemanal from '@/componentes/GraficoSemanal';
-import { BarraDeMeta, Cartao, Vazio } from '@/componentes/ui';
-import GraficoCsat, { type PontoCsat } from '@/componentes/GraficoCsat';
+import Link from '@/componentes/Link';
+import { NoCanal, type Canal } from '@/componentes/Canal';
+import GraficoDeLinha, { type PontoDaLinha } from '@/componentes/GraficoDeLinha';
+import SeletorDeDetalhe, { type Destaque } from '@/componentes/SeletorDeDetalhe';
+import { BarraDeMeta, Painel, Secao, Vazio } from '@/componentes/ui';
 import { criarClienteServidor } from '@/lib/supabase/servidor';
-import { corDoCsat, percentual } from '@/lib/formatar';
+import { corDoCsat, hojeNoBrasil, percentual, semanaDoCiclo } from '@/lib/formatar';
+import { mesAnterior } from '@/lib/competencia';
 
-type Canal = 'huggy' | 'diretores';
-const CANAIS: { chave: Canal; rotulo: string }[] = [
-  { chave: 'huggy', rotulo: 'Expansão' },
-  { chave: 'diretores', rotulo: 'Diretores-Expansão' },
-];
+const CANAIS: Canal[] = ['huggy', 'diretores'];
 const META_CSAT = 0.95;
 
-const pct = (v: number, max: number) => `${Math.max(0, Math.min(100, (v / max) * 100))}%`;
-
-type Csat = { pessoa_id: string; origem: Canal; semana: number; avaliacoes: number; positivas: number };
-type Volume = { pessoa_id: string; canal: Canal; semana: number; finalizados: number; tme_seg: number | null };
+type Csat = { pessoa_id: string; origem: Canal; semana: number; avaliacoes: number; positivas: number; mes_competencia: string };
+type Volume = { pessoa_id: string; canal: Canal; semana: number; finalizados: number; tme_seg: number | null; mes_competencia: string };
 type Criterio = { criterio: string; avaliacoes: number; reprovacoes: number; taxa_reprovacao: number };
 type Cota = {
   pessoa_id: string; pessoa: string; cargo: string | null; resultado: number; meta: number | null;
   compoe_media: boolean | null;
 };
+type Fechado = { pessoa_id: string; mes_competencia: string; resultado: number; meta: number | null; cargo: string | null };
+type Monitoria = { operador_id: string; nota_final: number; mes_referencia: string };
 
 const inteiro = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
 const nomeCurto = (nome: string) => nome.trim().split(/\s+/).slice(0, 2).join(' ');
+const primeiroNome = (nome: string) => nome.trim().split(/\s+/)[0];
+const media = (l: number[]) => (l.length ? l.reduce((a, b) => a + b, 0) / l.length : null);
+const pct = (v: number, max: number) => `${Math.max(0, Math.min(100, (v / max) * 100))}%`;
 
 /** Segundos → "12:34" ou "1h02". */
 function tempo(seg: number) {
@@ -34,32 +34,57 @@ function tempo(seg: number) {
   return h ? `${h}h${String(m).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
 }
 
-/** Tons das 4 semanas, do mais claro ao mais escuro. */
+/** '2026-08-01' → 'agosto'. */
+const nomeDoMes = (c: string) =>
+  new Date(`${c}T12:00:00Z`).toLocaleDateString('pt-BR', { month: 'long', timeZone: 'UTC' });
+
+/** Escala única do painel para a nota de monitoria: 85% é o piso para pontuar. */
+const tomDaNota = (v: number): 'bom' | 'atencao' | 'ruim' => (v >= 0.85 ? 'bom' : v >= 0.70 ? 'atencao' : 'ruim');
+const tomDoCsat = (v: number): 'bom' | 'atencao' | 'ruim' => (v >= 0.90 ? 'bom' : v >= 0.85 ? 'atencao' : 'ruim');
+
+/** Tons das 4 semanas no volume por atendente, do mais claro ao mais escuro. */
 const TONS_SEMANA = ['bg-emerald-300', 'bg-emerald-500', 'bg-emerald-700', 'bg-emerald-900'];
 
 /**
- * Tela inicial do gestor: a equipe inteira na competência.
+ * Tela inicial do gestor (1.15.0): um painel de acompanhamento.
+ *
+ * Responde três perguntas, nesta ordem:
+ *   - o que precisa de mim agora? — as pendências do mês, cada uma levando à
+ *     tela onde se resolve;
+ *   - está melhor ou pior? — cada destaque compara com o mês anterior;
+ *   - para onde está indo? — com o ciclo correndo, a projeção da pontuação.
+ *
+ * Os destaques (Na meta, C-SAT, Volume, TME, Monitoria) são as abas: cada um
+ * abre o próprio detalhe logo abaixo da faixa. C-SAT, volume e TME respeitam o
+ * canal das abas do topo (ProvedorDeCanal, na página).
  *
  * Tudo é SVG ou barra de CSS montado no servidor — nada de biblioteca de
- * gráfico no navegador. C-SAT, volume e TME respeitam o canal escolhido;
- * monitoria e cota são do mês inteiro, sem canal.
+ * gráfico no navegador.
  */
-export default async function PainelGestor({ competencia, canal }: { competencia: string; canal: Canal }) {
-  // `canal` é só o canal que abre primeiro.
+export default async function PainelGestor({ competencia, atual }: { competencia: string; atual: string }) {
+  const anterior = mesAnterior(competencia);
+  const meses = [competencia, anterior];
   const db = await criarClienteServidor();
 
-  const [pessoas, csat, volume, criterios, cota, cargos] = await Promise.all([
+  const [pessoas, csat, volume, criterios, cota, cargos, fechados, monitorias, valores, semCargo, conferir]
+    = await Promise.all([
     db.from('pessoas').select('id, nome, exibir_no_painel, conta_nas_medias'),
-    db.from('vw_csat_semanal').select('pessoa_id, origem, semana, avaliacoes, positivas')
-      .eq('mes_competencia', competencia),
-    db.from('volume_semanal').select('pessoa_id, canal, semana, finalizados, tme_seg')
-      .eq('mes_competencia', competencia),
+    db.from('vw_csat_semanal').select('pessoa_id, origem, semana, avaliacoes, positivas, mes_competencia')
+      .in('mes_competencia', meses),
+    db.from('volume_semanal').select('pessoa_id, canal, semana, finalizados, tme_seg, mes_competencia')
+      .in('mes_competencia', meses),
     db.from('vw_criterios_reprovados').select('criterio, avaliacoes, reprovacoes, taxa_reprovacao')
       .eq('mes_referencia', competencia).gt('reprovacoes', 0)
       .order('reprovacoes', { ascending: false }).limit(8),
     db.from('vw_cota_mensal').select('pessoa_id, pessoa, cargo, resultado, meta, compoe_media')
       .eq('mes_competencia', competencia).order('resultado', { ascending: false }),
     db.from('cargos').select('nome, recebe_bonus'),
+    db.from('fechamentos_cota').select('pessoa_id, mes_competencia, resultado, meta, cargo')
+      .in('mes_competencia', meses),
+    db.from('vw_monitorias').select('operador_id, nota_final, mes_referencia').in('mes_referencia', meses),
+    db.from('valores_da_cota').select('mes_competencia').in('mes_competencia', meses),
+    db.from('vw_sem_cargo').select('nome').eq('mes_competencia', competencia),
+    db.from('vw_lancamentos_a_conferir').select('bloco').eq('mes_competencia', competencia),
   ]);
 
   const nome = new Map((pessoas.data ?? []).map((p) => [p.id as string, nomeCurto(p.nome as string)]));
@@ -72,12 +97,18 @@ export default async function PainelGestor({ competencia, canal }: { competencia
   const conta = new Set((pessoas.data ?? [])
     .filter((p) => p.conta_nas_medias !== false).map((p) => p.id as string));
 
-  // ---------- Monitoria e cota ----------
+  const todoCsat = (csat.data ?? []) as Csat[];
+  const todoVolume = (volume.data ?? []) as Volume[];
+  const todosFechados = (fechados.data ?? []) as Fechado[];
+  const todasMonitorias = ((monitorias.data ?? []) as Monitoria[]).filter((m) => m.nota_final != null);
+  const fechadoEm = (m: string) => todosFechados.some((f) => f.mes_competencia === m);
+  const temValor = (m: string) => (valores.data ?? []).some((v) => v.mes_competencia === m);
+  const vs = `vs ${nomeDoMes(anterior)}`;
+
+  // ---------- Cota e bônus ----------
   const lista = (criterios.data ?? []) as Criterio[];
-  const maiorReprov = Math.max(1, ...lista.map((c) => c.reprovacoes));
   const todasAsCotas = (cota.data ?? []) as Cota[];
   const cotas = todasAsCotas.filter((c) => exibe.has(c.pessoa_id));
-  // A barra de todo mundo na mesma escala, senão não se comparam.
   const escalaCota = Math.max(1.25, ...cotas.map((c) => (c.meta ? Number(c.resultado) / Number(c.meta) : 0)));
 
   // Bônus de equipe: mesma regra do pagamento (bonus_da_competencia) — cargo
@@ -87,385 +118,520 @@ export default async function PainelGestor({ competencia, canal }: { competencia
   const comDireito = todasAsCotas.filter((c) =>
     c.cargo != null && comBonus.has(c.cargo) && c.compoe_media !== false && c.meta);
   const abaixo = comDireito.filter((c) => Number(c.resultado) < Number(c.meta));
+  const naMeta = comDireito.length - abaixo.length;
 
+  // No mês anterior, pelo que foi fechado (entregue), quando houver.
+  const fechadosAntes = todosFechados.filter((f) => f.mes_competencia === anterior
+    && f.cargo != null && comBonus.has(f.cargo) && f.meta);
+  const naMetaAntes = fechadosAntes.length
+    ? fechadosAntes.filter((f) => Number(f.resultado) >= Number(f.meta)).length : null;
 
-  // C-SAT, volume e TME dos dois canais vêm prontos; o botão só alterna.
-  const quadros = (canal: Canal) => {
-    const rotuloCanal = CANAIS.find((c) => c.chave === canal)!.rotulo;
-    // ---------- C-SAT ----------
-    const csatCanal = ((csat.data ?? []) as Csat[]).filter((c) => c.origem === canal);
-    // O que soma e o que se lista são conjuntos diferentes: ver a linha de
-    // alguém não obriga a contá-lo na média da equipe, nem o contrário.
-    const csatSomado = csatCanal.filter((c) => conta.has(c.pessoa_id));
-    const csatListado = csatCanal.filter((c) => exibe.has(c.pessoa_id));
-    const soma = (l: Csat[]) => l.reduce((a, c) => [a[0] + c.positivas, a[1] + c.avaliacoes], [0, 0]);
-    const pontosCsat: PontoCsat[] = [1, 2, 3, 4].map((s) => {
-      const [pos, tot] = soma(csatSomado.filter((c) => c.semana === s));
-      return { semana: s, pessoa: tot ? pos / tot : null, equipe: null };
+  // ---------- Projeção ----------
+  // Só com o ciclo correndo. O ritmo vem das semanas com volume lançado, e não
+  // do calendário: volume e avaliações chegam por importação semanal, e contar
+  // pelo dia de hoje projetaria para baixo no começo de cada semana.
+  const semanasLancadas = new Set(todoVolume.filter((v) => v.mes_competencia === competencia).map((v) => v.semana)).size;
+  const projetar = competencia === atual && semanasLancadas > 0 && semanasLancadas < 4;
+  const projecao = (resultado: number) => (resultado * 4) / semanasLancadas;
+  const naMetaProjetado = comDireito.filter((c) => projecao(Number(c.resultado)) >= Number(c.meta)).length;
+
+  // ---------- Pendências ----------
+  // O que precisa do gestor, cada uma com o caminho de onde se resolve.
+  const mes = competencia.slice(0, 7);
+  const pendencias: { texto: string; acao: string; href: string; grave?: boolean }[] = [];
+  const semanasEsperadas = competencia < atual ? 4 : Math.max(0, semanaDoCiclo(hojeNoBrasil()) - 1);
+  const semVolume = [1, 2, 3, 4].slice(0, semanasEsperadas).filter((s) =>
+    !todoVolume.some((v) => v.mes_competencia === competencia && v.canal === 'huggy' && v.semana === s));
+  if (semVolume.length) {
+    pendencias.push({
+      texto: semVolume.length === 1 ? `Semana ${semVolume[0]} sem volume lançado`
+        : `Semanas ${semVolume.join(', ').replace(/, (\d)$/, ' e $1')} sem volume lançado`,
+      acao: 'Importar', href: '/cota/importar',
     });
-    const [posMes, totMes] = soma(csatSomado);
-    const csatPorPessoa = [...new Set(csatListado.map((c) => c.pessoa_id))].map((id) => {
-      const [pos, tot] = soma(csatListado.filter((c) => c.pessoa_id === id));
-      return { id, csat: pos / tot, avaliacoes: tot };
+  }
+  if (competencia < atual && !fechadoEm(competencia)) {
+    pendencias.push({
+      texto: `${nomeDoMes(competencia).replace(/^./, (l) => l.toUpperCase())} aguardando fechamento`,
+      acao: 'Fechar', href: `/cota/fechamento?mes=${mes}`,
+    });
+  }
+  for (const m of meses) {
+    if (fechadoEm(m) && !temValor(m)) {
+      pendencias.push({
+        texto: `Valor por ponto de ${nomeDoMes(m)} não informado`, grave: true,
+        acao: 'Informar', href: `/cota/fechamento?mes=${m.slice(0, 7)}`,
+      });
+    }
+  }
+  if ((semCargo.data ?? []).length) {
+    const n = (semCargo.data ?? []).length;
+    pendencias.push({ texto: `${n} pessoa${n > 1 ? 's' : ''} sem cargo no mês`, acao: 'Definir', href: '/cota/configuracao', grave: true });
+  }
+  if ((conferir.data ?? []).length) {
+    pendencias.push({ texto: 'Lançamento com faixas que não fecham com o total', acao: 'Conferir', href: `/cota/lancamentos?mes=${mes}` });
+  }
+
+  // ---------- Por canal ----------
+  const canal = (c: Canal, m: string) => {
+    const csatCanal = todoCsat.filter((x) => x.origem === c && x.mes_competencia === m);
+    const csatSomado = csatCanal.filter((x) => conta.has(x.pessoa_id));
+    const soma = (l: Csat[]) => l.reduce((a, x) => [a[0] + x.positivas, a[1] + x.avaliacoes], [0, 0]);
+    const [pos, tot] = soma(csatSomado);
+    const csatSemanas = [1, 2, 3, 4].map((s) => {
+      const [p, t] = soma(csatSomado.filter((x) => x.semana === s));
+      return t ? { valor: p / t, positivas: p, avaliacoes: t } : null;
+    });
+
+    const volTodos = todoVolume.filter((v) => v.canal === c && v.mes_competencia === m);
+    const volCanal = volTodos.filter((v) => conta.has(v.pessoa_id));
+    const volSemanas = [1, 2, 3, 4].map((s) =>
+      volCanal.filter((v) => v.semana === s).reduce((a, v) => a + v.finalizados, 0) || null);
+    const volTotal = volSemanas.reduce<number>((a, v) => a + (v ?? 0), 0);
+
+    // TME da equipe como a regra usa: média simples dos TMEs lançados.
+    const tmes = (l: Volume[]) => l.map((v) => v.tme_seg ?? 0).filter((t) => t > 0);
+    const tmeEquipe = media(tmes(volCanal));
+    const tmeSemanas = [1, 2, 3, 4].map((s) => media(tmes(volCanal.filter((v) => v.semana === s))));
+
+    return { csatCanal, soma, csatMes: tot ? pos / tot : null, csatSemanas, volTodos, volSemanas, volTotal, tmeEquipe, tmeSemanas };
+  };
+
+  /** "▲ 7% vs agosto", verde quando melhora e rosa quando piora. */
+  const Comparacao = ({ texto, melhor }: { texto: string | null; melhor: boolean }) => texto ? (
+    <p className="mt-0.5 text-xs text-slate-500">
+      <b className={`font-semibold ${melhor ? 'text-marca-700 dark:text-marca-400' : 'text-rose-700'}`}>{texto}</b> {vs}
+    </p>
+  ) : null;
+  const seta = (d: number) => (d >= 0 ? '▲' : '▼');
+
+  /** Rótulo, valor grande e as quatro semanas em barras pequenas. */
+  const Bloco = ({ rotulo, valor, nota, comparacao, barras, min = 0, max }: {
+    rotulo: string; valor: string; nota?: string; comparacao?: React.ReactNode;
+    barras?: ({ v: number; cor: string } | null)[]; min?: number; max?: number;
+  }) => {
+    const teto = max ?? Math.max(1, ...(barras ?? []).map((b) => b?.v ?? 0));
+    const fracao = (v: number) => Math.max(0.04, Math.min(1, (v - min) / (teto - min)));
+    return (
+      <>
+        <p className="text-sm text-slate-500">{rotulo}</p>
+        <p className="text-[1.65rem] font-semibold leading-tight tracking-tight tabular-nums text-slate-900">
+          {valor}{nota && <span className="ml-1.5 text-xs font-normal tracking-normal text-slate-500">{nota}</span>}
+        </p>
+        {comparacao}
+        {barras && (
+          <div className="mt-2.5 grid h-8 grid-cols-4 items-end gap-1.5">
+            {barras.map((b, i) => (
+              <span key={i} className={`crescer-y block h-full origin-bottom rounded-t ${b ? b.cor : 'bg-slate-100'}`}
+                    style={{ transform: `scaleY(${b ? fracao(b.v) : 0.04})` }} />
+            ))}
+          </div>
+        )}
+      </>
+    );
+  };
+
+  const porCanal = Object.fromEntries(CANAIS.map((c) => {
+    const agora = canal(c, competencia);
+    const antes = canal(c, anterior);
+
+    const dCsat = agora.csatMes != null && antes.csatMes != null ? (agora.csatMes - antes.csatMes) * 100 : null;
+    const dVol = agora.volTotal && antes.volTotal ? (agora.volTotal - antes.volTotal) / antes.volTotal : null;
+    const dTme = agora.tmeEquipe != null && antes.tmeEquipe != null ? agora.tmeEquipe - antes.tmeEquipe : null;
+
+    // ----- Detalhe do C-SAT -----
+    const csatListado = agora.csatCanal.filter((x) => exibe.has(x.pessoa_id));
+    const csatPorPessoa = [...new Set(csatListado.map((x) => x.pessoa_id))].map((id) => {
+      const [p, t] = agora.soma(csatListado.filter((x) => x.pessoa_id === id));
+      return { id, csat: p / t, avaliacoes: t };
     }).sort((a, b) => b.csat - a.csat);
 
-    // ---------- Volume ----------
-    const volTodos = ((volume.data ?? []) as Volume[]).filter((v) => v.canal === canal);
-    const volCanal = volTodos.filter((v) => conta.has(v.pessoa_id));
-    const volListado = volTodos.filter((v) => exibe.has(v.pessoa_id));
+    // ----- Detalhe do volume e do TME -----
+    const volListado = agora.volTodos.filter((v) => exibe.has(v.pessoa_id));
     const volumePorPessoa = [...new Set(volListado.map((v) => v.pessoa_id))].map((id) => {
-      const semanas = [1, 2, 3, 4].map((s) => volTodos.find((v) => v.pessoa_id === id && v.semana === s)?.finalizados ?? 0);
+      const semanas = [1, 2, 3, 4].map((s) => agora.volTodos.find((v) => v.pessoa_id === id && v.semana === s)?.finalizados ?? 0);
       return { id, semanas, total: semanas.reduce((a, b) => a + b, 0) };
     }).sort((a, b) => b.total - a.total);
     const maiorVolume = Math.max(1, ...volumePorPessoa.map((v) => v.total));
-    const mediaVolume = volumePorPessoa.length
-      ? volumePorPessoa.reduce((a, v) => a + v.total, 0) / volumePorPessoa.length : 0;
-  
-    // ---------- TME ----------
-    // Por pessoa: média das semanas ponderada pelos finalizados.
+    const mediaVolume = media(volumePorPessoa.map((v) => v.total)) ?? 0;
+
     const tmePorPessoa = [...new Set(volListado.map((v) => v.pessoa_id))].map((id) => {
-      const linhas = volTodos.filter((v) => v.pessoa_id === id && (v.tme_seg ?? 0) > 0);
+      // Média das semanas ponderada pelos finalizados.
+      const linhas = agora.volTodos.filter((v) => v.pessoa_id === id && (v.tme_seg ?? 0) > 0);
       const peso = linhas.reduce((a, v) => a + Math.max(1, v.finalizados), 0);
       const tme = peso ? linhas.reduce((a, v) => a + (v.tme_seg ?? 0) * Math.max(1, v.finalizados), 0) / peso : null;
       return { id, tme };
     }).filter((x): x is { id: string; tme: number } => x.tme != null).sort((a, b) => a.tme - b.tme);
-    // Média da equipe como a regra usa: média simples dos TMEs lançados.
-    const tmesLancados = volCanal.map((v) => v.tme_seg ?? 0).filter((t) => t > 0);
-    const tmeEquipe = tmesLancados.length ? tmesLancados.reduce((a, b) => a + b, 0) / tmesLancados.length : null;
-    const maiorTme = Math.max(1, tmeEquipe ?? 0, ...tmePorPessoa.map((t) => t.tme), canal === 'diretores' ? 1800 : 0);
-    // Referências das faixas de Diretores (15 e 30 min).
-    const faixasTme = canal === 'diretores' ? [900, 1800] : [];
+    const maiorTme = Math.max(1, agora.tmeEquipe ?? 0, ...tmePorPessoa.map((t) => t.tme));
+    const mediaVolSemanal = media(agora.volSemanas.filter((v): v is number => v != null));
 
-    // ---------- As mesmas medidas, semana a semana ----------
-    // A média do mês esconde a semana ruim: quatro semanas de 30 min e uma de
-    // 1h20 saem como "38 min" e ninguém vê o dia em que a fila estourou.
-    const volumePorSemana = [1, 2, 3, 4].map((s) =>
-      volCanal.filter((v) => v.semana === s).reduce((a, v) => a + v.finalizados, 0) || null);
+    return [c, {
+      blocoCsat: <Bloco rotulo="C-SAT" nota="meta 95%" min={0.7} max={1}
+                        valor={agora.csatMes != null ? percentual(agora.csatMes) : '—'}
+                        comparacao={<Comparacao melhor={(dCsat ?? 0) >= 0}
+                          texto={dCsat == null ? null : `${seta(dCsat)} ${Math.abs(dCsat).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} pt`} />}
+                        barras={agora.csatSemanas.map((s) => s && {
+                          v: s.valor, cor: { bom: 'bg-marca-600', atencao: 'bg-amber-500', ruim: 'bg-rose-500' }[tomDoCsat(s.valor)] })} />,
+      blocoVol: <Bloco rotulo="Volume" nota="finalizados"
+                       valor={agora.volTotal ? inteiro(agora.volTotal) : '—'}
+                       comparacao={<Comparacao melhor={(dVol ?? 0) >= 0}
+                         texto={dVol == null ? null : `${seta(dVol)} ${Math.abs(dVol * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`} />}
+                       barras={agora.volSemanas.map((v) => v == null ? null : { v, cor: 'bg-marca-600' })} />,
+      // TME: subir é piorar.
+      blocoTme: <Bloco rotulo="TME" nota="média da equipe"
+                       valor={agora.tmeEquipe != null ? tempo(agora.tmeEquipe) : '—'}
+                       comparacao={<Comparacao melhor={(dTme ?? 0) <= 0}
+                         texto={dTme == null ? null : `${seta(dTme)} ${tempo(Math.abs(dTme))}`} />}
+                       barras={agora.tmeSemanas.map((v) => v == null ? null : {
+                         v, cor: agora.tmeEquipe != null && v > agora.tmeEquipe ? 'bg-amber-500' : 'bg-marca-600' })} />,
 
-    const tmePorSemana = [1, 2, 3, 4].map((s) => {
-      // Média simples dos TMEs lançados, como a regra da faixa usa.
-      const lancados = volCanal.filter((v) => v.semana === s).map((v) => v.tme_seg ?? 0).filter((t) => t > 0);
-      return lancados.length ? lancados.reduce((a, b) => a + b, 0) / lancados.length : null;
-    });
-
-    const tmeSemanalDe = (id: string) => [1, 2, 3, 4].map((s) => {
-      const v = volTodos.find((x) => x.pessoa_id === id && x.semana === s);
-      return v && (v.tme_seg ?? 0) > 0 ? v.tme_seg! : null;
-    });
-
-    /** Quatro caixinhas com o valor de cada semana. */
-    const Semanas = ({ valores, formatar }: {
-      valores: (number | null)[]; formatar: (v: number) => string;
-    }) => (
-      <div className="flex gap-1">
-        {valores.map((v, i) => (
-          <span key={i} title={`${i + 1}ª semana`}
-                className={`flex-1 rounded px-1 py-0.5 text-center text-[10px] tabular-nums ${
-                  v == null ? 'bg-slate-50 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
-            {v == null ? '—' : formatar(v)}
-          </span>
-        ))}
-      </div>
-    );
-  
-  
-    return (
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* C-SAT da equipe */}
-          <Cartao
-            titulo={`C-SAT · ${rotuloCanal}`}
-            acao={totMes > 0 && <span className="text-lg font-semibold tabular-nums text-slate-900">{percentual(posMes / totMes)}</span>}
-          >
-            {totMes === 0 ? <Vazio>Sem avaliações neste canal.</Vazio> : (
-              <AlternadorDeVisao
-                rotulos={['Por semana', 'Por atendente']}
-                paineis={[
-                  // A linha já mostra a evolução; repetir em barras não
-                  // acrescenta nada. O que falta é o tamanho da amostra de
-                  // cada semana: 100% de duas avaliações não é 100% de
-                  // duzentas.
-                  <div key="s" className="space-y-3">
-                    <GraficoCsat pontos={pontosCsat} meta={META_CSAT} rotulo="Equipe" />
-                    <table className="w-full border-t border-slate-100 pt-2 text-xs">
-                      <thead>
-                        <tr className="text-left text-[11px] uppercase tracking-wide text-slate-500">
-                          <th className="py-1 font-semibold">Semana</th>
-                          <th className="py-1 text-right font-semibold">C-SAT</th>
-                          <th className="py-1 text-right font-semibold">Positivas</th>
-                          <th className="py-1 text-right font-semibold">Avaliações</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[1, 2, 3, 4].map((s) => {
-                          const [pos, tot] = soma(csatSomado.filter((c) => c.semana === s));
-                          const valor = tot ? pos / tot : null;
-                          return (
-                            <tr key={s} className="border-t border-slate-100">
-                              <td className="py-1 text-slate-700">{s}ª</td>
-                              <td className={`py-1 text-right font-semibold tabular-nums ${corDoCsat(valor)}`}>
-                                {valor == null ? '—' : percentual(valor)}
-                              </td>
-                              <td className="py-1 text-right tabular-nums text-slate-500">
-                                {tot ? inteiro(pos) : '—'}
-                              </td>
-                              <td className="py-1 text-right tabular-nums text-slate-500">
-                                {tot ? inteiro(tot) : '—'}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                        <tr className="border-t border-slate-200">
-                          <td className="py-1 font-semibold text-slate-700">Mês</td>
-                          <td className="py-1 text-right font-semibold tabular-nums text-slate-800">
-                            {percentual(posMes / totMes)}
-                          </td>
-                          <td className="py-1 text-right tabular-nums text-slate-500">{inteiro(posMes)}</td>
-                          <td className="py-1 text-right tabular-nums text-slate-500">{inteiro(totMes)}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>,
-                  // Uma linha por pessoa: nome, as quatro semanas e o mês. A
-                  // cor já diz a faixa, então dispensa barra; e a contagem de
-                  // avaliações some — ela pertence à visão por semana, onde o
-                  // tamanho da amostra importa.
-                  <div key="p" className="text-xs">
-                    <div className="flex items-center gap-2 pb-1 text-[10px] uppercase
-                                    tracking-wide text-slate-400">
-                      <span className="flex-1" />
-                      {[1, 2, 3, 4].map((s) => (
-                        <span key={s} className="w-11 text-center">{s}ª</span>
-                      ))}
-                      <span className="w-12 text-right">Mês</span>
-                    </div>
-
-                    <ul className="divide-y divide-slate-100">
-                      {csatPorPessoa.map((p) => {
-                        // O tamanho da amostra fica no título de cada semana:
-                        // 100% de uma avaliação e 100% de vinte aparecem
-                        // iguais, e é daí que vem a impressão de que o mês
-                        // "não bate" com a média das semanas.
-                        const semanas = [1, 2, 3, 4].map((s) => {
-                          const [pos, tot] = soma(csatCanal.filter(
-                            (c) => c.pessoa_id === p.id && c.semana === s));
-                          return { valor: tot ? pos / tot : null, pos, tot };
-                        });
-                        return (
-                          <li key={p.id} className="flex items-center gap-2 py-1.5">
-                            <span className="flex-1 truncate text-slate-700">{nome.get(p.id)}</span>
-                            {semanas.map((s, i) => (
-                              <span key={i}
-                                    title={s.tot
-                                      ? `${i + 1}ª semana: ${s.pos} de ${s.tot} ${s.tot === 1 ? 'avaliação' : 'avaliações'}`
-                                      : `${i + 1}ª semana: sem avaliação`}
-                                    className={`w-11 cursor-help rounded px-1 py-0.5 text-center tabular-nums ${corDoCsat(s.valor, true)}`}>
-                                {s.valor == null ? '·' : percentual(s.valor)}
-                              </span>
-                            ))}
-                            <span title={`No mês: ${p.avaliacoes} ${p.avaliacoes === 1 ? 'avaliação' : 'avaliações'}`}
-                                  className={`w-12 cursor-help text-right font-semibold tabular-nums ${corDoCsat(p.csat)}`}>
-                              {percentual(p.csat)}
+      detalheCsat: (
+        <div className="grid items-start gap-4 xl:grid-cols-[1.3fr_1fr]">
+          <Painel>
+            <Secao titulo="C-SAT por semana" subtitulo="Positivas sobre avaliações. Escala de 75% a 100%.">
+              {agora.csatMes == null ? <Vazio>Sem avaliações neste canal.</Vazio> : (
+                <>
+                  <GraficoDeLinha min={0.75} max={1} formatar={percentual}
+                                  referencia={{ valor: META_CSAT, rotulo: 'meta 95%' }}
+                                  pontos={agora.csatSemanas.map((s): PontoDaLinha => s && { valor: s.valor, tom: tomDoCsat(s.valor) })} />
+                  {/* O tamanho da amostra: 100% de duas avaliações não é 100% de duzentas. */}
+                  <p className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-500">
+                    {agora.csatSemanas.map((s, i) => (
+                      <span key={i}>{i + 1}ª: {s ? `${inteiro(s.positivas)} de ${inteiro(s.avaliacoes)}` : '—'}</span>
+                    ))}
+                  </p>
+                </>
+              )}
+            </Secao>
+          </Painel>
+          <Painel>
+            <Secao titulo="C-SAT por atendente" subtitulo="Semana a semana e no mês. Passe o mouse para ver a amostra.">
+              {csatPorPessoa.length === 0 ? <Vazio>Sem avaliações neste canal.</Vazio> : (
+                <div className="text-sm">
+                  <div className="flex items-center gap-2 pb-1 text-xs text-slate-400">
+                    <span className="flex-1" />
+                    {[1, 2, 3, 4].map((s) => <span key={s} className="w-12 text-center">{s}ª</span>)}
+                    <span className="w-14 text-right">Mês</span>
+                  </div>
+                  <ul className="divide-y divide-slate-100">
+                    {csatPorPessoa.map((p) => {
+                      const semanas = [1, 2, 3, 4].map((s) => {
+                        const [pos, tot] = agora.soma(agora.csatCanal.filter((x) => x.pessoa_id === p.id && x.semana === s));
+                        return { valor: tot ? pos / tot : null, pos, tot };
+                      });
+                      return (
+                        <li key={p.id} className="flex items-center gap-2 py-2">
+                          <span className="flex-1 truncate text-slate-700">{nome.get(p.id)}</span>
+                          {semanas.map((s, i) => (
+                            <span key={i}
+                                  title={s.tot ? `${i + 1}ª semana: ${s.pos} de ${s.tot} ${s.tot === 1 ? 'avaliação' : 'avaliações'}`
+                                    : `${i + 1}ª semana: sem avaliação`}
+                                  className={`w-12 cursor-help rounded px-1 py-0.5 text-center text-xs tabular-nums ${corDoCsat(s.valor, true)}`}>
+                              {s.valor == null ? '·' : percentual(s.valor)}
                             </span>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>,
-                ]}
-              />
-            )}
-          </Cartao>
-  
-          {/* Volume */}
-          <Cartao
-            titulo={`Volume de atendimentos · ${rotuloCanal}`}
-            acao={volumePorPessoa.length > 0 && (
-              <span className="text-lg font-semibold tabular-nums text-slate-900">
-                {inteiro(volumePorPessoa.reduce((a, v) => a + v.total, 0))}
-              </span>
-            )}
-          >
-            {volumePorPessoa.length === 0 ? <Vazio>Nenhum volume lançado neste canal.</Vazio> : (
-              <AlternadorDeVisao
-                rotulos={['Por semana', 'Por atendente']}
-                paineis={[
-                  <GraficoSemanal
-                    key="s"
-                    valores={volumePorSemana}
-                    formatar={(v) => inteiro(v)}
-                    media={volumePorSemana.filter((v): v is number => v != null).length
-                      ? volumePorSemana.filter((v): v is number => v != null)
-                        .reduce((a, b) => a + b, 0)
-                        / volumePorSemana.filter((v) => v != null).length
-                      : null}
-                    cor="bg-marca-600"
-                  />,
-                  <div key="p" className="space-y-3">
-                <ul className="space-y-2.5 text-xs">
-                  {volumePorPessoa.map((p) => (
-                    <li key={p.id} className="space-y-1">
-                      <div className="flex justify-between">
-                        <span className="text-slate-700">{nome.get(p.id)}</span>
-                        <span className="font-semibold tabular-nums text-slate-800">{inteiro(p.total)}</span>
-                      </div>
-                      <div className="relative flex h-3 overflow-hidden rounded bg-slate-100">
-                        {p.semanas.map((q, i) => q > 0 && (
-                          <span key={i} className={TONS_SEMANA[i]} style={{ width: pct(q, maiorVolume) }}
-                                title={`${i + 1}ª semana: ${q}`} />
-                        ))}
-                        <span className="absolute inset-y-0 w-px bg-slate-900/50" style={{ left: pct(mediaVolume, maiorVolume) }}
-                              title={`Média da equipe: ${inteiro(mediaVolume)}`} />
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-                <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-slate-100 pt-2 text-[11px] text-slate-500">
-                  {TONS_SEMANA.map((t, i) => (
-                    <span key={t} className="flex items-center gap-1"><span className={`inline-block h-2 w-3 rounded-sm ${t}`} />{i + 1}ª</span>
-                  ))}
-                  <span className="flex items-center gap-1"><span className="inline-block h-3 w-px bg-slate-900/50" />média {inteiro(mediaVolume)}</span>
+                          ))}
+                          <span title={`No mês: ${p.avaliacoes} ${p.avaliacoes === 1 ? 'avaliação' : 'avaliações'}`}
+                                className={`w-14 cursor-help text-right font-semibold tabular-nums ${corDoCsat(p.csat)}`}>
+                            {percentual(p.csat)}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
-                  </div>,
-                ]}
-              />
-            )}
-          </Cartao>
-  
-          {/* TME */}
-          <Cartao
-            titulo={`TME médio · ${rotuloCanal}`}
-            acao={tmeEquipe != null && <span className="text-lg font-semibold tabular-nums text-slate-900">{tempo(tmeEquipe)}</span>}
-          >
-            {tmePorPessoa.length === 0 ? <Vazio>Nenhum TME lançado neste canal.</Vazio> : (
-              <AlternadorDeVisao
-                rotulos={['Por semana', 'Por atendente']}
-                paineis={[
-                  <GraficoSemanal
-                    key="s"
-                    valores={tmePorSemana}
-                    formatar={(v) => tempo(v)}
-                    media={tmeEquipe}
-                    piorEMaior
-                    referencias={faixasTme.map((f) => ({ valor: f, rotulo: `${f / 60} min` }))}
-                    cor="bg-sky-500"
-                  />,
-                  <div key="p" className="space-y-3">
-                <ul className="space-y-2.5 text-xs">
-                  {tmePorPessoa.map((p) => {
-                    const acima = tmeEquipe != null && p.tme > tmeEquipe;
-                    return (
+              )}
+            </Secao>
+          </Painel>
+        </div>
+      ),
+
+      detalheVol: (
+        <div className="grid items-start gap-4 xl:grid-cols-[1.3fr_1fr]">
+          <Painel>
+            <Secao titulo="Volume por semana" subtitulo="Finalizados de cada semana do ciclo.">
+              {!agora.volTotal ? <Vazio>Nenhum volume lançado neste canal.</Vazio> : (
+                <GraficoDeLinha formatar={inteiro}
+                                referencia={mediaVolSemanal != null ? { valor: mediaVolSemanal, rotulo: `média ${inteiro(mediaVolSemanal)}` } : undefined}
+                                pontos={agora.volSemanas.map((v): PontoDaLinha => v == null ? null : { valor: v })} />
+              )}
+            </Secao>
+          </Painel>
+          <Painel>
+            <Secao titulo="Volume por atendente" subtitulo="No mês, com a média da equipe como referência.">
+              {volumePorPessoa.length === 0 ? <Vazio>Nenhum volume lançado neste canal.</Vazio> : (
+                <div className="space-y-3">
+                  <ul className="space-y-3 text-sm">
+                    {volumePorPessoa.map((p) => (
                       <li key={p.id} className="space-y-1">
                         <div className="flex justify-between">
-                          <span className={acima ? 'font-semibold text-rose-700' : 'text-slate-700'}>
-                            {acima && '▲ '}{nome.get(p.id)}
-                          </span>
-                          <span className={`font-semibold tabular-nums ${acima ? 'text-rose-700' : 'text-slate-800'}`}>{tempo(p.tme)}</span>
+                          <span className="text-slate-700">{nome.get(p.id)}</span>
+                          <span className="font-semibold tabular-nums text-slate-800">{inteiro(p.total)}</span>
                         </div>
-                        <div className="relative h-3 overflow-hidden rounded bg-slate-100">
-                          <span className={`block h-full rounded ${acima ? 'bg-rose-400' : 'bg-sky-500'}`} style={{ width: pct(p.tme, maiorTme) }} />
-                          {faixasTme.map((f) => (
-                            <span key={f} className="absolute inset-y-0 w-px bg-amber-500/70" style={{ left: pct(f, maiorTme) }} />
+                        <div className="relative flex h-2.5 overflow-hidden rounded bg-slate-100">
+                          {p.semanas.map((q, i) => q > 0 && (
+                            <span key={i} className={TONS_SEMANA[i]} style={{ width: pct(q, maiorVolume) }}
+                                  title={`${i + 1}ª semana: ${q}`} />
                           ))}
-                          {tmeEquipe != null && (
-                            <span className="absolute inset-y-0 w-0.5 bg-slate-900/60" style={{ left: pct(tmeEquipe, maiorTme) }} />
-                          )}
+                          <span className="absolute inset-y-0 w-px bg-slate-900/50" style={{ left: pct(mediaVolume, maiorVolume) }}
+                                title={`Média da equipe: ${inteiro(mediaVolume)}`} />
                         </div>
-                        <Semanas valores={tmeSemanalDe(p.id)} formatar={(v) => tempo(v)} />
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-slate-100 pt-2 text-[11px] text-slate-500">
+                    {TONS_SEMANA.map((t, i) => (
+                      <span key={t} className="flex items-center gap-1"><span className={`inline-block h-2 w-3 rounded-sm ${t}`} />{i + 1}ª</span>
+                    ))}
+                    <span className="flex items-center gap-1"><span className="inline-block h-3 w-px bg-slate-900/50" />média {inteiro(mediaVolume)}</span>
+                  </div>
+                </div>
+              )}
+            </Secao>
+          </Painel>
+        </div>
+      ),
+
+      detalheTme: (
+        <div className="grid items-start gap-4 xl:grid-cols-[1.3fr_1fr]">
+          <Painel>
+            <Secao titulo="TME por semana" subtitulo="Âmbar nas semanas acima da média da equipe.">
+              {agora.tmeEquipe == null ? <Vazio>Nenhum TME lançado neste canal.</Vazio> : (
+                <GraficoDeLinha formatar={tempo}
+                                referencia={{ valor: agora.tmeEquipe, rotulo: `média ${tempo(agora.tmeEquipe)}` }}
+                                pontos={agora.tmeSemanas.map((v): PontoDaLinha => v == null ? null
+                                  : { valor: v, tom: v > agora.tmeEquipe! ? 'atencao' : 'bom' })} />
+              )}
+            </Secao>
+          </Painel>
+          <Painel>
+            <Secao titulo="TME por atendente" subtitulo="Âmbar para quem está acima da média da equipe.">
+              {tmePorPessoa.length === 0 ? <Vazio>Nenhum TME lançado neste canal.</Vazio> : (
+                <ul className="space-y-3 text-sm">
+                  {tmePorPessoa.map((p) => {
+                    const acima = agora.tmeEquipe != null && p.tme > agora.tmeEquipe;
+                    return (
+                      <li key={p.id} className="grid grid-cols-[7rem_1fr_3.5rem] items-center gap-3">
+                        <span className={acima ? 'font-medium text-amber-700' : 'text-slate-700'}>{nome.get(p.id)}</span>
+                        <span className="relative h-2.5 overflow-hidden rounded bg-slate-100">
+                          <span className={`crescer-x absolute inset-0 origin-left rounded ${acima ? 'bg-amber-500' : 'bg-marca-600'}`}
+                                style={{ transform: `scaleX(${p.tme / maiorTme})` }} />
+                          {agora.tmeEquipe != null && (
+                            <span className="absolute inset-y-0 w-0.5 bg-slate-900/60" style={{ left: pct(agora.tmeEquipe, maiorTme) }} />
+                          )}
+                        </span>
+                        <span className={`text-right font-semibold tabular-nums ${acima ? 'text-amber-700' : 'text-slate-800'}`}>{tempo(p.tme)}</span>
                       </li>
                     );
                   })}
                 </ul>
-                <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-slate-100 pt-2 text-[11px] text-slate-500">
-                  <span className="flex items-center gap-1"><span className="inline-block h-3 w-0.5 bg-slate-900/60" />média da equipe</span>
-                  <span className="flex items-center gap-1"><span className="text-rose-700">▲</span>acima da média</span>
-                  {faixasTme.length > 0 && (
-                    <span className="flex items-center gap-1"><span className="inline-block h-3 w-px bg-amber-500/70" />faixas 15 e 30 min</span>
-                  )}
-                </div>
-                  </div>,
-                ]}
-              />
-            )}
-          </Cartao>
+              )}
+            </Secao>
+          </Painel>
         </div>
-  
-      );
-  };
+      ),
+    }];
+  })) as unknown as Record<Canal, Record<string, React.ReactNode>>;
 
-  return (
-    <div className="space-y-6">
-      {/* Cota primeiro: é o que o gestor acompanha para fechar o mês. */}
-      <Cartao titulo="Pontuação de cota">
-        {cotas.length === 0 ? <Vazio>Sem pontuação nesta competência.</Vazio> : (
-          <div className="space-y-4">
-            {comDireito.length > 0 && (
-              <p className={`rounded-lg px-3 py-2 text-sm ${abaixo.length
-                ? 'bg-amber-50 text-amber-900' : 'bg-emerald-50 text-emerald-800'}`}>
-                {abaixo.length === 0
-                  ? `Os ${comDireito.length} com direito ao bônus de equipe estão na meta.`
-                  : <>
-                      <strong>{abaixo.length} de {comDireito.length}</strong> com direito ao bônus
-                      {abaixo.length === 1 ? ' está' : ' estão'} abaixo da meta
-                      ({abaixo.map((c) => nomeCurto(c.pessoa)).join(', ')}).
-                      Basta um abaixo para o bônus de equipe não sair.
-                    </>}
-              </p>
+  /** Mostra a versão do canal escolhido nas abas do topo. */
+  const doCanal = (chave: string) => CANAIS.map((c) => <NoCanal key={c} canal={c}>{porCanal[c][chave]}</NoCanal>);
+
+  // ---------- Monitoria ----------
+  const notasDe = (m: string) => todasMonitorias.filter((x) => x.mes_referencia === m).map((x) => Number(x.nota_final));
+  const notaMes = media(notasDe(competencia));
+  const notaAntes = media(notasDe(anterior));
+  const dNota = notaMes != null && notaAntes != null ? (notaMes - notaAntes) * 100 : null;
+  const notaPorPessoa = [...new Set(todasMonitorias.filter((x) => x.mes_referencia === competencia && exibe.has(x.operador_id))
+    .map((x) => x.operador_id))].map((id) => {
+    const notas = todasMonitorias.filter((x) => x.mes_referencia === competencia && x.operador_id === id).map((x) => Number(x.nota_final));
+    return { id, nota: media(notas)!, quantidade: notas.length };
+  }).sort((a, b) => b.nota - a.nota);
+  const totalMonitorias = notasDe(competencia).length;
+
+  const destaques: Destaque[] = [
+    {
+      chave: 'meta',
+      tom: abaixo.length ? 'atencao' : 'normal',
+      bloco: (
+        <>
+          <p className="text-sm text-slate-500">Na meta</p>
+          <p className={`text-[1.65rem] font-semibold leading-tight tracking-tight tabular-nums ${
+            abaixo.length ? 'text-amber-700' : 'text-marca-700 dark:text-marca-400'}`}>
+            {comDireito.length === 0 ? '—' : abaixo.length ? `${naMeta} de ${comDireito.length}` : 'Todos'}
+          </p>
+          <Comparacao melhor={naMeta - (naMetaAntes ?? naMeta) >= 0}
+                      texto={naMetaAntes == null || comDireito.length === 0 ? null
+                        : naMeta === naMetaAntes ? '= mesmo' : `${seta(naMeta - naMetaAntes)} ${Math.abs(naMeta - naMetaAntes)}`} />
+          {projetar && comDireito.length > 0 && (
+            <p className="mt-0.5 text-xs text-slate-600">
+              Projeção: <b className={naMetaProjetado === comDireito.length ? 'text-marca-700 dark:text-marca-400' : 'text-amber-700'}>
+                {naMetaProjetado} de {comDireito.length}</b> no fim do ciclo
+            </p>
+          )}
+          {abaixo.length > 0 && (
+            <p className="mt-1 text-xs text-slate-600">{abaixo.map((c) => primeiroNome(c.pessoa)).join(', ')} abaixo</p>
+          )}
+        </>
+      ),
+      detalhe: (
+        <Painel>
+          <Secao titulo="Pontuação de cota"
+                 subtitulo={`${cotas[0]?.meta ? `Meta de ${inteiro(Number(cotas[0].meta))} pontos. ` : ''}Basta um com direito abaixo da meta para o bônus de equipe não sair.`}>
+            {cotas.length === 0 ? <Vazio>Sem pontuação nesta competência.</Vazio> : (
+              <div className="-mx-6 overflow-x-auto sm:-mx-7">
+                <table className="w-full text-[15px]">
+                  <thead>
+                    <tr className="text-left text-xs text-slate-500">
+                      <th className="py-2.5 pl-6 pr-4 font-medium sm:pl-7">Pessoa</th>
+                      <th className="px-4 py-2.5 font-medium">Cargo</th>
+                      <th className="px-4 py-2.5 text-right font-medium">Pontos</th>
+                      <th className="w-2/5 px-4 py-2.5 font-medium">Atingimento da meta</th>
+                      <th className="px-4 py-2.5 text-right font-medium">Falta / sobra</th>
+                      {projetar && (
+                        <th className="px-4 py-2.5 text-right font-medium"
+                            title={`No ritmo das ${semanasLancadas} semana(s) com volume lançado, até o fim do ciclo`}>
+                          Projeção
+                        </th>
+                      )}
+                      <th className="py-2.5 pl-4 pr-6 sm:pr-7"><span className="sr-only">Extrato</span></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cotas.map((c) => {
+                      const ating = c.meta ? Number(c.resultado) / Number(c.meta) : null;
+                      const diferenca = c.meta ? Number(c.resultado) - Number(c.meta) : null;
+                      const proj = projecao(Number(c.resultado));
+                      return (
+                        <tr key={`${c.pessoa_id}-${c.cargo}`} className="border-t border-slate-100">
+                          <td className="py-3 pl-6 pr-4 font-medium text-slate-800 sm:pl-7">{nomeCurto(c.pessoa)}</td>
+                          <td className="px-4 py-3 text-xs text-slate-500">{c.cargo ?? '—'}</td>
+                          <td className="px-4 py-3 text-right font-semibold tabular-nums text-slate-800">{inteiro(Number(c.resultado))}</td>
+                          <td className="px-4 py-3">
+                            {ating == null
+                              ? <span className="text-xs text-slate-400">sem meta</span>
+                              : <BarraDeMeta atingimento={ating} escala={escalaCota} />}
+                          </td>
+                          <td className="px-4 py-3 text-right tabular-nums">
+                            {diferenca == null ? '—' : diferenca < 0
+                              ? <span className="font-semibold text-amber-700">faltam {inteiro(-diferenca)}</span>
+                              : <span className="text-slate-500">+{inteiro(diferenca)}</span>}
+                          </td>
+                          {projetar && (
+                            <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">
+                              {!c.meta ? '—' : proj >= Number(c.meta)
+                                ? <span className="font-semibold text-marca-700 dark:text-marca-400">{inteiro(proj)} ✓</span>
+                                : <span className="font-semibold text-amber-700">{inteiro(proj)} · faltariam {inteiro(Number(c.meta) - proj)}</span>}
+                            </td>
+                          )}
+                          <td className="py-3 pl-4 pr-6 text-right sm:pr-7">
+                            <Link href={`/cota/extrato?pessoa=${c.pessoa_id}&mes=${mes}`}
+                                  className="whitespace-nowrap rounded-full border border-slate-200 px-2.5 py-0.5 text-xs
+                                             text-slate-600 hover:border-marca-600 hover:text-marca-700 dark:hover:text-marca-400">
+                              extrato ›
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
-            <div className="-mx-5 -mb-5 overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-t border-slate-100 text-left text-xs text-slate-500">
-                    <th className="px-5 py-2.5 font-medium">Pessoa</th>
-                    <th className="px-4 py-2.5 font-medium">Cargo</th>
-                    <th className="px-4 py-2.5 text-right font-medium">Pontos</th>
-                    <th className="w-1/2 px-5 py-2.5 font-medium">Atingimento da meta</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {cotas.map((c) => {
-                    const ating = c.meta ? Number(c.resultado) / Number(c.meta) : null;
+          </Secao>
+        </Painel>
+      ),
+    },
+    { chave: 'csat', bloco: doCanal('blocoCsat'), detalhe: doCanal('detalheCsat') },
+    { chave: 'vol', bloco: doCanal('blocoVol'), detalhe: doCanal('detalheVol') },
+    { chave: 'tme', bloco: doCanal('blocoTme'), detalhe: doCanal('detalheTme') },
+    {
+      chave: 'monitoria',
+      bloco: (
+        <Bloco rotulo="Monitoria" nota="nota média"
+               valor={notaMes != null ? percentual(notaMes) : '—'}
+               comparacao={<>
+                 <Comparacao melhor={(dNota ?? 0) >= 0}
+                             texto={dNota == null ? null : `${seta(dNota)} ${Math.abs(dNota).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} pt`} />
+                 <p className="mt-0.5 text-xs text-slate-500">{totalMonitorias} monitoria{totalMonitorias === 1 ? '' : 's'} no mês</p>
+               </>} />
+      ),
+      detalhe: (
+        <div className="grid items-start gap-4 xl:grid-cols-[1.3fr_1fr]">
+          {/* Critérios: cinza, porque não é bom nem ruim por si; a barra é a
+              fatia das monitorias do mês, não do critério mais reprovado. */}
+          <Painel>
+            <Secao titulo="Critérios mais reprovados"
+                   subtitulo={totalMonitorias ? `Em ${totalMonitorias} monitorias no mês.` : undefined}>
+              {lista.length === 0 ? <Vazio>Nenhuma reprovação nesta competência.</Vazio> : (
+                <ul className="grid gap-3 text-sm">
+                  {lista.map((c) => (
+                    <li key={c.criterio}>
+                      <div className="flex justify-between gap-3">
+                        <span className="text-slate-700">{c.criterio}</span>
+                        <span className="shrink-0 tabular-nums text-slate-500">
+                          <strong className="font-semibold text-slate-800">{c.reprovacoes}</strong> · {percentual(Number(c.taxa_reprovacao))}
+                        </span>
+                      </div>
+                      <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-slate-100">
+                        <span className="crescer-x block h-full origin-left rounded-full bg-slate-400"
+                              style={{ width: `${Math.min(100, Number(c.taxa_reprovacao) * 100)}%` }} />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Secao>
+          </Painel>
+          <Painel>
+            <Secao titulo="Nota média por atendente" subtitulo="Monitorias do mês. Verde a partir de 85%, o piso para pontuar.">
+              {notaPorPessoa.length === 0 ? <Vazio>Nenhuma monitoria nesta competência.</Vazio> : (
+                <ul className="space-y-3 text-sm">
+                  {notaPorPessoa.map((p) => {
+                    const tom = tomDaNota(p.nota);
+                    const cor = { bom: 'bg-marca-600', atencao: 'bg-amber-500', ruim: 'bg-rose-500' }[tom];
+                    const texto = { bom: 'text-slate-800', atencao: 'text-amber-700', ruim: 'text-rose-700' }[tom];
                     return (
-                      <tr key={`${c.pessoa_id}-${c.cargo}`} className="border-t border-slate-100">
-                        <td className="px-5 py-2 font-medium text-slate-800">{nomeCurto(c.pessoa)}</td>
-                        <td className="px-4 py-2 text-xs text-slate-500">{c.cargo ?? '—'}</td>
-                        <td className="px-4 py-2 text-right font-semibold tabular-nums text-slate-800">{inteiro(Number(c.resultado))}</td>
-                        <td className="px-5 py-2">
-                          {ating == null
-                            ? <span className="text-xs text-slate-400">sem meta</span>
-                            : <BarraDeMeta atingimento={ating} escala={escalaCota} />}
-                        </td>
-                      </tr>
+                      <li key={p.id} className="grid grid-cols-[7rem_1fr_3.5rem] items-center gap-3"
+                          title={`${p.quantidade} monitoria${p.quantidade === 1 ? '' : 's'}`}>
+                        <span className="text-slate-700">{nome.get(p.id)}</span>
+                        <span className="relative h-2.5 overflow-hidden rounded bg-slate-100">
+                          <span className={`crescer-x absolute inset-0 origin-left rounded ${cor}`}
+                                style={{ transform: `scaleX(${Math.max(0, Math.min(1, p.nota))})` }} />
+                        </span>
+                        <span className={`text-right font-semibold tabular-nums ${texto}`}>{percentual(p.nota)}</span>
+                      </li>
                     );
                   })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </Cartao>
+                </ul>
+              )}
+            </Secao>
+          </Painel>
+        </div>
+      ),
+    },
+  ];
 
-      <AlternadorCanal inicial={canal} paineis={{ huggy: quadros('huggy'), diretores: quadros('diretores') }} />
+  return (
+    <div className="space-y-4">
+      {/* O que precisa do gestor agora — cada item leva à tela onde se resolve. */}
+      {pendencias.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-sm font-semibold text-sobre-fundo">Precisa de você</span>
+          {pendencias.map((p) => (
+            <Link key={p.texto} href={p.href}
+                  className="inline-flex items-center gap-2 rounded-xl bg-superficie py-1.5 pl-3 pr-1.5 text-sm text-slate-800
+                             shadow-sm transition hover:ring-2 hover:ring-marca-600/40">
+              <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${p.grave ? 'bg-rose-500' : 'bg-amber-500'}`} />
+              {p.texto}
+              <span className="rounded-md bg-marca-50 px-2 py-0.5 text-xs font-semibold text-marca-700 dark:text-marca-400">
+                {p.acao} ›
+              </span>
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-sobre-fundo-suave">Nada pendente neste mês.</p>
+      )}
 
-      {/* Critérios de monitoria */}
-      <Cartao titulo="Critérios mais reprovados em monitoria">
-        {lista.length === 0 ? <Vazio>Nenhuma reprovação nesta competência.</Vazio> : (
-          <ul className="grid gap-x-8 gap-y-2.5 text-xs md:grid-cols-2">
-            {lista.map((c) => (
-              <li key={c.criterio} className="space-y-1">
-                <div className="flex justify-between gap-3">
-                  <span className="text-slate-700">{c.criterio}</span>
-                  <span className="shrink-0 tabular-nums text-slate-500">
-                    <strong className="text-slate-800">{c.reprovacoes}</strong> de {c.avaliacoes} · {percentual(Number(c.taxa_reprovacao))}
-                  </span>
-                </div>
-                <div className="h-2 overflow-hidden rounded bg-slate-100">
-                  <span className="block h-full rounded bg-rose-400" style={{ width: pct(c.reprovacoes, maiorReprov) }} />
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Cartao>
+      <SeletorDeDetalhe destaques={destaques} />
     </div>
   );
 }

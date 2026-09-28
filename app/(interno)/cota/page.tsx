@@ -1,10 +1,11 @@
 import PainelGestor from '@/componentes/PainelGestor';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { BarraDeMeta, Cartao, EtiquetaNota, Vazio } from '@/componentes/ui';
-import Relogio from '@/componentes/Relogio';
+import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
+import { AbasDeCanal, ProvedorDeCanal } from '@/componentes/Canal';
 import PainelAtendente from '@/componentes/PainelAtendente';
-import { codigoMonitoria, data as formatarData, mesRotulo, percentual } from '@/lib/formatar';
-import { resolverCompetencia } from '@/lib/competencia';
+import { codigoMonitoria, data as formatarData, hojeNoBrasil, mesRotulo, percentual } from '@/lib/formatar';
+import { mesAnterior, resolverCompetencia } from '@/lib/competencia';
 import { ENDERECO_MONITORIAS } from '@/lib/sistema';
 
 export const dynamic = 'force-dynamic';
@@ -17,6 +18,31 @@ function saudacao() {
   if (hora < 12) return 'Bom dia';
   if (hora < 18) return 'Boa tarde';
   return 'Boa noite';
+}
+
+/** Selo da situação do mês, sobre a arte de fundo — legível no verde e no preto. */
+function Selo({ tom, children }: { tom: 'bom' | 'atencao' | 'neutro'; children: React.ReactNode }) {
+  const cores = {
+    bom: 'border-emerald-400/40 bg-emerald-500/20 text-emerald-200',
+    atencao: 'border-amber-400/40 bg-amber-500/20 text-amber-200',
+    neutro: 'border-white/25 bg-white/10 text-sobre-fundo-suave',
+  };
+  const ponto = { bom: 'bg-emerald-400', atencao: 'bg-amber-400', neutro: 'bg-white/60' };
+  return (
+    <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${cores[tom]}`}>
+      <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${ponto[tom]}`} />
+      {children}
+    </span>
+  );
+}
+
+/** Em que dia do ciclo (26 → 25) estamos: 'dia 12 de 30'. */
+function diaDoCiclo(atual: string) {
+  const inicio = Date.parse(`${mesAnterior(atual).slice(0, 8)}26T12:00:00Z`);
+  const fim = Date.parse(`${atual.slice(0, 8)}25T12:00:00Z`);
+  const hoje = Date.parse(`${hojeNoBrasil()}T12:00:00Z`);
+  const dia = 86_400_000;
+  return { dia: Math.round((hoje - inicio) / dia) + 1, total: Math.round((fim - inicio) / dia) + 1 };
 }
 
 /** "Allana Castro da Silva" → "Allana Castro". */
@@ -53,59 +79,63 @@ export default async function InicioCota({
   const outroMes = competencia !== atual;
 
   /**
-   * Por que a tela não está no mês de hoje. Aberta sozinha na anterior, diz
-   * que é o mês em aberto; escolhida pela pessoa, só avisa que é outro mês.
-   */
-  const AvisoDoMes = () => emAberto ? (
-    <span className="ml-2 text-amber-700 dark:text-amber-400">
-      em aberto · {mesRotulo(atual)} ainda sem lançamentos
-    </span>
-  ) : outroMes ? (
-    <span className="ml-2 text-amber-700 dark:text-amber-400">competência anterior</span>
-  ) : null;
-
-  /**
-   * Seletor de competência.
+   * Topo da tela (1.15.0): a saudação primeiro; embaixo, o mês com as setas;
+   * depois o selo com a situação do mês e, bem discreta, a nota de que o mês
+   * seguinte ainda não tem lançamentos. O relógio saiu — ocupava o lugar mais
+   * visível da tela sem ajudar em nenhuma decisão.
    *
-   * O canal vai junto num campo escondido: trocar o mês não deve devolver a
-   * pessoa ao canal que ela não estava olhando.
+   * O selo fala do fechamento, que é trabalho do gestor: só ele vê.
    */
-  const SeletorDeMes = () => (
-    <form className="flex items-end gap-2">
-      {canalPedido && <input type="hidden" name="canal" value={canalPedido} />}
-      <label>
-        <span className="mb-1 block text-xs font-medium text-slate-600">Competência</span>
-        <input type="month" name="mes" defaultValue={competencia.slice(0, 7)}
-               className="rounded-md border border-slate-300 px-2 py-1 text-sm" />
-      </label>
-      <button className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5
-                         text-sm font-medium text-slate-700 hover:bg-slate-50">
-        Abrir
-      </button>
-    </form>
+  const Topo = ({ selo, direita }: { selo?: React.ReactNode; direita?: React.ReactNode }) => (
+    <div className="flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">
+          {saudacao()}, {nomeCurto(perfil.nome).split(' ')[0]}
+        </h1>
+        <div className="mt-1.5">
+          <SetasDeCompetencia competencia={competencia} atual={atual} caminho="/cota" compacto
+                              manter={{ canal: canalPedido }} />
+        </div>
+        {(selo || emAberto || outroMes) && (
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+            {selo}
+            {emAberto && (
+              <span className="text-xs text-sobre-fundo-suave opacity-75">
+                {mesRotulo(atual)} ainda sem lançamentos
+              </span>
+            )}
+            {!emAberto && outroMes && !selo && (
+              <span className="text-xs text-sobre-fundo-suave opacity-75">Competência anterior</span>
+            )}
+          </div>
+        )}
+      </div>
+      {direita}
+    </div>
   );
 
-  // Gestor: mesmo cabeçalho, com a visão da equipe no lugar da própria cota.
+  // Gestor: mesmo topo, com a visão da equipe no lugar da própria cota.
   if (perfil.papel === 'gestor') {
+    const db = await criarClienteServidor();
+    const { data: fechados } = await db.from('fechamentos_cota').select('fechado_em')
+      .eq('mes_competencia', competencia).order('fechado_em', { ascending: false }).limit(1);
+    const fechadoEm = fechados?.[0]?.fechado_em as string | undefined;
+
+    const selo = fechadoEm ? (
+      <Selo tom="bom">Fechado em {formatarData(fechadoEm.slice(0, 10))}</Selo>
+    ) : competencia === atual ? (
+      <Selo tom="neutro">Mês atual · dia {diaDoCiclo(atual).dia} de {diaDoCiclo(atual).total} do ciclo</Selo>
+    ) : (
+      <Selo tom="atencao">Em aberto · aguardando fechamento</Selo>
+    );
+
     return (
-      <div className="space-y-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold text-sobre-fundo">
-              {saudacao()}, {nomeCurto(perfil.nome)}
-            </h1>
-            <p className="text-sm text-sobre-fundo-suave">
-              {mesRotulo(competencia)} · Visão da equipe
-              <AvisoDoMes />
-            </p>
-          </div>
-          <div className="flex flex-wrap items-end gap-4">
-            <SeletorDeMes />
-            <Relogio />
-          </div>
+      <ProvedorDeCanal inicial={canalPedido === 'diretores' ? 'diretores' : 'huggy'}>
+        <div className="space-y-6">
+          <Topo selo={selo} direita={<AbasDeCanal />} />
+          <PainelGestor competencia={competencia} atual={atual} />
         </div>
-        <PainelGestor competencia={competencia} canal={canalPedido === 'diretores' ? 'diretores' : 'huggy'} />
-      </div>
+      </ProvedorDeCanal>
     );
   }
 
@@ -138,21 +168,7 @@ export default async function InicioCota({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-sobre-fundo">
-            {saudacao()}, {nomeCurto(perfil.nome)}
-          </h1>
-          <p className="text-sm text-sobre-fundo-suave">
-            {mesRotulo(competencia)}{cota.data?.cargo ? ` · ${cota.data.cargo}` : ''}
-            <AvisoDoMes />
-          </p>
-        </div>
-        <div className="flex flex-wrap items-end gap-4">
-          <SeletorDeMes />
-          <Relogio />
-        </div>
-      </div>
+      <Topo />
 
       <div className="grid gap-6">
         {/* Pontuação */}

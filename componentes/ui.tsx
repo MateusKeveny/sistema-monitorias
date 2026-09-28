@@ -21,6 +21,46 @@ export function Cartao({
   );
 }
 
+/**
+ * Uma superfície para a tela inteira, com seções separadas por linha fina.
+ *
+ * Substitui a caixa por quadro na tela inicial (1.15.0): com um cartão para
+ * cada coisa, a tela virava um mosaico de bordas e sombras iguais, e nada
+ * tinha mais peso que o resto. A arte de fundo continua aparecendo nas
+ * margens.
+ */
+export function Painel({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`divide-y divide-slate-200 rounded-2xl bg-superficie shadow-sm ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+export function Secao({
+  titulo, subtitulo, acao, children,
+}: {
+  titulo?: string;
+  subtitulo?: React.ReactNode;
+  acao?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="px-6 py-6 sm:px-7">
+      {(titulo || acao) && (
+        <header className="mb-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+          <div>
+            {titulo && <h2 className="text-base font-semibold text-slate-800">{titulo}</h2>}
+            {subtitulo && <p className="text-sm text-slate-500">{subtitulo}</p>}
+          </div>
+          {acao}
+        </header>
+      )}
+      {children}
+    </section>
+  );
+}
+
 export function Indicador({
   rotulo, valor, detalhe, tom = 'neutro',
 }: {
@@ -61,15 +101,16 @@ export function Indicador({
 export function BarraDeMeta({ atingimento, escala = 1.5 }: { atingimento: number; escala?: number }) {
   const fim = Math.max(1.1, escala);
   const bateu = atingimento >= 1;
-  const largura = (v: number) => `${Math.max(0, Math.min(100, (v / fim) * 100))}%`;
+  const fracao = (v: number) => Math.max(0, Math.min(1, v / fim));
   return (
     <div className="flex items-center gap-3">
       <span className="relative h-2 flex-1 rounded-full bg-slate-100">
-        <span className={`absolute inset-y-0 left-0 rounded-full ${bateu ? 'bg-emerald-500' : 'bg-amber-500'}`}
-              style={{ width: largura(atingimento) }} />
+        {/* Largura cheia encolhida por scaleX: cresce ao aparecer (crescer-x). */}
+        <span className={`crescer-x absolute inset-0 origin-left rounded-full ${bateu ? 'bg-marca-600' : 'bg-amber-500'}`}
+              style={{ transform: `scaleX(${fracao(atingimento)})` }} />
         <span aria-hidden title="Meta"
               className="absolute -inset-y-1 w-0.5 rounded-full bg-slate-500"
-              style={{ left: largura(1) }} />
+              style={{ left: `${fracao(1) * 100}%` }} />
       </span>
       <Atingimento valor={atingimento} className="w-24" />
     </div>

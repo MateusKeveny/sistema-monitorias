@@ -147,6 +147,32 @@ textarea {
   filter: invert(1) opacity(0.6);
 }
 
+/* ---------------------------------------------------------------------------
+   Barras que crescem ao aparecer (1.15.0).
+
+   Trocar de mês é navegação no servidor, então não há valor anterior de onde
+   a barra partir; o movimento que existe é ela crescer do zero quando aparece
+   — ao abrir a tela e ao mostrar um canal ou visão que estava escondido
+   (elemento escondido não anima; ao aparecer, a animação começa). Só
+   `transform`, que o navegador anima sem recalcular a página. O keyframe tem
+   só o ponto de partida: o final é o valor que o componente já definiu.
+--------------------------------------------------------------------------- */
+@keyframes crescer-y { from { transform: scaleY(0); } }
+@keyframes crescer-x { from { transform: scaleX(0); } }
+.crescer-y { animation: crescer-y 600ms cubic-bezier(.2, .8, .2, 1); }
+.crescer-x { animation: crescer-x 600ms cubic-bezier(.2, .8, .2, 1); }
+/* A linha do GraficoDeLinha se desenha uma vez (pathLength = 1). */
+@keyframes desenhar-linha { from { stroke-dashoffset: 1; } }
+.desenhar-linha { stroke-dasharray: 1; animation: desenhar-linha 700ms cubic-bezier(.2, .8, .2, 1); }
+
+/* O detalhe de um destaque aparece sem salto (SeletorDeDetalhe). */
+@keyframes surgir { from { opacity: 0; transform: translateY(-4px); } }
+.surgir { animation: surgir 250ms ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .crescer-y, .crescer-x, .desenhar-linha, .surgir { animation: none; }
+}
+
 /* A folha de feedback sai sempre em papel branco, independente do tema. */
 @media print {
   .sem-impressao { display: none !important; }
