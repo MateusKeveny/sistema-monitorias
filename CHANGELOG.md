@@ -9,6 +9,18 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 4.14.0
+
+Diário de bordo: consulta dos registros do dia a dia da equipe.
+
+- Nova tela **Diário de bordo** (gestor e qualidade): processos novos,
+  treinamentos, autorizações e exceções registrados pela equipe no Painel de
+  Performance, com busca por protocolo, assunto ou texto e filtro por tipo.
+- Ao salvar uma monitoria, se o protocolo tiver **autorização ou exceção**
+  no diário, o monitor vê o registro e responde se ele **impacta** a
+  avaliação — com justificativa quando impacta. A resposta aparece na
+  consulta do diário.
+
 ## 4.13.0
 
 Recuperação de senha: quem esqueceu a senha agora tem um caminho.

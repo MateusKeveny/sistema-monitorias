@@ -10,6 +10,9 @@ import {
   data as formatarDataBR,
 } from '@/lib/formatar';
 import type { Canal, Criterio, Operador } from '@/lib/tipos';
+import {
+  ROTULO_QUEM, ROTULO_TIPO, TIPOS_QUE_AVISAM_NA_MONITORIA, type RegistroDiario,
+} from '@/lib/diario';
 
 type Resposta = { conforme: boolean | null; observacao: string };
 
@@ -67,6 +70,12 @@ export default function FormularioMonitoria({
   const [parecer, setParecer] = useState(emEdicao?.parecer ?? '');
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+
+  // Diário de bordo (4.13.0): autorização ou exceção registrada para este
+  // protocolo abre um aviso antes de gravar, e o monitor diz se ela impacta a
+  // avaliação. A resposta fica em `diario_citacoes`.
+  const [citados, setCitados] = useState<RegistroDiario[] | null>(null);
+  const [impactos, setImpactos] = useState<Record<string, { impacta: boolean | null; justificativa: string }>>({});
 
   // No ciclo 26→25 da IGreen, semana e mês de competência são função
   // determinística da data do atendimento — por isso não são digitados. O banco
@@ -152,14 +161,46 @@ export default function FormularioMonitoria({
   async function salvar(e: React.FormEvent) {
     e.preventDefault();
     setErro(null);
+    if (!validar()) return;
 
-    if (!temData) return setErro('Informe a data do atendimento.');
-    if (!operadorId) return setErro('Selecione o operador avaliado.');
-    if (semanaCheia) return setErro('Esta semana já tem as 4 monitorias do operador. Escolha outra data ou outro operador.');
-    if (pendentes > 0) return setErro(`Faltam ${pendentes} critério(s) sem resposta.`);
+    // O protocolo tem autorização ou exceção no diário ainda sem resposta
+    // nesta monitoria? Então o aviso vem antes de gravar.
+    const db = criarClienteNavegador();
+    const { data: doDiario, error: erroDiario } = await db.from('diario_registros').select('*')
+      .eq('protocolo', protocolo.trim()).in('tipo', TIPOS_QUE_AVISAM_NA_MONITORIA).neq('situacao', 'devolvido')
+      .order('criado_em', { ascending: false });
+    // Sem conseguir conferir o diário, não grava: seguir em silêncio pularia o
+    // aviso justamente quando ele poderia existir.
+    if (erroDiario) {
+      setErro(`Não foi possível conferir o diário de bordo (${erroDiario.message}). Tente salvar de novo.`);
+      return;
+    }
+    let pendentesDoDiario = (doDiario ?? []) as RegistroDiario[];
+    if (emEdicao && pendentesDoDiario.length) {
+      const { data: jaRespondidos } = await db.from('diario_citacoes').select('registro_id').eq('monitoria_id', emEdicao.id);
+      const respondidos = new Set((jaRespondidos ?? []).map((c) => c.registro_id as string));
+      pendentesDoDiario = pendentesDoDiario.filter((r) => !respondidos.has(r.id));
+    }
+    if (pendentesDoDiario.length) { setCitados(pendentesDoDiario); return; }
+    await gravar([]);
+  }
+
+  /** As mesmas conferências de antes de gravar; devolve se pode seguir. */
+  function validar(): boolean {
+    const falha = (m: string) => { setErro(m); return false; };
+
+    if (!temData) return falha('Informe a data do atendimento.');
+    if (!operadorId) return falha('Selecione o operador avaliado.');
+    if (semanaCheia) return falha('Esta semana já tem as 4 monitorias do operador. Escolha outra data ou outro operador.');
+    if (pendentes > 0) return falha(`Faltam ${pendentes} critério(s) sem resposta.`);
     if (zerado && !motivoZeramento.trim())
-      return setErro('Descreva o motivo do zeramento por falha crítica.');
+      return falha('Descreva o motivo do zeramento por falha crítica.');
+    return true;
+  }
 
+  /** Grava a monitoria e, se houver, as respostas do aviso do diário. */
+  async function gravar(respostasDiario: { registro_id: string; impacta: boolean; justificativa: string | null }[]) {
+    setErro(null);
     setSalvando(true);
     const db = criarClienteNavegador();
 
@@ -203,6 +244,7 @@ export default function FormularioMonitoria({
         return;
       }
 
+      if (!(await gravarCitacoes(emEdicao.id, respostasDiario))) return;
       router.push(`/monitorias/${emEdicao.id}`);
       router.refresh();
       return;
@@ -237,8 +279,37 @@ export default function FormularioMonitoria({
       return;
     }
 
+    if (!(await gravarCitacoes(criada.id, respostasDiario))) return;
     router.push(`/monitorias/${criada.id}`);
     router.refresh();
+  }
+
+  async function gravarCitacoes(monitoriaId: string, lista: { registro_id: string; impacta: boolean; justificativa: string | null }[]) {
+    if (!lista.length) return true;
+    const { error } = await criarClienteNavegador().from('diario_citacoes')
+      .upsert(lista.map((c) => ({ ...c, monitoria_id: monitoriaId })), { onConflict: 'monitoria_id,registro_id' });
+    if (error) {
+      setSalvando(false);
+      setErro(`A monitoria foi salva, mas a resposta ao diário não: ${error.message}. Abra a monitoria e salve de novo para responder.`);
+      return false;
+    }
+    return true;
+  }
+
+  const respostaCompleta = (id: string) => {
+    const r = impactos[id];
+    return !!r && r.impacta !== null && (!r.impacta || r.justificativa.trim().length > 0);
+  };
+
+  async function concluirComDiario() {
+    if (!citados) return;
+    const lista = citados.map((r) => ({
+      registro_id: r.id,
+      impacta: impactos[r.id].impacta as boolean,
+      justificativa: impactos[r.id].justificativa.trim() || null,
+    }));
+    setCitados(null);
+    await gravar(lista);
   }
 
   const cores = {
@@ -248,6 +319,77 @@ export default function FormularioMonitoria({
 
   return (
     <form onSubmit={salvar} className="space-y-6 pb-24">
+      {citados && (
+        <div role="dialog" aria-modal="true" aria-labelledby="titulo-diario"
+             className="fixed inset-0 z-50 grid place-items-start overflow-y-auto bg-black/50 px-4 py-10 backdrop-blur-[2px]">
+          <div className="surgir mx-auto w-full max-w-2xl rounded-2xl border border-amber-500/50 bg-superficie p-6 shadow-2xl">
+            <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-300">
+              Protocolo citado no diário de bordo
+            </span>
+            <h2 id="titulo-diario" className="mt-3 text-lg font-semibold text-slate-900">
+              O protocolo {protocolo.trim()} tem {citados.length === 1 ? 'um registro' : `${citados.length} registros`} no diário
+            </h2>
+            <p className="text-sm text-slate-500">Confira se o registro muda a avaliação antes de concluir a monitoria.</p>
+
+            <div className="mt-4 space-y-5">
+              {citados.map((r) => {
+                const resp = impactos[r.id] ?? { impacta: null, justificativa: '' };
+                // Parte do valor atual, e não do que estava na tela: escolher
+                // e digitar em seguida não desfaz a escolha.
+                const responder = (v: Partial<typeof resp>) => setImpactos((s) => ({
+                  ...s, [r.id]: { ...(s[r.id] ?? { impacta: null, justificativa: '' }), ...v },
+                }));
+                return (
+                  <div key={r.id}>
+                    <div className="rounded-r-xl border-l-4 border-amber-500 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                      <b className="text-slate-900">{r.assunto}</b> · {ROTULO_TIPO[r.tipo].toLowerCase()} · {formatarDataBR(r.data)}
+                      <span className="mt-1 block whitespace-pre-line">{r.descricao}</span>
+                      {r.autorizado_por && (
+                        <span className="mt-1 block text-xs text-slate-500">
+                          Autorizado por {ROTULO_QUEM[r.autorizado_por]}{r.autorizado_por_nome ? ` (${r.autorizado_por_nome})` : ''}
+                          {r.situacao === 'aguardando' ? ' · ainda aguardando aprovação do gestor' : ''}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      {([[true, 'Impacta a monitoria', 'o critério afetado deve ser revisto'],
+                        [false, 'Não impacta', 'o registro não muda a avaliação']] as const).map(([valor, titulo, dica]) => (
+                        <button key={String(valor)} type="button" aria-pressed={resp.impacta === valor}
+                                onClick={() => responder({ impacta: valor })}
+                                className={`rounded-xl border-2 px-3 py-2 text-left ${resp.impacta === valor
+                                  ? 'border-marca-600 bg-marca-600/8' : 'border-slate-200 hover:border-slate-300'}`}>
+                          <b className="block text-sm text-slate-800">{titulo}</b>
+                          <span className="text-xs text-slate-500">{dica}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <label className="mt-3 block">
+                      <span className="mb-1 block text-xs font-medium text-slate-600">
+                        Justificativa {resp.impacta ? '*' : '(opcional)'}
+                      </span>
+                      <textarea rows={2} value={resp.justificativa} onChange={(e) => responder({ justificativa: e.target.value })}
+                                placeholder="Ex.: o estorno fora do prazo foi autorizado; o critério ‘seguiu a política’ não deve descontar."
+                                className={campo} />
+                    </label>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button type="button" onClick={() => setCitados(null)}
+                      className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                Voltar à monitoria
+              </button>
+              <button type="button" disabled={salvando || !citados.every((r) => respostaCompleta(r.id))} onClick={concluirComDiario}
+                      className="rounded-lg bg-marca-600 px-4 py-2 text-sm font-semibold text-white hover:bg-marca-700 disabled:opacity-40">
+                {editando ? 'Salvar monitoria' : 'Concluir monitoria'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div>
         <h1 className="text-xl font-semibold text-sobre-fundo">
           {editando ? `Editar monitoria ${emEdicao!.protocolo}` : 'Nova monitoria'}

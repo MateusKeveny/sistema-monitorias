@@ -73,7 +73,7 @@ export default async function PainelGestor({
   const meses = [competencia, anterior];
   const db = await criarClienteServidor();
 
-  const [pessoas, csat, volume, criterios, cota, cargos, fechados, monitorias, valores, semCargo, conferir]
+  const [pessoas, csat, volume, criterios, cota, cargos, fechados, monitorias, valores, semCargo, conferir, diario]
     = await Promise.all([
     db.from('pessoas').select('id, nome, exibir_no_painel, conta_nas_medias'),
     db.from('vw_csat_semanal').select('pessoa_id, origem, semana, avaliacoes, positivas, mes_competencia')
@@ -92,6 +92,7 @@ export default async function PainelGestor({
     db.from('valores_da_cota').select('mes_competencia').in('mes_competencia', meses),
     db.from('vw_sem_cargo').select('nome').eq('mes_competencia', competencia),
     db.from('vw_lancamentos_a_conferir').select('bloco').eq('mes_competencia', competencia),
+    db.from('diario_registros').select('id', { count: 'exact', head: true }).eq('situacao', 'aguardando'),
   ]);
 
   const nome = new Map((pessoas.data ?? []).map((p) => [p.id as string, nomeCurto(p.nome as string)]));
@@ -172,7 +173,13 @@ export default async function PainelGestor({
   }
   if ((semCargo.data ?? []).length) {
     const n = (semCargo.data ?? []).length;
-    pendencias.push({ texto: `${n} pessoa${n > 1 ? 's' : ''} sem cargo no mês`, acao: 'Definir', href: '/cota/configuracao', grave: true });
+    pendencias.push({ texto: `${n} pessoa${n > 1 ? 's' : ''} sem cargo no mês`, acao: 'Definir', href: '/cota/atendentes', grave: true });
+  }
+  if (diario.count) {
+    pendencias.push({
+      texto: `${diario.count} registro${diario.count > 1 ? 's' : ''} do diário aguardando aprovação`,
+      acao: 'Revisar', href: '/cota/diario?filtro=aguardando',
+    });
   }
   if ((conferir.data ?? []).length) {
     pendencias.push({ texto: 'Lançamento com faixas que não fecham com o total', acao: 'Conferir', href: `/cota/lancamentos?mes=${mes}` });

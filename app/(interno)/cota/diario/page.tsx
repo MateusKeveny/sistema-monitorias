@@ -1,0 +1,53 @@
+import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
+import DiarioDeBordo from '@/componentes/DiarioDeBordo';
+import { hojeNoBrasil } from '@/lib/formatar';
+import type { RegistroDiario } from '@/lib/diario';
+
+export const dynamic = 'force-dynamic';
+
+/**
+ * Diário de bordo (1.22.0): o que aconteceu no dia e vale para todos —
+ * processos novos, treinamentos, autorizações e exceções.
+ *
+ * Todos registram e todos leem todos os registros. A consulta de gestão e
+ * qualidade fica também no site de Monitorias, onde o protocolo é conferido
+ * antes de concluir uma monitoria.
+ */
+export default async function Diario({
+  searchParams,
+}: {
+  searchParams: Promise<{ filtro?: string }>;
+}) {
+  const perfil = await exigirPerfil();
+  const { filtro } = await searchParams;
+  const db = await criarClienteServidor();
+
+  const [{ data: registros }, { data: pessoas }] = await Promise.all([
+    // Os últimos 500: bastam para a consulta do dia a dia. A busca por um
+    // protocolo antigo está na consulta do site de Monitorias.
+    db.from('diario_registros').select('*')
+      .order('data', { ascending: false }).order('criado_em', { ascending: false }).limit(500),
+    db.from('pessoas').select('id, nome'),
+  ]);
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">Diário de bordo</h1>
+        <p className="mt-1 text-sm text-sobre-fundo-suave">
+          O que aconteceu hoje e vale para todos: processos novos, treinamentos, autorizações e exceções.
+          Todos veem todos os registros.
+        </p>
+      </div>
+
+      <DiarioDeBordo
+        registros={(registros ?? []) as RegistroDiario[]}
+        nomes={Object.fromEntries((pessoas ?? []).map((p) => [p.id as string, p.nome as string]))}
+        pessoaId={perfil.id}
+        ehGestor={perfil.papel === 'gestor'}
+        hoje={hojeNoBrasil()}
+        filtroInicial={filtro}
+      />
+    </div>
+  );
+}

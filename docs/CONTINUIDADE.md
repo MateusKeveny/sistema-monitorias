@@ -11,9 +11,9 @@ Escrito em 28/09/2026, atualizado em 29/09/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.22.0** · Monitorias **4.13.0** (deploy de 29/09/2026) |
+| Publicado | Performance **1.23.0** · Monitorias **4.14.0** (deploy de 29/09/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
-| Migrações no banco | 01 a 32, todas aplicadas (o arquivo da 31, do diário de bordo, entra no repositório com a 1.23.0) |
+| Migrações no banco | 01 a 32, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
 
 ### Revisão de design (28/09/2026)
@@ -122,10 +122,18 @@ Três versões, cada uma publicada e conferida antes da próxima:
   que orienta a procurar o gestor. O "Copiar" não chegou à área de
   transferência no navegador embutido do app: conferir no Chrome, no site
   publicado. Ler na tela sempre funciona.
-- **Em espera: Diário de bordo (1.23.0 / Monitorias 4.14.0)**. Código pronto
-  e testado, guardado no `git stash` ("diario-de-bordo"); a migração 31 já
-  está aplicada. Falta o teste do fluxo de aprovação com um perfil que não
-  seja gestor (Teste de acesso ou a Suyara).
+- **1.23.0 / Monitorias 4.14.0** (publicada): **Diário de bordo** (migração
+  31). Todos registram no Performance (Registrar → Diário de bordo) processos
+  novos, treinamentos, autorizações e exceções; protocolo obrigatório; todos
+  veem todos os registros. Palavras como "autoriz", "liberad", "diretoria",
+  "gestão", "exceção" exigem dizer quem autorizou (ou marcar que o texto só
+  menciona). Autorização da gestão ou diretoria feita por quem não é gestor
+  fica **aguardando aprovação**: o gestor aprova ou devolve com comentário
+  (pendência no Início), e o autor corrige e reenvia. No Monitorias, gestor e
+  qualidade consultam em "Diário de bordo"; ao salvar uma monitoria cujo
+  protocolo tem autorização ou exceção no diário, o monitor responde se
+  impacta (com justificativa) — fica em `diario_citacoes`. Fluxo de
+  aprovação testado com o perfil Teste de acesso.
 
 Visão de celular fica fora da revisão, por decisão do gestor.
 
