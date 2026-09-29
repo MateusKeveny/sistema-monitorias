@@ -21,19 +21,33 @@ export type Destaque = {
  * detalhe. Tudo já vem pronto do servidor; o clique só mostra um e esconde os
  * outros.
  */
-export default function SeletorDeDetalhe({ destaques }: { destaques: Destaque[] }) {
-  const [aberto, setAberto] = useState(destaques[0]?.chave);
+export default function SeletorDeDetalhe({
+  destaques,
+  inicial = destaques[0]?.chave ?? null,
+  alternar = false,
+  rotulo = 'Destaques do mês',
+  grade = 'sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5',
+}: {
+  destaques: Destaque[];
+  /** O que começa aberto; `null` começa com tudo fechado (semanas do extrato). */
+  inicial?: string | null;
+  /** Clicar de novo no aberto fecha o detalhe. */
+  alternar?: boolean;
+  rotulo?: string;
+  grade?: string;
+}) {
+  const [aberto, setAberto] = useState<string | null>(inicial);
 
   return (
     <div className="space-y-4">
-      <div role="tablist" aria-label="Destaques do mês"
-           className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+      <div role="tablist" aria-label={rotulo}
+           className={`grid gap-3 ${grade}`}>
         {destaques.map((d) => {
           const ativo = d.chave === aberto;
           return (
             <button key={d.chave} type="button" role="tab" aria-selected={ativo}
                     aria-controls={`detalhe-${d.chave}`}
-                    onClick={() => setAberto(d.chave)}
+                    onClick={() => setAberto(alternar && ativo ? null : d.chave)}
                     className={`relative rounded-2xl border-2 px-5 py-4 text-left shadow-sm transition-colors ${
                       d.tom === 'atencao' ? 'bg-amber-50' : 'bg-superficie'} ${
                       ativo ? 'border-marca-600' : 'border-transparent hover:border-slate-200'}`}>

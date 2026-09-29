@@ -1,17 +1,17 @@
 # Continuidade — Painel de Performance
 
 Onde o trabalho parou, o que já vale como regra e o que ficou pendente.
-Escrito em 28/09/2026. Para o modelo de dados completo, ver
+Escrito em 28/09/2026, atualizado em 29/09/2026. Para o modelo de dados completo, ver
 [MODELO-PAINEL.md](MODELO-PAINEL.md); para infraestrutura,
 [HOSPEDAGEM.md](HOSPEDAGEM.md).
 
 ---
 
-## Estado em 28/09/2026
+## Estado em 29/09/2026
 
 | | |
 |---|---|
-| Publicado | Performance **1.17.0** · Monitorias **4.12.0** (deploy de 28/09/2026) |
+| Publicado | Performance **1.18.0** (deploy de 29/09/2026) · Monitorias **4.12.0** (deploy de 28/09/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
 | Migrações no banco | 01 a 30, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
@@ -58,8 +58,18 @@ Três versões, cada uma publicada e conferida antes da próxima:
   tela **Monitorias do atendente** (`/cota/monitorias`) dentro do Performance,
   no lugar do link para o site de Monitorias. Atalhos "comparar meses ›" nos
   detalhes da tela inicial. O operador vê só a própria evolução.
-- **Próximas**: o estilo novo nas telas de consulta (Extrato, Histórico,
-  Fechamento com as pendências dele no topo); depois registro e
+- **1.18.0** (publicada): o estilo novo nas telas de consulta. **Extrato**:
+  resumo do mês no topo, "De onde vieram os pontos" (o que somou e o que
+  tirou, por categoria), as semanas lado a lado como cartões que abrem o
+  detalhe e o resumo geral do mês por canal, sempre visível. Todo quadro
+  segue a **ordem da planilha** — atendimento e transferências, TME, faixas
+  de C-SAT, notas, monitoria, demanda extra —, e não o `ordem` do catálogo,
+  que punha o TME de Diretores depois das notas. A monitoria do mês é a
+  **média das semanas**, não a soma. **Histórico**: resumo, linha dos pontos
+  por mês e meses recolhíveis. **Fechamento**: setas, situação e o quadro
+  "Antes de fechar" (sem cargo, lançamentos a conferir, semanas sem volume,
+  monitorias incompletas, ciclo correndo).
+- **Próximas**: o estilo novo no registro e na
   administração (Lançamentos, Importar, Presencial, Atendentes,
   Configuração). E o **Pleno** ver a equipe no Comparativo: precisa da
   migração 31, uma consulta liberada só para gestor e Pleno (como

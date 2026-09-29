@@ -2,7 +2,7 @@ import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { BarraDeMeta, Quadro, Vazio } from '@/componentes/ui';
 import { mesRotulo, percentual } from '@/lib/formatar';
 import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
-import Abas from '@/componentes/Abas';
+import SeletorDeDetalhe from '@/componentes/SeletorDeDetalhe';
 import { resolverCompetencia } from '@/lib/competencia';
 import type { Pessoa } from '@/lib/tipos';
 
@@ -44,10 +44,11 @@ const faixaDo = (csat: number, faixas: Faixa[]) => faixas.find((f) =>
   && (f.faixa_max == null || csat < Number(f.faixa_max)));
 
 /**
- * Extrato: à esquerda o que aconteceu em cada semana, à direita a soma do mês.
+ * Extrato (1.18.0): o resumo do mês, de onde vieram os pontos, as semanas lado
+ * a lado (o clique abre o detalhe) e o resumo geral do mês por canal.
  *
- * Dentro de cada semana as regras ficam em blocos por canal, como na planilha:
- * o canal é o título do bloco, não uma coluna repetida linha a linha.
+ * As regras ficam em blocos por canal, como na planilha — o canal é o título do
+ * bloco, não uma coluna repetida linha a linha — e na mesma sequência dela.
  */
 export default async function Extrato({
   searchParams,
@@ -151,12 +152,50 @@ export default async function Extrato({
       .sort((a, b) => b.resultado - a.resultado);
   }
 
-  const semanas = [...new Set(linhas.map((l) => l.semana))].sort((a, b) => (a ?? 9) - (b ?? 9));
+  // Só as semanas numeradas viram cartão; o que não tem semana entra no mês.
+  const semanas = [...new Set(linhas.map((l) => l.semana))]
+    .filter((s): s is number => s != null).sort((a, b) => a - b);
+
+  // Ordem da planilha em todo quadro (1.18.0): atendimento e transferências,
+  // TME, faixas de C-SAT, notas, monitoria e a demanda extra. O `ordem` do
+  // catálogo sozinho não basta: o TME de Diretores (61–63) viria depois das
+  // faixas (30–34) e das notas (40–44), que os dois canais dividem.
+  const ETAPA: Record<string, number> = {
+    media: 0, atendimento: 1, tme: 2, tme_diretores: 2, csat: 3, nota: 4, monitoria: 5,
+  };
+  const posicao = (grupo: string, ordem: number) => (ETAPA[grupo] ?? (ordem < 20 ? 1 : 6)) * 1000 + ordem;
+  const naOrdem = <T extends { grupo: string; ordem: number }>(ls: T[]) =>
+    [...ls].sort((a, b) => posicao(a.grupo, a.ordem) - posicao(b.grupo, b.ordem));
+  const ORDEM_CANAL = ['huggy', 'diretores', 'geral'];
   const canaisDe = (ls: Linha[]) => [...new Set(ls.map((l) => chaveCanal(l.origem)))]
-    .sort((a, b) => (a === 'geral' ? 1 : 0) - (b === 'geral' ? 1 : 0));
+    .sort((a, b) => ORDEM_CANAL.indexOf(a) - ORDEM_CANAL.indexOf(b));
 
   const csatDe = (origem: Canal | null, semana: number | null) =>
     origem && semana ? semanal.find((c) => c.origem === origem && c.semana === semana) : undefined;
+
+  // Mesma escala de cor do painel: verde na meta, âmbar atenção, rosa ruim.
+  const tomCsat = (v: number) => v >= 0.9
+    ? 'bg-marca-600/15 text-marca-700 dark:text-marca-400'
+    : v >= 0.85 ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+      : 'bg-rose-500/15 text-rose-700 dark:text-rose-300';
+  const tomMonitoria = (v: number) => v > 0.85
+    ? 'bg-marca-600/15 text-marca-700 dark:text-marca-400'
+    : 'bg-amber-500/15 text-amber-700 dark:text-amber-300';
+
+  /** O C-SAT de um canal no cartão da semana, na cor da escala. */
+  const etiquetaCsat = (canal: Canal, semana: number) => {
+    const c = csatDe(canal, semana);
+    return c ? (
+      <span className={`rounded-md px-1.5 py-px font-semibold ${tomCsat(Number(c.csat))}`}>
+        {canal === 'huggy' ? 'Exp' : 'Dir'} {percentual(Number(c.csat))}
+      </span>
+    ) : null;
+  };
+
+  /** O "Feito" de cada linha: a monitoria é média (percentual), não contagem. */
+  const feito = (l: Pick<Linha, 'grupo' | 'quantidade'>) =>
+    l.grupo === 'monitoria' ? percentual(Number(l.quantidade))
+      : l.grupo === 'csat' ? num(Number(l.quantidade), 4) : num(Number(l.quantidade));
 
   /** Uma linha da tabela: rótulo, quantidade, peso e pontos. */
   const Linha = ({ l, detalhe }: { l: Linha; detalhe?: string }) => (
@@ -165,9 +204,7 @@ export default async function Extrato({
         {l.rotulo}
         {detalhe && <span className="ml-2 text-xs font-semibold text-marca-700 dark:text-marca-400">{detalhe}</span>}
       </td>
-      <td className="px-2 py-1.5 text-right tabular-nums text-slate-600">
-        {l.grupo === 'csat' || l.grupo === 'monitoria' ? num(Number(l.quantidade), 4) : num(Number(l.quantidade))}
-      </td>
+      <td className="px-2 py-1.5 text-right tabular-nums text-slate-600">{feito(l)}</td>
       <td className="px-2 py-1.5 text-right tabular-nums text-slate-400">{num(Number(l.peso))}</td>
       <td className={`py-1.5 pl-2 text-right font-semibold tabular-nums ${
         Number(l.cota) < 0 ? 'text-rose-700' : 'text-slate-800'}`}>{num(Number(l.cota))}</td>
@@ -184,6 +221,31 @@ export default async function Extrato({
       </tr>
     </thead>
   );
+
+  // De onde vieram os pontos: cada regra somada no mês, os dois canais
+  // juntos. Só o C-SAT fica separado por canal, porque a faixa de um canal
+  // não diz nada sobre a do outro. A monitoria mostra a média das semanas.
+  type Origem = { chave: string; rotulo: string; grupo: string; quantidade: number; cota: number; vezes: number };
+  const porOrigem = new Map<string, Origem>();
+  for (const l of linhas) {
+    const chave = l.grupo === 'csat' ? `${l.regra}|${l.origem}` : l.regra;
+    const o = porOrigem.get(chave) ?? {
+      chave, grupo: l.grupo, quantidade: 0, cota: 0, vezes: 0,
+      rotulo: l.grupo === 'csat' && l.origem ? `${l.rotulo} · ${NOME_CANAL[l.origem]}` : l.rotulo,
+    };
+    o.quantidade += Number(l.quantidade);
+    o.cota += Number(l.cota);
+    o.vezes += 1;
+    porOrigem.set(chave, o);
+  }
+  const origens = [...porOrigem.values()].filter((o) => Math.abs(o.cota) >= 0.005).map((o) => ({
+    ...o,
+    detalhe: o.grupo === 'monitoria' ? `média ${percentual(o.quantidade / o.vezes)}`
+      : o.grupo === 'media' ? '' : `${num(o.quantidade, 0)}×`,
+  }));
+  const somou = origens.filter((o) => o.cota > 0).sort((a, b) => b.cota - a.cota);
+  const tirou = origens.filter((o) => o.cota < 0).sort((a, b) => a.cota - b.cota);
+  const maiorOrigem = Math.max(1, ...origens.map((o) => Math.abs(o.cota)));
 
   return (
     <div className="space-y-6">
@@ -286,57 +348,118 @@ export default async function Extrato({
       {linhas.length === 0 ? (
         <Quadro titulo="Extrato"><Vazio>Nenhum ponto nesta competência.</Vazio></Quadro>
       ) : (
-        // Abas (1.18.0): o mês inteiro primeiro e cada semana numa aba, em vez
-        // da pilha de semanas ao lado da soma do mês. Uma coisa de cada vez.
-        <Abas inicial="mes" itens={[
-            ...semanas.map((semana) => {
+        <>
+          {/* De onde vieram os pontos (1.18.0): cada categoria somada no mês,
+              os dois canais e a monitoria juntos, do que mais somou ao que
+              mais tirou. Responde "por que deu isso" antes das tabelas. */}
+          <Quadro titulo="De onde vieram os pontos"
+                  subtitulo="Cada categoria no mês, do que mais somou ao que mais tirou — os dois canais e a monitoria juntos.">
+            <div className="grid gap-x-12 gap-y-6 lg:grid-cols-2">
+              {([
+                ['O que somou', somou, '+'],
+                ['O que tirou', tirou, '−'],
+              ] as const).map(([titulo, itens, sinal]) => (
+                <div key={titulo}>
+                  <h3 className="mb-2 text-[13px] font-semibold text-slate-500">
+                    {titulo}
+                    {itens.length > 0 && ` · ${sinal}${num(Math.abs(itens.reduce((a, i) => a + i.cota, 0)), 1)}`}
+                  </h3>
+                  {itens.length === 0 ? (
+                    <p className="text-sm text-slate-500">Nada neste mês.</p>
+                  ) : (
+                    <ul className="grid gap-2.5">
+                      {itens.map((i) => (
+                        <li key={i.chave} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 text-sm">
+                          <span className="truncate text-slate-700">
+                            {i.rotulo}
+                            {i.detalhe && <span className="ml-1.5 text-xs text-slate-500">{i.detalhe}</span>}
+                          </span>
+                          <span className={`text-right font-semibold tabular-nums ${
+                            i.cota < 0 ? 'text-rose-700 dark:text-rose-300' : 'text-marca-700 dark:text-marca-400'}`}>
+                            {i.cota < 0 ? '−' : '+'}{num(Math.abs(i.cota), 1)}
+                          </span>
+                          <span className="col-span-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                            <span className={`crescer-x block h-full origin-left rounded-full ${
+                              i.cota < 0 ? 'bg-rose-500' : 'bg-marca-600'}`}
+                                  style={{ transform: `scaleX(${Math.max(0.02, Math.abs(i.cota) / maiorOrigem)})` }} />
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Quadro>
+
+          {/* As semanas lado a lado; o clique abre o detalhe logo abaixo. */}
+          {semanas.length > 0 && (
+            <SeletorDeDetalhe inicial={null} alternar rotulo="Semanas do mês"
+                              grade={`sm:grid-cols-2 ${semanas.length > 4 ? 'xl:grid-cols-5' : 'xl:grid-cols-4'}`}
+                              destaques={semanas.map((semana) => {
               const daSemana = linhas.filter((l) => l.semana === semana);
               const soma = daSemana.reduce((a, l) => a + Number(l.cota), 0);
-              return { chave: `s${semana ?? 'x'}`, rotulo: semana ? `${semana}ª semana · ${num(soma, 0)} pts` : 'Sem semana', conteudo: (
-                <Quadro
-                  key={semana ?? 'mes'}
-                  titulo={semana ? `${semana}ª semana` : 'No mês'}
-                  acao={<span className={`text-sm font-semibold tabular-nums ${
-                    soma < 0 ? 'text-rose-700' : 'text-slate-900'}`}>{num(soma)} pts</span>}
-                >
-                  <div className="space-y-4">
-                    {canaisDe(daSemana).map((canal) => {
-                      const doCanal = daSemana.filter((l) => chaveCanal(l.origem) === canal);
+              const monitoria = daSemana.find((l) => l.grupo === 'monitoria');
+              const canais = canaisDe(daSemana);
+              return {
+                chave: `s${semana}`,
+                // Fragmento na raiz, como na tela inicial: com <div> o React acusa
+                // lista sem chave ao hidratar o cartão vindo do servidor.
+                bloco: (
+                  <>
+                    <p className="tabular-nums text-[13px] text-slate-500">{semana}ª semana</p>
+                    <p className={`tabular-nums text-2xl font-semibold ${soma < 0 ? 'text-rose-700' : 'text-slate-900'}`}>
+                      {num(soma, 0)} pts
+                    </p>
+                    <p className="tabular-nums mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
+                      C-SAT
+                      {etiquetaCsat('huggy', semana)}
+                      {etiquetaCsat('diretores', semana)}
+                    </p>
+                    <p className="tabular-nums mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
+                      Monitoria
+                      {monitoria ? (
+                        <span className={`rounded-md px-1.5 py-px font-semibold ${tomMonitoria(Number(monitoria.quantidade))}`}>
+                          {percentual(Number(monitoria.quantidade))}
+                        </span>
+                      ) : <span className="text-slate-400">—</span>}
+                    </p>
+                  </>
+                ),
+                detalhe: (
+                  <div className="grid items-start gap-4 xl:grid-cols-3">
+                    {canais.map((canal) => {
+                      const doCanal = naOrdem(daSemana.filter((l) => chaveCanal(l.origem) === canal));
                       const c = csatDe(canal === 'geral' ? null : canal as Canal, semana);
+                      const somaCanal = doCanal.reduce((a, l) => a + Number(l.cota), 0);
                       return (
-                        <section key={canal}>
-                          <h3 className="mb-1 rounded bg-slate-100 px-2 py-1 text-xs font-semibold
-                                         text-slate-600">
-                            {NOME_CANAL[canal]}
-                            {c && (
-                              <span className="ml-2 font-normal text-slate-500">
-                                C-SAT {percentual(Number(c.csat))} · {c.positivas} de {c.avaliacoes}
-                              </span>
-                            )}
-                          </h3>
+                        <Quadro key={canal} titulo={`${NOME_CANAL[canal]} · ${semana}ª semana`}
+                                subtitulo={c ? `C-SAT ${percentual(Number(c.csat))} · ${c.positivas} de ${c.avaliacoes}` : undefined}
+                                acao={<span className={`text-sm font-semibold tabular-nums ${
+                                  somaCanal < 0 ? 'text-rose-700' : 'text-slate-900'}`}>{num(somaCanal)} pts</span>}>
                           <table className="w-full text-sm">
                             <Cabecalho />
                             <tbody>
                               {doCanal.map((l) => (
-                                <Linha
-                                  key={`${l.regra}-${l.origem ?? 'sem'}`} l={l}
-                                  detalhe={l.grupo === 'csat' && c ? percentual(Number(c.csat)) : undefined}
-                                />
+                                <Linha key={`${l.regra}-${l.origem ?? 'sem'}`} l={l}
+                                       detalhe={l.grupo === 'csat' && c ? percentual(Number(c.csat)) : undefined} />
                               ))}
                             </tbody>
                           </table>
-                        </section>
+                        </Quadro>
                       );
                     })}
                   </div>
-                </Quadro>
-              ) };
-            }),
-            { chave: 'mes', rotulo: 'Mês inteiro', conteudo: (
-          <div className="grid items-start gap-4 xl:grid-cols-2">
+                ),
+              };
+            })} />
+          )}
 
+          <h2 className="pt-2 text-base font-semibold text-sobre-fundo">Resumo geral do mês</h2>
+          <div className="grid items-start gap-4 xl:grid-cols-3">
             {linhaMedia && (
               <Quadro
+                className="xl:col-span-3"
                 titulo="Como a média foi formada"
                 acao={<span className="text-sm font-semibold tabular-nums text-slate-900">
                   {num(Number(linhaMedia.cota))} pts
@@ -382,19 +505,21 @@ export default async function Extrato({
               </Quadro>
             )}
 
-            {canaisDe(linhas).map((canal) => {
-              const doCanal = linhas.filter((l) => chaveCanal(l.origem) === canal);
+            {canaisDe(linhas.filter((l) => l.regra !== 'media_da_equipe')).map((canal) => {
+              const doCanal = linhas.filter((l) => chaveCanal(l.origem) === canal && l.regra !== 'media_da_equipe');
               const soma = doCanal.reduce((a, l) => a + Number(l.cota), 0);
 
               // Cada categoria somada no mês; o C-SAT tem tratamento próprio.
+              // A monitoria é a média das semanas (cada semana já é a média
+              // das monitorias dela), não a soma; a cota, essa sim, soma.
               const categorias = [...new Map(doCanal.filter((l) => l.grupo !== 'csat')
                 .map((l) => [l.regra, l])).values()]
-                .sort((a, b) => a.ordem - b.ordem)
                 .map((base) => {
                   const iguais = doCanal.filter((l) => l.regra === base.regra);
+                  const total = iguais.reduce((a, l) => a + Number(l.quantidade), 0);
                   return {
                     ...base,
-                    quantidade: iguais.reduce((a, l) => a + Number(l.quantidade), 0),
+                    quantidade: base.grupo === 'monitoria' ? total / iguais.length : total,
                     cota: iguais.reduce((a, l) => a + Number(l.cota), 0),
                   };
                 });
@@ -419,6 +544,12 @@ export default async function Extrato({
                   / semanasDoCanal.reduce((a, c) => a + c.avaliacoes, 0)
                 : null;
 
+              // As faixas entram no lugar delas na sequência da planilha:
+              // depois do TME e antes das notas.
+              const antes = naOrdem(categorias).filter((l) => posicao(l.grupo, l.ordem) < posicao('csat', 0));
+              const depois = naOrdem(categorias).filter((l) => posicao(l.grupo, l.ordem) >= posicao('csat', 0));
+              const monitoria = categorias.find((l) => l.grupo === 'monitoria');
+
               return (
                 <Quadro
                   key={canal}
@@ -429,7 +560,7 @@ export default async function Extrato({
                   <table className="w-full text-sm">
                     <Cabecalho />
                     <tbody>
-                      {categorias.map((l) => <Linha key={l.regra} l={l} />)}
+                      {antes.map((l) => <Linha key={l.regra} l={l} />)}
 
                       {linhasFaixa.length > 0 && (
                         <tr className="border-t border-slate-200">
@@ -465,14 +596,24 @@ export default async function Extrato({
                           </td>
                         </tr>
                       ))}
+                      {linhasFaixa.length > 0 && depois.length > 0 && (
+                        <tr><td colSpan={4} className="pt-2" /></tr>
+                      )}
+
+                      {depois.map((l) => <Linha key={l.regra} l={l} />)}
                     </tbody>
                   </table>
+                  {monitoria && (
+                    <p className="mt-3 text-xs leading-relaxed text-slate-500">
+                      Monitoria: cada semana vale a média das monitorias dela, e o mês mostra a média das
+                      semanas. A cota soma o que cada semana rendeu.
+                    </p>
+                  )}
                 </Quadro>
               );
             })}
           </div>
-            ) },
-          ].sort((a, b) => (a.chave === 'mes' ? -1 : 0) - (b.chave === 'mes' ? -1 : 0))} />
+        </>
       )}
 
       <p className="text-xs leading-relaxed text-sobre-fundo-suave">
