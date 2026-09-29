@@ -20,6 +20,7 @@ export default function FormularioLogin({
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState<string | null>(aviso);
   const [enviando, setEnviando] = useState(false);
+  const [esqueci, setEsqueci] = useState(false);
 
   async function entrar(e: React.FormEvent) {
     e.preventDefault();
@@ -77,6 +78,21 @@ export default function FormularioLogin({
       >
         {enviando ? 'Entrando…' : 'Entrar'}
       </button>
+
+      {/* Não há recuperação por e-mail: quem redefine é o gestor, pela ficha da
+          pessoa em Atendentes, com uma senha temporária (migração 32). */}
+      <div className="text-center">
+        <button type="button" onClick={() => setEsqueci((v) => !v)} aria-expanded={esqueci}
+                className="text-sm text-slate-500 hover:text-marca-700 hover:underline">
+          Esqueci minha senha
+        </button>
+        {esqueci && (
+          <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-left text-sm text-slate-600 ring-1 ring-slate-200">
+            Procure o seu <strong>gestor</strong>: ele redefine a sua senha e passa uma senha temporária.
+            No primeiro acesso com ela, o sistema pede que você crie uma nova.
+          </p>
+        )}
+      </div>
     </form>
   );
 }

@@ -11,9 +11,9 @@ Escrito em 28/09/2026, atualizado em 29/09/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.21.0** (deploy de 29/09/2026) · Monitorias **4.12.0** (deploy de 28/09/2026) |
+| Publicado | Performance **1.22.0** · Monitorias **4.13.0** (deploy de 29/09/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
-| Migrações no banco | 01 a 30, todas aplicadas |
+| Migrações no banco | 01 a 32, todas aplicadas (o arquivo da 31, do diário de bordo, entra no repositório com a 1.23.0) |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
 
 ### Revisão de design (28/09/2026)
@@ -109,8 +109,23 @@ Três versões, cada uma publicada e conferida antes da próxima:
   gestor na RLS (pesos, métricas, cargos, lançamentos, volume, avaliações,
   valor, fechamento, saída).
 - **Revisão concluída**: todas as telas do Performance estão no estilo
-  novo. A migração 31 fica como nota para o futuro: só é necessária se
-  existir um Pleno com papel Operador (hoje a única Pleno é Qualidade).
+  novo. Pleno com papel Operador vendo a equipe no Comparativo fica como
+  nota para o futuro: pediria uma migração própria, com consulta liberada só
+  para o cargo (hoje a única Pleno é Qualidade, que já vê a equipe).
+- **1.22.0 / Monitorias 4.13.0** (publicada): **redefinir senha pelo
+  gestor** (migração 32). Não havia como recuperar senha esquecida. Na ficha
+  da pessoa (Atendentes → Acesso), "Redefinir senha" gera uma senha
+  temporária aleatória (10 caracteres, sem 0/O, 1/l/I), mostrada uma vez ao
+  gestor, encerra as sessões abertas e obriga a troca no próximo acesso;
+  cada redefinição fica em `redefinicoes_de_senha`. Só o gestor redefine, e
+  não a própria senha. O login dos dois sites ganhou "Esqueci minha senha",
+  que orienta a procurar o gestor. O "Copiar" não chegou à área de
+  transferência no navegador embutido do app: conferir no Chrome, no site
+  publicado. Ler na tela sempre funciona.
+- **Em espera: Diário de bordo (1.23.0 / Monitorias 4.14.0)**. Código pronto
+  e testado, guardado no `git stash` ("diario-de-bordo"); a migração 31 já
+  está aplicada. Falta o teste do fluxo de aprovação com um perfil que não
+  seja gestor (Teste de acesso ou a Suyara).
 
 Visão de celular fica fora da revisão, por decisão do gestor.
 

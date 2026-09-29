@@ -9,6 +9,26 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 4.13.0
+
+Recuperação de senha: quem esqueceu a senha agora tem um caminho.
+
+- No login, **"Esqueci minha senha"** orienta a procurar o gestor.
+- O gestor redefine pela ficha da pessoa, no Painel de Performance
+  (Atendentes → Acesso): o banco gera uma **senha temporária aleatória**,
+  mostrada uma única vez, encerra as sessões abertas e obriga a troca no
+  primeiro acesso. A senha padrão não é reaproveitada — todos a conhecem.
+- Cada redefinição fica registrada (quem, de quem, quando), sem a senha.
+
+## 4.12.0
+
+O mês seguinte das monitorias só abre depois do fechamento da cota.
+
+- Enquanto a cota do mês não é fechada, as monitorias do mês seguinte ficam
+  bloqueadas — a trava é do banco (migração 30), não só da tela.
+- A data do atendimento começa **vazia** no lançamento novo: preenchida com
+  a data de hoje, ela era salva sem ser conferida.
+
 ## 4.11.1
 
 Corrige a exportação, que vinha cortada em 1.000 linhas.

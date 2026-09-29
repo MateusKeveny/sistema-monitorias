@@ -239,6 +239,36 @@ function Interruptor({ ligado, disabled, onChange, rotulo }: {
   );
 }
 
+/**
+ * Copia para a área de transferência e diz se deu certo.
+ *
+ * O jeito moderno (`navigator.clipboard`) pode ser bloqueado pelo navegador;
+ * aí tenta o antigo, por uma caixa de texto escondida. Só devolve `true` se
+ * uma das duas funcionou: dizer "copiada" sem ter copiado faz o gestor perder
+ * a senha temporária, que não aparece de novo.
+ */
+async function copiar(texto: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(texto);
+    return true;
+  } catch {
+    try {
+      const caixa = document.createElement('textarea');
+      caixa.value = texto;
+      caixa.setAttribute('readonly', '');
+      caixa.style.position = 'fixed';
+      caixa.style.opacity = '0';
+      document.body.appendChild(caixa);
+      caixa.select();
+      const ok = document.execCommand('copy');
+      caixa.remove();
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+}
+
 /** Uma parte da ficha. Fora de `Ficha`: definida dentro, seria recriada a
  *  cada tecla e o campo em edição perderia o foco. */
 const Secao = ({ titulo, children }: { titulo: string; children: React.ReactNode }) => (
@@ -268,6 +298,10 @@ function Ficha({
   const [saidaDia, setSaidaDia] = useState('');
   const [motivo, setMotivo] = useState('');
   const [verRegistro, setVerRegistro] = useState(false);
+  // A senha temporária só existe nesta tela, até ser fechada: o banco não a
+  // guarda em lugar nenhum além do hash.
+  const [senhaTemporaria, setSenhaTemporaria] = useState<string | null>(null);
+  const [copiada, setCopiada] = useState<'ok' | 'falhou' | null>(null);
 
   async function executar(acao: () => PromiseLike<{ error: { message: string } | null }>, ok?: string) {
     setOcupado(true); setErro(null); setAviso(null);
@@ -391,6 +425,67 @@ function Ficha({
         ))}
         <p className="mt-1 text-xs text-slate-500">Só apresentação: não muda pontuação, média do cargo nem pagamento.</p>
       </Secao>
+
+      {pessoa.auth_id && pessoa.ativo && !pessoa.desligado_em && (
+        <Secao titulo="Acesso">
+          {senhaTemporaria ? (
+            <div className="rounded-xl border border-marca-600/40 bg-marca-600/8 px-4 py-3">
+              <p className="text-sm text-slate-700">
+                Senha temporária de <strong>{pessoa.nome.split(' ')[0]}</strong>. Ela aparece <strong>só agora</strong>:
+                passe para a pessoa, que vai trocá-la no primeiro acesso. Não há letras que se confundem
+                (sem 0/O nem 1/l/I), então dá para ditar ou digitar lendo da tela.
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {/* Um clique seleciona a senha inteira, para copiar à mão. */}
+                <code className="select-all rounded-lg bg-superficie px-4 py-2 font-mono text-2xl tracking-[0.2em] text-slate-900 ring-1 ring-slate-200"
+                      onClick={(e) => { const s = window.getSelection(); s?.selectAllChildren(e.currentTarget); }}>
+                  {senhaTemporaria}
+                </code>
+                <button type="button" className={botaoSecundario}
+                        onClick={async () => setCopiada(await copiar(senhaTemporaria) ? 'ok' : 'falhou')}>
+                  {copiada === 'ok' ? 'Copiado, cole para conferir' : 'Copiar'}
+                </button>
+                <button type="button"
+                        onClick={() => {
+                          if (!confirm('Já passou a senha para a pessoa (e conferiu que ela está certa)? Depois de fechar, ela não pode ser vista de novo.')) return;
+                          setSenhaTemporaria(null); setCopiada(null);
+                        }}
+                        className="ml-auto text-xs text-slate-500 hover:underline">
+                  já passei, fechar
+                </button>
+              </div>
+              {copiada === 'falhou' && (
+                <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                  Este navegador bloqueou a cópia. Clique na senha para selecioná-la e use Ctrl+C.
+                </p>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+                <span>{pessoa.senha_definida ? 'Senha própria definida' : 'Ainda não trocou a senha provisória'}</span>
+                <button type="button" disabled={ocupado} className={botaoSecundario}
+                        onClick={async () => {
+                          if (!confirm(`Redefinir a senha de ${pessoa.nome}? A senha atual deixa de valer, `
+                            + 'as sessões abertas são encerradas e uma senha temporária é gerada para você repassar.')) return;
+                          setOcupado(true); setErro(null); setAviso(null);
+                          const { data, error } = await db().rpc('redefinir_senha', { p_pessoa: pessoa.id });
+                          setOcupado(false);
+                          if (error) { setErro(error.message); return; }
+                          setSenhaTemporaria(String(data)); setCopiada(null);
+                          router.refresh();
+                        }}>
+                  Redefinir senha
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-slate-500">
+                Para quem esqueceu a senha: gera uma senha temporária, encerra as sessões abertas e
+                obriga a troca no próximo acesso.
+              </p>
+            </>
+          )}
+        </Secao>
+      )}
 
       <Secao titulo={pessoa.desligado_em ? 'Saída' : 'Saída da operação'}>
         {pessoa.desligado_em ? (
