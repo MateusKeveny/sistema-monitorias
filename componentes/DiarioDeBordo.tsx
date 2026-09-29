@@ -32,17 +32,22 @@ const vazio = { tipo: '' as TipoRegistro | '', protocolo: '', assunto: '', descr
  *
  * Autorização e exceção — ou qualquer texto que cite "autorizado",
  * "diretoria", "gestão", "exceção"… — pedem quem autorizou; sem isso o
- * registro não fecha. Autorização da gestão ou da diretoria vai para a
- * aprovação do gestor. O banco decide a situação (migração 31); a tela só
- * antecipa o que vai acontecer.
+ * registro não fecha. Autorização da gestão ou da diretoria registrada por um
+ * júnior vai para a aprovação do gestor ou do Pleno; a do gestor, do Pleno e
+ * do Analista conclui direto (1.24.0). O banco decide a situação (migrações
+ * 31 e 33); a tela só antecipa o que vai acontecer.
  */
 export default function DiarioDeBordo({
-  registros, nomes, pessoaId, ehGestor, hoje, filtroInicial,
+  registros, nomes, pessoaId, ehGestor, aprova, concluiDireto, hoje, filtroInicial,
 }: {
   registros: RegistroDiario[];
   nomes: Record<string, string>;
   pessoaId: string;
   ehGestor: boolean;
+  /** Gestor ou Pleno: aprova e devolve o que aguarda. */
+  aprova: boolean;
+  /** Gestor, Pleno ou Analista: a autorização da gestão já nasce concluída. */
+  concluiDireto: boolean;
   hoje: string;
   filtroInicial?: string;
 }) {
@@ -69,7 +74,7 @@ export default function DiarioDeBordo({
     !f.descricao.trim() && 'o que aconteceu',
     pedeQuem && (!f.quem || (exigeQuem && f.quem === 'ninguem')) && 'quem autorizou', pedeQuem && !ninguem && !f.nome.trim() && 'nome de quem autorizou',
   ].filter(Boolean) as string[];
-  const vaiAprovar = pedeQuem && (f.quem === 'gestao' || f.quem === 'diretoria') && !ehGestor;
+  const vaiAprovar = pedeQuem && (f.quem === 'gestao' || f.quem === 'diretoria') && !concluiDireto;
 
   const set = (campo: keyof typeof vazio) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
@@ -94,7 +99,7 @@ export default function DiarioDeBordo({
     setOcupado(false);
     if (error) { setErro(error.message); return; }
     setAviso(vaiAprovar
-      ? 'Registro enviado para a aprovação do gestor. Ele conclui quando for aprovado.'
+      ? 'Registro enviado para a aprovação do gestor ou do Pleno. Ele conclui quando for aprovado.'
       : corrigindo ? 'Registro corrigido.' : 'Registro concluído.');
     setF(vazio); setCorrigindo(null);
     router.refresh();
@@ -192,7 +197,9 @@ export default function DiarioDeBordo({
                          placeholder={ninguem ? '—' : 'Ex.: Carlos (diretoria comercial)'} /></label>
               </div>
               <p className="mt-2 text-xs text-slate-600">
-                Autorização da gestão ou da diretoria vai para <strong>aprovação do gestor</strong> antes de concluir.
+                {concluiDireto
+                  ? <>Pelo seu cargo, a autorização da gestão ou da diretoria <strong>conclui direto</strong>.</>
+                  : <>Autorização da gestão ou da diretoria vai para <strong>aprovação do gestor ou do Pleno</strong> antes de concluir.</>}
               </p>
             </div>
           )}
@@ -202,7 +209,7 @@ export default function DiarioDeBordo({
 
           <div className="flex flex-wrap items-center justify-between gap-3">
             <span className="text-sm text-slate-500">
-              {faltam.length ? `Falta: ${faltam.join(', ')}` : vaiAprovar ? 'Vai para a aprovação do gestor.' : 'Pronto para concluir.'}
+              {faltam.length ? `Falta: ${faltam.join(', ')}` : vaiAprovar ? 'Vai para a aprovação do gestor ou do Pleno.' : 'Pronto para concluir.'}
             </span>
             <span className="flex gap-2">
               {corrigindo && (
@@ -271,12 +278,12 @@ export default function DiarioDeBordo({
                     </p>
                   )}
 
-                  {(ehGestor || (r.pessoa_id === pessoaId && r.situacao === 'devolvido')) && (
+                  {(ehGestor || aprova || (r.pessoa_id === pessoaId && r.situacao === 'devolvido')) && (
                     <div className="mt-1 flex flex-wrap items-center gap-2">
                       {r.pessoa_id === pessoaId && r.situacao === 'devolvido' && (
                         <button type="button" onClick={() => corrigir(r)} className={botaoSecundario}>Corrigir e reenviar</button>
                       )}
-                      {ehGestor && r.situacao === 'aguardando' && devolvendo?.id !== r.id && (
+                      {aprova && r.situacao === 'aguardando' && r.pessoa_id !== pessoaId && devolvendo?.id !== r.id && (
                         <>
                           <button type="button" disabled={ocupado} onClick={() => decidir(r.id, true, '')}
                                   className="rounded-lg bg-marca-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-marca-700 disabled:opacity-40">
@@ -287,7 +294,7 @@ export default function DiarioDeBordo({
                           </button>
                         </>
                       )}
-                      {ehGestor && devolvendo?.id === r.id && (
+                      {aprova && devolvendo?.id === r.id && (
                         <span className="flex w-full flex-wrap gap-2">
                           <input autoFocus value={devolvendo.texto} disabled={ocupado}
                                  onChange={(e) => setDevolvendo({ id: r.id, texto: e.target.value })}

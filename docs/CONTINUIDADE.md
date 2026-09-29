@@ -11,9 +11,9 @@ Escrito em 28/09/2026, atualizado em 29/09/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.23.0** · Monitorias **4.14.0** (deploy de 29/09/2026) |
+| Publicado | Performance **1.24.0** · Monitorias **4.14.1** (deploy de 29/09/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
-| Migrações no banco | 01 a 32, todas aplicadas |
+| Migrações no banco | 01 a 33, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
 
 ### Revisão de design (28/09/2026)
@@ -134,6 +134,15 @@ Três versões, cada uma publicada e conferida antes da próxima:
   protocolo tem autorização ou exceção no diário, o monitor responde se
   impacta (com justificativa) — fica em `diario_citacoes`. Fluxo de
   aprovação testado com o perfil Teste de acesso.
+- **1.24.0 / Monitorias 4.14.1** (publicada): **aprovação do diário pelo
+  cargo** (migração 33). Gestor, Pleno e Analista registram autorização da
+  gestão ou diretoria e ela conclui direto; júnior (e quem não tem cargo) vai
+  para aprovação. Aprovam ou devolvem o gestor e o Pleno, nunca o próprio
+  registro; excluir segue só do gestor. O Início do Pleno mostra os registros
+  que aguardam. Os cargos são lidos pelo nome ("Atendente Pleno",
+  "Analista") em `cargo_atual_nome()`: renomear um desses cargos exige
+  ajustar `conclui_diario_direto()` e `aprova_diario()`. Testado com o
+  Teste de acesso sem cargo e com o cargo Pleno temporário (removido).
 
 Visão de celular fica fora da revisão, por decisão do gestor.
 

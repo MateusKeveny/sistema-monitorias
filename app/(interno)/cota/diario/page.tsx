@@ -22,12 +22,16 @@ export default async function Diario({
   const { filtro } = await searchParams;
   const db = await criarClienteServidor();
 
-  const [{ data: registros }, { data: pessoas }] = await Promise.all([
+  const [{ data: registros }, { data: pessoas }, { data: aprova }, { data: concluiDireto }] = await Promise.all([
     // Os últimos 500: bastam para a consulta do dia a dia. A busca por um
     // protocolo antigo está na consulta do site de Monitorias.
     db.from('diario_registros').select('*')
       .order('data', { ascending: false }).order('criado_em', { ascending: false }).limit(500),
     db.from('pessoas').select('id, nome'),
+    // Pelo cargo (migração 33): gestor e Pleno aprovam; gestor, Pleno e
+    // Analista concluem a própria autorização da gestão sem aprovação.
+    db.rpc('aprova_diario'),
+    db.rpc('conclui_diario_direto'),
   ]);
 
   return (
@@ -45,6 +49,8 @@ export default async function Diario({
         nomes={Object.fromEntries((pessoas ?? []).map((p) => [p.id as string, p.nome as string]))}
         pessoaId={perfil.id}
         ehGestor={perfil.papel === 'gestor'}
+        aprova={aprova === true}
+        concluiDireto={concluiDireto === true}
         hoje={hojeNoBrasil()}
         filtroInicial={filtro}
       />

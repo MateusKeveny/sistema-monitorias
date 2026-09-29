@@ -347,7 +347,7 @@ export default function FormularioMonitoria({
                       {r.autorizado_por && (
                         <span className="mt-1 block text-xs text-slate-500">
                           Autorizado por {ROTULO_QUEM[r.autorizado_por]}{r.autorizado_por_nome ? ` (${r.autorizado_por_nome})` : ''}
-                          {r.situacao === 'aguardando' ? ' · ainda aguardando aprovação do gestor' : ''}
+                          {r.situacao === 'aguardando' ? ' · ainda aguardando aprovação' : ''}
                         </span>
                       )}
                     </div>

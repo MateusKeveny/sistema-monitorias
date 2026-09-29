@@ -9,6 +9,11 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 4.14.1
+
+- No aviso do diário ao salvar a monitoria, "aguardando aprovação do gestor"
+  passa a "aguardando aprovação": o Pleno também aprova registros.
+
 ## 4.14.0
 
 Diário de bordo: consulta dos registros do dia a dia da equipe.

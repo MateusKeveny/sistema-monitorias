@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import PainelGestor from '@/componentes/PainelGestor';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
@@ -148,10 +149,31 @@ export default async function InicioCota({
 
   if (cargoId && media?.ativo) {
     const veOTime = perfil.papel !== 'operador';
+    // O Pleno aprova os registros do diário que aguardam (migração 33) — a
+    // única pendência do gestor que também é dele.
+    const { data: aprova } = await db.rpc('aprova_diario');
+    const { count: aguardando } = aprova === true
+      ? await db.from('diario_registros').select('id', { count: 'exact', head: true })
+          .eq('situacao', 'aguardando').neq('pessoa_id', perfil.id)
+      : { count: 0 };
     return (
       <ProvedorDeCanal inicial={canalPedido === 'diretores' ? 'diretores' : 'huggy'}>
         <div className="space-y-6">
           <Topo selo={seloOperador} />
+          {!!aguardando && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="mr-1 text-sm font-semibold text-sobre-fundo">Precisa de você</span>
+              <Link href="/cota/diario?filtro=aguardando"
+                    className="inline-flex items-center gap-2 rounded-xl bg-superficie py-1.5 pl-3 pr-1.5 text-sm text-slate-800
+                               shadow-sm transition hover:ring-2 hover:ring-marca-600/40">
+                <span aria-hidden className="h-2 w-2 shrink-0 rounded-full bg-amber-500" />
+                {aguardando} registro{aguardando > 1 ? 's' : ''} do diário aguardando aprovação
+                <span className="rounded-md bg-marca-50 px-2 py-0.5 text-xs font-semibold text-marca-700 dark:text-marca-400">
+                  Revisar ›
+                </span>
+              </Link>
+            </div>
+          )}
           <PainelPleno pessoaId={perfil.id} cargoId={cargoId} competencia={competencia} />
           {veOTime && (
             <>
