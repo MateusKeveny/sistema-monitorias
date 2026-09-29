@@ -153,7 +153,7 @@ Três versões, cada uma publicada e conferida antes da próxima:
   (`pessoas.diario_conclui_direto`), para um júnior de confiança concluir
   direto. A 34 também corrige a lista do diário para o operador, que via os
   registros dos colegas sem autor (função `nomes_das_pessoas`, só id e
-  nome). Falta conferir com perfil de operador e ligar a chave do júnior.
+  nome). Chave na ficha conferida pelo gestor no site publicado.
 
 Visão de celular fica fora da revisão, por decisão do gestor.
 
