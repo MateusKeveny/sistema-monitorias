@@ -3,265 +3,441 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
-import { Cartao, Tabela, Th, Td, Vazio } from '@/componentes/ui';
-import { NOMES_PAPEL, type Pessoa, type Saida } from '@/lib/tipos';
+import { mesRotulo } from '@/lib/formatar';
+import { NOMES_PAPEL, type Cargo, type CargoDaPessoa, type Pessoa, type Saida } from '@/lib/tipos';
 
-const entrada = `rounded-md border border-slate-300 px-2 py-1 text-sm outline-none
-                 focus:border-marca-600 disabled:bg-slate-50`;
-const botaoPrimario = `rounded-lg bg-marca-600 px-3 py-1.5 text-xs font-semibold text-white
+const entrada = `rounded-lg border border-slate-300 bg-superficie px-2.5 py-1.5 text-sm outline-none
+                 focus:border-marca-600 disabled:opacity-50`;
+const botaoPrimario = `rounded-lg bg-marca-600 px-3 py-1.5 text-sm font-semibold text-white
                        hover:bg-marca-700 disabled:opacity-40`;
-const botaoSecundario = `rounded-lg border border-slate-300 bg-superficie px-2.5 py-1 text-xs
+const botaoSecundario = `rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
                          font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40`;
 
 const data = (iso: string | null | undefined) =>
   iso ? new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDateString('pt-BR') : '—';
 const numero = (v: unknown) =>
   Number(v ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 });
-const competencia = (iso: string) => {
+const competenciaCurta = (iso: string) => {
   const [ano, mes] = iso.split('-');
   return `${mes}/${ano}`;
 };
+const curto = (nome: string) => nome.replace(/^Atendente\s+/, '');
+
+type Filtro = 'operacao' | 'atencao' | 'recentes' | 'desligados';
+type Recorte = 'todos' | 'operadores' | 'gestao';
 
 /**
- * Atendentes: quem está na operação, desde quando, e o registro de quem saiu.
+ * Atendentes (1.20.0): tudo de uma pessoa num lugar só.
+ *
+ * Antes o cargo e o Nome no Hub ficavam na Configuração, a exibição na tela
+ * inicial em outra aba e a saída aqui. Agora a lista mostra o essencial e o
+ * clique abre a ficha ao lado: entrada, cargo com histórico, Nome no Hub, o
+ * que aparece na tela inicial e a saída.
  *
  * As duas datas existem por causa do cálculo: quem entrou ou saiu no meio da
- * competência fica de fora da média do cargo, porque um mês pela metade
- * puxaria a média de quem recebe por ela. O extrato da pessoa continua
- * intacto — ela só não entra na conta dos outros.
- *
- * Registrar a saída faz tudo de uma vez: guarda a foto do que a pessoa
- * produziu, grava a data e corta o acesso aos dois sistemas.
+ * competência fica de fora da média do cargo — o extrato dela continua
+ * intacto, ela só não entra na conta dos outros. Registrar a saída guarda a
+ * foto do que a pessoa produziu, grava a data e corta o acesso aos dois
+ * sistemas.
  */
 export default function PainelAtendentes({
-  pessoas, saidas,
+  pessoas, saidas, cargos, historico, competencia, inicioDoCicloAnterior,
 }: {
   pessoas: Pessoa[];
   saidas: Saida[];
+  cargos: Cargo[];
+  historico: CargoDaPessoa[];
+  /** Competência corrente ('2026-10-01'): o "cargo em outubro". */
+  competencia: string;
+  /** Início do ciclo anterior: entradas e saídas a partir daí são "recentes". */
+  inicioDoCicloAnterior: string;
 }) {
-  const router = useRouter();
-  const [mostrarSaidas, setMostrarSaidas] = useState(false);
-  const [desligando, setDesligando] = useState<string | null>(null);
-  const [ocupado, setOcupado] = useState(false);
-  const [erro, setErro] = useState<string | null>(null);
-  const [aviso, setAviso] = useState<string | null>(null);
-  const [aberta, setAberta] = useState<string | null>(null);
+  const nomeCargo = new Map(cargos.map((c) => [c.id, c.nome]));
+  const linhasDe = (id: string) => historico.filter((h) => h.pessoa_id === id)
+    .sort((a, b) => b.desde.localeCompare(a.desde));
+  const vigente = (id: string) => linhasDe(id).find((h) => h.desde <= competencia) ?? null;
+
+  /** O que atrapalha o cálculo da pessoa, em frases curtas. */
+  const pendencias = (p: Pessoa) => {
+    if (p.desligado_em) return [];
+    const l: string[] = [];
+    const cargo = vigente(p.id);
+    if (!cargo) l.push('sem cargo — não recebe cota');
+    const linhas = linhasDe(p.id);
+    if (linhas.some((h, i) => i > 0 && h.cargo_id === linhas[i - 1].cargo_id)) l.push('mesmo cargo repetido no histórico');
+    if (p.papel === 'operador' && cargo && nomeCargo.get(cargo.cargo_id)?.startsWith('Atendente') && !p.nome_hub) {
+      l.push('sem Nome no Hub — a importação não acha as avaliações');
+    }
+    return l;
+  };
 
   const naOperacao = pessoas.filter((p) => !p.desligado_em);
-  const foraDaOperacao = pessoas.filter((p) => p.desligado_em);
-  const saidaDe = (id: string) =>
-    saidas.filter((s) => s.pessoa_id === id && !s.revertida_em)
-      .sort((a, b) => b.data.localeCompare(a.data))[0];
+  const desligados = pessoas.filter((p) => p.desligado_em);
+  const atencao = naOperacao.filter((p) => pendencias(p).length);
+  const recentes = pessoas.filter((p) => (p.desligado_em && p.desligado_em >= inicioDoCicloAnterior)
+    || (p.admitido_em && p.admitido_em >= inicioDoCicloAnterior));
 
-  async function salvarData(id: string, campo: 'admitido_em', valor: string) {
-    setOcupado(true); setErro(null); setAviso(null);
-    const db = criarClienteNavegador();
-    const { error } = await db.from('pessoas').update({ [campo]: valor || null }).eq('id', id);
-    setOcupado(false);
-    if (error) { setErro(error.message); return; }
-    router.refresh();
+  const [filtro, setFiltro] = useState<Filtro>('operacao');
+  const [recorte, setRecorte] = useState<Recorte>('todos');
+  const [selecionada, setSelecionada] = useState<string | null>(naOperacao[0]?.id ?? null);
+
+  const base = filtro === 'atencao' ? atencao : filtro === 'recentes' ? recentes
+    : filtro === 'desligados' ? desligados : naOperacao;
+  const lista = base.filter((p) => recorte === 'todos'
+    || (recorte === 'operadores' ? p.papel === 'operador' : p.papel !== 'operador'));
+  const pessoa = pessoas.find((p) => p.id === selecionada) ?? null;
+
+  const porCargo = new Map<string, number>();
+  for (const p of naOperacao) {
+    const c = vigente(p.id);
+    const nome = c ? curto(nomeCargo.get(c.cargo_id) ?? '') : 'sem cargo';
+    porCargo.set(nome, (porCargo.get(nome) ?? 0) + 1);
   }
 
-  async function registrarSaida(pessoa: Pessoa, dia: string, motivo: string) {
-    if (!dia) { setErro('Informe a data da saída.'); return; }
-    setOcupado(true); setErro(null); setAviso(null);
-    const db = criarClienteNavegador();
-    const { error } = await db.rpc('registrar_saida', {
-      p_pessoa: pessoa.id, p_data: dia, p_motivo: motivo || null,
-    });
-    setOcupado(false);
-    if (error) { setErro(error.message); return; }
-    setDesligando(null);
-    setAviso(`Saída de ${pessoa.nome} registrada em ${data(dia)}. `
-      + 'O acesso foi encerrado e o histórico ficou guardado.');
-    router.refresh();
-  }
-
-  async function reverter(pessoa: Pessoa) {
-    setOcupado(true); setErro(null); setAviso(null);
-    const db = criarClienteNavegador();
-    const { error } = await db.rpc('reverter_saida', { p_pessoa: pessoa.id });
-    setOcupado(false);
-    if (error) { setErro(error.message); return; }
-    setAviso(`${pessoa.nome} voltou para a operação, com acesso liberado.`);
-    router.refresh();
-  }
-
-  const Aviso = () => (
-    <>
-      {erro && (
-        <p className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800
-                      ring-1 ring-rose-600/20">{erro}</p>
-      )}
-      {aviso && (
-        <p className="mb-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800
-                      ring-1 ring-emerald-600/20">{aviso}</p>
-      )}
-    </>
+  const Cartao = ({ chave, titulo, valor, detalhe, alerta }: {
+    chave: Filtro; titulo: string; valor: string; detalhe: React.ReactNode; alerta?: boolean;
+  }) => (
+    <button type="button" aria-pressed={filtro === chave} onClick={() => setFiltro(chave)}
+            className={`rounded-2xl border-2 px-5 py-4 text-left shadow-sm transition-colors ${
+              alerta ? 'bg-amber-50' : 'bg-superficie'} ${
+              filtro === chave ? 'border-marca-600' : 'border-transparent hover:border-slate-200'}`}>
+      <p className="text-[13px] text-slate-500">{titulo}</p>
+      <p className={`text-2xl font-semibold tabular-nums ${alerta ? 'text-amber-700 dark:text-amber-300' : 'text-slate-900'}`}>{valor}</p>
+      <div className="mt-1 text-xs leading-relaxed text-slate-600">{detalhe}</div>
+    </button>
   );
 
   return (
-    <div className="space-y-6">
-      <Cartao
-        titulo={`Na operação (${naOperacao.length})`}
-        acao={foraDaOperacao.length ? (
-          <button type="button" className={botaoSecundario}
-                  onClick={() => setMostrarSaidas((v) => !v)}>
-            {mostrarSaidas ? 'Esconder' : `Ver desligados (${foraDaOperacao.length})`}
-          </button>
-        ) : undefined}
-      >
-        <Aviso />
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Cartao chave="operacao" titulo="Na operação" valor={`${naOperacao.length} pessoas`}
+                detalhe={[...porCargo].map(([c, q]) => `${q} ${c}`).join(' · ')} />
+        <Cartao chave="atencao" titulo="Precisa de atenção" valor={String(atencao.length)} alerta={atencao.length > 0}
+                detalhe={atencao.length
+                  ? atencao.map((p) => <span key={p.id} className="block truncate">{p.nome.split(' ')[0]}: {pendencias(p)[0]}</span>)
+                  : 'nada pendente'} />
+        <Cartao chave="recentes" titulo="Entradas e saídas recentes" valor={String(recentes.length)}
+                detalhe={recentes.length
+                  ? recentes.map((p) => (
+                    <span key={p.id} className="block truncate">
+                      {p.nome.split(' ')[0]} {p.desligado_em ? `saiu em ${data(p.desligado_em)}` : `entrou em ${data(p.admitido_em)}`}
+                    </span>))
+                  : 'desde o ciclo anterior, ninguém entrou nem saiu'} />
+        <Cartao chave="desligados" titulo="Desligados" valor={String(desligados.length)}
+                detalhe="registro guardado · dá para voltar para a operação" />
+      </div>
 
-        <Tabela>
-          <thead>
-            <tr>
-              <Th>Pessoa</Th>
-              <Th className="w-36">Papel</Th>
-              <Th className="w-40">Entrada</Th>
-              <Th className="w-24 text-center">Acesso</Th>
-              <Th className="w-44"> </Th>
-            </tr>
-          </thead>
-          <tbody>
-            {naOperacao.map((p) => (
-              <tr key={p.id}>
-                <Td className="font-medium text-slate-800">
-                  {p.nome}
-                  {p.email && <span className="block text-xs font-normal text-slate-500">{p.email}</span>}
-                </Td>
-                <Td className="text-sm text-slate-600">{NOMES_PAPEL[p.papel]}</Td>
-                <Td>
-                  <input
-                    type="date" defaultValue={p.admitido_em ?? ''} disabled={ocupado}
-                    className={entrada} aria-label={`Entrada de ${p.nome}`}
-                    onBlur={(e) => {
-                      if ((e.target.value || null) !== (p.admitido_em ?? null)) {
-                        salvarData(p.id, 'admitido_em', e.target.value);
-                      }
-                    }}
-                  />
-                </Td>
-                <Td className="text-center text-xs">
-                  {p.ativo
-                    ? <span className="text-emerald-700">tem login</span>
-                    : <span className="text-slate-400">sem login</span>}
-                </Td>
-                <Td>
-                  {desligando === p.id ? (
-                    <FormularioSaida
-                      pessoa={p} ocupado={ocupado}
-                      onCancelar={() => setDesligando(null)}
-                      onConfirmar={(dia, motivo) => registrarSaida(p, dia, motivo)}
-                    />
-                  ) : (
-                    <button type="button" className={botaoSecundario} disabled={ocupado}
-                            onClick={() => { setDesligando(p.id); setErro(null); setAviso(null); }}>
-                      Registrar saída
-                    </button>
-                  )}
-                </Td>
-              </tr>
-            ))}
-          </tbody>
-        </Tabela>
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(22rem,1fr)]">
+        <section className="rounded-2xl bg-superficie px-6 py-5 shadow-sm">
+          <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold text-slate-800">Pessoas</h2>
+              <p className="text-sm text-slate-500">Clique numa pessoa para abrir a ficha.</p>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {([['todos', 'Todos'], ['operadores', 'Operadores'], ['gestao', 'Gestão e qualidade']] as const).map(([k, r]) => (
+                <button key={k} type="button" aria-pressed={recorte === k} onClick={() => setRecorte(k)}
+                        className={`rounded-full border px-3 py-0.5 text-xs ${recorte === k
+                          ? 'border-marca-600 bg-marca-600/10 text-marca-700 dark:text-marca-400'
+                          : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+                  {r}
+                </button>
+              ))}
+            </div>
+          </div>
 
-        <p className="mt-4 text-xs text-slate-500">
-          A <strong>entrada</strong> e a saída decidem quem compõe a média do cargo: quem
-          trabalhou a competência pela metade fica de fora dela, sem perder o próprio
-          extrato. Entrada em branco significa que a pessoa já estava na equipe antes do
-          painel existir, e por isso conta em todos os meses.
-        </p>
-      </Cartao>
-
-      {mostrarSaidas && (
-        <Cartao titulo={`Desligados (${foraDaOperacao.length})`}>
-          <Aviso />
-          {!foraDaOperacao.length ? (
-            <Vazio>Ninguém desligado.</Vazio>
+          {lista.length === 0 ? (
+            <p className="py-10 text-center text-sm text-slate-500">Ninguém neste recorte.</p>
           ) : (
-            <div className="space-y-3">
-              {foraDaOperacao.map((p) => {
-                const s = saidaDe(p.id);
-                return (
-                  <div key={p.id} className="rounded-lg ring-1 ring-slate-200">
-                    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-                      <div>
-                        <p className="font-medium text-slate-800">{p.nome}</p>
-                        <p className="text-xs text-slate-500">
-                          Saída em {data(p.desligado_em)}
-                          {s?.motivo ? ` · ${s.motivo}` : ''}
-                          {s?.registrado_por_nome ? ` · registrado por ${s.registrado_por_nome}` : ''}
-                        </p>
-                      </div>
-                      <div className="flex gap-2">
-                        {s && (
-                          <button type="button" className={botaoSecundario}
-                                  onClick={() => setAberta(aberta === p.id ? null : p.id)}>
-                            {aberta === p.id ? 'Fechar registro' : 'Ver registro'}
-                          </button>
-                        )}
-                        <button type="button" className={botaoSecundario} disabled={ocupado}
-                                onClick={() => reverter(p)}>
-                          Voltar para a operação
-                        </button>
-                      </div>
-                    </div>
-
-                    {aberta === p.id && s && <Registro saida={s} />}
-                  </div>
-                );
-              })}
+            <div className="-mx-6 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-slate-500">
+                    <th className="border-b border-slate-200 py-2 pl-6 pr-2 font-medium">Pessoa</th>
+                    <th className="border-b border-slate-200 px-2 py-2 font-medium">Cargo em {mesRotulo(competencia).split('/')[0].toLowerCase()}</th>
+                    <th className="border-b border-slate-200 px-2 py-2 font-medium">Nome no Hub</th>
+                    <th className="border-b border-slate-200 px-2 py-2 text-center font-medium" title="Aparece nas listas · Entra nas médias">
+                      Aparece · Média
+                    </th>
+                    <th className="border-b border-slate-200 py-2 pl-2 pr-6 text-center font-medium">Acesso</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lista.map((p) => {
+                    const c = vigente(p.id);
+                    const pend = pendencias(p);
+                    const ativa = p.id === selecionada;
+                    return (
+                      <tr key={p.id} onClick={() => setSelecionada(p.id)} aria-selected={ativa}
+                          className={`cursor-pointer ${ativa ? 'bg-marca-600/8' : 'hover:bg-slate-50'} ${p.desligado_em ? 'text-slate-400' : ''}`}>
+                        <td className="border-b border-slate-100 py-2.5 pl-6 pr-2">
+                          <span className="font-semibold text-slate-800">{p.nome}</span>
+                          <span className="block text-xs text-slate-500">
+                            {NOMES_PAPEL[p.papel]}{p.desligado_em ? ` · saiu em ${data(p.desligado_em)}` : ''}
+                          </span>
+                        </td>
+                        <td className="border-b border-slate-100 px-2 py-2.5">
+                          {c ? <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{curto(nomeCargo.get(c.cargo_id) ?? '')}</span>
+                            : <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-300">sem cargo</span>}
+                        </td>
+                        <td className="border-b border-slate-100 px-2 py-2.5 text-slate-600">
+                          {p.nome_hub ?? (pend.some((x) => x.startsWith('sem Nome no Hub'))
+                            ? <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-300">sem vínculo</span>
+                            : <span className="text-slate-400">—</span>)}
+                        </td>
+                        <td className="border-b border-slate-100 px-2 py-2.5 text-center text-xs">
+                          <Bolinha ligada={p.exibir_no_painel ?? true} /> <Bolinha ligada={p.conta_nas_medias ?? true} />
+                        </td>
+                        <td className="border-b border-slate-100 py-2.5 pl-2 pr-6 text-center">
+                          {p.ativo
+                            ? <span className="rounded-md bg-marca-600/15 px-2 py-0.5 text-xs font-semibold text-marca-700 dark:text-marca-400">tem login</span>
+                            : <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500">sem login</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
-          <p className="mt-4 text-xs text-slate-500">
-            O registro é a foto tirada no dia da saída e não muda depois — nem se os
-            dados da competência forem corrigidos ou redistribuídos. Voltar alguém para a
-            operação libera o acesso de novo e mantém o registro guardado.
+          <p className="mt-4 text-xs leading-relaxed text-slate-500">
+            A <strong>entrada</strong> e a saída decidem quem compõe a média do cargo: quem trabalhou a
+            competência pela metade fica de fora dela, sem perder o próprio extrato.
           </p>
-        </Cartao>
-      )}
+        </section>
+
+        {pessoa ? (
+          <Ficha key={pessoa.id} pessoa={pessoa} cargos={cargos} linhas={linhasDe(pessoa.id)}
+                 competencia={competencia} pendencias={pendencias(pessoa)}
+                 saida={saidas.filter((s) => s.pessoa_id === pessoa.id && !s.revertida_em)
+                   .sort((a, b) => b.data.localeCompare(a.data))[0]} />
+        ) : (
+          <section className="rounded-2xl bg-superficie px-6 py-10 text-center text-sm text-slate-500 shadow-sm">
+            Escolha uma pessoa na lista.
+          </section>
+        )}
+      </div>
     </div>
   );
 }
 
-function FormularioSaida({
-  pessoa, ocupado, onCancelar, onConfirmar,
+const Bolinha = ({ ligada }: { ligada: boolean }) => (
+  <span aria-label={ligada ? 'sim' : 'não'}
+        className={`inline-block h-2.5 w-2.5 rounded-full align-middle ${ligada ? 'bg-marca-600' : 'border border-slate-300'}`} />
+);
+
+/** Liga/desliga com a aparência de interruptor. */
+function Interruptor({ ligado, disabled, onChange, rotulo }: {
+  ligado: boolean; disabled?: boolean; onChange: (v: boolean) => void; rotulo: string;
+}) {
+  return (
+    <button type="button" role="switch" aria-checked={ligado} aria-label={rotulo} disabled={disabled}
+            onClick={() => onChange(!ligado)}
+            className={`relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:opacity-50 ${ligado ? 'bg-marca-600' : 'bg-slate-300'}`}>
+      <span className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${ligado ? 'translate-x-4' : ''}`} />
+    </button>
+  );
+}
+
+/** Uma parte da ficha. Fora de `Ficha`: definida dentro, seria recriada a
+ *  cada tecla e o campo em edição perderia o foco. */
+const Secao = ({ titulo, children }: { titulo: string; children: React.ReactNode }) => (
+  <div className="border-t border-slate-100 py-4 first:border-t-0 first:pt-1">
+    <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">{titulo}</h3>
+    {children}
+  </div>
+);
+
+function Ficha({
+  pessoa, cargos, linhas, competencia, pendencias, saida,
 }: {
   pessoa: Pessoa;
-  ocupado: boolean;
-  onCancelar: () => void;
-  onConfirmar: (dia: string, motivo: string) => void;
+  cargos: Cargo[];
+  linhas: CargoDaPessoa[];
+  competencia: string;
+  pendencias: string[];
+  saida: Saida | undefined;
 }) {
-  const [dia, setDia] = useState('');
+  const router = useRouter();
+  const nomeCargo = new Map(cargos.map((c) => [c.id, c.nome]));
+  const [ocupado, setOcupado] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
+  const [novoCargo, setNovoCargo] = useState({ cargo: '', mes: competencia.slice(0, 7) });
+  const [hub, setHub] = useState(pessoa.nome_hub ?? '');
+  const [saidaDia, setSaidaDia] = useState('');
   const [motivo, setMotivo] = useState('');
+  const [verRegistro, setVerRegistro] = useState(false);
+
+  async function executar(acao: () => PromiseLike<{ error: { message: string } | null }>, ok?: string) {
+    setOcupado(true); setErro(null); setAviso(null);
+    const { error } = await acao();
+    setOcupado(false);
+    if (error) { setErro(error.message); return false; }
+    if (ok) setAviso(ok);
+    router.refresh();
+    return true;
+  }
+  const db = () => criarClienteNavegador();
 
   return (
-    <div className="space-y-2">
-      <input
-        type="date" value={dia} disabled={ocupado} className={entrada}
-        aria-label={`Data da saída de ${pessoa.nome}`}
-        onChange={(e) => setDia(e.target.value)}
-      />
-      <input
-        value={motivo} disabled={ocupado} className={`${entrada} w-full`}
-        placeholder="Motivo (opcional)"
-        onChange={(e) => setMotivo(e.target.value)}
-      />
-      <div className="flex gap-2">
-        <button type="button" className={botaoPrimario} disabled={ocupado || !dia}
-                onClick={() => onConfirmar(dia, motivo)}>
-          Confirmar saída
-        </button>
-        <button type="button" className={botaoSecundario} disabled={ocupado}
-                onClick={onCancelar}>
-          Cancelar
-        </button>
+    <section className="rounded-2xl bg-superficie px-6 py-5 shadow-sm xl:sticky xl:top-6">
+      <div className="mb-2 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900">{pessoa.nome}</h2>
+          <p className="text-sm text-slate-500">
+            {NOMES_PAPEL[pessoa.papel]} · {pessoa.ativo ? 'tem login nos dois sistemas' : 'sem login'}
+          </p>
+        </div>
+        {pessoa.desligado_em
+          ? <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500">desligado</span>
+          : <span className="rounded-md bg-marca-600/15 px-2 py-0.5 text-xs font-semibold text-marca-700 dark:text-marca-400">na operação</span>}
       </div>
-      <p className="text-[11px] text-slate-500">
-        O acesso é encerrado na hora.
-      </p>
-    </div>
+      {pendencias.map((x) => (
+        <p key={x} className="mb-1 inline-block rounded-md bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-300">{x}</p>
+      ))}
+      {erro && <p className="my-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800 ring-1 ring-rose-600/20">{erro}</p>}
+      {aviso && <p className="my-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-emerald-600/20">{aviso}</p>}
+
+      <Secao titulo="Entrada">
+        <label className="flex items-center justify-between gap-3 text-sm text-slate-600">
+          Na equipe desde
+          <input type="date" defaultValue={pessoa.admitido_em ?? ''} disabled={ocupado} className={entrada}
+                 aria-label={`Entrada de ${pessoa.nome}`}
+                 onBlur={(e) => {
+                   if ((e.target.value || null) !== (pessoa.admitido_em ?? null)) {
+                     executar(() => db().from('pessoas').update({ admitido_em: e.target.value || null }).eq('id', pessoa.id));
+                   }
+                 }} />
+        </label>
+        <p className="mt-1 text-xs text-slate-500">Em branco: já estava antes do painel e conta em todos os meses.</p>
+      </Secao>
+
+      <Secao titulo="Cargo">
+        {linhas.length ? (
+          <ul className="mb-3 ml-1.5 space-y-1.5 border-l-2 border-slate-200 pl-4 text-sm">
+            {linhas.map((h, i) => (
+              <li key={h.desde} className="relative flex items-center gap-2">
+                <i className={`absolute -left-[1.4rem] top-1.5 h-2.5 w-2.5 rounded-full ${i === 0 ? 'bg-marca-600' : 'bg-slate-300'}`} />
+                <span className="text-slate-800">{nomeCargo.get(h.cargo_id)}</span>
+                <span className="text-xs text-slate-500">desde {mesRotulo(h.desde)}</span>
+                <button type="button" disabled={ocupado}
+                        onClick={() => {
+                          if (!confirm(`Remover "${nomeCargo.get(h.cargo_id)}" de ${pessoa.nome} a partir de ${mesRotulo(h.desde)}? `
+                            + 'Os meses desse período passam a usar o cargo anterior.')) return;
+                          executar(() => db().from('cargos_da_pessoa').delete().eq('pessoa_id', h.pessoa_id).eq('desde', h.desde));
+                        }}
+                        className="ml-auto text-xs text-slate-400 hover:text-rose-700 hover:underline">
+                  remover
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : <p className="mb-3 text-sm text-slate-500">Sem cargo: não recebe cota.</p>}
+        <div className="flex flex-wrap items-center gap-2">
+          <select value={novoCargo.cargo} disabled={ocupado} aria-label="Novo cargo"
+                  onChange={(e) => setNovoCargo((s) => ({ ...s, cargo: e.target.value }))} className={entrada}>
+            <option value="">Novo cargo…</option>
+            {cargos.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+          </select>
+          <span className="text-sm text-slate-500">a partir de</span>
+          <input type="month" value={novoCargo.mes} disabled={ocupado} aria-label="Competência inicial"
+                 onChange={(e) => setNovoCargo((s) => ({ ...s, mes: e.target.value }))} className={entrada} />
+          <button type="button" disabled={ocupado || !novoCargo.cargo || !novoCargo.mes} className={botaoPrimario}
+                  onClick={async () => {
+                    const ok = await executar(() => db().from('cargos_da_pessoa').upsert(
+                      { pessoa_id: pessoa.id, desde: `${novoCargo.mes}-01`, cargo_id: Number(novoCargo.cargo) },
+                      { onConflict: 'pessoa_id,desde' },
+                    ));
+                    if (ok) setNovoCargo((s) => ({ ...s, cargo: '' }));
+                  }}>
+            Aplicar
+          </button>
+        </div>
+        <p className="mt-1.5 text-xs text-slate-500">
+          Uma promoção é um cargo novo a partir de um mês: os anteriores continuam no cargo antigo.
+        </p>
+      </Secao>
+
+      <Secao titulo="Nome no Hub">
+        <div className="flex gap-2">
+          <input value={hub} disabled={ocupado} onChange={(e) => setHub(e.target.value)}
+                 placeholder="Como aparece no relatório do Hub" aria-label={`Nome de ${pessoa.nome} no Hub`}
+                 className={`${entrada} min-w-0 flex-1`} />
+          <button type="button" disabled={ocupado || hub.trim() === (pessoa.nome_hub ?? '')} className={botaoSecundario}
+                  onClick={async () => {
+                    setOcupado(true); setErro(null);
+                    const { error } = await db().from('pessoas').update({ nome_hub: hub.trim() || null }).eq('id', pessoa.id);
+                    setOcupado(false);
+                    if (error) { setErro(/duplicate|unique/i.test(error.message) ? 'Esse nome já é de outra pessoa.' : error.message); return; }
+                    router.refresh();
+                  }}>
+            Salvar
+          </button>
+        </div>
+        <p className="mt-1 text-xs text-slate-500">É por ele que a importação acha a pessoa.</p>
+      </Secao>
+
+      <Secao titulo="Tela inicial">
+        {([
+          ['exibir_no_painel', 'Aparece nas listas', pessoa.exibir_no_painel ?? true],
+          ['conta_nas_medias', 'Entra nas médias (C-SAT, TME)', pessoa.conta_nas_medias ?? true],
+        ] as const).map(([campo, rotulo, valor]) => (
+          <div key={campo} className="flex items-center justify-between gap-3 py-1 text-sm text-slate-600">
+            {rotulo}
+            <Interruptor ligado={valor} disabled={ocupado} rotulo={rotulo}
+                         onChange={(v) => executar(() => db().from('pessoas').update({ [campo]: v }).eq('id', pessoa.id))} />
+          </div>
+        ))}
+        <p className="mt-1 text-xs text-slate-500">Só apresentação: não muda pontuação, média do cargo nem pagamento.</p>
+      </Secao>
+
+      <Secao titulo={pessoa.desligado_em ? 'Saída' : 'Saída da operação'}>
+        {pessoa.desligado_em ? (
+          <>
+            <p className="text-sm text-slate-600">
+              Saiu em {data(pessoa.desligado_em)}{saida?.motivo ? ` · ${saida.motivo}` : ''}
+              {saida?.registrado_por_nome ? ` · registrado por ${saida.registrado_por_nome}` : ''}.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {saida && (
+                <button type="button" className={botaoSecundario} onClick={() => setVerRegistro((v) => !v)}>
+                  {verRegistro ? 'Fechar registro' : 'Ver registro'}
+                </button>
+              )}
+              <button type="button" className={botaoSecundario} disabled={ocupado}
+                      onClick={() => executar(() => db().rpc('reverter_saida', { p_pessoa: pessoa.id }),
+                        `${pessoa.nome} voltou para a operação, com acesso liberado.`)}>
+                Voltar para a operação
+              </button>
+            </div>
+            {verRegistro && saida && <Registro saida={saida} />}
+          </>
+        ) : (
+          <>
+            <div className="flex flex-wrap gap-2">
+              <input type="date" value={saidaDia} disabled={ocupado} onChange={(e) => setSaidaDia(e.target.value)}
+                     aria-label={`Data da saída de ${pessoa.nome}`} className={entrada} />
+              <input value={motivo} disabled={ocupado} onChange={(e) => setMotivo(e.target.value)}
+                     placeholder="Motivo (opcional)" className={`${entrada} min-w-0 flex-1`} />
+              <button type="button" disabled={ocupado || !saidaDia}
+                      className="rounded-lg border border-rose-500/40 px-3 py-1.5 text-sm font-medium text-rose-700
+                                 hover:bg-rose-50 disabled:opacity-40 dark:text-rose-300"
+                      onClick={() => {
+                        if (!confirm(`Registrar a saída de ${pessoa.nome} em ${data(saidaDia)}? O acesso aos dois sistemas é encerrado na hora.`)) return;
+                        executar(() => db().rpc('registrar_saida', { p_pessoa: pessoa.id, p_data: saidaDia, p_motivo: motivo || null }),
+                          `Saída de ${pessoa.nome} registrada em ${data(saidaDia)}. O acesso foi encerrado e o histórico ficou guardado.`);
+                      }}>
+                Registrar saída
+              </button>
+            </div>
+            <p className="mt-1.5 text-xs text-slate-500">
+              Encerra o acesso aos dois sistemas na hora e guarda a foto do que a pessoa produziu.
+            </p>
+          </>
+        )}
+      </Secao>
+    </section>
   );
 }
 
@@ -272,24 +448,17 @@ function Registro({ saida }: { saida: Saida }) {
   const cota = saida.cota ?? [];
 
   return (
-    <div className="border-t border-slate-100 px-4 py-3 text-sm">
+    <div className="mt-3 rounded-xl bg-slate-50 px-4 py-3 text-sm">
       <dl className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
-        <div><dt className="inline text-slate-500">E-mail: </dt>
-          <dd className="inline text-slate-800">{ficha.email ?? '—'}</dd></div>
-        <div><dt className="inline text-slate-500">Papel: </dt>
-          <dd className="inline text-slate-800">{ficha.papel ?? '—'}</dd></div>
-        <div><dt className="inline text-slate-500">Entrada: </dt>
-          <dd className="inline text-slate-800">{data(ficha.admitido_em)}</dd></div>
-        <div><dt className="inline text-slate-500">Nome no Hub: </dt>
-          <dd className="inline text-slate-800">{ficha.nome_hub ?? ficha.nome_huggy ?? '—'}</dd></div>
+        <div><dt className="inline text-slate-500">E-mail: </dt><dd className="inline text-slate-800">{ficha.email ?? '—'}</dd></div>
+        <div><dt className="inline text-slate-500">Papel: </dt><dd className="inline text-slate-800">{ficha.papel ?? '—'}</dd></div>
+        <div><dt className="inline text-slate-500">Entrada: </dt><dd className="inline text-slate-800">{data(ficha.admitido_em)}</dd></div>
+        <div><dt className="inline text-slate-500">Nome no Hub: </dt><dd className="inline text-slate-800">{ficha.nome_hub ?? ficha.nome_huggy ?? '—'}</dd></div>
         <div className="sm:col-span-2"><dt className="inline text-slate-500">Cargos: </dt>
           <dd className="inline text-slate-800">
-            {cargos.length
-              ? cargos.map((c) => `${c.cargo} desde ${competencia(c.desde)}`).join(' · ')
-              : '—'}
+            {cargos.length ? cargos.map((c) => `${c.cargo} desde ${competenciaCurta(c.desde)}`).join(' · ') : '—'}
           </dd></div>
       </dl>
-
       {cota.length > 0 && (
         <table className="mt-3 w-full text-sm">
           <thead>
@@ -303,8 +472,8 @@ function Registro({ saida }: { saida: Saida }) {
           </thead>
           <tbody>
             {cota.map((c) => (
-              <tr key={c.competencia} className="border-t border-slate-100">
-                <td className="py-1 pr-2 text-slate-800">{competencia(c.competencia)}</td>
+              <tr key={c.competencia} className="border-t border-slate-200">
+                <td className="py-1 pr-2 text-slate-800">{competenciaCurta(c.competencia)}</td>
                 <td className="px-2 py-1 text-slate-600">{c.cargo ?? '—'}</td>
                 <td className="px-2 py-1 text-right tabular-nums text-slate-800">{numero(c.resultado)}</td>
                 <td className="px-2 py-1 text-right tabular-nums text-slate-500">{numero(c.meta)}</td>
@@ -317,10 +486,7 @@ function Registro({ saida }: { saida: Saida }) {
           </tbody>
         </table>
       )}
-
-      <p className="mt-2 text-[11px] text-slate-500">
-        Guardado em {new Date(saida.registrado_em).toLocaleString('pt-BR')}.
-      </p>
+      <p className="mt-2 text-[11px] text-slate-500">Guardado em {new Date(saida.registrado_em).toLocaleString('pt-BR')}.</p>
     </div>
   );
 }

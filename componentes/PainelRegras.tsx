@@ -3,7 +3,7 @@
 import { Fragment, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
-import { Cartao, Tabela, Th, Td } from '@/componentes/ui';
+import { Quadro, Tabela, Th, Td } from '@/componentes/ui';
 import type { RegraCota } from '@/lib/tipos';
 
 const entrada = `rounded-md border border-slate-300 px-2 py-1 text-sm outline-none
@@ -28,27 +28,12 @@ function unidadeDa(grupo: string): Unidade {
   return 'nenhuma';
 }
 
-const SUFIXO: Record<Unidade, string> = {
-  minutos: 'min', percentual: '%', nota: '', nenhuma: '',
-};
-
 /** Banco para a tela. */
 function paraTela(valor: number | null, unidade: Unidade): string {
   if (valor === null || valor === undefined) return '';
   if (unidade === 'minutos') return String(Math.round((valor / 60) * 100) / 100);
   if (unidade === 'percentual') return String(Math.round(valor * 10000) / 100);
   return String(valor);
-}
-
-/** Tela para o banco. Campo vazio é "sem limite", e continua nulo. */
-function paraBanco(texto: string, unidade: Unidade): number | null {
-  const t = texto.trim();
-  if (!t) return null;
-  const n = Number(t.replace(',', '.'));
-  if (!Number.isFinite(n)) return NaN;
-  if (unidade === 'minutos') return Math.round(n * 60);
-  if (unidade === 'percentual') return Math.round((n / 100) * 10000) / 10000;
-  return n;
 }
 
 const NOME_DO_GRUPO: Record<string, string> = {
@@ -81,8 +66,6 @@ type Alteracao = {
   chave: string;
   rotulo: string;
   mudanca: Record<string, unknown>;
-  invalido?: boolean;
-  invertido?: boolean;
 };
 
 /**
@@ -92,6 +75,10 @@ type Alteracao = {
  *
  * Mudar o nome é cosmético e vale para os meses abertos; os fechados guardam o
  * nome que valia no dia. Mudar a faixa recalcula os meses abertos.
+ *
+ * Desde a 1.20.0 as faixas se editam nas réguas (`ReguasDeFaixa`), que gravam
+ * as duas pontas de cada corte juntas; aqui ficam o nome, o liga/desliga e a
+ * criação de métrica manual.
  */
 export default function PainelRegras({ regras }: { regras: RegraCota[] }) {
   const router = useRouter();
@@ -126,25 +113,13 @@ export default function PainelRegras({ regras }: { regras: RegraCota[] }) {
   function alteradas(): Alteracao[] {
     return regras.flatMap<Alteracao>((r) => {
       const d = rascunho[r.chave] ?? linhaDe(r);
-      const u = unidadeDa(r.grupo);
       const mudanca: Record<string, unknown> = {};
 
+      // Só nome e liga/desliga: as faixas são das réguas. Comparar a faixa
+      // daqui regravaria o valor antigo por cima do que a régua acabou de salvar.
       const rotulo = d.rotulo.trim();
       if (rotulo && rotulo !== r.rotulo) mudanca.rotulo = rotulo;
       if (d.ativo !== r.ativo) mudanca.ativo = d.ativo;
-
-      if (u === 'minutos' || u === 'percentual') {
-        const min = paraBanco(d.min, u);
-        const max = paraBanco(d.max, u);
-        if (Number.isNaN(min) || Number.isNaN(max)) {
-          return [{ chave: r.chave, rotulo: r.rotulo, mudanca: {}, invalido: true }];
-        }
-        if (min !== null && max !== null && min >= max) {
-          return [{ chave: r.chave, rotulo: r.rotulo, mudanca: {}, invertido: true }];
-        }
-        if (min !== r.faixa_min) mudanca.faixa_min = min;
-        if (max !== r.faixa_max) mudanca.faixa_max = max;
-      }
 
       return Object.keys(mudanca).length
         ? [{ chave: r.chave, rotulo: r.rotulo, mudanca }] : [];
@@ -156,13 +131,6 @@ export default function PainelRegras({ regras }: { regras: RegraCota[] }) {
     if (vazio) { setErro('Toda métrica precisa de um nome.'); return; }
 
     const lista = alteradas();
-
-    const invalida = lista.find((l) => l.invalido);
-    if (invalida) { setErro(`Valor inválido na faixa de "${invalida.rotulo}".`); return; }
-    const invertida = lista.find((l) => l.invertido);
-    if (invertida) {
-      setErro(`Em "${invertida.rotulo}", o "de" precisa ser menor que o "até".`); return;
-    }
 
     if (!lista.length) { setErro(null); setAviso('Nada mudou.'); return; }
 
@@ -233,19 +201,15 @@ export default function PainelRegras({ regras }: { regras: RegraCota[] }) {
   let grupoAnterior = '';
 
   return (
-    <Cartao
-      titulo={`Métricas (${regras.length})`}
+    <Quadro
+      titulo={`Nomes das métricas (${regras.length})`}
+      subtitulo="O nome que aparece em toda tela. O peso é por cargo, na tabela de pesos."
       acao={
         <button type="button" onClick={salvar} disabled={ocupado} className={botaoPrimario}>
           {ocupado ? 'Salvando…' : 'Salvar métricas'}
         </button>
       }
     >
-      <p className="mb-4 text-sm text-slate-600">
-        O nome de cada métrica e os limites das faixas. O <strong>peso</strong> é por cargo,
-        no painel acima — a mesma métrica vale valores diferentes em cada cargo.
-      </p>
-
       {erro && (
         <p className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800
                       ring-1 ring-rose-600/20">{erro}</p>
@@ -255,20 +219,17 @@ export default function PainelRegras({ regras }: { regras: RegraCota[] }) {
                       ring-1 ring-emerald-600/20">{aviso}</p>
       )}
 
-      <Tabela>
+      <Tabela noQuadro>
         <thead>
           <tr>
             <Th className="w-16">Ativa</Th>
             <Th>Nome</Th>
-            <Th className="w-32">Origem</Th>
-            <Th className="w-32 text-right">Faixa de</Th>
-            <Th className="w-32 text-right">até</Th>
+            <Th className="w-40">Origem</Th>
           </tr>
         </thead>
         <tbody>
           {regras.map((r) => {
             const d = rascunho[r.chave] ?? linhaDe(r);
-            const u = unidadeDa(r.grupo);
             const novoGrupo = r.grupo !== grupoAnterior;
             grupoAnterior = r.grupo;
 
@@ -276,7 +237,7 @@ export default function PainelRegras({ regras }: { regras: RegraCota[] }) {
               <Fragment key={r.chave}>
                 {novoGrupo && (
                   <tr>
-                    <Td colSpan={5} className="bg-slate-50 text-xs font-semibold
+                    <Td colSpan={3} className="bg-slate-50 text-xs font-semibold
                                                uppercase tracking-wide text-slate-500">
                       {NOME_DO_GRUPO[r.grupo] ?? r.grupo}
                     </Td>
@@ -300,32 +261,6 @@ export default function PainelRegras({ regras }: { regras: RegraCota[] }) {
                   <Td className="text-xs text-slate-500">
                     {r.valor_manual ? 'valor digitado' : r.manual ? 'lançamento' : 'automático'}
                   </Td>
-                  {u === 'minutos' || u === 'percentual' ? (
-                    <>
-                      <Td className="text-right">
-                        <input
-                          value={d.min} disabled={ocupado} inputMode="decimal"
-                          placeholder="—" className={entradaNumero}
-                          aria-label={`Início da faixa de ${r.rotulo}`}
-                          onChange={(e) => editar(r, 'min', e.target.value)}
-                        />
-                        <span className="ml-1 text-xs text-slate-500">{SUFIXO[u]}</span>
-                      </Td>
-                      <Td className="text-right">
-                        <input
-                          value={d.max} disabled={ocupado} inputMode="decimal"
-                          placeholder="—" className={entradaNumero}
-                          aria-label={`Fim da faixa de ${r.rotulo}`}
-                          onChange={(e) => editar(r, 'max', e.target.value)}
-                        />
-                        <span className="ml-1 text-xs text-slate-500">{SUFIXO[u]}</span>
-                      </Td>
-                    </>
-                  ) : (
-                    <Td colSpan={2} className="text-right text-xs text-slate-400">
-                      {u === 'nota' ? `nota ${r.faixa_min}` : 'sem faixa'}
-                    </Td>
-                  )}
                 </tr>
               </Fragment>
             );
@@ -334,12 +269,10 @@ export default function PainelRegras({ regras }: { regras: RegraCota[] }) {
       </Tabela>
 
       <p className="mt-4 text-xs text-slate-500">
-        Faixa vazia é “sem limite”. O “de” conta a partir do valor e o “até” conta até
-        antes dele: 0–15 min e 15–30 min não se sobrepõem. Desmarcar “Ativa” tira a
-        métrica da conta dos meses ainda abertos.
+        Desmarcar “Ativa” tira a métrica da conta dos meses ainda abertos.
       </p>
 
-      <form onSubmit={criar} className="mt-5 flex flex-wrap items-end gap-3
+      <form id="nova-metrica" onSubmit={criar} className="mt-5 scroll-mt-6 flex flex-wrap items-end gap-3
                                         border-t border-slate-100 pt-4">
         <label className="min-w-56 flex-1">
           <span className="mb-1 block text-xs font-medium text-slate-600">Nova métrica</span>
@@ -373,10 +306,10 @@ export default function PainelRegras({ regras }: { regras: RegraCota[] }) {
       <p className="mt-2 text-xs text-slate-500">
         A métrica nova entra por <strong>lançamento manual</strong> — as automáticas
         (volume, C-SAT, TME, monitoria) vêm de cálculo no banco. Depois de criada, marque
-        no painel de cargos em quais cargos ela pontua e com que peso; sem isso ela não
+        na tabela de pesos em quais cargos ela pontua e com que peso; sem isso ela não
         aparece na tela de lançamentos. Marque “o gestor digita os pontos” quando o valor
         não for quantidade × peso, como no Atestado.
       </p>
-    </Cartao>
+    </Quadro>
   );
 }

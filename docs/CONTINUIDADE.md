@@ -11,7 +11,7 @@ Escrito em 28/09/2026, atualizado em 29/09/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.19.0** (deploy de 29/09/2026) · Monitorias **4.12.0** (deploy de 28/09/2026) |
+| Publicado | Performance **1.20.0** (deploy de 29/09/2026) · Monitorias **4.12.0** (deploy de 28/09/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
 | Migrações no banco | 01 a 30, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
@@ -85,8 +85,18 @@ Três versões, cada uma publicada e conferida antes da próxima:
   lista por dia com busca. **Importar**: grade "O que já está no sistema"
   por semana e canal, com a última importação, e o importador em três
   passos.
-- **Próximas**: o estilo novo na
-  administração (Lançamentos, Importar, Presencial, Atendentes,
+- **1.20.0** (publicada): administração. **Atendentes**: tudo de uma
+  pessoa num lugar só — cartões que filtram (na operação, precisa de atenção,
+  entradas e saídas recentes, desligados), lista e a **ficha** ao lado com
+  entrada, cargo com histórico, Nome no Hub, o que aparece na tela inicial e
+  a saída (agora com confirmação). **Configuração**: "Pesos por cargo" é a
+  tabela da planilha (métrica na linha, cargo na coluna; cartão do cargo
+  abre nome, meta e média; barra diz quantas pessoas a mudança afeta);
+  "Faixas e nomes" tem réguas com os cortes editáveis — cada corte grava o
+  fim de uma faixa e o começo da próxima — e os nomes das métricas (a faixa
+  saiu dessa lista para não haver dois lugares gravando o mesmo campo).
+  Saíram PainelCargos, PainelCargosDaPessoa, PainelExibicao e AbasLaterais.
+- **Próximas**: revisão do que sobrou fora do estilo novo (Lançamentos, Importar, Presencial, Atendentes,
   Configuração). E o **Pleno** ver a equipe no Comparativo: precisa da
   migração 31, uma consulta liberada só para gestor e Pleno (como
   `bonus_da_competencia`), para não abrir o acesso dele ao sistema inteiro.

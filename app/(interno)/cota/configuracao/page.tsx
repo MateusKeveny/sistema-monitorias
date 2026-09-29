@@ -1,24 +1,35 @@
 import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
-import PainelCargos from '@/componentes/PainelCargos';
-import PainelCargosDaPessoa from '@/componentes/PainelCargosDaPessoa';
+import MatrizDePesos from '@/componentes/MatrizDePesos';
+import ReguasDeFaixa from '@/componentes/ReguasDeFaixa';
 import PainelRegras from '@/componentes/PainelRegras';
-import PainelExibicao from '@/componentes/PainelExibicao';
-import AbasLaterais from '@/componentes/AbasLaterais';
+import Abas from '@/componentes/Abas';
+import { hojeNoBrasil, mesDeCompetencia } from '@/lib/formatar';
 import type { Cargo, CargoDaPessoa, PesoCargo, Pessoa, ReferenciaCargo, RegraCota } from '@/lib/tipos';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ConfiguracaoDaCota() {
+/**
+ * Configuração (1.20.0): só as regras da cota.
+ *
+ * "Pesos por cargo" é a tabela da planilha — métrica na linha, cargo na
+ * coluna. "Faixas e nomes" tem as réguas das métricas com faixa e o nome de
+ * cada métrica. O cargo de cada pessoa e o que aparece na tela inicial foram
+ * para a ficha da pessoa, em Atendentes.
+ */
+export default async function ConfiguracaoDaCota({
+  searchParams,
+}: {
+  searchParams: Promise<{ cat?: string }>;
+}) {
   await exigirGestor();
+  const { cat } = await searchParams;
   const db = await criarClienteServidor();
 
   const [
     { data: pessoas }, { data: cargos }, { data: regras },
     { data: pesos }, { data: referencias }, { data: historico },
   ] = await Promise.all([
-    // Inclui quem foi desligado: o cargo dele decide como os meses em que ele
-    // trabalhou são calculados, e isso precisa continuar ajustável depois da saída.
-    db.from('pessoas').select('*').order('ativo', { ascending: false }).order('nome'),
+    db.from('pessoas').select('id, ativo, desligado_em'),
     db.from('cargos').select('*').eq('ativo', true).order('ordem'),
     db.from('regras').select('*').order('ordem'),
     db.from('pesos_por_cargo').select('cargo_id, regra, peso, ativo'),
@@ -26,53 +37,64 @@ export default async function ConfiguracaoDaCota() {
     db.from('cargos_da_pessoa').select('*'),
   ]);
 
+  const listaCargos = (cargos ?? []) as Cargo[];
+  const listaPesos = (pesos ?? []) as PesoCargo[];
+  const listaRegras = (regras ?? []) as RegraCota[];
+
+  // Quantas pessoas na operação estão em cada cargo agora: é o "afeta N
+  // pessoas" da barra de salvar.
+  const competencia = mesDeCompetencia(hojeNoBrasil());
+  const naOperacao = ((pessoas ?? []) as Pick<Pessoa, 'id' | 'ativo' | 'desligado_em'>[]).filter((p) => !p.desligado_em);
+  const pessoasPorCargo: Record<number, number> = {};
+  for (const p of naOperacao) {
+    const vigente = ((historico ?? []) as CargoDaPessoa[])
+      .filter((h) => h.pessoa_id === p.id && h.desde <= competencia)
+      .sort((a, b) => b.desde.localeCompare(a.desde))[0];
+    if (vigente) pessoasPorCargo[vigente.cargo_id] = (pessoasPorCargo[vigente.cargo_id] ?? 0) + 1;
+  }
+
+  const base = listaCargos.find((c) => c.nome === 'Atendente Júnior') ?? listaCargos[0];
+  const pesosBase = Object.fromEntries(listaPesos
+    .filter((p) => p.cargo_id === base?.id)
+    .map((p) => [p.regra, p.ativo ? Number(p.peso) : null]));
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-sobre-fundo">Configuração</h1>
-        <p className="text-sm text-sobre-fundo-suave">
-          Cargos, pesos, metas, métricas, o cargo de cada pessoa e o que a tela inicial mostra.
+        <h1 className="text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">Configuração</h1>
+        <p className="mt-1 text-sm text-sobre-fundo-suave">
+          As regras da cota. Mudar algo recalcula os meses em aberto; os fechados guardam o valor da época.
         </p>
       </div>
 
-      <AbasLaterais
-        abas={[
+      {/* `key`: o atalho "+ Métrica manual" troca só o ?cat= e precisa reabrir na aba certa. */}
+      <Abas
+        key={cat ?? 'pesos'}
+        inicial={cat}
+        itens={[
           {
-            chave: 'cargos',
-            rotulo: 'Cargos e pesos',
-            descricao: 'Quanto vale cada métrica, a meta e as médias',
-            painel: (
-              <PainelCargos
-                cargos={(cargos ?? []) as Cargo[]}
-                regras={(regras ?? []) as RegraCota[]}
-                pesos={(pesos ?? []) as PesoCargo[]}
+            chave: 'pesos',
+            rotulo: 'Pesos por cargo',
+            conteudo: (
+              <MatrizDePesos
+                cargos={listaCargos}
+                regras={listaRegras}
+                pesos={listaPesos}
                 referencias={(referencias ?? []) as ReferenciaCargo[]}
+                pessoasPorCargo={pessoasPorCargo}
               />
             ),
           },
           {
-            chave: 'metricas',
-            rotulo: 'Métricas',
-            descricao: 'Nome, faixas e criação de métrica manual',
-            painel: <PainelRegras regras={(regras ?? []) as RegraCota[]} />,
-          },
-          {
-            chave: 'pessoas',
-            rotulo: 'Cargo das pessoas',
-            descricao: 'Desde quando cada uma está em cada cargo',
-            painel: (
-              <PainelCargosDaPessoa
-                pessoas={(pessoas ?? []) as Pessoa[]}
-                cargos={(cargos ?? []) as Cargo[]}
-                historico={(historico ?? []) as CargoDaPessoa[]}
-              />
+            chave: 'faixas',
+            rotulo: 'Faixas e nomes das métricas',
+            conteudo: (
+              <div className="space-y-6">
+                <ReguasDeFaixa regras={listaRegras} pesosBase={pesosBase}
+                               nomeBase={(base?.nome ?? '').replace(/^Atendente\s+/, '')} />
+                <PainelRegras regras={listaRegras} />
+              </div>
             ),
-          },
-          {
-            chave: 'exibicao',
-            rotulo: 'Exibição e contagem',
-            descricao: 'Quem aparece e quem entra nas médias da tela inicial',
-            painel: <PainelExibicao pessoas={(pessoas ?? []) as Pessoa[]} />,
           },
         ]}
       />
