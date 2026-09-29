@@ -11,9 +11,9 @@ Escrito em 28/09/2026, atualizado em 29/09/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.24.0** · Monitorias **4.14.1** (deploy de 29/09/2026) |
+| Publicado | Performance **1.25.0** · Monitorias **4.14.1** (deploy de 29/09/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
-| Migrações no banco | 01 a 33, todas aplicadas |
+| Migrações no banco | 01 a 34, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
 
 ### Revisão de design (28/09/2026)
@@ -143,6 +143,17 @@ Três versões, cada uma publicada e conferida antes da próxima:
   "Analista") em `cargo_atual_nome()`: renomear um desses cargos exige
   ajustar `conclui_diario_direto()` e `aprova_diario()`. Testado com o
   Teste de acesso sem cargo e com o cargo Pleno temporário (removido).
+- **1.25.0** (publicada; Monitorias sem mudança): **quem autorizou por
+  lista** e **liberação por pessoa** (migração 34). Gestão e diretoria
+  escolhem o nome numa lista fixa em `AUTORIZADORES` (lib/diario.ts: gestão
+  Mateus Keveny e Suyara Martins, diretoria Luciana Freire — mudou alguém,
+  ajustar ali); "Outro" pede nome, cargo e setor, gravados juntos como
+  "Nome · Cargo · Setor". Na ficha da pessoa (Atendentes → Diário de bordo)
+  o gestor liga "Registra autorizações sem aprovação"
+  (`pessoas.diario_conclui_direto`), para um júnior de confiança concluir
+  direto. A 34 também corrige a lista do diário para o operador, que via os
+  registros dos colegas sem autor (função `nomes_das_pessoas`, só id e
+  nome). Falta conferir com perfil de operador e ligar a chave do júnior.
 
 Visão de celular fica fora da revisão, por decisão do gestor.
 

@@ -37,6 +37,24 @@ export const ROTULO_TIPO = Object.fromEntries(TIPOS.map((t) => [t.chave, t.rotul
 
 export const ROTULO_QUEM: Record<QuemAutorizou, string> = { gestao: 'Gestão', diretoria: 'Diretoria', outro: 'Outro' };
 
+/**
+ * Quem pode ter autorizado, por origem (1.25.0): na gestão e na diretoria o
+ * nome é escolhido na lista; em "Outro", digita-se nome, cargo e setor.
+ * Mudou alguém na gestão ou na diretoria, é aqui que se ajusta.
+ */
+export const AUTORIZADORES: Record<'gestao' | 'diretoria', string[]> = {
+  diretoria: ['Luciana Freire'],
+  gestao: ['Mateus Keveny', 'Suyara Martins'],
+};
+
+/** "Outro" é gravado como "Nome · Cargo · Setor" no nome de quem autorizou. */
+export const juntarOutro = (nome: string, cargo: string, setor: string) =>
+  [nome, cargo, setor].map((p) => p.trim()).join(' · ');
+export const separarOutro = (texto: string) => {
+  const [nome = '', cargo = '', setor = ''] = texto.split(' · ');
+  return { nome, cargo, setor };
+};
+
 export const ROTULO_SITUACAO: Record<SituacaoRegistro, string> = {
   concluido: 'Concluído', aguardando: 'Aguardando aprovação', devolvido: 'Devolvido',
 };

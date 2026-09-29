@@ -27,7 +27,9 @@ export default async function Diario({
     // protocolo antigo está na consulta do site de Monitorias.
     db.from('diario_registros').select('*')
       .order('data', { ascending: false }).order('criado_em', { ascending: false }).limit(500),
-    db.from('pessoas').select('id, nome'),
+    // Pela função (migração 34): o operador não lê o cadastro dos colegas,
+    // mas precisa ver quem registrou.
+    db.rpc('nomes_das_pessoas'),
     // Pelo cargo (migração 33): gestor e Pleno aprovam; gestor, Pleno e
     // Analista concluem a própria autorização da gestão sem aprovação.
     db.rpc('aprova_diario'),
@@ -46,7 +48,7 @@ export default async function Diario({
 
       <DiarioDeBordo
         registros={(registros ?? []) as RegistroDiario[]}
-        nomes={Object.fromEntries((pessoas ?? []).map((p) => [p.id as string, p.nome as string]))}
+        nomes={Object.fromEntries((pessoas ?? []).map((p: { id: string; nome: string }) => [p.id, p.nome]))}
         pessoaId={perfil.id}
         ehGestor={perfil.papel === 'gestor'}
         aprova={aprova === true}

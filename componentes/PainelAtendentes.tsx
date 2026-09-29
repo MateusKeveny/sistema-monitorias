@@ -426,6 +426,18 @@ function Ficha({
         <p className="mt-1 text-xs text-slate-500">Só apresentação: não muda pontuação, média do cargo nem pagamento.</p>
       </Secao>
 
+      <Secao titulo="Diário de bordo">
+        <div className="flex items-center justify-between gap-3 py-1 text-sm text-slate-600">
+          Registra autorizações sem aprovação
+          <Interruptor ligado={pessoa.diario_conclui_direto ?? false} disabled={ocupado} rotulo="Registra autorizações sem aprovação"
+                       onChange={(v) => executar(() => db().from('pessoas').update({ diario_conclui_direto: v }).eq('id', pessoa.id))} />
+        </div>
+        <p className="mt-1 text-xs text-slate-500">
+          Autorização da gestão ou da diretoria registrada por esta pessoa conclui na hora, como a do Pleno e do
+          Analista. Gestor, Pleno e Analista já têm isso pelo cargo.
+        </p>
+      </Secao>
+
       {pessoa.auth_id && pessoa.ativo && !pessoa.desligado_em && (
         <Secao titulo="Acesso">
           {senhaTemporaria ? (

@@ -32,6 +32,8 @@ export type Pessoa = {
   exibir_no_painel?: boolean;
   /** Entra nas médias de C-SAT, TME e volume da tela inicial. Não afeta a cota. */
   conta_nas_medias?: boolean;
+  /** Registra autorização da gestão ou diretoria no diário sem aprovação (migração 34). */
+  diario_conclui_direto?: boolean;
 };
 
 /** Resumo da cota de uma competência, congelado no dia da saída. */

@@ -4,8 +4,8 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import {
-  COR_SITUACAO, COR_TIPO, ROTULO_QUEM, ROTULO_SITUACAO, ROTULO_TIPO, TIPOS,
-  palavrasEncontradas, type QuemAutorizou, type RegistroDiario, type TipoRegistro,
+  AUTORIZADORES, COR_SITUACAO, COR_TIPO, ROTULO_QUEM, ROTULO_SITUACAO, ROTULO_TIPO, TIPOS,
+  juntarOutro, palavrasEncontradas, separarOutro, type QuemAutorizou, type RegistroDiario, type TipoRegistro,
 } from '@/lib/diario';
 
 const entrada = `w-full rounded-xl border border-slate-300 bg-superficie px-3 py-2 text-sm outline-none
@@ -25,7 +25,10 @@ const diaExtenso = (iso: string, hoje: string) => {
 };
 
 type Filtro = 'todos' | TipoRegistro | 'aguardando' | 'meus';
-const vazio = { tipo: '' as TipoRegistro | '', protocolo: '', assunto: '', descricao: '', quem: '' as QuemAutorizou | 'ninguem' | '', nome: '' };
+const vazio = {
+  tipo: '' as TipoRegistro | '', protocolo: '', assunto: '', descricao: '',
+  quem: '' as QuemAutorizou | 'ninguem' | '', nome: '', cargo: '', setor: '',
+};
 
 /**
  * Diário de bordo (1.22.0): o registro de todos e a lista de todos os casos.
@@ -69,10 +72,13 @@ export default function DiarioDeBordo({
   // Em processo e treinamento a palavra pode aparecer sem ter havido
   // autorização ("não foi autorizado"): aí vale responder "ninguém".
   const ninguem = !exigeQuem && f.quem === 'ninguem';
+  const outro = f.quem === 'outro';
   const faltam = [
     !f.tipo && 'tipo', !f.protocolo.trim() && 'protocolo', !f.assunto.trim() && 'assunto',
     !f.descricao.trim() && 'o que aconteceu',
-    pedeQuem && (!f.quem || (exigeQuem && f.quem === 'ninguem')) && 'quem autorizou', pedeQuem && !ninguem && !f.nome.trim() && 'nome de quem autorizou',
+    pedeQuem && (!f.quem || (exigeQuem && f.quem === 'ninguem')) && 'quem autorizou',
+    pedeQuem && f.quem && !ninguem && !f.nome.trim() && 'nome de quem autorizou',
+    pedeQuem && outro && !f.cargo.trim() && 'cargo', pedeQuem && outro && !f.setor.trim() && 'setor',
   ].filter(Boolean) as string[];
   const vaiAprovar = pedeQuem && (f.quem === 'gestao' || f.quem === 'diretoria') && !concluiDireto;
 
@@ -90,7 +96,7 @@ export default function DiarioDeBordo({
       assunto: f.assunto.trim(),
       descricao: f.descricao.trim(),
       autorizado_por: pedeQuem && !ninguem ? f.quem : null,
-      autorizado_por_nome: pedeQuem && !ninguem ? f.nome.trim() : null,
+      autorizado_por_nome: !pedeQuem || ninguem ? null : outro ? juntarOutro(f.nome, f.cargo, f.setor) : f.nome.trim(),
     };
     const db = criarClienteNavegador();
     const { error } = corrigindo
@@ -107,9 +113,16 @@ export default function DiarioDeBordo({
 
   function corrigir(r: RegistroDiario) {
     setCorrigindo(r.id);
+    const nomeGravado = r.autorizado_por_nome ?? '';
+    const quem = r.autorizado_por;
     setF({
       tipo: r.tipo, protocolo: r.protocolo, assunto: r.assunto, descricao: r.descricao,
-      quem: r.autorizado_por ?? '', nome: r.autorizado_por_nome ?? '',
+      quem: quem ?? '', cargo: '', setor: '',
+      // Nome que não está mais na lista (registro antigo) volta vazio, para
+      // ser escolhido de novo.
+      nome: quem === 'gestao' || quem === 'diretoria'
+        ? (AUTORIZADORES[quem].includes(nomeGravado) ? nomeGravado : '') : nomeGravado,
+      ...(quem === 'outro' ? separarOutro(nomeGravado) : {}),
     });
     setErro(null); setAviso(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -187,18 +200,36 @@ export default function DiarioDeBordo({
               </p>
               <div className="grid gap-3 sm:grid-cols-2">
                 <label><span className={rotulo}>Quem autorizou? *</span>
-                  <select value={f.quem} onChange={set('quem')} disabled={ocupado} className={entrada}>
+                  {/* Trocar a origem limpa o nome: o da gestão não vale na diretoria. */}
+                  <select value={f.quem} disabled={ocupado} className={entrada}
+                          onChange={(e) => setF((s) => ({ ...s, quem: e.target.value as typeof s.quem, nome: '', cargo: '', setor: '' }))}>
                     <option value="">Escolha…</option>
                     {(Object.keys(ROTULO_QUEM) as QuemAutorizou[]).map((q) => <option key={q} value={q}>{ROTULO_QUEM[q]}</option>)}
                     {!exigeQuem && <option value="ninguem">Ninguém autorizou — o texto só menciona</option>}
                   </select></label>
-                <label><span className={rotulo}>Nome de quem autorizou {ninguem ? '' : '*'}</span>
-                  <input value={ninguem ? '' : f.nome} onChange={set('nome')} disabled={ocupado || ninguem} className={entrada}
-                         placeholder={ninguem ? '—' : 'Ex.: Carlos (diretoria comercial)'} /></label>
+                {f.quem === 'gestao' || f.quem === 'diretoria' ? (
+                  <label><span className={rotulo}>Nome de quem autorizou *</span>
+                    <select value={f.nome} onChange={set('nome')} disabled={ocupado} className={entrada}>
+                      <option value="">Escolha…</option>
+                      {AUTORIZADORES[f.quem].map((n) => <option key={n} value={n}>{n}</option>)}
+                    </select></label>
+                ) : (
+                  <label><span className={rotulo}>Nome de quem autorizou {f.quem && !ninguem ? '*' : ''}</span>
+                    <input value={ninguem ? '' : f.nome} onChange={set('nome')} disabled={ocupado || !f.quem || ninguem} className={entrada}
+                           placeholder={ninguem ? '—' : outro ? 'Nome completo' : 'Escolha quem autorizou'} /></label>
+                )}
+                {outro && (
+                  <>
+                    <label><span className={rotulo}>Cargo *</span>
+                      <input value={f.cargo} onChange={set('cargo')} disabled={ocupado} className={entrada} placeholder="Ex.: Coordenador" /></label>
+                    <label><span className={rotulo}>Setor *</span>
+                      <input value={f.setor} onChange={set('setor')} disabled={ocupado} className={entrada} placeholder="Ex.: Comercial" /></label>
+                  </>
+                )}
               </div>
               <p className="mt-2 text-xs text-slate-600">
                 {concluiDireto
-                  ? <>Pelo seu cargo, a autorização da gestão ou da diretoria <strong>conclui direto</strong>.</>
+                  ? <>Para você, a autorização da gestão ou da diretoria <strong>conclui direto</strong>, sem aprovação.</>
                   : <>Autorização da gestão ou da diretoria vai para <strong>aprovação do gestor ou do Pleno</strong> antes de concluir.</>}
               </p>
             </div>
@@ -270,7 +301,9 @@ export default function DiarioDeBordo({
                   <p className="text-xs text-slate-500">
                     {nomeCurto(nomes[r.pessoa_id] ?? '—')} · {hora(r.criado_em)}
                     {r.autorizado_por && ` · autorizado por ${ROTULO_QUEM[r.autorizado_por]}${r.autorizado_por_nome ? ` (${r.autorizado_por_nome})` : ''}`}
-                    {r.situacao === 'concluido' && r.decidido_por && ` · aprovado por ${nomeCurto(nomes[r.decidido_por] ?? '—')}`}
+                    {/* Quem conclui direto fica como "decidido por" si mesmo: não é aprovação. */}
+                    {r.situacao === 'concluido' && r.decidido_por && r.decidido_por !== r.pessoa_id
+                      && ` · aprovado por ${nomeCurto(nomes[r.decidido_por] ?? '—')}`}
                   </p>
                   {r.situacao === 'devolvido' && r.comentario_decisao && (
                     <p className="rounded-lg bg-rose-50 px-3 py-1.5 text-xs text-rose-800 ring-1 ring-rose-600/20">
