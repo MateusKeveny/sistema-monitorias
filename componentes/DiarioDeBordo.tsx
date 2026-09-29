@@ -74,7 +74,7 @@ export default function DiarioDeBordo({
   const ninguem = !exigeQuem && f.quem === 'ninguem';
   const outro = f.quem === 'outro';
   const faltam = [
-    !f.tipo && 'tipo', !f.protocolo.trim() && 'protocolo', !f.assunto.trim() && 'assunto',
+    !f.tipo && 'tipo', exigeQuem && !f.protocolo.trim() && 'protocolo', !f.assunto.trim() && 'assunto',
     !f.descricao.trim() && 'o que aconteceu',
     pedeQuem && (!f.quem || (exigeQuem && f.quem === 'ninguem')) && 'quem autorizou',
     pedeQuem && f.quem && !ninguem && !f.nome.trim() && 'nome de quem autorizou',
@@ -92,7 +92,7 @@ export default function DiarioDeBordo({
     setOcupado(true); setErro(null); setAviso(null);
     const campos = {
       tipo: f.tipo,
-      protocolo: f.protocolo.trim(),
+      protocolo: exigeQuem ? f.protocolo.trim() : null,
       assunto: f.assunto.trim(),
       descricao: f.descricao.trim(),
       autorizado_por: pedeQuem && !ninguem ? f.quem : null,
@@ -116,7 +116,7 @@ export default function DiarioDeBordo({
     const nomeGravado = r.autorizado_por_nome ?? '';
     const quem = r.autorizado_por;
     setF({
-      tipo: r.tipo, protocolo: r.protocolo, assunto: r.assunto, descricao: r.descricao,
+      tipo: r.tipo, protocolo: r.protocolo ?? '', assunto: r.assunto, descricao: r.descricao,
       quem: quem ?? '', cargo: '', setor: '',
       // Nome que não está mais na lista (registro antigo) volta vazio, para
       // ser escolhido de novo.
@@ -141,7 +141,7 @@ export default function DiarioDeBordo({
   }
 
   async function excluir(r: RegistroDiario) {
-    if (!confirm(`Excluir o registro "${r.assunto}" (protocolo ${r.protocolo})? Não dá para desfazer.`)) return;
+    if (!confirm(`Excluir o registro "${r.assunto}"${r.protocolo ? ` (protocolo ${r.protocolo})` : ''}? Não dá para desfazer.`)) return;
     setOcupado(true); setErro(null);
     const { error } = await criarClienteNavegador().from('diario_registros').delete().eq('id', r.id);
     setOcupado(false);
@@ -154,7 +154,7 @@ export default function DiarioDeBordo({
   const lista = useMemo(() => registros.filter((r) =>
     (filtro === 'todos' || (filtro === 'aguardando' ? r.situacao === 'aguardando'
       : filtro === 'meus' ? r.pessoa_id === pessoaId : r.tipo === filtro))
-    && (!termo || [r.protocolo, r.assunto, r.descricao, nomes[r.pessoa_id] ?? '', r.autorizado_por_nome ?? '']
+    && (!termo || [r.protocolo ?? '', r.assunto, r.descricao, nomes[r.pessoa_id] ?? '', r.autorizado_por_nome ?? '']
       .some((t) => t.toLocaleLowerCase('pt-BR').includes(termo)))), [registros, filtro, termo, pessoaId, nomes]);
   const porDia = [...lista.reduce((m, r) => m.set(r.data, [...(m.get(r.data) ?? []), r]), new Map<string, RegistroDiario[]>())];
 
@@ -163,7 +163,7 @@ export default function DiarioDeBordo({
       {/* ------------------------------------------------ Novo registro */}
       <section className="rounded-[18px] bg-superficie px-6 py-5 shadow-sm xl:sticky xl:top-6">
         <h2 className="text-base font-semibold text-slate-800">{corrigindo ? 'Corrigir registro devolvido' : 'Novo registro'}</h2>
-        <p className="mb-4 text-sm text-slate-500">O protocolo é obrigatório para concluir.</p>
+        <p className="mb-4 text-sm text-slate-500">Autorização e exceção pedem o protocolo do atendimento.</p>
 
         <form onSubmit={registrar} className="grid gap-3">
           <div className="grid grid-cols-2 gap-2 2xl:grid-cols-4" role="radiogroup" aria-label="Tipo do registro">
@@ -178,9 +178,12 @@ export default function DiarioDeBordo({
             ))}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-[11rem_1fr]">
-            <label><span className={rotulo}>Protocolo *</span>
-              <input value={f.protocolo} onChange={set('protocolo')} disabled={ocupado} className={entrada} placeholder="Ex.: 88124" /></label>
+          {/* Protocolo só em autorização e exceção: processo e treinamento não têm. */}
+          <div className={`grid gap-3 ${exigeQuem ? 'sm:grid-cols-[11rem_1fr]' : ''}`}>
+            {exigeQuem && (
+              <label><span className={rotulo}>Protocolo *</span>
+                <input value={f.protocolo} onChange={set('protocolo')} disabled={ocupado} className={entrada} placeholder="Ex.: 88124" /></label>
+            )}
             <label><span className={rotulo}>Assunto *</span>
               <input value={f.assunto} onChange={set('assunto')} disabled={ocupado} className={entrada} placeholder="Em poucas palavras" /></label>
           </div>
@@ -291,7 +294,7 @@ export default function DiarioDeBordo({
                 <li key={r.id} className="grid gap-1 py-3.5">
                   <div className="flex flex-wrap items-center gap-2 text-sm">
                     <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${COR_TIPO[r.tipo]}`}>{ROTULO_TIPO[r.tipo]}</span>
-                    <span className="font-semibold tabular-nums text-slate-800">#{r.protocolo}</span>
+                    {r.protocolo && <span className="font-semibold tabular-nums text-slate-800">#{r.protocolo}</span>}
                     <b className="font-semibold text-slate-800">{r.assunto}</b>
                     <span className={`ml-auto rounded-md px-2 py-0.5 text-xs font-semibold ${COR_SITUACAO[r.situacao]}`}>
                       {ROTULO_SITUACAO[r.situacao]}

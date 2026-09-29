@@ -9,6 +9,11 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 4.14.2
+
+- Consulta do diário: processo novo e treinamento podem não ter protocolo; a
+  coluna mostra "—". Autorização e exceção continuam sempre com protocolo.
+
 ## 4.14.1
 
 - No aviso do diário ao salvar a monitoria, "aguardando aprovação do gestor"

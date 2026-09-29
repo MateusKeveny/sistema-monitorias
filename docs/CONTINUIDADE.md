@@ -11,9 +11,9 @@ Escrito em 28/09/2026, atualizado em 29/09/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.25.0** · Monitorias **4.14.1** (deploy de 29/09/2026) |
+| Publicado | Performance **1.26.0** · Monitorias **4.14.2** (deploy de 29/09/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
-| Migrações no banco | 01 a 34, todas aplicadas |
+| Migrações no banco | 01 a 35, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
 
 ### Revisão de design (28/09/2026)
@@ -154,6 +154,11 @@ Três versões, cada uma publicada e conferida antes da próxima:
   direto. A 34 também corrige a lista do diário para o operador, que via os
   registros dos colegas sem autor (função `nomes_das_pessoas`, só id e
   nome). Chave na ficha conferida pelo gestor no site publicado.
+- **1.26.0 / Monitorias 4.14.2** (publicada): **protocolo só em autorização
+  e exceção** (migração 35). Processo novo e treinamento não mostram o campo
+  e gravam sem protocolo; uma trava no banco (`diario_protocolo_quando_exige`)
+  segue exigindo o protocolo em autorização e exceção. Na consulta do
+  Monitorias, registro sem protocolo aparece com "—".
 
 Visão de celular fica fora da revisão, por decisão do gestor.
 

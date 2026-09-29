@@ -15,7 +15,8 @@ export type RegistroDiario = {
   pessoa_id: string;
   data: string;
   tipo: TipoRegistro;
-  protocolo: string;
+  /** Obrigatório em autorização e exceção; opcional em processo e treinamento (migração 35). */
+  protocolo: string | null;
   assunto: string;
   descricao: string;
   autorizado_por: QuemAutorizou | null;
