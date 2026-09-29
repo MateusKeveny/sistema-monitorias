@@ -11,7 +11,7 @@ Escrito em 28/09/2026, atualizado em 29/09/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.20.1** (deploy de 29/09/2026) · Monitorias **4.12.0** (deploy de 28/09/2026) |
+| Publicado | Performance **1.21.0** (deploy de 29/09/2026) · Monitorias **4.12.0** (deploy de 28/09/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
 | Migrações no banco | 01 a 30, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
@@ -99,6 +99,15 @@ Três versões, cada uma publicada e conferida antes da próxima:
 - **1.20.1** (publicada): gráfico de linha nas telas de largura cheia
   (Comparativo, Histórico, Monitorias do atendente) desenhado com base de
   1.400 em vez de 640 — antes saía com mais que o dobro do tamanho.
+- **1.21.0** (publicada, em teste com a Suyara): tela inicial de quem
+  recebe pela média (`PainelPleno`) — a cota com a conta aberta (média dos
+  Juniores × 1,2 + demandas), as demandas do mês, os Juniores que formam a
+  média e, para quem enxerga o time, a equipe com o painel do gestor sem
+  "Precisa de você". **A migração 31 não foi feita**: a Suyara, única Pleno,
+  tem papel Qualidade, que já vê a equipe (`ve_o_time`); ela só seria
+  necessária para um Pleno com papel Operador. A gestão continua só do
+  gestor na RLS (pesos, métricas, cargos, lançamentos, volume, avaliações,
+  valor, fechamento, saída).
 - **Próximas**: revisão do que sobrou fora do estilo novo (Lançamentos, Importar, Presencial, Atendentes,
   Configuração). E o **Pleno** ver a equipe no Comparativo: precisa da
   migração 31, uma consulta liberada só para gestor e Pleno (como

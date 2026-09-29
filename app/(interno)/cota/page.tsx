@@ -3,6 +3,7 @@ import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
 import { AbasDeCanal, ProvedorDeCanal } from '@/componentes/Canal';
 import PainelAtendente from '@/componentes/PainelAtendente';
+import PainelPleno from '@/componentes/PainelPleno';
 import { data as formatarData, hojeNoBrasil, mesRotulo } from '@/lib/formatar';
 import { mesAnterior, resolverCompetencia } from '@/lib/competencia';
 
@@ -49,7 +50,8 @@ const nomeCurto = (nome: string) => nome.trim().split(/\s+/).slice(0, 2).join(' 
 /**
  * Tela inicial do Painel de Performance: painel de acompanhamento.
  *
- * O gestor vê a equipe (PainelGestor); o operador, a própria competência
+ * O gestor vê a equipe (PainelGestor); quem recebe por média, a própria conta
+ * e a equipe (PainelPleno); o operador, a própria competência
  * (PainelAtendente). As views respeitam a RLS, então o operador não tem como
  * ver o dado de outra pessoa por aqui.
  */
@@ -130,6 +132,45 @@ export default async function InicioCota({
   const seloOperador = competencia === atual
     ? <Selo tom="neutro">Dia {diaDoCiclo(atual).dia} de {diaDoCiclo(atual).total} do ciclo</Selo>
     : undefined;
+
+  // Quem recebe pela média de outros cargos — o Pleno (1.21.0): a conta dela
+  // aberta e, para quem enxerga o time (a Suyara é Qualidade, o suporte do
+  // gestor), a equipe com o mesmo acompanhamento do gestor, sem as pendências
+  // que levam a telas só dele. Nada aqui grava: a gestão continua só do gestor,
+  // e a RLS garante isso no banco.
+  const db = await criarClienteServidor();
+  const { data: cargos } = await db.from('cargos_da_pessoa').select('cargo_id, desde')
+    .eq('pessoa_id', perfil.id).lte('desde', competencia).order('desde', { ascending: false }).limit(1);
+  const cargoId = cargos?.[0]?.cargo_id as number | undefined;
+  const { data: media } = cargoId
+    ? await db.from('pesos_por_cargo').select('ativo').eq('cargo_id', cargoId).eq('regra', 'media_da_equipe').maybeSingle()
+    : { data: null };
+
+  if (cargoId && media?.ativo) {
+    const veOTime = perfil.papel !== 'operador';
+    return (
+      <ProvedorDeCanal inicial={canalPedido === 'diretores' ? 'diretores' : 'huggy'}>
+        <div className="space-y-6">
+          <Topo selo={seloOperador} />
+          <PainelPleno pessoaId={perfil.id} cargoId={cargoId} competencia={competencia} />
+          {veOTime && (
+            <>
+              <div className="flex flex-wrap items-end justify-between gap-3 pt-2">
+                <h2 className="text-base font-semibold text-sobre-fundo">
+                  A equipe
+                  <span className="ml-2 text-xs font-normal text-sobre-fundo-suave">
+                    o mesmo acompanhamento do gestor — clique num destaque para abrir o detalhe
+                  </span>
+                </h2>
+                <AbasDeCanal />
+              </div>
+              <PainelGestor competencia={competencia} atual={atual} comPendencias={false} />
+            </>
+          )}
+        </div>
+      </ProvedorDeCanal>
+    );
+  }
 
   return (
     <PainelAtendente pessoaId={perfil.id} competencia={competencia} atual={atual} canalPedido={canalPedido}

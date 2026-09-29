@@ -61,7 +61,14 @@ const TONS_SEMANA = ['bg-emerald-300', 'bg-emerald-500', 'bg-emerald-700', 'bg-e
  * Tudo é SVG ou barra de CSS montado no servidor — nada de biblioteca de
  * gráfico no navegador.
  */
-export default async function PainelGestor({ competencia, atual }: { competencia: string; atual: string }) {
+export default async function PainelGestor({
+  competencia, atual, comPendencias = true,
+}: {
+  competencia: string;
+  atual: string;
+  /** A faixa "Precisa de você" leva a telas só do gestor; o Pleno vê o painel sem ela. */
+  comPendencias?: boolean;
+}) {
   const anterior = mesAnterior(competencia);
   const meses = [competencia, anterior];
   const db = await criarClienteServidor();
@@ -612,7 +619,7 @@ export default async function PainelGestor({ competencia, atual }: { competencia
   return (
     <div className="space-y-4">
       {/* O que precisa do gestor agora — cada item leva à tela onde se resolve. */}
-      {pendencias.length > 0 ? (
+      {!comPendencias ? null : pendencias.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2">
           <span className="mr-1 text-sm font-semibold text-sobre-fundo">Precisa de você</span>
           {pendencias.map((p) => (
