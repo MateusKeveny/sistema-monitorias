@@ -108,10 +108,9 @@ Três versões, cada uma publicada e conferida antes da próxima:
   necessária para um Pleno com papel Operador. A gestão continua só do
   gestor na RLS (pesos, métricas, cargos, lançamentos, volume, avaliações,
   valor, fechamento, saída).
-- **Próximas**: revisão do que sobrou fora do estilo novo (Lançamentos, Importar, Presencial, Atendentes,
-  Configuração). E o **Pleno** ver a equipe no Comparativo: precisa da
-  migração 31, uma consulta liberada só para gestor e Pleno (como
-  `bonus_da_competencia`), para não abrir o acesso dele ao sistema inteiro.
+- **Revisão concluída**: todas as telas do Performance estão no estilo
+  novo. A migração 31 fica como nota para o futuro: só é necessária se
+  existir um Pleno com papel Operador (hoje a única Pleno é Qualidade).
 
 Visão de celular fica fora da revisão, por decisão do gestor.
 
@@ -234,7 +233,9 @@ redistribuído pelo gestor.
 
 **Trabalho em aberto**
 
-- **Semana 4 de setembro** sem volume lançado — o ciclo fechou em 25/09;
+- **Reimportar as avaliações de setembro** até 25/09 antes do fechamento: a
+  última importação foi em 23/09, e a 4ª semana está parcial nos dois canais
+  (145 em Expansão, 70 em Diretores-Expansão). O volume já está lançado;
 - **marcar a origem do fechamento** (calculado × importado), para a tela
   mostrar detalhe semanal só de quem foi calculado pelo painel;
 - **documentação**: MODELO-PAINEL e HOSPEDAGEM estão na 1.4.0, e o documento
