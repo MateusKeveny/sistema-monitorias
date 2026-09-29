@@ -61,6 +61,25 @@ export function Secao({
   );
 }
 
+/**
+ * Um quadro no formato novo (1.18.0): superfície com seção, no mesmo uso do
+ * Cartao. As telas do Performance trocam Cartao por Quadro; as Monitorias
+ * seguem com o Cartao, que é outro sistema com outro público.
+ */
+export function Quadro({ titulo, subtitulo, acao, children, className = '' }: {
+  titulo?: string;
+  subtitulo?: React.ReactNode;
+  acao?: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <Painel className={className}>
+      <Secao titulo={titulo} subtitulo={subtitulo} acao={acao}>{children}</Secao>
+    </Painel>
+  );
+}
+
 export function Indicador({
   rotulo, valor, detalhe, tom = 'neutro',
 }: {
@@ -148,9 +167,15 @@ export function Vazio({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function Tabela({ children }: { children: React.ReactNode }) {
+/**
+ * Tabela que encosta nas bordas do quadro. As margens negativas desfazem o
+ * recuo de quem a contém: o Cartao (p-5) ou, com `noQuadro`, o Quadro
+ * (px-6/7, com o título acima e às vezes um botão abaixo — por isso só nas
+ * laterais).
+ */
+export function Tabela({ children, noQuadro = false }: { children: React.ReactNode; noQuadro?: boolean }) {
   return (
-    <div className="-mx-5 -my-5 overflow-x-auto">
+    <div className={noQuadro ? '-mx-6 overflow-x-auto sm:-mx-7' : '-mx-5 -my-5 overflow-x-auto'}>
       <table className="w-full text-sm">{children}</table>
     </div>
   );

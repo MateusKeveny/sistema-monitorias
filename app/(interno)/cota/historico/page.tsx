@@ -1,6 +1,7 @@
 import Link from '@/componentes/Link';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
-import { Cartao, Vazio } from '@/componentes/ui';
+import { Quadro, Vazio } from '@/componentes/ui';
+import GraficoDeLinha, { type PontoDaLinha } from '@/componentes/GraficoDeLinha';
 import { mesRotulo, percentual } from '@/lib/formatar';
 import type { PagamentoMensal, Pessoa } from '@/lib/tipos';
 
@@ -85,22 +86,37 @@ export default async function Historico({
   const totalPago = meses.reduce(
     (a, m) => a + Number(pagamento.get(m.mes_competencia)?.valor ?? 0), 0);
 
+  // Os meses do mais antigo ao mais recente, para a linha.
+  const serie = [...meses].reverse();
+  const naMeta = meses.filter((m) => m.meta && Number(m.resultado) >= Number(m.meta)).length;
+  const melhor = meses.reduce<Fechamento | null>((a, m) => (!a || Number(m.resultado) > Number(a.resultado) ? m : a), null);
+  const metaRef = meses.find((m) => m.meta)?.meta ?? null;
+  const nomePessoa = lista.find((p) => p.id === pessoaId)?.nome ?? perfil.nome;
+  const tomDe = (m: Fechamento) => {
+    if (!m.meta) return 'bom' as const;
+    const a = Number(m.resultado) / Number(m.meta);
+    return a >= 1 ? 'bom' as const : a >= 0.9 ? 'atencao' as const : 'ruim' as const;
+  };
+  const rotuloCurto = (c: string) => `${['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][Number(c.slice(5, 7)) - 1]}/${c.slice(2, 4)}`;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-sobre-fundo">Histórico</h1>
-          <p className="text-sm text-sobre-fundo-suave">
-            Competências fechadas{totalPago > 0 ? ` · ${reais(totalPago)} no total` : ''}
+          <h1 className="text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">
+            {veOTime ? `Histórico de ${nomePessoa.split(/\s+/).slice(0, 2).join(' ')}` : 'Seu histórico'}
+          </h1>
+          <p className="mt-1 text-sm text-sobre-fundo-suave">
+            Competências fechadas: o que foi entregue e pago em cada mês.
           </p>
         </div>
 
         {veOTime && (
           <form className="flex items-end gap-2">
             <label>
-              <span className="mb-1 block text-xs font-medium text-slate-600">Pessoa</span>
+              <span className="mb-1 block text-xs font-medium text-sobre-fundo-suave">Pessoa</span>
               <select name="pessoa" defaultValue={pessoaId}
-                      className="rounded-md border border-slate-300 px-2 py-1 text-sm">
+                      className="rounded-md border border-slate-300 px-2 py-1.5 text-sm">
                 {lista.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
               </select>
             </label>
@@ -112,16 +128,45 @@ export default async function Historico({
         )}
       </div>
 
-      {!meses.length && <Vazio>Nenhuma competência fechada ainda.</Vazio>}
+      {!meses.length ? <Quadro><Vazio>Nenhuma competência fechada ainda.</Vazio></Quadro> : (
+        <>
+          {/* O histórico inteiro de uma olhada, antes do detalhe de cada mês. */}
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {[
+              { rotulo: 'Meses fechados', valor: String(meses.length) },
+              { rotulo: 'Total recebido', valor: totalPago > 0 ? reais(totalPago)! : '—', verde: totalPago > 0 },
+              { rotulo: 'Na meta', valor: `${naMeta} de ${meses.length}` },
+              { rotulo: 'Melhor mês', valor: melhor ? `${rotuloCurto(melhor.mes_competencia)} · ${num(Number(melhor.resultado), 0)} pts` : '—' },
+            ].map((r) => (
+              <div key={r.rotulo} className="rounded-2xl bg-superficie px-5 py-4 shadow-sm">
+                <p className="text-sm text-slate-500">{r.rotulo}</p>
+                <p className={`text-2xl font-semibold tracking-tight tabular-nums ${
+                  r.verde ? 'text-marca-700 dark:text-marca-400' : 'text-slate-900'}`}>{r.valor}</p>
+              </div>
+            ))}
+          </div>
 
-      {meses.map((m) => {
+          {serie.length > 1 && (
+            <Quadro titulo="Pontos por mês"
+                    subtitulo={`Verde na meta, âmbar até 10% abaixo, rosa mais abaixo.${metaRef ? ` Linha tracejada: a meta de ${num(Number(metaRef), 0)}.` : ''}`}>
+              <GraficoDeLinha largura={Math.max(640, serie.length * 90)} rotulos={serie.map((m) => rotuloCurto(m.mes_competencia))}
+                              formatar={(v) => num(v, 0)}
+                              referencia={metaRef ? { valor: Number(metaRef), rotulo: `meta ${num(Number(metaRef), 0)}` } : undefined}
+                              pontos={serie.map((m): PontoDaLinha => ({ valor: Number(m.resultado), tom: tomDe(m) }))} />
+            </Quadro>
+          )}
+        </>
+      )}
+
+      {meses.map((m, indice) => {
+
         const doMes = linhas.filter((l) => l.fechamento_id === m.id);
         const pago = pagamento.get(m.mes_competencia);
         const canais = [...new Set(doMes.map((l) => l.origem ?? 'geral'))]
           .sort((a, b) => (a === 'geral' ? 1 : 0) - (b === 'geral' ? 1 : 0));
 
         return (
-          <Cartao
+          <Quadro
             key={m.id}
             titulo={mesRotulo(m.mes_competencia)}
             acao={
@@ -160,7 +205,13 @@ export default async function Historico({
               {pago?.atingiu_meta && pago.valor == null && <> · valor por ponto ainda não informado</>}
             </p>
 
-            <div className="space-y-4">
+            {/* O detalhe fica recolhido: aberto, o histórico virava uma página
+                interminável. Só o mês mais recente vem aberto. */}
+            <details open={indice === 0} className="group">
+              <summary className="cursor-pointer select-none text-sm font-medium text-marca-700 marker:text-slate-400 dark:text-marca-400">
+                Detalhe do mês
+              </summary>
+            <div className="mt-3 space-y-4">
               {canais.map((canal) => {
                 const doCanal = doMes.filter((l) => (l.origem ?? 'geral') === canal);
                 const soma = doCanal.reduce((a, l) => a + Number(l.cota), 0);
@@ -180,13 +231,13 @@ export default async function Historico({
                 return (
                   <section key={canal}>
                     <h3 className="mb-1 flex items-baseline justify-between gap-2 rounded bg-slate-100
-                                   px-2 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                                   px-2 py-1 text-xs font-semibold text-slate-600">
                       {NOME_CANAL[canal] ?? canal}
                       <span className="tabular-nums">{num(soma)} pts</span>
                     </h3>
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="text-left text-[11px] uppercase tracking-wide text-slate-500">
+                        <tr className="text-left text-[11px] text-slate-500">
                           <th className="pb-1 pr-2 font-semibold">Categoria</th>
                           <th className="px-2 pb-1 text-right font-semibold">Feito</th>
                           <th className="px-2 pb-1 text-right font-semibold">Pontuação</th>
@@ -217,6 +268,8 @@ export default async function Historico({
               })}
             </div>
 
+            </details>
+
             <p className="mt-4 text-xs text-slate-500">
               Valores congelados no fechamento.{' '}
               <Link href={`/cota/extrato?pessoa=${pessoaId}&mes=${m.mes_competencia.slice(0, 7)}`}
@@ -224,7 +277,7 @@ export default async function Historico({
                 Ver o extrato semana a semana
               </Link>
             </p>
-          </Cartao>
+          </Quadro>
         );
       })}
     </div>

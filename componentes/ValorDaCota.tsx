@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
-import { Cartao } from '@/componentes/ui';
+import { Quadro } from '@/componentes/ui';
 import type { AlteracaoDeValor, ValorDaCota as Valor } from '@/lib/tipos';
 
 const entrada = `rounded-md border border-slate-300 px-2 py-1 text-sm outline-none
@@ -73,7 +73,7 @@ export default function ValorDaCota({
   }
 
   return (
-    <Cartao titulo="Valor por ponto">
+    <Quadro titulo="Valor por ponto">
       {erro && (
         <p className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800
                       ring-1 ring-rose-600/20">{erro}</p>
@@ -143,6 +143,6 @@ export default function ValorDaCota({
           </ul>
         </div>
       )}
-    </Cartao>
+    </Quadro>
   );
 }

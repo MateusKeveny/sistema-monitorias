@@ -1,6 +1,8 @@
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
-import { BarraDeMeta, Cartao, Vazio } from '@/componentes/ui';
+import { BarraDeMeta, Quadro, Vazio } from '@/componentes/ui';
 import { mesRotulo, percentual } from '@/lib/formatar';
+import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
+import Abas from '@/componentes/Abas';
 import { resolverCompetencia } from '@/lib/competencia';
 import type { Pessoa } from '@/lib/tipos';
 
@@ -185,53 +187,48 @@ export default async function Extrato({
 
   return (
     <div className="space-y-6">
+      {/* Topo no padrão das telas novas (1.18.0): de quem é o extrato, o mês
+          com setas e, discreto, o cargo e a situação do mês. */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-sobre-fundo">Extrato</h1>
-          <p className="text-sm text-sobre-fundo-suave">
-            {cota.data?.pessoa ?? perfil.nome} · {mesRotulo(competencia)}
-            {congelado?.cargo ?? cota.data?.cargo ? ` · ${congelado?.cargo ?? cota.data?.cargo}` : ''}
-            {emAberto && (
-              <span className="ml-2 text-amber-700 dark:text-amber-400">
-                em aberto · {mesRotulo(atual)} ainda sem lançamentos
-              </span>
-            )}
+          <h1 className="text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">
+            {veOTime ? `Extrato de ${(cota.data?.pessoa ?? lista.find((p) => p.id === pessoaId)?.nome ?? perfil.nome)
+              .split(/\s+/).slice(0, 2).join(' ')}` : 'Seu extrato'}
+          </h1>
+          <div className="mt-1.5">
+            <SetasDeCompetencia competencia={competencia} atual={atual} caminho="/cota/extrato" compacto
+                                manter={{ pessoa: veOTime ? pessoaId : undefined }} />
+          </div>
+          <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-sobre-fundo-suave">
+            {(congelado?.cargo ?? cota.data?.cargo) && <span>{congelado?.cargo ?? cota.data?.cargo}</span>}
+            {congelado && <span className="font-semibold text-emerald-200">Competência fechada · valores congelados no fechamento</span>}
+            {emAberto && <span className="opacity-75">{mesRotulo(atual)} ainda sem lançamentos</span>}
           </p>
-          {congelado && (
-            <p className="mt-1 inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5
-                          text-xs font-medium text-slate-600 ring-1 ring-slate-300">
-              Competência fechada · valores congelados no fechamento
-            </p>
-          )}
         </div>
 
-        <form className="flex flex-wrap items-end gap-2">
-          {veOTime && (
+        {veOTime && (
+          <form className="flex flex-wrap items-end gap-2">
+            <input type="hidden" name="mes" value={competencia.slice(0, 7)} />
             <label>
-              <span className="mb-1 block text-xs font-medium text-slate-600">Pessoa</span>
+              <span className="mb-1 block text-xs font-medium text-sobre-fundo-suave">Pessoa</span>
               <select name="pessoa" defaultValue={pessoaId}
-                      className="rounded-md border border-slate-300 px-2 py-1 text-sm">
+                      className="rounded-md border border-slate-300 px-2 py-1.5 text-sm">
                 {lista.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
               </select>
             </label>
-          )}
-          <label>
-            <span className="mb-1 block text-xs font-medium text-slate-600">Competência</span>
-            <input type="month" name="mes" defaultValue={competencia.slice(0, 7)}
-                   className="rounded-md border border-slate-300 px-2 py-1 text-sm" />
-          </label>
-          <button className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5
-                             text-sm font-medium text-slate-700 hover:bg-slate-50">
-            Abrir
-          </button>
-        </form>
+            <button className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5
+                               text-sm font-medium text-slate-700 hover:bg-slate-50">
+              Abrir
+            </button>
+          </form>
+        )}
       </div>
 
       {/* O mês em uma linha, antes do detalhe: bateu a meta? quanto falta?
           quanto vale? Ficava na coluna da direita, que em janela média desce
           para depois de todas as semanas. */}
       {linhas.length > 0 && resultado != null && (
-        <Cartao>
+        <Quadro>
           <div className="grid items-center gap-x-10 gap-y-4 md:grid-cols-[auto_1fr_auto]">
             <div>
               <p className="text-sm text-slate-500">Resultado da competência</p>
@@ -283,22 +280,20 @@ export default async function Extrato({
               </p>
             )}
           </div>
-        </Cartao>
+        </Quadro>
       )}
 
       {linhas.length === 0 ? (
-        <Cartao titulo="Extrato"><Vazio>Nenhum ponto nesta competência.</Vazio></Cartao>
+        <Quadro titulo="Extrato"><Vazio>Nenhum ponto nesta competência.</Vazio></Quadro>
       ) : (
-        <div className="grid items-start gap-6 lg:grid-cols-2">
-          {/* ---------------- Esquerda: semana a semana ---------------- */}
-          <div className="space-y-6">
-            <h2 className="text-sm font-semibold text-sobre-fundo-suave">Semana a semana</h2>
-
-            {semanas.map((semana) => {
+        // Abas (1.18.0): o mês inteiro primeiro e cada semana numa aba, em vez
+        // da pilha de semanas ao lado da soma do mês. Uma coisa de cada vez.
+        <Abas inicial="mes" itens={[
+            ...semanas.map((semana) => {
               const daSemana = linhas.filter((l) => l.semana === semana);
               const soma = daSemana.reduce((a, l) => a + Number(l.cota), 0);
-              return (
-                <Cartao
+              return { chave: `s${semana ?? 'x'}`, rotulo: semana ? `${semana}ª semana · ${num(soma, 0)} pts` : 'Sem semana', conteudo: (
+                <Quadro
                   key={semana ?? 'mes'}
                   titulo={semana ? `${semana}ª semana` : 'No mês'}
                   acao={<span className={`text-sm font-semibold tabular-nums ${
@@ -334,19 +329,14 @@ export default async function Extrato({
                       );
                     })}
                   </div>
-                </Cartao>
-              );
-            })}
-          </div>
-
-          {/* ---------------- Direita: o mês somado ---------------- */}
-          <div className="space-y-6 lg:sticky lg:top-6">
-            <h2 className="text-sm font-semibold text-sobre-fundo-suave">
-              Somando todas as semanas do mês
-            </h2>
+                </Quadro>
+              ) };
+            }),
+            { chave: 'mes', rotulo: 'Mês inteiro', conteudo: (
+          <div className="grid items-start gap-4 xl:grid-cols-2">
 
             {linhaMedia && (
-              <Cartao
+              <Quadro
                 titulo="Como a média foi formada"
                 acao={<span className="text-sm font-semibold tabular-nums text-slate-900">
                   {num(Number(linhaMedia.cota))} pts
@@ -389,7 +379,7 @@ export default async function Extrato({
                     </div>
                   </div>
                 )}
-              </Cartao>
+              </Quadro>
             )}
 
             {canaisDe(linhas).map((canal) => {
@@ -430,7 +420,7 @@ export default async function Extrato({
                 : null;
 
               return (
-                <Cartao
+                <Quadro
                   key={canal}
                   titulo={NOME_CANAL[canal]}
                   acao={<span className={`text-sm font-semibold tabular-nums ${
@@ -477,11 +467,12 @@ export default async function Extrato({
                       ))}
                     </tbody>
                   </table>
-                </Cartao>
+                </Quadro>
               );
             })}
           </div>
-        </div>
+            ) },
+          ].sort((a, b) => (a.chave === 'mes' ? -1 : 0) - (b.chave === 'mes' ? -1 : 0))} />
       )}
 
       <p className="text-xs leading-relaxed text-sobre-fundo-suave">

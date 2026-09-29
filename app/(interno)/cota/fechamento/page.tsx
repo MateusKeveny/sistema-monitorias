@@ -7,8 +7,9 @@ import PagamentoDoMes from '@/componentes/PagamentoDoMes';
 import type {
   AlteracaoDeValor, PagamentoMensal, ValorDaCota as ValorDaCotaTipo,
 } from '@/lib/tipos';
-import { Atingimento, Cartao, Tabela, Th, Td, Vazio } from '@/componentes/ui';
-import { dataHora, mesRotulo } from '@/lib/formatar';
+import { Atingimento, Quadro, Tabela, Th, Td, Vazio } from '@/componentes/ui';
+import { dataHora, hojeNoBrasil, mesRotulo, semanaDoCiclo } from '@/lib/formatar';
+import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
 import { resolverCompetencia } from '@/lib/competencia';
 
 export const dynamic = 'force-dynamic';
@@ -42,10 +43,10 @@ export default async function Fechamento({
 }) {
   await exigirGestor();
   const { mes } = await searchParams;
-  const { competencia } = await resolverCompetencia(mes);
+  const { competencia, atual } = await resolverCompetencia(mes);
 
   const db = await criarClienteServidor();
-  const [abertos, fechados, semCargo, conferir, alteracoes, valor, pagamento, correcoes]
+  const [abertos, fechados, semCargo, conferir, alteracoes, valor, pagamento, correcoes, volumes, monitorias, avaliados]
     = await Promise.all([
     db.from('vw_cota_mensal').select('pessoa_id, pessoa, cargo, resultado, meta')
       .eq('mes_competencia', competencia).order('resultado', { ascending: false }),
@@ -62,6 +63,10 @@ export default async function Fechamento({
       .eq('mes_competencia', competencia).order('valor', { ascending: false, nullsFirst: false }),
     db.from('valores_alteracoes').select('*')
       .eq('mes_competencia', competencia).order('alterado_em', { ascending: false }),
+    // Para "Antes de fechar": semanas com volume e a cobertura das monitorias.
+    db.from('volume_semanal').select('semana, canal').eq('mes_competencia', competencia),
+    db.from('vw_monitorias').select('operador_id, semana_mes').eq('mes_referencia', competencia),
+    db.from('pessoas').select('id, nome').eq('avaliado', true).eq('ativo', true).order('nome'),
   ]);
 
   const lista = (abertos.data ?? []) as Aberto[];
@@ -78,6 +83,46 @@ export default async function Fechamento({
     avisos.push(`${(conferir.data ?? []).length} lançamento(s) com faixas que não fecham com o total.`);
   }
 
+  // ------------------------------------------------------- Antes de fechar
+  // O que ainda falta para o mês estar pronto, cada item com o caminho de onde
+  // se resolve. Semana e monitoria só cobram o que já terminou: num ciclo em
+  // andamento, semana que ainda não aconteceu não é pendência.
+  const semanasEncerradas = competencia < atual ? 4 : Math.max(0, semanaDoCiclo(hojeNoBrasil()) - 1);
+  const comVolume = new Set(((volumes.data ?? []) as { semana: number; canal: string }[])
+    .filter((v) => v.canal === 'huggy').map((v) => v.semana));
+  const semVolume = [1, 2, 3, 4].slice(0, semanasEncerradas).filter((s) => !comVolume.has(s));
+  const POR_SEMANA = 4;
+  const esperadas = POR_SEMANA * semanasEncerradas;
+  const feitasPor = new Map<string, number>();
+  for (const m of (monitorias.data ?? []) as { operador_id: string; semana_mes: number }[]) {
+    if (m.semana_mes <= semanasEncerradas) feitasPor.set(m.operador_id, (feitasPor.get(m.operador_id) ?? 0) + 1);
+  }
+  const monitoriasIncompletas = esperadas === 0 ? [] : ((avaliados.data ?? []) as { id: string; nome: string }[])
+    .map((p) => ({ ...p, feitas: feitasPor.get(p.id) ?? 0 }))
+    .filter((p) => p.feitas < esperadas);
+  const mesCurto = competencia.slice(0, 7);
+  const antesDeFechar: { texto: React.ReactNode; grave?: boolean; acao?: { rotulo: string; href: string } }[] = [];
+  if ((semCargo.data ?? []).length) {
+    antesDeFechar.push({ grave: true, acao: { rotulo: 'Definir', href: '/cota/configuracao' },
+      texto: <>Sem cargo, ficam fora do fechamento: <b>{(semCargo.data ?? []).map((p) => p.nome as string).join(', ')}</b></> });
+  }
+  if ((conferir.data ?? []).length) {
+    antesDeFechar.push({ acao: { rotulo: 'Conferir', href: `/cota/lancamentos?mes=${mesCurto}` },
+      texto: <>{(conferir.data ?? []).length} lançamento(s) com faixas que não fecham com o total</> });
+  }
+  if (semVolume.length) {
+    antesDeFechar.push({ acao: { rotulo: 'Importar', href: '/cota/importar' },
+      texto: <>{semVolume.length === 1 ? `Semana ${semVolume[0]}` : `Semanas ${semVolume.join(', ')}`} sem volume lançado</> });
+  }
+  if (monitoriasIncompletas.length) {
+    antesDeFechar.push({
+      texto: <>Monitorias incompletas ({esperadas} por pessoa até agora):{' '}
+        <b>{monitoriasIncompletas.map((p) => `${p.nome.split(/\s+/)[0]} ${p.feitas}`).join(', ')}</b></> });
+  }
+  if (competencia === atual) {
+    antesDeFechar.push({ texto: <>O ciclo ainda está correndo: termina em 25/{competencia.slice(5, 7)}.</> });
+  }
+
   const quando = congelados[0]?.fechado_em;
   const historico = (alteracoes.data ?? []) as Alteracao[];
   const NOME_CAMPO: Record<string, string> = {
@@ -86,49 +131,69 @@ export default async function Fechamento({
 
   return (
     <div className="space-y-6">
+      {/* Topo no padrão das telas novas (1.18.0): o mês com setas e a situação dele. */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-sobre-fundo">Fechamento do ciclo</h1>
-          <p className="text-sm text-sobre-fundo-suave">
-            {mesRotulo(competencia)} ·{' '}
+          <h1 className="text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">Fechamento</h1>
+          <div className="mt-1.5">
+            <SetasDeCompetencia competencia={competencia} atual={atual} caminho="/cota/fechamento" compacto />
+          </div>
+          <p className="mt-2 text-xs text-sobre-fundo-suave">
             {congelados.length
-              ? `${congelados.length} pessoa(s) fechadas por ${congelados[0].fechado_por_nome ?? '—'}`
-              + (quando ? ` em ${dataHora(quando)}` : '')
-              : 'ainda aberto'}
+              ? <span className="font-semibold text-emerald-200">
+                  {congelados.length} pessoa(s) fechadas por {congelados[0].fechado_por_nome ?? '—'}
+                  {quando ? ` em ${dataHora(quando)}` : ''}
+                </span>
+              : <span className="font-semibold text-amber-200">Ainda aberto</span>}
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
-          <a href={`/api/cota/exportar?mes=${competencia.slice(0, 7)}&formato=detalhado`}
+          <a href={`/api/cota/exportar?mes=${mesCurto}&formato=detalhado`}
              className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
                         font-medium text-slate-700 hover:bg-slate-50">
             Relatório detalhado
           </a>
-          <a href={`/api/cota/exportar?mes=${competencia.slice(0, 7)}`}
+          <a href={`/api/cota/exportar?mes=${mesCurto}`}
              className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
                         font-medium text-slate-700 hover:bg-slate-50">
             Resumo para importação
           </a>
         </div>
-
-        <form className="flex items-end gap-2">
-          <label>
-            <span className="mb-1 block text-xs font-medium text-slate-600">Competência</span>
-            <input type="month" name="mes" defaultValue={competencia.slice(0, 7)}
-                   className="rounded-md border border-slate-300 px-2 py-1 text-sm" />
-          </label>
-          <button className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5
-                             text-sm font-medium text-slate-700 hover:bg-slate-50">
-            Abrir
-          </button>
-        </form>
       </div>
 
+      {/* Antes de fechar: só enquanto há gente para fechar. */}
+      {pendentes.length > 0 && (
+        <Quadro titulo="Antes de fechar"
+                subtitulo={antesDeFechar.length ? 'O que ainda falta para o mês estar pronto.' : undefined}>
+          {antesDeFechar.length === 0 ? (
+            <p className="text-sm font-medium text-marca-700 dark:text-marca-400">
+              ✓ Tudo pronto para fechar: todos com cargo, volume das semanas lançado e monitorias completas.
+            </p>
+          ) : (
+            <ul className="divide-y divide-slate-100 text-sm">
+              {antesDeFechar.map((p, i) => (
+                <li key={i} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5">
+                  <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${p.grave ? 'bg-rose-500' : 'bg-amber-500'}`} />
+                  <span className="flex-1 text-slate-700">{p.texto}</span>
+                  {p.acao && (
+                    <Link href={p.acao.href}
+                          className="rounded-md bg-marca-50 px-2 py-0.5 text-xs font-semibold text-marca-700 dark:text-marca-400">
+                      {p.acao.rotulo} ›
+                    </Link>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Quadro>
+      )}
+
       {congelados.length > 0 && (
-        <Cartao
+        <Quadro
           titulo={`Congelado (${congelados.length})`}
           acao={<span className="text-xs text-slate-500">valores entregues, não mudam mais</span>}
         >
-          <Tabela>
+          <Tabela noQuadro>
             <thead>
               <tr>
                 <Th>Pessoa</Th><Th>Cargo</Th>
@@ -167,7 +232,7 @@ export default async function Fechamento({
               ))}
             </tbody>
           </Tabela>
-        </Cartao>
+        </Quadro>
       )}
 
       {congelados.length > 0 && (
@@ -184,7 +249,7 @@ export default async function Fechamento({
         </>
       )}
 
-      <Cartao
+      <Quadro
         titulo={congelados.length ? `Ainda em aberto (${pendentes.length})` : `Prévia do fechamento (${pendentes.length})`}
       >
         {pendentes.length === 0 ? (
@@ -195,7 +260,7 @@ export default async function Fechamento({
           </Vazio>
         ) : (
           <div className="space-y-5">
-            <Tabela>
+            <Tabela noQuadro>
               <thead>
                 <tr>
                   <Th>Pessoa</Th><Th>Cargo</Th>
@@ -231,11 +296,11 @@ export default async function Fechamento({
             </div>
           </div>
         )}
-      </Cartao>
+      </Quadro>
 
       {historico.length > 0 && (
-        <Cartao titulo={`Correções feitas (${historico.length})`}>
-          <Tabela>
+        <Quadro titulo={`Correções feitas (${historico.length})`}>
+          <Tabela noQuadro>
             <thead>
               <tr>
                 <Th>Quando</Th><Th>Pessoa</Th><Th>O que mudou</Th>
@@ -263,7 +328,7 @@ export default async function Fechamento({
               ))}
             </tbody>
           </Tabela>
-        </Cartao>
+        </Quadro>
       )}
 
       <p className="text-xs leading-relaxed text-sobre-fundo-suave">

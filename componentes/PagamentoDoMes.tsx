@@ -1,4 +1,4 @@
-import { Cartao, Tabela, Th, Td, Vazio } from '@/componentes/ui';
+import { Quadro, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import { hojeNoBrasil } from '@/lib/formatar';
 import type { PagamentoMensal } from '@/lib/tipos';
 
@@ -33,9 +33,9 @@ export default function PagamentoDoMes({
 }) {
   if (!linhas.length) {
     return (
-      <Cartao titulo={titulo}>
+      <Quadro titulo={titulo}>
         <Vazio>Nada fechado nesta competência.</Vazio>
-      </Cartao>
+      </Quadro>
     );
   }
 
@@ -46,7 +46,7 @@ export default function PagamentoDoMes({
   // Sem soma dos valores, por decisão do gestor: o total do mês não é
   // conferido aqui e um número somado na tela vira número citado em reunião.
   return (
-    <Cartao titulo={titulo}>
+    <Quadro titulo={titulo}>
       {semValor ? (
         <p className={`mb-4 rounded-lg px-3 py-2 text-sm ring-1 ${
           atrasado(competencia)
@@ -70,7 +70,7 @@ export default function PagamentoDoMes({
         </p>
       )}
 
-      <Tabela>
+      <Tabela noQuadro>
         <thead>
           <tr>
             <Th>Pessoa</Th>
@@ -113,6 +113,6 @@ export default function PagamentoDoMes({
         e Gestor não recebem: já são remunerados pela média multiplicada. Quem trabalhou a
         competência pela metade não entra na conta do bônus.
       </p>
-    </Cartao>
+    </Quadro>
   );
 }
