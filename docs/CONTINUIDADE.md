@@ -99,7 +99,7 @@ Três versões, cada uma publicada e conferida antes da próxima:
 - **1.20.1** (publicada): gráfico de linha nas telas de largura cheia
   (Comparativo, Histórico, Monitorias do atendente) desenhado com base de
   1.400 em vez de 640 — antes saía com mais que o dobro do tamanho.
-- **1.21.0** (publicada, em teste com a Suyara): tela inicial de quem
+- **1.21.0** (publicada e aprovada pela Suyara em 29/09/2026): tela inicial de quem
   recebe pela média (`PainelPleno`) — a cota com a conta aberta (média dos
   Juniores × 1,2 + demandas), as demandas do mês, os Juniores que formam a
   média e, para quem enxerga o time, a equipe com o painel do gestor sem
