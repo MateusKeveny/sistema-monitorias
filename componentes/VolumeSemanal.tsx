@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
-import { Cartao, Tabela, Th, Td, Vazio } from '@/componentes/ui';
+import { Quadro, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import type { Pessoa } from '@/lib/tipos';
 
 export type LinhaVolume = {
@@ -40,41 +40,52 @@ const entrada = `w-24 rounded-md border border-slate-300 px-2 py-1 text-right te
                  outline-none focus:border-marca-600 disabled:bg-slate-50`;
 
 /**
- * Volume da semana, digitado pelo gestor: uma linha por pessoa, a semana
+ * Volume de UMA semana, digitado pelo gestor: uma linha por pessoa, a semana
  * inteira de uma vez. É daqui que saem os pontos por atendimento, a faixa de
  * TME da equipe e a base do C-SAT de Expansão.
+ *
+ * Desde a 1.19.0 cada semana é aberta pelo cartão dela no topo da tela de
+ * Lançamentos, em vez das abas de semana dentro deste quadro. Quem ainda não
+ * tem volume aparece marcado, e o número da semana anterior fica ao lado
+ * como referência para pegar erro de digitação.
  */
 export default function VolumeSemanal({
-  competencia, canal, pessoas, volumes,
+  competencia, canal, semana, periodo, pessoas: todas, volumes, esperados,
 }: {
   competencia: string;
   /** 'huggy' = Expansão · 'diretores' = Diretores-Expansão. */
   canal: 'huggy' | 'diretores';
+  semana: number;
+  /** "03/09 a 10/09", só para o subtítulo. */
+  periodo: string;
   /** Só quem pontua por atendimento no cargo vigente. */
   pessoas: Pessoa[];
+  /** O mês inteiro do canal: a semana anterior serve de referência. */
   volumes: LinhaVolume[];
+  /** Quem se espera nesta semana (teve volume na última lançada). Os demais
+   *  continuam na lista para digitar, mas sem a marca de "falta". */
+  esperados: string[];
 }) {
+  const esperado = new Set(esperados);
+  // Esperados primeiro, na ordem do nome; depois quem não atendeu na última.
+  const pessoas = [...todas].sort((a, b) =>
+    Number(esperado.has(b.id)) - Number(esperado.has(a.id)) || a.nome.localeCompare(b.nome, 'pt-BR'));
   const router = useRouter();
-  const [semana, setSemana] = useState(1);
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
 
-  const inicial = (s: number): Rascunho => Object.fromEntries(pessoas.map((p) => {
-    const v = volumes.find((x) => x.pessoa_id === p.id && x.semana === s);
+  const daSemana = new Map(volumes.filter((v) => v.semana === semana).map((v) => [v.pessoa_id, v]));
+  const anterior = new Map(volumes.filter((v) => v.semana === semana - 1).map((v) => [v.pessoa_id, v]));
+
+  const [rascunho, setRascunho] = useState<Rascunho>(() => Object.fromEntries(pessoas.map((p) => {
+    const v = daSemana.get(p.id);
     return [p.id, {
       finalizados: v ? String(v.finalizados) : '',
       tma: paraTempo(v?.tma_seg ?? null),
       tme: paraTempo(v?.tme_seg ?? null),
     }];
-  }));
-  const [rascunho, setRascunho] = useState<Rascunho>(() => inicial(1));
-
-  function trocarSemana(s: number) {
-    setSemana(s); setRascunho(inicial(s)); setErro(null); setAviso(null);
-  }
-
-  const lancadas = new Set(volumes.map((v) => v.semana));
+  })));
 
   async function salvar() {
     setErro(null); setAviso(null);
@@ -84,8 +95,7 @@ export default function VolumeSemanal({
     for (const p of pessoas) {
       const d = rascunho[p.id];
       const vazio = !d.finalizados.trim() && !d.tma.trim() && !d.tme.trim();
-      const existia = volumes.some((v) => v.pessoa_id === p.id && v.semana === semana);
-      if (vazio) { if (existia) apagar.push(p.id); continue; }
+      if (vazio) { if (daSemana.has(p.id)) apagar.push(p.id); continue; }
 
       const finalizados = Number(d.finalizados || 0);
       const tma = paraSegundos(d.tma);
@@ -120,30 +130,21 @@ export default function VolumeSemanal({
   const set = (id: string, campo: 'finalizados' | 'tma' | 'tme', valor: string) =>
     setRascunho((r) => ({ ...r, [id]: { ...r[id], [campo]: valor } }));
 
+  const total = pessoas.reduce((a, p) => a + (Number(rascunho[p.id]?.finalizados) || 0), 0);
+  const preenchidas = pessoas.filter((p) => rascunho[p.id]?.finalizados.trim()).length;
+  const esperadosOuPreenchidos = pessoas.filter((p) => esperado.has(p.id) || rascunho[p.id]?.finalizados.trim()).length;
+
   return (
-    <Cartao
-      titulo={`Volume semanal · ${canal === 'huggy' ? 'Expansão' : 'Diretores-Expansão'}`}
+    <Quadro
+      titulo={`Volume · ${semana}ª semana · ${canal === 'huggy' ? 'Expansão' : 'Diretores-Expansão'}`}
+      subtitulo={`${periodo} · tempos em H:MM:SS (as horas podem passar de 24) ou MM:SS · linha em branco remove o volume da pessoa`}
       acao={
-        <div className="flex items-center gap-3">
-          <div className="inline-flex rounded-lg bg-slate-100 p-0.5" role="tablist" aria-label="Semana">
-            {[1, 2, 3, 4].map((s) => (
-              <button
-                key={s} type="button" role="tab" aria-selected={s === semana} disabled={ocupado}
-                onClick={() => trocarSemana(s)}
-                className={`rounded-md px-3 py-1 text-xs font-medium ${
-                  s === semana ? 'bg-superficie text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-              >
-                {s}ª{lancadas.has(s) && <span className="ml-1 text-emerald-600">●</span>}
-              </button>
-            ))}
-          </div>
-          <button
-            type="button" onClick={salvar} disabled={ocupado || pessoas.length === 0}
-            className="rounded-lg bg-marca-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-marca-700 disabled:opacity-40"
-          >
-            {ocupado ? 'Salvando…' : `Salvar ${semana}ª semana`}
-          </button>
-        </div>
+        <button
+          type="button" onClick={salvar} disabled={ocupado || pessoas.length === 0}
+          className="rounded-lg bg-marca-600 px-4 py-2 text-sm font-semibold text-white hover:bg-marca-700 disabled:opacity-40"
+        >
+          {ocupado ? 'Salvando…' : `Salvar ${semana}ª semana`}
+        </button>
       }
     >
       {erro && <p className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800 ring-1 ring-rose-600/20">{erro}</p>}
@@ -152,51 +153,68 @@ export default function VolumeSemanal({
       {pessoas.length === 0 ? (
         <Vazio>Ninguém com cargo que pontue por atendimento nesta competência.</Vazio>
       ) : (
-        <div className="py-5">
-          <Tabela>
-            <thead>
-              <tr>
-                <Th>Pessoa</Th>
-                <Th className="text-right">Finalizados</Th>
-                <Th className="text-right">TMA</Th>
-                <Th className="text-right">TME</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {pessoas.map((p) => {
-                const d = rascunho[p.id];
-                return (
-                  <tr key={p.id}>
-                    <Td className="font-medium text-slate-800">
-                      {p.nome}{!p.ativo && <span className="ml-2 text-xs text-slate-500">· desligado</span>}
-                    </Td>
-                    <Td className="text-right">
-                      <input inputMode="numeric" value={d.finalizados} disabled={ocupado}
-                             aria-label={`Finalizados de ${p.nome}`}
-                             onChange={(e) => set(p.id, 'finalizados', e.target.value)} className={entrada} />
-                    </Td>
-                    <Td className="text-right">
-                      <input value={d.tma} disabled={ocupado} placeholder="H:MM:SS"
-                             aria-label={`TMA de ${p.nome}`}
-                             onChange={(e) => set(p.id, 'tma', e.target.value)} className={entrada} />
-                    </Td>
-                    <Td className="text-right">
-                      <input value={d.tme} disabled={ocupado} placeholder="H:MM:SS"
-                             aria-label={`TME de ${p.nome}`}
-                             onChange={(e) => set(p.id, 'tme', e.target.value)} className={entrada} />
-                    </Td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </Tabela>
-        </div>
+        <Tabela noQuadro>
+          <thead>
+            <tr>
+              <Th>Pessoa</Th>
+              <Th className="text-right">Finalizados</Th>
+              <Th className="text-right">TMA</Th>
+              <Th className="text-right">TME</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {pessoas.map((p) => {
+              const d = rascunho[p.id];
+              const falta = esperado.has(p.id) && !daSemana.has(p.id);
+              const fora = !esperado.has(p.id) && !daSemana.has(p.id);
+              const ref = anterior.get(p.id);
+              const borda = falta ? 'border-dashed' : '';
+              return (
+                <tr key={p.id}>
+                  <Td className={`font-medium ${fora ? 'text-slate-400' : 'text-slate-800'}`}>
+                    {p.nome}
+                    {!p.ativo && <span className="ml-2 text-xs text-slate-500">· desligado</span>}
+                    {fora && <span className="ml-2 text-xs font-normal text-slate-400">· não atendeu na última semana</span>}
+                    {falta && (
+                      <span className="ml-2 rounded-md bg-amber-500/15 px-1.5 py-px text-xs font-semibold
+                                       text-amber-700 dark:text-amber-300">falta</span>
+                    )}
+                  </Td>
+                  <Td className="whitespace-nowrap text-right">
+                    <input inputMode="numeric" value={d.finalizados} disabled={ocupado}
+                           aria-label={`Finalizados de ${p.nome}`}
+                           onChange={(e) => set(p.id, 'finalizados', e.target.value)} className={`${entrada} ${borda}`} />
+                    {semana > 1 && (
+                      <span className="ml-2 inline-block w-24 text-left text-xs tabular-nums text-slate-400">
+                        {ref ? `sem. ant. ${ref.finalizados}` : 'sem. ant. —'}
+                      </span>
+                    )}
+                  </Td>
+                  <Td className="text-right">
+                    <input value={d.tma} disabled={ocupado} placeholder="H:MM:SS"
+                           aria-label={`TMA de ${p.nome}`}
+                           onChange={(e) => set(p.id, 'tma', e.target.value)} className={`${entrada} ${borda}`} />
+                  </Td>
+                  <Td className="text-right">
+                    <input value={d.tme} disabled={ocupado} placeholder="H:MM:SS"
+                           aria-label={`TME de ${p.nome}`}
+                           onChange={(e) => set(p.id, 'tme', e.target.value)} className={`${entrada} ${borda}`} />
+                  </Td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot>
+            <tr className="border-t border-slate-200 font-semibold text-slate-800">
+              <td className="px-4 py-2.5">Equipe · {preenchidas} de {esperadosOuPreenchidos} preenchidos</td>
+              <td className={`px-4 py-2.5 text-right tabular-nums ${semana > 1 ? 'pr-[8.5rem]' : ''}`}>
+                {total.toLocaleString('pt-BR')}
+              </td>
+              <td /><td />
+            </tr>
+          </tfoot>
+        </Tabela>
       )}
-
-      <p className="text-xs leading-relaxed text-slate-500">
-        Tempos em <strong>H:MM:SS</strong> (as horas podem passar de 24) ou MM:SS. Deixar a linha toda
-        em branco e salvar remove o volume da pessoa naquela semana. ● indica semana já lançada.
-      </p>
-    </Cartao>
+    </Quadro>
   );
 }

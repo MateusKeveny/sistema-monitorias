@@ -198,16 +198,6 @@ export type Lancamento = {
   criado_em: string;
 };
 
-export type AvaliacaoDiretores = {
-  id: string;
-  pessoa_id: string;
-  data: string;
-  protocolo: string | null;
-  nota: number | null;
-  observacao: string | null;
-  criado_em: string;
-};
-
 export type ConferenciaLancamento = {
   pessoa_id: string;
   mes_competencia: string;

@@ -11,7 +11,7 @@ Escrito em 28/09/2026, atualizado em 29/09/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.18.0** (deploy de 29/09/2026) · Monitorias **4.12.0** (deploy de 28/09/2026) |
+| Publicado | Performance **1.19.0** (deploy de 29/09/2026) · Monitorias **4.12.0** (deploy de 28/09/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
 | Migrações no banco | 01 a 30, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
@@ -69,7 +69,23 @@ Três versões, cada uma publicada e conferida antes da próxima:
   por mês e meses recolhíveis. **Fechamento**: setas, situação e o quadro
   "Antes de fechar" (sem cargo, lançamentos a conferir, semanas sem volume,
   monitorias incompletas, ciclo correndo).
-- **Próximas**: o estilo novo no registro e na
+- **1.19.0** (publicada): o estilo novo nas telas de registro.
+  **Lançamentos**: mês nas setas; um cartão por semana com o volume lançado
+  e as avaliações importadas (a semana que termina depois da última
+  importação aparece como parcial) e um cartão "A conferir"; o clique abre o
+  volume da semana, com o valor da semana anterior como referência. Cada
+  semana espera quem teve volume na **última semana lançada** (na 1ª, a
+  última do mês anterior) — no Diretores-Expansão nem todos atendem; quem
+  não atendeu fica na lista sem a marca de "falta". Lançamento manual mostra
+  o efeito antes de lançar e a lista filtra por pessoa. Saiu a digitação de
+  **avaliações de diretores**: todas vêm da importação (as 547 do banco
+  vieram de lá). **Presencial**: data, ID do cliente, nome e demanda
+  **obrigatórios** (na tela; registros antigos sem ID ficam como estão),
+  observação opcional, cartões do mês e das semanas, total por pessoa e
+  lista por dia com busca. **Importar**: grade "O que já está no sistema"
+  por semana e canal, com a última importação, e o importador em três
+  passos.
+- **Próximas**: o estilo novo na
   administração (Lançamentos, Importar, Presencial, Atendentes,
   Configuração). E o **Pleno** ver a equipe no Comparativo: precisa da
   migração 31, uma consulta liberada só para gestor e Pleno (como

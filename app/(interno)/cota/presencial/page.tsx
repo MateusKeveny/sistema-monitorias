@@ -1,6 +1,8 @@
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import FormularioPresencial from '@/componentes/FormularioPresencial';
-import { hojeNoBrasil, mesDeCompetencia, mesRotulo } from '@/lib/formatar';
+import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
+import { Painel } from '@/componentes/ui';
+import { diaMes, hojeNoBrasil, mesDeCompetencia, periodoDaSemana } from '@/lib/formatar';
 import type { Presencial } from '@/lib/tipos';
 
 export const dynamic = 'force-dynamic';
@@ -19,7 +21,9 @@ export default async function AtendimentoPresencial({
 }) {
   const perfil = await exigirPerfil();
   const { mes } = await searchParams;
-  const competencia = /^\d{4}-\d{2}$/.test(mes ?? '') ? `${mes}-01` : mesDeCompetencia(hojeNoBrasil());
+  const hoje = hojeNoBrasil();
+  const atual = mesDeCompetencia(hoje);
+  const competencia = /^\d{4}-\d{2}$/.test(mes ?? '') ? `${mes}-01` : atual;
   const veOTime = perfil.papel !== 'operador';
 
   const db = await criarClienteServidor();
@@ -33,40 +37,92 @@ export default async function AtendimentoPresencial({
   ]);
 
   const cargoId = (linhas ?? [])[0]?.cargo_id as number | undefined;
-  const { data: peso } = cargoId
-    ? await db.from('pesos_por_cargo').select('peso')
-      .eq('cargo_id', cargoId).eq('regra', 'presencial').eq('ativo', true).maybeSingle()
-    : { data: null };
+  // Quem vê a equipe nem sempre pontua por presencial no próprio cargo (o
+  // gestor não pontua): aí vale o peso de quem atende.
+  const { data: pesos } = veOTime
+    ? await db.from('pesos_por_cargo').select('peso').eq('regra', 'presencial').eq('ativo', true)
+    : cargoId
+      ? await db.from('pesos_por_cargo').select('peso')
+        .eq('cargo_id', cargoId).eq('regra', 'presencial').eq('ativo', true)
+      : { data: [] };
+
+  const lista = (registros ?? []) as Presencial[];
+  const valores = (pesos ?? []).map((p) => Number(p.peso)).filter((v) => v > 0);
+  const pontos = valores.length ? Math.max(...valores) : null;
+  const pessoasNoMes = new Set(lista.map((r) => r.pessoa_id)).size;
+
+  // O mês por semana (1.19.0): quantos em cada uma, e se ela já começou.
+  const semanas = [1, 2, 3, 4].map((s) => {
+    const [de, ate] = periodoDaSemana(competencia, s);
+    return {
+      s, periodo: `${diaMes(de)} a ${diaMes(ate)}`, quantidade: lista.filter((r) => r.semana === s).length,
+      situacao: hoje < de ? 'futura' : hoje <= ate ? 'andamento' : 'passada',
+    };
+  });
+  const maiorSemana = Math.max(1, ...semanas.map((s) => s.quantidade));
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold text-sobre-fundo">Atendimento presencial</h1>
-          <p className="text-sm text-sobre-fundo-suave">
-            {mesRotulo(competencia)}
-            {veOTime ? ' · toda a equipe' : ' · seus registros'}
-          </p>
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">
+          Atendimento presencial
+        </h1>
+        <div className="mt-1.5">
+          <SetasDeCompetencia competencia={competencia} atual={atual} caminho="/cota/presencial" compacto />
         </div>
+        <p className="mt-2 text-xs text-sobre-fundo-suave">
+          {veOTime ? 'Toda a equipe' : 'Seus registros'}
+          {pontos != null && ` · cada atendimento vale ${pontos.toLocaleString('pt-BR')} pts no extrato de quem atendeu`}
+        </p>
+      </div>
 
-        <form className="flex items-end gap-2">
-          <label>
-            <span className="mb-1 block text-xs font-medium text-slate-600">Competência</span>
-            <input type="month" name="mes" defaultValue={competencia.slice(0, 7)}
-                   className="rounded-md border border-slate-300 px-2 py-1 text-sm" />
-          </label>
-          <button className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5
-                             text-sm font-medium text-slate-700 hover:bg-slate-50">
-            Abrir
-          </button>
-        </form>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.2fr_repeat(4,1fr)]">
+        <Painel className="px-5 py-4">
+          <p className="text-[13px] text-slate-500">No mês</p>
+          <p className="text-2xl font-semibold tabular-nums text-slate-900">
+            {lista.length} atendimento{lista.length === 1 ? '' : 's'}
+          </p>
+          <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
+            {pontos != null && lista.length > 0 && (
+              <span className="rounded-md bg-marca-600/15 px-1.5 py-px font-semibold text-marca-700 dark:text-marca-400">
+                +{(lista.length * pontos).toLocaleString('pt-BR')} pts
+              </span>
+            )}
+            {veOTime && `em ${pessoasNoMes} pessoa${pessoasNoMes === 1 ? '' : 's'}`}
+          </p>
+        </Painel>
+        {semanas.map((s) => (
+          <Painel key={s.s} className="px-5 py-4">
+            <p className="text-[13px] text-slate-500">{s.s}ª semana · {s.periodo}</p>
+            {s.situacao === 'futura' ? (
+              <>
+                <p className="text-2xl font-semibold text-slate-400">—</p>
+                <p className="mt-1 text-xs text-slate-500">ainda não começou</p>
+              </>
+            ) : (
+              <>
+                <p className="text-2xl font-semibold tabular-nums text-slate-900">{s.quantidade}</p>
+                {s.situacao === 'andamento' ? (
+                  <p className="mt-1 text-xs">
+                    <span className="rounded-md bg-slate-100 px-1.5 py-px font-semibold text-slate-600">em andamento</span>
+                  </p>
+                ) : (
+                  <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-slate-100">
+                    <span className="crescer-x block h-full origin-left rounded-full bg-marca-600"
+                          style={{ transform: `scaleX(${s.quantidade / maiorSemana})` }} />
+                  </span>
+                )}
+              </>
+            )}
+          </Painel>
+        ))}
       </div>
 
       <FormularioPresencial
-        registros={(registros ?? []) as Presencial[]}
+        registros={lista}
         pessoaId={perfil.id}
         veOTime={veOTime}
-        pontosPorAtendimento={peso?.peso == null ? null : Number(peso.peso)}
+        pontosPorAtendimento={pontos}
       />
     </div>
   );

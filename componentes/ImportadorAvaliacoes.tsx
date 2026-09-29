@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
-import { Cartao, Tabela, Th, Td } from '@/componentes/ui';
+import { Quadro, Tabela, Th, Td } from '@/componentes/ui';
 import { data as formatarData, mesDeCompetencia, mesRotulo, semanaDoCiclo } from '@/lib/formatar';
 import { dataDoExcel, lerPlanilha, type Linha } from '@/lib/xlsx-navegador';
 import type { Pessoa } from '@/lib/tipos';
@@ -253,8 +253,32 @@ export default function ImportadorAvaliacoes({
     return m;
   }, [analise]);
 
+  // Três passos (1.19.0): escolher, conferir, importar.
+  const passo = sucesso ? 3 : analise ? 2 : 1;
+  const Passo = ({ n, rotulo }: { n: number; rotulo: string }) => (
+    <span className={`flex items-center gap-2 text-sm ${n === passo && !sucesso ? 'font-semibold text-slate-800' : 'text-slate-500'}`}>
+      <b className={`grid h-6 w-6 place-items-center rounded-full text-xs ${n < passo || sucesso
+        ? 'bg-marca-600 text-white' : n === passo ? 'bg-slate-800 text-superficie' : 'bg-slate-100 text-slate-600'}`}>
+        {n < passo || sucesso ? '✓' : n}
+      </b>
+      {rotulo}
+    </span>
+  );
+
+  function recomecar() {
+    setArquivo(null); setAbas(null); setAnalise(null); setErro(null); setSucesso(null);
+  }
+
   return (
-    <Cartao titulo="Importar avaliações">
+    <Quadro titulo="Importar avaliações">
+      <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <Passo n={1} rotulo="Escolher arquivo" />
+        <span aria-hidden className="h-px w-7 bg-slate-300" />
+        <Passo n={2} rotulo="Conferir" />
+        <span aria-hidden className="h-px w-7 bg-slate-300" />
+        <Passo n={3} rotulo="Importar" />
+      </div>
+
       <p className="mb-4 text-sm text-slate-600">
         Relatório de atendimentos do Hub (<code>.xlsx</code>). Entram só as avaliações com nota de 1 a 5:
         os setores <strong>Expansão</strong> e <strong>Diretores-Expansão</strong> são contados
@@ -262,12 +286,15 @@ export default function ImportadorAvaliacoes({
       </p>
 
       <div className="flex flex-wrap items-end gap-3">
-        <label>
-          <span className="mb-1 block text-xs font-medium text-slate-600">Arquivo</span>
+        <label className="flex min-w-72 flex-1 cursor-pointer flex-col items-center gap-1 rounded-2xl border-2
+                          border-dashed border-slate-300 px-6 py-6 text-center text-sm text-slate-500
+                          hover:border-marca-600">
+          {arquivo
+            ? <span><strong className="text-slate-800">{arquivo.name}</strong> · clique para trocar</span>
+            : <span><strong className="text-slate-800">Escolha o relatório do Hub</strong> (.xlsx)</span>}
           <input
-            type="file" accept=".xlsx" disabled={!!ocupado}
+            type="file" accept=".xlsx" disabled={!!ocupado} className="sr-only"
             onChange={(e) => escolherArquivo(e.target.files?.[0] ?? null)}
-            className="text-sm"
           />
         </label>
         {abasValidas.length > 1 && (
@@ -294,18 +321,26 @@ export default function ImportadorAvaliacoes({
 
       {analise && (
         <div className="mt-5 space-y-5 border-t border-slate-100 pt-5">
-          <dl className="grid gap-3 text-sm sm:grid-cols-3 lg:grid-cols-6">
-            {[
-              ['Formato', analise.formato === 'hub' ? 'Hub' : 'Huggy (e-mail)'],
-              ['Período', analise.periodo ? `${formatarData(analise.periodo[0])} a ${formatarData(analise.periodo[1])}` : '—'],
-              ['Linhas lidas', analise.lidas],
-              ['Sem avaliação', analise.semNota],
-              ['Duplicadas / já importadas', analise.duplicadasNoArquivo + analise.jaImportadas],
-              ['Novas', analise.novas.length],
-            ].map(([rotulo, valor]) => (
-              <div key={String(rotulo)} className="rounded-lg bg-slate-50 px-3 py-2 ring-1 ring-slate-200">
-                <dt className="text-xs text-slate-500">{rotulo}</dt>
-                <dd className="font-semibold tabular-nums text-slate-800">{valor}</dd>
+          <p className="text-xs text-slate-500">
+            {analise.formato === 'hub' ? 'Relatório do Hub' : 'Relatório da Huggy (e-mail)'}
+            {analise.periodo && ` · de ${formatarData(analise.periodo[0])} a ${formatarData(analise.periodo[1])}`}
+            {` · ${analise.lidas} linhas lidas, ${analise.semNota} sem avaliação`}
+          </p>
+          <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {([
+              ['No arquivo', analise.novas.length + analise.duplicadasNoArquivo + analise.jaImportadas + semVinculoTotal, 'avaliações com nota e data', 'normal'],
+              ['Já estavam no sistema', analise.duplicadasNoArquivo + analise.jaImportadas, 'serão ignoradas', 'apagado'],
+              ['Novas', analise.novas.length, 'entram agora', 'bom'],
+              ['Sem pessoa vinculada', semVinculoTotal, semVinculoTotal ? 'ficarão de fora (ver abaixo)' : 'todas vinculadas', semVinculoTotal ? 'atencao' : 'normal'],
+            ] as const).map(([rotulo, valor, nota, tom]) => (
+              <div key={rotulo} className={`rounded-2xl px-5 py-4 ring-1 ring-slate-200 ${tom === 'atencao' ? 'bg-amber-50' : ''}`}>
+                <dt className="text-[13px] text-slate-500">{rotulo}</dt>
+                <dd className={`text-2xl font-semibold tabular-nums ${tom === 'bom' ? 'text-marca-700 dark:text-marca-400'
+                  : tom === 'atencao' ? 'text-amber-700 dark:text-amber-300'
+                    : tom === 'apagado' ? 'text-slate-500' : 'text-slate-900'}`}>
+                  {valor.toLocaleString('pt-BR')}
+                </dd>
+                <dd className="mt-0.5 text-xs text-slate-500">{nota}</dd>
               </div>
             ))}
           </dl>
@@ -343,6 +378,7 @@ export default function ImportadorAvaliacoes({
               números separados. A Tabela tem margem negativa para encostar nas
               bordas do cartão; o py-5 devolve o espaço, senão o texto seguinte
               sobe por cima da última linha. */}
+          <div className="grid items-start gap-4 xl:grid-cols-2">
           {CANAIS.map((canal) => {
             const linhas = resumo.filter((r) => r.origem === canal);
             const total = linhas.reduce((s, r) => s + r.total, 0);
@@ -388,16 +424,23 @@ export default function ImportadorAvaliacoes({
               </section>
             );
           })}
+          </div>
 
-          <button
-            type="button" onClick={importar}
-            disabled={!!ocupado || bloqueado || analise.novas.length === 0}
-            className="rounded-lg bg-marca-600 px-4 py-2 text-sm font-semibold text-white hover:bg-marca-700 disabled:opacity-40"
-          >
-            {analise.novas.length ? `Importar ${analise.novas.length} avaliações` : 'Nada novo para importar'}
-          </button>
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={recomecar} disabled={!!ocupado}
+                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40">
+              Cancelar
+            </button>
+            <button
+              type="button" onClick={importar}
+              disabled={!!ocupado || bloqueado || analise.novas.length === 0}
+              className="rounded-lg bg-marca-600 px-4 py-2 text-sm font-semibold text-white hover:bg-marca-700 disabled:opacity-40"
+            >
+              {analise.novas.length ? `Importar ${analise.novas.length} avaliações` : 'Nada novo para importar'}
+            </button>
+          </div>
         </div>
       )}
-    </Cartao>
+    </Quadro>
   );
 }

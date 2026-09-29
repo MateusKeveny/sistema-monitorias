@@ -166,6 +166,22 @@ export function semanaDoCiclo(iso: string): number {
   return 4;
 }
 
+/** Primeiro e último dia (ISO) de uma semana do ciclo da competência. */
+export function periodoDaSemana(competencia: string, semana: number): [string, string] {
+  const [a, m] = competencia.split('-').map(Number);
+  const dia = (mes: number, d: number) => new Date(Date.UTC(a, mes - 1, d)).toISOString().slice(0, 10);
+  const limites: Record<number, [string, string]> = {
+    1: [dia(m - 1, 26), dia(m, 2)],
+    2: [dia(m, 3), dia(m, 10)],
+    3: [dia(m, 11), dia(m, 18)],
+    4: [dia(m, 19), dia(m, 25)],
+  };
+  return limites[semana];
+}
+
+/** '2026-09-03' → '03/09'. */
+export const diaMes = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+
 /** Mês de competência: dia >= 26 já pertence ao mês seguinte. */
 export function mesDeCompetencia(iso: string): string {
   let ano = Number(iso.slice(0, 4));

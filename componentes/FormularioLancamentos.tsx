@@ -3,11 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
-import { Cartao, Tabela, Th, Td, Vazio } from '@/componentes/ui';
-import { data as formatarData, semanaDoCiclo } from '@/lib/formatar';
-import type {
-  AvaliacaoDiretores, CargoDaPessoa, ConferenciaLancamento, Lancamento, PesoCargo, Pessoa, RegraCota,
-} from '@/lib/tipos';
+import { Quadro, Tabela, Th, Td, Vazio } from '@/componentes/ui';
+import type { CargoDaPessoa, Lancamento, PesoCargo, Pessoa, RegraCota } from '@/lib/tipos';
 
 const entrada = `w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm outline-none
                  focus:border-marca-600 disabled:bg-slate-50`;
@@ -20,24 +17,22 @@ const numero = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits:
 type Props = {
   competencia: string;
   canal: 'huggy' | 'diretores';
-  inicio: string;
-  fim: string;
   pessoas: Pessoa[];
   regras: RegraCota[];
   pesos: PesoCargo[];
   historico: CargoDaPessoa[];
   lancamentos: Lancamento[];
-  diretores: AvaliacaoDiretores[];
-  conferencia: ConferenciaLancamento[];
 };
 
 /**
- * O que não vem de sistema nenhum: lançamentos por regra (chamados, diretores,
- * demandas extras, atestado…) e as avaliações de diretores, nota a nota.
+ * O que não vem de sistema nenhum: lançamentos por regra (transferências,
+ * demandas extras, atestado…).
+ *
+ * As avaliações de diretores digitadas nota a nota saíram na 1.19.0: todas
+ * chegam pela importação (as 547 do banco vieram de lá, nenhuma digitada).
  */
 export default function FormularioLancamentos(props: Props) {
-  const { competencia, pessoas, historico, conferencia } = props;
-  const nomePessoa = new Map(pessoas.map((p) => [p.id, p.nome]));
+  const { competencia, pessoas, historico } = props;
 
   /** Cargo vigente da pessoa nesta competência. */
   const cargoDe = (pessoaId: string) => historico
@@ -46,29 +41,7 @@ export default function FormularioLancamentos(props: Props) {
 
   const comCargo = pessoas.filter((p) => cargoDe(p.id) != null);
 
-  return (
-    <div className="space-y-6">
-      {conferencia.length > 0 && (
-        <div className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-600/20">
-          <p className="font-semibold">Faixas que não fecham com o total</p>
-          <ul className="mt-1 list-disc pl-5">
-            {conferencia.map((c) => (
-              <li key={`${c.pessoa_id}-${c.bloco}`}>
-                {nomePessoa.get(c.pessoa_id) ?? 'Pessoa'} · {c.bloco}: {numero(Number(c.atendimentos))} no
-                total, {numero(Number(c.soma_das_faixas))} nas faixas
-                ({Number(c.diferenca) > 0 ? '+' : ''}{numero(Number(c.diferenca))})
-              </li>
-            ))}
-          </ul>
-          <p className="mt-1 text-xs">É só um aviso: confira se falta lançar alguma faixa.</p>
-        </div>
-      )}
-
-      <NovoLancamento {...props} pessoas={comCargo} cargoDe={cargoDe} />
-      {/* Avaliação digitada só existe no canal de diretores. */}
-      {props.canal === 'diretores' && <AvaliacoesDiretores {...props} pessoas={comCargo} />}
-    </div>
-  );
+  return <NovoLancamento {...props} pessoas={comCargo} cargoDe={cargoDe} />;
 }
 
 function NovoLancamento({
@@ -79,6 +52,7 @@ function NovoLancamento({
   const [f, setF] = useState(vazio);
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [filtro, setFiltro] = useState<string | null>(null);
 
   const cargo = f.pessoa ? cargoDe(f.pessoa) : null;
   // Só as regras que pontuam no cargo da pessoa escolhida.
@@ -89,6 +63,12 @@ function NovoLancamento({
   const regra = regras.find((r) => r.chave === f.regra) ?? null;
   const nomePessoa = new Map(pessoas.map((p) => [p.id, p.nome]));
   const rotuloRegra = new Map(regras.map((r) => [r.chave, r.rotulo]));
+
+  // O efeito no extrato antes de lançar: quantidade × peso do cargo, ou o
+  // valor digitado nas regras de valor manual.
+  const efeito = !regra || !f.pessoa ? null
+    : regra.valor_manual ? (f.pontos === '' ? null : Number(f.pontos))
+      : f.quantidade === '' ? null : Number(f.quantidade) * (pesoNoCargo.get(regra.chave) ?? 0);
 
   const set = (campo: keyof typeof vazio) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
@@ -129,7 +109,8 @@ function NovoLancamento({
   }
 
   return (
-    <Cartao titulo="Lançamentos manuais">
+    <Quadro titulo="Lançamentos manuais"
+            subtitulo="O que não vem de sistema: transferências, demandas extras, atestado, atraso…">
       <form onSubmit={salvar} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
         <label className="lg:col-span-2">
           <span className={rotuloCampo}>Pessoa</span>
@@ -187,15 +168,41 @@ function NovoLancamento({
         </div>
       </form>
 
+      {efeito != null && Number.isFinite(efeito) && (
+        <p className="mt-2 text-sm text-slate-500">
+          Vai {efeito < 0 ? 'tirar' : 'somar'}{' '}
+          <strong className={efeito < 0 ? 'text-rose-700 dark:text-rose-300' : 'text-marca-700 dark:text-marca-400'}>
+            {efeito < 0 ? '−' : '+'}{numero(Math.abs(efeito))} pts
+          </strong>
+          {' '}no extrato de {nomePessoa.get(f.pessoa)?.split(' ')[0]}, {f.semana ? `${f.semana}ª semana` : 'no mês'}.
+        </p>
+      )}
+
       {erro && (
         <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800 ring-1 ring-rose-600/20">{erro}</p>
       )}
 
-      <div className="mt-5 border-t border-slate-100 pt-5">
+      <div className="mt-5 border-t border-slate-100 pt-4">
+        {lancamentos.length > 0 && (
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            {[null, ...new Set(lancamentos.map((l) => l.pessoa_id))].map((id) => {
+              const ativo = filtro === id;
+              const qtd = id ? lancamentos.filter((l) => l.pessoa_id === id).length : lancamentos.length;
+              return (
+                <button key={id ?? 'todos'} type="button" aria-pressed={ativo} onClick={() => setFiltro(id)}
+                        className={`rounded-full border px-3 py-0.5 text-xs ${ativo
+                          ? 'border-marca-600 bg-marca-600/10 text-marca-700 dark:text-marca-400'
+                          : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+                  {id ? nomePessoa.get(id) ?? 'Pessoa' : 'Todos'} · {qtd}
+                </button>
+              );
+            })}
+          </div>
+        )}
         {lancamentos.length === 0 ? (
           <Vazio>Nenhum lançamento nesta competência.</Vazio>
         ) : (
-          <Tabela>
+          <Tabela noQuadro>
             <thead>
               <tr>
                 <Th>Pessoa</Th><Th>Semana</Th><Th>Regra</Th>
@@ -203,7 +210,7 @@ function NovoLancamento({
               </tr>
             </thead>
             <tbody>
-              {lancamentos.map((l) => (
+              {lancamentos.filter((l) => !filtro || l.pessoa_id === filtro).map((l) => (
                 <tr key={l.id}>
                   <Td>{nomePessoa.get(l.pessoa_id) ?? '—'}</Td>
                   <Td>{l.semana ? `${l.semana}ª` : 'mês'}</Td>
@@ -225,129 +232,6 @@ function NovoLancamento({
           </Tabela>
         )}
       </div>
-    </Cartao>
-  );
-}
-
-function AvaliacoesDiretores({ inicio, fim, pessoas, diretores }: Props) {
-  const router = useRouter();
-  const vazio = { pessoa: '', data: '', nota: '', protocolo: '', observacao: '' };
-  const [f, setF] = useState(vazio);
-  const [ocupado, setOcupado] = useState(false);
-  const [erro, setErro] = useState<string | null>(null);
-  const nomePessoa = new Map(pessoas.map((p) => [p.id, p.nome]));
-
-  const set = (campo: keyof typeof vazio) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-      setF((s) => ({ ...s, [campo]: e.target.value }));
-
-  async function salvar(e: React.FormEvent) {
-    e.preventDefault();
-    if (!f.pessoa || !f.data || !f.nota) return;
-    // A data define competência e semana; fora do ciclo aberto, iria parar em
-    // outro mês sem aparecer nesta lista.
-    if (f.data < inicio || f.data > fim) {
-      setErro(`A data precisa estar dentro do ciclo (${formatarData(inicio)} a ${formatarData(fim)}).`);
-      return;
-    }
-
-    setOcupado(true); setErro(null);
-    const { error } = await criarClienteNavegador().from('avaliacoes').insert({
-      pessoa_id: f.pessoa,
-      origem: 'diretores',
-      data: f.data,
-      nota: Number(f.nota),
-      protocolo: f.protocolo.trim() || null,
-      observacao: f.observacao.trim() || null,
-    });
-    setOcupado(false);
-    if (error) { setErro(error.message); return; }
-
-    setF((s) => ({ ...vazio, pessoa: s.pessoa, data: s.data }));
-    router.refresh();
-  }
-
-  async function excluir(a: AvaliacaoDiretores) {
-    if (!confirm(`Excluir a avaliação nota ${a.nota} de ${nomePessoa.get(a.pessoa_id) ?? 'pessoa'}?`)) return;
-    const { error } = await criarClienteNavegador().from('avaliacoes').delete().eq('id', a.id);
-    if (error) { setErro(error.message); return; }
-    router.refresh();
-  }
-
-  return (
-    <Cartao titulo={`Avaliações de diretores (${diretores.length})`}>
-      <form onSubmit={salvar} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-        <label className="lg:col-span-2">
-          <span className={rotuloCampo}>Pessoa</span>
-          <select value={f.pessoa} onChange={set('pessoa')} disabled={ocupado} className={entrada} required>
-            <option value="">Selecione…</option>
-            {pessoas.map((p) => (
-              <option key={p.id} value={p.id}>{p.nome}{p.ativo ? '' : ' · desligado'}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <span className={rotuloCampo}>Data</span>
-          <input type="date" min={inicio} max={fim} value={f.data} onChange={set('data')}
-                 disabled={ocupado} className={entrada} required />
-        </label>
-        <label>
-          <span className={rotuloCampo}>Nota</span>
-          <select value={f.nota} onChange={set('nota')} disabled={ocupado} className={entrada} required>
-            <option value="">—</option>
-            {[5, 4, 3, 2, 1].map((n) => <option key={n} value={n}>{n}</option>)}
-          </select>
-        </label>
-        <label className="lg:col-span-2">
-          <span className={rotuloCampo}>Protocolo</span>
-          <input value={f.protocolo} onChange={set('protocolo')} disabled={ocupado}
-                 className={entrada} placeholder="Opcional" />
-        </label>
-        <label className="lg:col-span-5">
-          <span className={rotuloCampo}>Observação</span>
-          <input value={f.observacao} onChange={set('observacao')} disabled={ocupado}
-                 className={entrada} placeholder="Campo aberto" />
-        </label>
-        <div className="flex items-end">
-          <button type="submit" disabled={ocupado || !f.pessoa || !f.data || !f.nota} className={botaoPrimario}>
-            {ocupado ? 'Salvando…' : 'Registrar'}
-          </button>
-        </div>
-      </form>
-
-      {erro && (
-        <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800 ring-1 ring-rose-600/20">{erro}</p>
-      )}
-
-      <div className="mt-5 border-t border-slate-100 pt-5">
-        {diretores.length === 0 ? (
-          <Vazio>Nenhuma avaliação de diretores neste ciclo.</Vazio>
-        ) : (
-          <Tabela>
-            <thead>
-              <tr><Th>Data</Th><Th>Semana</Th><Th>Pessoa</Th><Th>Nota</Th><Th>Protocolo</Th><Th>Observação</Th><Th /></tr>
-            </thead>
-            <tbody>
-              {diretores.map((a) => (
-                <tr key={a.id}>
-                  <Td className="tabular-nums">{formatarData(a.data)}</Td>
-                  <Td>{semanaDoCiclo(a.data)}ª</Td>
-                  <Td>{nomePessoa.get(a.pessoa_id) ?? '—'}</Td>
-                  <Td className="tabular-nums">{a.nota ?? '—'}</Td>
-                  <Td className="tabular-nums">{a.protocolo ?? ''}</Td>
-                  <Td className="text-xs text-slate-500">{a.observacao ?? ''}</Td>
-                  <Td>
-                    <button type="button" onClick={() => excluir(a)}
-                            className="text-xs text-slate-500 hover:text-rose-700 hover:underline">
-                      excluir
-                    </button>
-                  </Td>
-                </tr>
-              ))}
-            </tbody>
-          </Tabela>
-        )}
-      </div>
-    </Cartao>
+    </Quadro>
   );
 }
