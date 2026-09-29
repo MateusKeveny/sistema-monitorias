@@ -229,7 +229,11 @@ export default async function Comparativo({
 
         <Painel>
           <Secao titulo={veOTime ? titulo : titulo.replace('da equipe', 'sua')} subtitulo={subtitulo}>
-            <GraficoDeLinha largura={Math.max(640, meses.length * 90)} rotulos={meses.map(rotuloMes)}
+            {/* O SVG estica até a largura do quadro, que aqui é a tela inteira:
+                com 640 de base, textos e pontos ficavam mais que o dobro do
+                tamanho. Com base próxima da largura real, a escala fica perto
+                de 1. */}
+            <GraficoDeLinha largura={Math.max(1400, meses.length * 120)} rotulos={meses.map(rotuloMes)}
                             formatar={formatar} referencia={referencia} min={min} max={max}
                             pontos={equipe.map((x, i): PontoDaLinha => x == null ? null : { valor: x, tom: TOM_LINHA[tom(x, i)] })} />
           </Secao>

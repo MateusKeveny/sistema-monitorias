@@ -149,7 +149,7 @@ export default async function Historico({
           {serie.length > 1 && (
             <Quadro titulo="Pontos por mês"
                     subtitulo={`Verde na meta, âmbar até 10% abaixo, rosa mais abaixo.${metaRef ? ` Linha tracejada: a meta de ${num(Number(metaRef), 0)}.` : ''}`}>
-              <GraficoDeLinha largura={Math.max(640, serie.length * 90)} rotulos={serie.map((m) => rotuloCurto(m.mes_competencia))}
+              <GraficoDeLinha largura={Math.max(1400, serie.length * 120)} rotulos={serie.map((m) => rotuloCurto(m.mes_competencia))}
                               formatar={(v) => num(v, 0)}
                               referencia={metaRef ? { valor: Number(metaRef), rotulo: `meta ${num(Number(metaRef), 0)}` } : undefined}
                               pontos={serie.map((m): PontoDaLinha => ({ valor: Number(m.resultado), tom: tomDe(m) }))} />

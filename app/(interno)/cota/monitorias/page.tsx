@@ -126,7 +126,7 @@ export default async function MonitoriasDoAtendente({
           {serie.length > 1 && (
             <Painel>
               <Secao titulo="Nota média por mês" subtitulo="Linha tracejada: 85%, o piso para a monitoria pontuar.">
-                <GraficoDeLinha largura={Math.max(640, serie.length * 90)} rotulos={serie.map(rotuloMes)}
+                <GraficoDeLinha largura={Math.max(1400, serie.length * 120)} rotulos={serie.map(rotuloMes)}
                                 formatar={percentual} min={0.7} max={1}
                                 referencia={{ valor: 0.85, rotulo: 'piso 85%' }}
                                 pontos={serie.map((m): PontoDaLinha => {
