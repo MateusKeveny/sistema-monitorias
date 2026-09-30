@@ -173,7 +173,7 @@ Três versões, cada uma publicada e conferida antes da próxima:
   e pendência "vencem em até 7 dias" no Início do gestor e do Pleno. O
   registro com dia do ocorrido para trás mostra também quando foi registrado.
   A janela de 7 dias está na migração 37 e em `DIAS_PARA_RENOVAR`
-  (lib/diario.ts): mudar nos dois.
+  (lib/diario.ts): mudar nos dois. Conferida pelo gestor no site publicado.
 
 Visão de celular fica fora da revisão, por decisão do gestor.
 
