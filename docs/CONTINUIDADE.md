@@ -187,7 +187,7 @@ Três versões, cada uma publicada e conferida antes da próxima:
   leitura pendente"; ficha em Atendentes: pendências e última confirmação.
   Testado com o Teste de acesso nos 3 processos reais da Suyara (confirmações
   de teste apagadas). A migração 39 marca o Teste de acesso como
-  `perfil_de_teste`, fora da leitura.
+  `perfil_de_teste`, fora da leitura. Conferida pelo gestor no site publicado.
 
 Visão de celular fica fora da revisão, por decisão do gestor.
 
