@@ -11,9 +11,9 @@ Escrito em 28/09/2026, atualizado em 29/09/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.33.0** · Monitorias **4.16.0** (deploy de 30/09/2026) |
+| Publicado | Performance **1.34.0** · Monitorias **4.16.0** (deploy de 30/09/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
-| Migrações no banco | 01 a 44, todas aplicadas |
+| Migrações no banco | 01 a 45, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
 
 ### Revisão de design (28/09/2026)
@@ -232,6 +232,18 @@ Três versões, cada uma publicada e conferida antes da próxima:
   abrir) ou reports novos (gestor). Pendência no Início do gestor e quinto
   aviso do Teams, "reporte_novo". Testado com o Teste de acesso e o gestor.
   Aviso no Teams configurado e conferido pelo gestor no site publicado.
+- **1.34.0** (publicada; Monitorias sem mudança): **importação de vários
+  arquivos e notas guardadas** (migração 45). O importador lê vários .xlsx de
+  uma vez (no navegador), com linha por arquivo e total; mesma avaliação
+  (data + protocolo) entra uma vez, mesmo repetida entre arquivos; arquivo com
+  erro sai sem travar os outros; conversa só com o robô ("Sem atendente…" ou
+  vazio) é ignorada. Nota de atendente não reconhecido vai para
+  `avaliacoes_guardadas` (só gestor, fora da cota). Quadro "Notas guardadas"
+  em Importar: atribuir (com opção de gravar o nome em
+  `pessoas.nomes_hub_extras`) ou descartar. Salvar o Nome no Hub na ficha
+  (`salvar_nome_hub`) atribui sozinho as guardadas com o nome e avisa se
+  tocou mês fechado — o fechamento não muda. Agosto não tem avaliações de
+  Diretores no banco e não deve ser importado (decisão do gestor).
 
 Visão de celular fica fora da revisão, por decisão do gestor.
 

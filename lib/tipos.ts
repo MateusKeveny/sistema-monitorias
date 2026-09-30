@@ -19,6 +19,8 @@ export type Pessoa = {
   nome_huggy: string | null;
   /** Nome usado no Hub, que substituiu o Huggy em 03/09/2026. */
   nome_hub?: string | null;
+  /** Outras grafias do mesmo nome no Hub (migração 45). */
+  nomes_hub_extras?: string[];
   papel: PapelUsuario;
   avaliado: boolean;
   ativo: boolean;

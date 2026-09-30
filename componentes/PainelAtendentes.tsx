@@ -410,16 +410,27 @@ function Ficha({
                  className={`${entrada} min-w-0 flex-1`} />
           <button type="button" disabled={ocupado || hub.trim() === (pessoa.nome_hub ?? '')} className={botaoSecundario}
                   onClick={async () => {
-                    setOcupado(true); setErro(null);
-                    const { error } = await db().from('pessoas').update({ nome_hub: hub.trim() || null }).eq('id', pessoa.id);
+                    setOcupado(true); setErro(null); setAviso(null);
+                    // Pela função (migração 45): grava o nome e traz as notas
+                    // guardadas que vieram com ele nos relatórios.
+                    const { data: r, error } = await db().rpc('salvar_nome_hub', { p_pessoa: pessoa.id, p_nome: hub.trim() });
                     setOcupado(false);
                     if (error) { setErro(/duplicate|unique/i.test(error.message) ? 'Esse nome já é de outra pessoa.' : error.message); return; }
+                    const res = r as { quantidade: number; meses: string[]; fechados: string[] } | null;
+                    setAviso(res?.quantidade
+                      ? `Nome salvo. ${res.quantidade} nota${res.quantidade > 1 ? 's' : ''} guardada${res.quantidade > 1 ? 's' : ''} com esse nome `
+                        + `entr${res.quantidade > 1 ? 'aram' : 'ou'} na cota (${res.meses.map((m) => mesRotulo(m)).join(', ')}).`
+                        + (res.fechados.length ? ` ${res.fechados.map((m) => mesRotulo(m)).join(', ')} já ${res.fechados.length > 1 ? 'estão fechados' : 'está fechado'}: o fechamento não muda sozinho.` : '')
+                      : 'Nome salvo.');
                     router.refresh();
                   }}>
             Salvar
           </button>
         </div>
         <p className="mt-1 text-xs text-slate-500">É por ele que a importação acha a pessoa.</p>
+        {(pessoa.nomes_hub_extras ?? []).length > 0 && (
+          <p className="mt-1 text-xs text-slate-500">Também reconhecido como: {pessoa.nomes_hub_extras!.map((n) => `"${n}"`).join(', ')}.</p>
+        )}
       </Secao>
 
       <Secao titulo="Tela inicial">

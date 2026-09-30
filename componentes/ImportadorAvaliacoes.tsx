@@ -53,27 +53,48 @@ function lerData(v: unknown): string | null {
   return m ? `${m[3]}-${m[2]}-${m[1]}` : null;
 }
 
+/** "Sem atendente (bot/sem handoff)", vazio: conversa sem pessoa — não há a quem atribuir. */
+const ehRobo = (atendente: string) => !atendente || normalizar(atendente).startsWith('sem atendente');
+
 type Avaliacao = {
   pessoa_id: string; origem: Origem; data: string; protocolo: string;
-  nota: number; tabulacao: string | null;
+  nota: number; tabulacao: string | null; origem_arquivo: string;
 };
 
-type Analise = {
-  aba: string;
-  formato: 'hub' | 'huggy';
+/** Nota de atendente que nenhuma ficha reconhece: fica guardada (migração 45). */
+type Guardada = {
+  nome_no_arquivo: string; origem: Origem; data: string; protocolo: string;
+  nota: number; tabulacao: string | null; origem_arquivo: string;
+};
+
+type AnaliseArquivo = {
+  nome: string;
+  aba: string | null;
+  formato: 'hub' | 'huggy' | null;
+  /** Arquivo fora: sem as colunas, ilegível ou com setor desconhecido. */
+  erro: string | null;
   lidas: number;
   semNota: number;
   semData: number;
-  duplicadasNoArquivo: number;
+  robo: number;
+  repetidasNoLote: number;
   jaImportadas: number;
   novas: Avaliacao[];
-  semVinculo: Map<string, number>;
-  setoresDesconhecidos: Map<string, number>;
+  guardar: Guardada[];
   periodo: [string, string] | null;
 };
 
 const PAGINA = 1000;
 
+/**
+ * Importar avaliações (1.34.0): um ou vários relatórios de uma vez.
+ *
+ * Cada arquivo é lido aqui, no navegador (lib/xlsx-navegador) — o servidor só
+ * recebe as avaliações prontas, em lotes. A mesma avaliação (data + protocolo)
+ * entra uma vez só, venha de um arquivo, de dois ou de uma importação antiga.
+ * Nota de atendente não reconhecido é guardada, não descartada; conversa só
+ * com o robô é ignorada.
+ */
 export default function ImportadorAvaliacoes({
   pessoas, importadoPor,
 }: {
@@ -81,191 +102,207 @@ export default function ImportadorAvaliacoes({
   importadoPor: string;
 }) {
   const router = useRouter();
-  const [arquivo, setArquivo] = useState<File | null>(null);
-  const [abas, setAbas] = useState<Map<string, Linha[]> | null>(null);
-  const [aba, setAba] = useState('');
-  const [analise, setAnalise] = useState<Analise | null>(null);
+  const [arquivos, setArquivos] = useState<AnaliseArquivo[] | null>(null);
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [sucesso, setSucesso] = useState<string | null>(null);
 
-  const porNomeHub = useMemo(() => new Map(pessoas.filter((p) => p.nome_hub)
-    .map((p) => [normalizar(p.nome_hub), p])), [pessoas]);
+  // Nome no Hub principal e os nomes a mais (migração 45).
+  const porNomeHub = useMemo(() => {
+    const m = new Map<string, Pessoa>();
+    for (const p of pessoas) {
+      for (const n of [p.nome_hub, ...(p.nomes_hub_extras ?? [])]) if (n) m.set(normalizar(n), p);
+    }
+    return m;
+  }, [pessoas]);
   const porEmail = useMemo(() => new Map(pessoas.filter((p) => p.email)
     .map((p) => [normalizar(p.email), p])), [pessoas]);
   const nomePessoa = useMemo(() => new Map(pessoas.map((p) => [p.id, p.nome])), [pessoas]);
 
-  /** Abas que parecem relatório de avaliações. */
-  const abasValidas = abas
-    ? [...abas].filter(([, linhas]) => linhas.length && acharColunas(linhas[0])).map(([n]) => n)
-    : [];
-
-  async function escolherArquivo(f: File | null) {
-    setArquivo(f); setAbas(null); setAnalise(null); setErro(null); setSucesso(null);
-    if (!f) return;
-    setOcupado('Lendo a planilha…');
-    try {
-      const lidas = await lerPlanilha(f);
-      const validas = [...lidas].filter(([, l]) => l.length && acharColunas(l[0])).map(([n]) => n);
-      if (!validas.length) {
-        setErro('Nenhuma aba com as colunas Data, Protocolo, Atendente e CSAT/Avaliação.');
-      } else {
-        setAbas(lidas);
-        setAba(validas[0]);
-        await analisar(lidas, validas[0]);
-      }
-    } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Não foi possível ler o arquivo.');
-    }
-    setOcupado(null);
-  }
-
-  async function analisar(todas: Map<string, Linha[]>, nomeAba: string) {
-    setAnalise(null); setErro(null); setSucesso(null);
-    const [cabecalho, ...linhas] = todas.get(nomeAba)!;
-    const col = acharColunas(cabecalho)!;
-    const formato = col.setor ? 'hub' : 'huggy';
-
-    const a: Analise = {
-      aba: nomeAba, formato, lidas: linhas.length, semNota: 0, semData: 0,
-      duplicadasNoArquivo: 0, jaImportadas: 0, novas: [],
-      semVinculo: new Map(), setoresDesconhecidos: new Map(), periodo: null,
+  /** Lê um arquivo e separa as linhas, sem olhar o banco ainda. */
+  async function lerArquivo(f: File, vistas: Set<string>): Promise<AnaliseArquivo> {
+    const a: AnaliseArquivo = {
+      nome: f.name, aba: null, formato: null, erro: null, lidas: 0, semNota: 0, semData: 0, robo: 0,
+      repetidasNoLote: 0, jaImportadas: 0, novas: [], guardar: [], periodo: null,
     };
-    const somar = (m: Map<string, number>, k: string) => m.set(k, (m.get(k) ?? 0) + 1);
+    let abas: Map<string, Linha[]>;
+    try { abas = await lerPlanilha(f); } catch (e) {
+      a.erro = e instanceof Error ? e.message : 'Não foi possível ler o arquivo.'; return a;
+    }
+    const aba = [...abas].find(([, l]) => l.length && acharColunas(l[0]));
+    if (!aba) { a.erro = 'Nenhuma aba com as colunas Data, Protocolo, Atendente e CSAT/Avaliação.'; return a; }
 
-    const candidatas: Avaliacao[] = [];
-    const vistas = new Set<string>();
+    const [nomeAba, [cabecalho, ...linhas]] = aba;
+    const col = acharColunas(cabecalho)!;
+    a.aba = nomeAba; a.formato = col.setor ? 'hub' : 'huggy'; a.lidas = linhas.length;
+    const desconhecidos = new Map<string, number>();
 
     for (const l of linhas) {
       const nota = Number(l[col.nota]);
       // Só avaliações contam. Atendimento sem nota não é assunto da importação.
       if (!(nota >= 1 && nota <= 5)) { a.semNota++; continue; }
-
       const data = lerData(l[col.data]);
       if (!data) { a.semData++; continue; }
-
-      const protocolo = String(l[col.protocolo] ?? '').trim();
-      const chave = `${data}|${protocolo}`;
-      if (vistas.has(chave)) { a.duplicadasNoArquivo++; continue; }
-      vistas.add(chave);
 
       let origem: Origem = 'huggy';
       if (col.setor) {
         const setor = String(l[col.setor] ?? '');
         const o = SETORES[normalizar(setor)];
-        if (!o) { somar(a.setoresDesconhecidos, setor || '(vazio)'); continue; }
+        if (!o) { desconhecidos.set(setor || '(vazio)', (desconhecidos.get(setor || '(vazio)') ?? 0) + 1); continue; }
         origem = o;
       }
 
       const atendente = String(l[col.atendente] ?? '').trim();
-      const pessoa = formato === 'hub'
-        ? porNomeHub.get(normalizar(atendente))
-        : porEmail.get(normalizar(atendente));
-      if (!pessoa) { somar(a.semVinculo, atendente || '(sem atendente)'); continue; }
+      if (ehRobo(atendente)) { a.robo++; continue; }
 
-      candidatas.push({
-        pessoa_id: pessoa.id, origem, data, protocolo, nota,
-        tabulacao: col.tabulacao && l[col.tabulacao] != null ? String(l[col.tabulacao]) : null,
-      });
+      const protocolo = String(l[col.protocolo] ?? '').trim();
+      const chave = `${data}|${protocolo}`;
+      if (vistas.has(chave)) { a.repetidasNoLote++; continue; }
+      vistas.add(chave);
+
+      const tabulacao = col.tabulacao && l[col.tabulacao] != null ? String(l[col.tabulacao]) : null;
+      const pessoa = a.formato === 'hub' ? porNomeHub.get(normalizar(atendente)) : porEmail.get(normalizar(atendente));
+      if (pessoa) {
+        a.novas.push({ pessoa_id: pessoa.id, origem, data, protocolo, nota, tabulacao, origem_arquivo: f.name });
+      } else {
+        a.guardar.push({ nome_no_arquivo: atendente, origem, data, protocolo, nota, tabulacao, origem_arquivo: f.name });
+      }
     }
 
-    if (candidatas.length) {
-      const datas = candidatas.map((c) => c.data).sort();
-      a.periodo = [datas[0], datas[datas.length - 1]];
+    // Setor desconhecido costuma ser arquivo errado: o arquivo inteiro fica de fora.
+    if (desconhecidos.size) {
+      a.erro = `Setores desconhecidos: ${[...desconhecidos].map(([n, q]) => `${n} (${q})`).join(', ')}. Confira se é o relatório certo.`;
+      a.novas = []; a.guardar = [];
+      return a;
+    }
+    const datas = [...a.novas, ...a.guardar].map((c) => c.data).sort();
+    if (datas.length) a.periodo = [datas[0], datas[datas.length - 1]];
+    return a;
+  }
 
-      // O que já está no banco para o período, para não importar de novo.
+  async function escolherArquivos(lista: File[]) {
+    setArquivos(null); setErro(null); setSucesso(null);
+    if (!lista.length) return;
+    setOcupado(`Lendo ${lista.length > 1 ? `${lista.length} planilhas` : 'a planilha'}…`);
+
+    // A mesma avaliação em dois arquivos entra uma vez só.
+    const vistas = new Set<string>();
+    const lidos: AnaliseArquivo[] = [];
+    for (const f of lista) lidos.push(await lerArquivo(f, vistas));
+
+    // O que já está no banco — na cota ou guardado — no período de todos.
+    const validos = lidos.filter((a) => !a.erro && a.periodo);
+    if (validos.length) {
       setOcupado('Conferindo o que já foi importado…');
+      const de = validos.map((a) => a.periodo![0]).sort()[0];
+      const fins = validos.map((a) => a.periodo![1]).sort();
+      const ate = fins[fins.length - 1];
       const existentes = new Set<string>();
       const db = criarClienteNavegador();
-      for (let de = 0; ; de += PAGINA) {
-        const { data: pag, error } = await db.from('avaliacoes').select('data, protocolo')
-          .gte('data', a.periodo[0]).lte('data', a.periodo[1])
-          .order('id').range(de, de + PAGINA - 1);
-        if (error) { setErro(error.message); setOcupado(null); return; }
-        for (const r of pag ?? []) existentes.add(`${r.data}|${r.protocolo}`);
-        if ((pag ?? []).length < PAGINA) break;
+      for (const tabela of ['avaliacoes', 'avaliacoes_guardadas'] as const) {
+        for (let i = 0; ; i += PAGINA) {
+          const { data: pag, error } = await db.from(tabela).select('data, protocolo')
+            .gte('data', de).lte('data', ate).order('data').order('protocolo').range(i, i + PAGINA - 1);
+          if (error) { setErro(error.message); setOcupado(null); return; }
+          for (const r of pag ?? []) existentes.add(`${r.data}|${r.protocolo}`);
+          if ((pag ?? []).length < PAGINA) break;
+        }
       }
-      for (const c of candidatas) {
-        if (existentes.has(`${c.data}|${c.protocolo}`)) a.jaImportadas++;
-        else a.novas.push(c);
+      for (const a of validos) {
+        const antes = a.novas.length + a.guardar.length;
+        a.novas = a.novas.filter((c) => !existentes.has(`${c.data}|${c.protocolo}`));
+        a.guardar = a.guardar.filter((c) => !existentes.has(`${c.data}|${c.protocolo}`));
+        a.jaImportadas = antes - a.novas.length - a.guardar.length;
       }
     }
 
-    setAnalise(a);
+    setArquivos(lidos);
     setOcupado(null);
   }
 
+  const ok = (arquivos ?? []).filter((a) => !a.erro);
+  const novas = ok.flatMap((a) => a.novas);
+  const guardar = ok.flatMap((a) => a.guardar);
+  const periodoTotal = useMemo(() => {
+    const d = [...novas, ...guardar].map((c) => c.data).sort();
+    return d.length ? [d[0], d[d.length - 1]] as [string, string] : null;
+  }, [novas, guardar]);
+
   async function importar() {
-    if (!analise || !arquivo || bloqueado) return;
+    if (!arquivos || (!novas.length && !guardar.length)) return;
     setOcupado('Importando…'); setErro(null);
     const db = criarClienteNavegador();
     const agora = new Date().toISOString();
     const lote = 500;
 
-    for (let i = 0; i < analise.novas.length; i += lote) {
+    for (let i = 0; i < novas.length; i += lote) {
       const { error } = await db.from('avaliacoes').upsert(
-        analise.novas.slice(i, i + lote).map((n) => ({
-          ...n, origem_arquivo: arquivo.name, importado_por: importadoPor, importado_em: agora,
-        })),
+        novas.slice(i, i + lote).map((n) => ({ ...n, importado_por: importadoPor, importado_em: agora })),
         { onConflict: 'data,protocolo', ignoreDuplicates: true },
       );
       if (error) {
-        setErro(`Falha após ${i} avaliações: ${error.message}. Importe o arquivo de novo — `
-          + 'as que já entraram são ignoradas.');
+        setErro(`Falha após ${i} avaliações: ${error.message}. Importe os arquivos de novo — as que já entraram são ignoradas.`);
+        setOcupado(null);
+        return;
+      }
+    }
+    for (let i = 0; i < guardar.length; i += lote) {
+      const { error } = await db.from('avaliacoes_guardadas').upsert(
+        guardar.slice(i, i + lote).map((g) => ({ ...g, importado_por: importadoPor, importado_em: agora })),
+        { onConflict: 'data,protocolo', ignoreDuplicates: true },
+      );
+      if (error) {
+        setErro(`As avaliações entraram, mas as notas sem atendente não foram guardadas: ${error.message}.`);
         setOcupado(null);
         return;
       }
     }
 
-    // Avisa Pleno e qualidade no Teams que as monitorias da semana podem
-    // começar (migração 40). Falha no aviso não desfaz a importação.
+    // Avisa Pleno e qualidade no Teams que as monitorias podem começar
+    // (migração 40) — uma vez, com o período de todos os arquivos.
     let avisou = false;
-    if (analise.novas.length && analise.periodo) {
-      const { data } = await db.rpc('aviso_relatorio_importado', {
-        p_ate: analise.periodo[1], p_quantidade: analise.novas.length,
-      });
+    if (novas.length && periodoTotal) {
+      const { data } = await db.rpc('aviso_relatorio_importado', { p_ate: periodoTotal[1], p_quantidade: novas.length });
       avisou = data === true;
     }
 
-    setSucesso(`${analise.novas.length} avaliações importadas de "${arquivo.name}".`
+    setSucesso(`${novas.length} avaliações importadas`
+      + (guardar.length ? ` e ${guardar.length} guardadas sem atendente reconhecido` : '')
+      + ` de ${ok.length} arquivo${ok.length > 1 ? 's' : ''}.`
       + (avisou ? ' A monitoria foi avisada no Teams.' : ''));
-    setAnalise(null); setAbas(null); setArquivo(null);
+    setArquivos(null);
     setOcupado(null);
     router.refresh();
   }
 
-  // Pessoa sem vínculo NÃO bloqueia: importa o que casou e avisa o que ficou
-  // de fora. Depois de cadastrar o nome, reimportar o mesmo arquivo traz só as
-  // que faltaram — as já gravadas são ignoradas pela data + protocolo.
-  // Setor desconhecido continua bloqueando: costuma ser arquivo errado.
-  const bloqueado = !!analise && analise.setoresDesconhecidos.size > 0;
-  const semVinculoTotal = analise ? [...analise.semVinculo.values()].reduce((s, q) => s + q, 0) : 0;
-
   // Resumo por pessoa e origem, com as notas.
   const resumo = useMemo(() => {
-    if (!analise) return [];
     const m = new Map<string, { pessoa: string; origem: Origem; notas: number[]; total: number }>();
-    for (const n of analise.novas) {
+    for (const n of novas) {
       const k = `${n.pessoa_id}|${n.origem}`;
       if (!m.has(k)) m.set(k, { pessoa: nomePessoa.get(n.pessoa_id) ?? '—', origem: n.origem, notas: [0, 0, 0, 0, 0], total: 0 });
       const r = m.get(k)!; r.notas[n.nota - 1]++; r.total++;
     }
     return [...m.values()].sort((x, y) => x.origem.localeCompare(y.origem) || x.pessoa.localeCompare(y.pessoa));
-  }, [analise, nomePessoa]);
+  }, [novas, nomePessoa]);
 
   /** Total por semana do ciclo, separado por canal. */
   const porSemana = useMemo(() => {
     const m = new Map<Origem, Map<string, number>>(CANAIS.map((c) => [c, new Map()]));
-    for (const n of analise?.novas ?? []) {
+    for (const n of novas) {
       const k = `${mesDeCompetencia(n.data)}|${semanaDoCiclo(n.data)}`;
       const s = m.get(n.origem)!;
       s.set(k, (s.get(k) ?? 0) + 1);
     }
     return m;
-  }, [analise]);
+  }, [novas]);
+
+  /** Guardadas por nome como veio no arquivo. */
+  const guardarPorNome = [...guardar.reduce((m, g) => m.set(g.nome_no_arquivo, (m.get(g.nome_no_arquivo) ?? 0) + 1),
+    new Map<string, number>())].sort((a, b) => b[1] - a[1]);
 
   // Três passos (1.19.0): escolher, conferir, importar.
-  const passo = sucesso ? 3 : analise ? 2 : 1;
+  const passo = sucesso ? 3 : arquivos ? 2 : 1;
   const Passo = ({ n, rotulo }: { n: number; rotulo: string }) => (
     <span className={`flex items-center gap-2 text-sm ${n === passo && !sucesso ? 'font-semibold text-slate-800' : 'text-slate-500'}`}>
       <b className={`grid h-6 w-6 place-items-center rounded-full text-xs ${n < passo || sucesso
@@ -276,14 +313,12 @@ export default function ImportadorAvaliacoes({
     </span>
   );
 
-  function recomecar() {
-    setArquivo(null); setAbas(null); setAnalise(null); setErro(null); setSucesso(null);
-  }
+  const soma = (f: (a: AnaliseArquivo) => number) => ok.reduce((s, a) => s + f(a), 0);
 
   return (
     <Quadro titulo="Importar avaliações">
       <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
-        <Passo n={1} rotulo="Escolher arquivo" />
+        <Passo n={1} rotulo="Escolher arquivos" />
         <span aria-hidden className="h-px w-7 bg-slate-300" />
         <Passo n={2} rotulo="Conferir" />
         <span aria-hidden className="h-px w-7 bg-slate-300" />
@@ -291,163 +326,141 @@ export default function ImportadorAvaliacoes({
       </div>
 
       <p className="mb-4 text-sm text-slate-600">
-        Relatório de atendimentos do Hub (<code>.xlsx</code>). Entram só as avaliações com nota de 1 a 5:
-        os setores <strong>Expansão</strong> e <strong>Diretores-Expansão</strong> são contados
-        separadamente, mesmo para quem atende os dois. Avaliação com a mesma data e protocolo de uma já importada é ignorada.
+        Relatórios de atendimentos do Hub (<code>.xlsx</code>), um ou vários de uma vez. Entram só as avaliações com nota
+        de 1 a 5: os setores <strong>Expansão</strong> e <strong>Diretores-Expansão</strong> são contados separadamente.
+        A mesma avaliação (data e protocolo) entra uma vez só. Nota de atendente não reconhecido fica guardada;
+        conversa só com o robô é ignorada.
       </p>
 
-      <div className="flex flex-wrap items-end gap-3">
-        <label className="flex min-w-72 flex-1 cursor-pointer flex-col items-center gap-1 rounded-2xl border-2
-                          border-dashed border-slate-300 px-6 py-6 text-center text-sm text-slate-500
-                          hover:border-marca-600">
-          {arquivo
-            ? <span><strong className="text-slate-800">{arquivo.name}</strong> · clique para trocar</span>
-            : <span><strong className="text-slate-800">Escolha o relatório do Hub</strong> (.xlsx)</span>}
-          <input
-            type="file" accept=".xlsx" disabled={!!ocupado} className="sr-only"
-            onChange={(e) => escolherArquivo(e.target.files?.[0] ?? null)}
-          />
-        </label>
-        {abasValidas.length > 1 && (
-          <label>
-            <span className="mb-1 block text-xs font-medium text-slate-600">Aba</span>
-            <select
-              value={aba} disabled={!!ocupado}
-              onChange={async (e) => { setAba(e.target.value); await analisar(abas!, e.target.value); }}
-              className="rounded-md border border-slate-300 px-2 py-1 text-sm"
-            >
-              {abasValidas.map((n) => <option key={n} value={n}>{n}</option>)}
-            </select>
-          </label>
-        )}
-      </div>
+      <label className="flex cursor-pointer flex-col items-center gap-1 rounded-2xl border-2 border-dashed border-slate-300
+                        px-6 py-6 text-center text-sm text-slate-500 hover:border-marca-600">
+        {arquivos
+          ? <span><strong className="text-slate-800">{arquivos.length} arquivo{arquivos.length > 1 ? 's' : ''}</strong> · clique para trocar</span>
+          : <span><strong className="text-slate-800">Escolha os relatórios do Hub</strong> (.xlsx) — pode selecionar vários</span>}
+        <input type="file" accept=".xlsx" multiple disabled={!!ocupado} className="sr-only"
+               onChange={(e) => { escolherArquivos([...(e.target.files ?? [])]); e.target.value = ''; }} />
+      </label>
 
       {ocupado && <p className="mt-4 text-sm text-slate-500">{ocupado}</p>}
-      {erro && (
-        <p className="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800 ring-1 ring-rose-600/20">{erro}</p>
-      )}
-      {sucesso && (
-        <p className="mt-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-emerald-600/20">{sucesso}</p>
-      )}
+      {erro && <p className="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800 ring-1 ring-rose-600/20">{erro}</p>}
+      {sucesso && <p className="mt-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-emerald-600/20">{sucesso}</p>}
 
-      {analise && (
+      {arquivos && (
         <div className="mt-5 space-y-5 border-t border-slate-100 pt-5">
+          <div className="px-1">
+            <Tabela>
+              <thead>
+                <tr>
+                  <Th>Arquivo</Th><Th>Período</Th><Th className="text-right">Novas</Th>
+                  <Th className="text-right">Já no sistema</Th><Th className="text-right">Guardar</Th>
+                  <Th className="text-right">Robô</Th><Th className="text-right">Repetidas</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {arquivos.map((a) => (
+                  <tr key={a.nome}>
+                    <Td>
+                      <span className="block max-w-xs truncate font-medium text-slate-800" title={a.nome}>{a.nome}</span>
+                      {a.erro
+                        ? <span className="block text-xs text-rose-700 dark:text-rose-300">Fora da importação: {a.erro}</span>
+                        : <span className="block text-xs text-slate-500">aba {a.aba} · {a.lidas} linhas, {a.semNota} sem avaliação{a.semData ? `, ${a.semData} sem data` : ''}</span>}
+                    </Td>
+                    <Td className="whitespace-nowrap text-xs">{a.periodo ? `${formatarData(a.periodo[0])} a ${formatarData(a.periodo[1])}` : '—'}</Td>
+                    <Td className="text-right font-semibold tabular-nums">{a.erro ? '—' : a.novas.length}</Td>
+                    <Td className="text-right tabular-nums text-slate-500">{a.erro ? '—' : a.jaImportadas}</Td>
+                    <Td className="text-right tabular-nums">{a.erro ? '—' : a.guardar.length || ''}</Td>
+                    <Td className="text-right tabular-nums text-slate-500">{a.erro ? '—' : a.robo || ''}</Td>
+                    <Td className="text-right tabular-nums text-slate-500">{a.erro ? '—' : a.repetidasNoLote || ''}</Td>
+                  </tr>
+                ))}
+                {arquivos.length > 1 && (
+                  <tr className="font-semibold">
+                    <Td>Total</Td>
+                    <Td className="whitespace-nowrap text-xs">{periodoTotal ? `${formatarData(periodoTotal[0])} a ${formatarData(periodoTotal[1])}` : '—'}</Td>
+                    <Td className="text-right tabular-nums">{novas.length}</Td>
+                    <Td className="text-right tabular-nums">{soma((a) => a.jaImportadas)}</Td>
+                    <Td className="text-right tabular-nums">{guardar.length || ''}</Td>
+                    <Td className="text-right tabular-nums">{soma((a) => a.robo) || ''}</Td>
+                    <Td className="text-right tabular-nums">{soma((a) => a.repetidasNoLote) || ''}</Td>
+                  </tr>
+                )}
+              </tbody>
+            </Tabela>
+          </div>
           <p className="text-xs text-slate-500">
-            {analise.formato === 'hub' ? 'Relatório do Hub' : 'Relatório da Huggy (e-mail)'}
-            {analise.periodo && ` · de ${formatarData(analise.periodo[0])} a ${formatarData(analise.periodo[1])}`}
-            {` · ${analise.lidas} linhas lidas, ${analise.semNota} sem avaliação`}
+            <b>Repetidas</b>: a mesma avaliação em mais de um arquivo — entra uma vez. <b>Robô</b>: conversas sem atendente, ignoradas.
           </p>
-          <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {([
-              ['No arquivo', analise.novas.length + analise.duplicadasNoArquivo + analise.jaImportadas + semVinculoTotal, 'avaliações com nota e data', 'normal'],
-              ['Já estavam no sistema', analise.duplicadasNoArquivo + analise.jaImportadas, 'serão ignoradas', 'apagado'],
-              ['Novas', analise.novas.length, 'entram agora', 'bom'],
-              ['Sem pessoa vinculada', semVinculoTotal, semVinculoTotal ? 'ficarão de fora (ver abaixo)' : 'todas vinculadas', semVinculoTotal ? 'atencao' : 'normal'],
-            ] as const).map(([rotulo, valor, nota, tom]) => (
-              <div key={rotulo} className={`rounded-2xl px-5 py-4 ring-1 ring-slate-200 ${tom === 'atencao' ? 'bg-amber-50' : ''}`}>
-                <dt className="text-[13px] text-slate-500">{rotulo}</dt>
-                <dd className={`text-2xl font-semibold tabular-nums ${tom === 'bom' ? 'text-marca-700 dark:text-marca-400'
-                  : tom === 'atencao' ? 'text-amber-700 dark:text-amber-300'
-                    : tom === 'apagado' ? 'text-slate-500' : 'text-slate-900'}`}>
-                  {valor.toLocaleString('pt-BR')}
-                </dd>
-                <dd className="mt-0.5 text-xs text-slate-500">{nota}</dd>
-              </div>
-            ))}
-          </dl>
 
-          {analise.semData > 0 && (
-            <p className="text-xs text-slate-500">{analise.semData} avaliação(ões) sem data foram ignoradas.</p>
-          )}
-
-          {analise.semVinculo.size > 0 && (
+          {guardarPorNome.length > 0 && (
             <div className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-600/20">
               <p className="font-semibold">
-                {semVinculoTotal} avaliação(ões) ficarão de fora — {analise.formato === 'hub' ? 'nome' : 'e-mail'} sem pessoa vinculada
+                {guardar.length} nota{guardar.length > 1 ? 's' : ''} de atendente{guardarPorNome.length > 1 ? 's' : ''} não reconhecido{guardarPorNome.length > 1 ? 's' : ''} ser{guardar.length > 1 ? 'ão' : 'á'} guardada{guardar.length > 1 ? 's' : ''}, sem entrar na cota
               </p>
-              <p className="mt-1">
-                {[...analise.semVinculo].map(([n, q]) => `${n} (${q})`).join(', ')}.
-              </p>
+              <p className="mt-1">{guardarPorNome.map(([n, q]) => `"${n}" (${q})`).join(', ')}.</p>
               <p className="mt-1 text-xs">
-                As demais são importadas normalmente.
-                {analise.formato === 'hub' && ' Para incluir estas depois, cadastre o "Nome no Hub" em Configuração e importe o mesmo arquivo de novo — só as que faltaram entram.'}
+                Grave o nome como Nome no Hub na ficha da pessoa (Atendentes) e as notas entram sozinhas — ou atribua no quadro
+                "Notas guardadas", abaixo.
               </p>
             </div>
           )}
 
-          {bloqueado && (
-            <div className="rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-900 ring-1 ring-rose-600/20">
-              <p className="font-semibold">Importação bloqueada</p>
-              <p className="mt-1">
-                Setores desconhecidos: {[...analise.setoresDesconhecidos].map(([n, q]) => `${n} (${q})`).join(', ')}.
-                Confira se é o relatório certo.
-              </p>
-            </div>
-          )}
-
-          {/* Um bloco por canal: quem atende os dois aparece nos dois, com os
-              números separados. A Tabela tem margem negativa para encostar nas
-              bordas do cartão; o py-5 devolve o espaço, senão o texto seguinte
-              sobe por cima da última linha. */}
           <div className="grid items-start gap-4 xl:grid-cols-2">
-          {CANAIS.map((canal) => {
-            const linhas = resumo.filter((r) => r.origem === canal);
-            const total = linhas.reduce((s, r) => s + r.total, 0);
-            const semanas = [...porSemana.get(canal)!].sort();
-            return (
-              <section key={canal} className="rounded-lg ring-1 ring-slate-200">
-                <header className="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-100 px-4 py-2.5">
-                  <h3 className="text-sm font-semibold text-slate-800">{ROTULO_ORIGEM[canal]}</h3>
-                  <span className="text-sm tabular-nums text-slate-600">{total} avaliações novas</span>
-                </header>
-                {linhas.length === 0 ? (
-                  <p className="px-4 py-4 text-sm text-slate-500">Nenhuma avaliação deste canal no arquivo.</p>
-                ) : (
-                  <div className="px-5 py-5">
-                    <Tabela>
-                      <thead>
-                        <tr>
-                          <Th>Pessoa</Th>
-                          {[1, 2, 3, 4, 5].map((n) => <Th key={n} className="text-right">Nota {n}</Th>)}
-                          <Th className="text-right">Total</Th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {linhas.map((r) => (
-                          <tr key={r.pessoa}>
-                            <Td>{r.pessoa}</Td>
-                            {r.notas.map((q, i) => <Td key={i} className="text-right tabular-nums">{q || ''}</Td>)}
-                            <Td className="text-right font-semibold tabular-nums">{r.total}</Td>
+            {CANAIS.map((canal) => {
+              const linhas = resumo.filter((r) => r.origem === canal);
+              const total = linhas.reduce((s, r) => s + r.total, 0);
+              const semanas = [...porSemana.get(canal)!].sort();
+              return (
+                <section key={canal} className="rounded-lg ring-1 ring-slate-200">
+                  <header className="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-100 px-4 py-2.5">
+                    <h3 className="text-sm font-semibold text-slate-800">{ROTULO_ORIGEM[canal]}</h3>
+                    <span className="text-sm tabular-nums text-slate-600">{total} avaliações novas</span>
+                  </header>
+                  {linhas.length === 0 ? (
+                    <p className="px-4 py-4 text-sm text-slate-500">Nenhuma avaliação nova deste canal.</p>
+                  ) : (
+                    <div className="px-5 py-5">
+                      <Tabela>
+                        <thead>
+                          <tr>
+                            <Th>Pessoa</Th>
+                            {[1, 2, 3, 4, 5].map((n) => <Th key={n} className="text-right">Nota {n}</Th>)}
+                            <Th className="text-right">Total</Th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </Tabela>
-                  </div>
-                )}
-                {semanas.length > 0 && (
-                  <p className="border-t border-slate-100 px-4 py-2 text-xs text-slate-500">
-                    Por semana: {semanas.map(([k, q]) => {
-                      const [mes, sem] = k.split('|');
-                      return `${mesRotulo(mes)} ${sem}ª: ${q}`;
-                    }).join(' · ')}
-                  </p>
-                )}
-              </section>
-            );
-          })}
+                        </thead>
+                        <tbody>
+                          {linhas.map((r) => (
+                            <tr key={r.pessoa}>
+                              <Td>{r.pessoa}</Td>
+                              {r.notas.map((q, i) => <Td key={i} className="text-right tabular-nums">{q || ''}</Td>)}
+                              <Td className="text-right font-semibold tabular-nums">{r.total}</Td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </Tabela>
+                    </div>
+                  )}
+                  {semanas.length > 0 && (
+                    <p className="border-t border-slate-100 px-4 py-2 text-xs text-slate-500">
+                      Por semana: {semanas.map(([k, q]) => {
+                        const [mes, sem] = k.split('|');
+                        return `${mesRotulo(mes)} ${sem}ª: ${q}`;
+                      }).join(' · ')}
+                    </p>
+                  )}
+                </section>
+              );
+            })}
           </div>
 
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={recomecar} disabled={!!ocupado}
+            <button type="button" onClick={() => { setArquivos(null); setErro(null); setSucesso(null); }} disabled={!!ocupado}
                     className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40">
               Cancelar
             </button>
-            <button
-              type="button" onClick={importar}
-              disabled={!!ocupado || bloqueado || analise.novas.length === 0}
-              className="rounded-lg bg-marca-600 px-4 py-2 text-sm font-semibold text-white hover:bg-marca-700 disabled:opacity-40"
-            >
-              {analise.novas.length ? `Importar ${analise.novas.length} avaliações` : 'Nada novo para importar'}
+            <button type="button" onClick={importar} disabled={!!ocupado || (!novas.length && !guardar.length)}
+                    className="rounded-lg bg-marca-600 px-4 py-2 text-sm font-semibold text-white hover:bg-marca-700 disabled:opacity-40">
+              {!novas.length && !guardar.length ? 'Nada novo para importar'
+                : `Importar ${novas.length}${guardar.length ? ` e guardar ${guardar.length}` : ''}`}
             </button>
           </div>
         </div>

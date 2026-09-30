@@ -1,5 +1,6 @@
 import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
 import ImportadorAvaliacoes from '@/componentes/ImportadorAvaliacoes';
+import NotasGuardadas, { type NotaGuardada } from '@/componentes/NotasGuardadas';
 import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
 import { Quadro } from '@/componentes/ui';
 import { dataHora, diaMes, hojeNoBrasil, mesDeCompetencia, periodoDaSemana } from '@/lib/formatar';
@@ -41,6 +42,11 @@ export default async function ImportarAvaliacoes({
       .not('importado_em', 'is', null).order('importado_em', { ascending: false }).limit(1).maybeSingle(),
     ...CANAIS.flatMap(([origem]) => SEMANAS.map((s) => contar(origem, s))),
   ]);
+
+  // Notas de atendentes não reconhecidos, esperando atribuição (migração 45).
+  const { data: guardadas } = await db.from('avaliacoes_guardadas')
+    .select('nome_no_arquivo, nome_normalizado, data, nota, origem_arquivo, importado_em')
+    .eq('situacao', 'guardada').order('data').limit(5000);
 
   const lista = (pessoas ?? []) as Pessoa[];
   const ultimaImportacao = ultima.data as { importado_em: string; importado_por: string | null } | null;
@@ -114,6 +120,8 @@ export default async function ImportarAvaliacoes({
       </Quadro>
 
       <ImportadorAvaliacoes pessoas={lista} importadoPor={perfil.id} />
+      <NotasGuardadas notas={(guardadas ?? []) as NotaGuardada[]}
+                      pessoas={lista.filter((p) => p.ativo && !p.desligado_em).map((p) => ({ id: p.id, nome: p.nome }))} />
     </div>
   );
 }
