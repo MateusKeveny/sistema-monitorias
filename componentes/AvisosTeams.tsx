@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 
 export type SituacaoAviso = {
-  chave: 'semana_encerrada' | 'monitorias_liberadas' | 'lembrete_fechamento';
+  chave: 'semana_encerrada' | 'monitorias_liberadas' | 'lembrete_fechamento' | 'diario_novidades';
   url: string | null;
   ultimo_envio: string | null;
   ultimo_titulo: string | null;
@@ -16,6 +16,8 @@ export type SituacaoAviso = {
 const AVISOS: { chave: SituacaoAviso['chave']; titulo: string; quando: string }[] = [
   { chave: 'semana_encerrada', titulo: 'Semana encerrada e mês fechado',
     quando: 'Canal da equipe · às 8h do dia seguinte ao fim de cada semana do ciclo, e quando o gestor fecha o mês' },
+  { chave: 'diario_novidades', titulo: 'Novidades do diário',
+    quando: 'Canal da equipe · quando um processo novo ou treinamento é concluído no diário' },
   { chave: 'monitorias_liberadas', titulo: 'Monitorias liberadas',
     quando: 'Pleno e qualidade · quando o gestor importa o relatório de atendimentos' },
   { chave: 'lembrete_fechamento', titulo: 'Lembrete de fechamento',

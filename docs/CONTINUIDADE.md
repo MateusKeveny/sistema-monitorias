@@ -11,9 +11,9 @@ Escrito em 28/09/2026, atualizado em 29/09/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.31.0** · Monitorias **4.15.1** (deploy de 30/09/2026) |
+| Publicado | Performance **1.31.1** · Monitorias **4.15.1** (deploy de 30/09/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
-| Migrações no banco | 01 a 41, todas aplicadas |
+| Migrações no banco | 01 a 42, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
 
 ### Revisão de design (28/09/2026)
@@ -207,6 +207,11 @@ Três versões, cada uma publicada e conferida antes da próxima:
   "semana_encerrada" (canal da equipe), uma vez por competência, com link
   para o extrato do mês. Textos da tela de avisos com os nomes reais dos
   modelos do Teams ("Enviar alertas de webhook para um canal/chat").
+- **1.31.1** (publicada; numerada como correção por decisão do gestor):
+  **aviso de novidades do diário** (migração 42). Processo ou treinamento
+  concluído (ao registrar ou ao ser aprovado) e que ainda exige leitura vira
+  cartão no destino `diario_novidades`, uma vez por registro: resumo de até
+  280 caracteres e botão para o painel, onde a leitura é confirmada.
 
 Visão de celular fica fora da revisão, por decisão do gestor.
 
