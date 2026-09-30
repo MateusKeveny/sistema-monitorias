@@ -211,7 +211,8 @@ Três versões, cada uma publicada e conferida antes da próxima:
   **aviso de novidades do diário** (migração 42). Processo ou treinamento
   concluído (ao registrar ou ao ser aprovado) e que ainda exige leitura vira
   cartão no destino `diario_novidades`, uma vez por registro: resumo de até
-  280 caracteres e botão para o painel, onde a leitura é confirmada.
+  280 caracteres e botão para o painel, onde a leitura é confirmada. Configurado
+  e testado pelo gestor no site publicado.
 
 Visão de celular fica fora da revisão, por decisão do gestor.
 
