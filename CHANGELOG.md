@@ -9,6 +9,12 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 4.15.1
+
+- Consulta do diário: nos 7 dias antes de vencer, a validade aparece como
+  "Vence em N dias"; e o registro com dia do ocorrido anterior mostra também
+  a data em que foi registrado.
+
 ## 4.15.0
 
 - Consulta do diário e aviso na monitoria mostram a **validade** do registro:

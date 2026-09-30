@@ -7,6 +7,7 @@ import PainelAtendente from '@/componentes/PainelAtendente';
 import PainelPleno from '@/componentes/PainelPleno';
 import { data as formatarData, hojeNoBrasil, mesRotulo } from '@/lib/formatar';
 import { mesAnterior, resolverCompetencia } from '@/lib/competencia';
+import { limiteDeRenovacao } from '@/lib/diario';
 
 export const dynamic = 'force-dynamic';
 
@@ -149,29 +150,42 @@ export default async function InicioCota({
 
   if (cargoId && media?.ativo) {
     const veOTime = perfil.papel !== 'operador';
-    // O Pleno aprova os registros do diário que aguardam (migração 33) — a
-    // única pendência do gestor que também é dele.
+    // O Pleno aprova os registros do diário que aguardam (migração 33) e
+    // renova os que vencem em até 7 dias (37) — as pendências do gestor que
+    // também são dele.
     const { data: aprova } = await db.rpc('aprova_diario');
-    const { count: aguardando } = aprova === true
-      ? await db.from('diario_registros').select('id', { count: 'exact', head: true })
-          .eq('situacao', 'aguardando').neq('pessoa_id', perfil.id)
-      : { count: 0 };
+    const [{ count: aguardando }, { count: vencendo }] = aprova === true
+      ? await Promise.all([
+          db.from('diario_registros').select('id', { count: 'exact', head: true })
+            .eq('situacao', 'aguardando').neq('pessoa_id', perfil.id),
+          db.from('diario_registros').select('id', { count: 'exact', head: true })
+            .gte('valido_ate', hojeNoBrasil()).lte('valido_ate', limiteDeRenovacao(hojeNoBrasil())),
+        ])
+      : [{ count: 0 }, { count: 0 }];
+    const pendenciasDoDiario = [
+      aguardando && { texto: `${aguardando} registro${aguardando > 1 ? 's' : ''} do diário aguardando aprovação`,
+                      acao: 'Revisar', href: '/cota/diario?filtro=aguardando' },
+      vencendo && { texto: `${vencendo} registro${vencendo > 1 ? 's' : ''} do diário vence${vencendo > 1 ? 'm' : ''} em até 7 dias`,
+                    acao: 'Renovar', href: '/cota/diario?filtro=vencendo' },
+    ].filter(Boolean) as { texto: string; acao: string; href: string }[];
     return (
       <ProvedorDeCanal inicial={canalPedido === 'diretores' ? 'diretores' : 'huggy'}>
         <div className="space-y-6">
           <Topo selo={seloOperador} />
-          {!!aguardando && (
+          {pendenciasDoDiario.length > 0 && (
             <div className="flex flex-wrap items-center gap-2">
               <span className="mr-1 text-sm font-semibold text-sobre-fundo">Precisa de você</span>
-              <Link href="/cota/diario?filtro=aguardando"
-                    className="inline-flex items-center gap-2 rounded-xl bg-superficie py-1.5 pl-3 pr-1.5 text-sm text-slate-800
-                               shadow-sm transition hover:ring-2 hover:ring-marca-600/40">
-                <span aria-hidden className="h-2 w-2 shrink-0 rounded-full bg-amber-500" />
-                {aguardando} registro{aguardando > 1 ? 's' : ''} do diário aguardando aprovação
-                <span className="rounded-md bg-marca-50 px-2 py-0.5 text-xs font-semibold text-marca-700 dark:text-marca-400">
-                  Revisar ›
-                </span>
-              </Link>
+              {pendenciasDoDiario.map((p) => (
+                <Link key={p.href} href={p.href}
+                      className="inline-flex items-center gap-2 rounded-xl bg-superficie py-1.5 pl-3 pr-1.5 text-sm text-slate-800
+                                 shadow-sm transition hover:ring-2 hover:ring-marca-600/40">
+                  <span aria-hidden className="h-2 w-2 shrink-0 rounded-full bg-amber-500" />
+                  {p.texto}
+                  <span className="rounded-md bg-marca-50 px-2 py-0.5 text-xs font-semibold text-marca-700 dark:text-marca-400">
+                    {p.acao} ›
+                  </span>
+                </Link>
+              ))}
             </div>
           )}
           <PainelPleno pessoaId={perfil.id} cargoId={cargoId} competencia={competencia} />

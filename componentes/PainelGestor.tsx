@@ -6,6 +6,7 @@ import { BarraDeMeta, Painel, Secao, Vazio } from '@/componentes/ui';
 import { criarClienteServidor } from '@/lib/supabase/servidor';
 import { corDoCsat, hojeNoBrasil, percentual, semanaDoCiclo } from '@/lib/formatar';
 import { mesAnterior } from '@/lib/competencia';
+import { limiteDeRenovacao } from '@/lib/diario';
 
 const CANAIS: Canal[] = ['huggy', 'diretores'];
 const META_CSAT = 0.95;
@@ -73,7 +74,7 @@ export default async function PainelGestor({
   const meses = [competencia, anterior];
   const db = await criarClienteServidor();
 
-  const [pessoas, csat, volume, criterios, cota, cargos, fechados, monitorias, valores, semCargo, conferir, diario]
+  const [pessoas, csat, volume, criterios, cota, cargos, fechados, monitorias, valores, semCargo, conferir, diario, vencendo]
     = await Promise.all([
     db.from('pessoas').select('id, nome, exibir_no_painel, conta_nas_medias'),
     db.from('vw_csat_semanal').select('pessoa_id, origem, semana, avaliacoes, positivas, mes_competencia')
@@ -93,6 +94,9 @@ export default async function PainelGestor({
     db.from('vw_sem_cargo').select('nome').eq('mes_competencia', competencia),
     db.from('vw_lancamentos_a_conferir').select('bloco').eq('mes_competencia', competencia),
     db.from('diario_registros').select('id', { count: 'exact', head: true }).eq('situacao', 'aguardando'),
+    // Validade nos próximos 7 dias: dá para renovar (migração 37).
+    db.from('diario_registros').select('id', { count: 'exact', head: true })
+      .gte('valido_ate', hojeNoBrasil()).lte('valido_ate', limiteDeRenovacao(hojeNoBrasil())),
   ]);
 
   const nome = new Map((pessoas.data ?? []).map((p) => [p.id as string, nomeCurto(p.nome as string)]));
@@ -179,6 +183,12 @@ export default async function PainelGestor({
     pendencias.push({
       texto: `${diario.count} registro${diario.count > 1 ? 's' : ''} do diário aguardando aprovação`,
       acao: 'Revisar', href: '/cota/diario?filtro=aguardando',
+    });
+  }
+  if (vencendo.count) {
+    pendencias.push({
+      texto: `${vencendo.count} registro${vencendo.count > 1 ? 's' : ''} do diário vence${vencendo.count > 1 ? 'm' : ''} em até 7 dias`,
+      acao: 'Renovar', href: '/cota/diario?filtro=vencendo',
     });
   }
   if ((conferir.data ?? []).length) {

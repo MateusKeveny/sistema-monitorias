@@ -57,9 +57,32 @@ export const AUTORIZADORES: Record<'gestao' | 'diretoria', string[]> = {
 export function validade(r: Pick<RegistroDiario, 'valido_ate'>, hoje: string) {
   if (!r.valido_ate) return null;
   const [a, m, d] = r.valido_ate.split('-');
-  const vencido = r.valido_ate < hoje;
-  return { vencido, texto: `${vencido ? 'Vencido em' : 'Vale até'} ${d}/${m}/${a}` };
+  const dias = Math.round((Date.parse(r.valido_ate) - Date.parse(hoje)) / 86_400_000);
+  const vencido = dias < 0;
+  // Nos últimos dias, gestor e Pleno podem renovar (migração 37).
+  const vencendo = !vencido && dias <= DIAS_PARA_RENOVAR;
+  const texto = vencido ? `Vencido em ${d}/${m}/${a}`
+    : dias === 0 ? 'Vence hoje'
+    : vencendo ? `Vence em ${dias} dia${dias > 1 ? 's' : ''} (${d}/${m})`
+    : `Vale até ${d}/${m}/${a}`;
+  return { vencido, vencendo, texto };
 }
+
+/** Quantos dias antes de vencer a renovação abre — o mesmo número da migração 37. */
+export const DIAS_PARA_RENOVAR = 7;
+
+/** Último dia de validade que já abre a renovação — para a pendência do Início. */
+export const limiteDeRenovacao = (hoje: string) =>
+  new Date(Date.parse(hoje) + DIAS_PARA_RENOVAR * 86_400_000).toISOString().slice(0, 10);
+
+/** Uma renovação: de quando para quando a validade passou (migração 37). */
+export type RenovacaoDiario = {
+  registro_id: string;
+  valia_ate: string;
+  passa_a_valer: string;
+  renovado_por: string | null;
+  renovado_em: string;
+};
 
 /** "Outro" é gravado como "Nome · Cargo · Setor" no nome de quem autorizou. */
 export const juntarOutro = (nome: string, cargo: string, setor: string) =>

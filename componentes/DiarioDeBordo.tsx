@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import {
   AUTORIZADORES, COR_SITUACAO, COR_TIPO, ROTULO_QUEM, ROTULO_SITUACAO, ROTULO_TIPO, TIPOS,
-  juntarOutro, palavrasEncontradas, separarOutro, validade, type QuemAutorizou, type RegistroDiario, type TipoRegistro,
+  juntarOutro, palavrasEncontradas, separarOutro, validade, type RenovacaoDiario, type QuemAutorizou, type RegistroDiario, type TipoRegistro,
 } from '@/lib/diario';
 
 const entrada = `w-full rounded-xl border border-slate-300 bg-superficie px-3 py-2 text-sm outline-none
@@ -24,7 +24,7 @@ const diaExtenso = (iso: string, hoje: string) => {
   return d.charAt(0).toUpperCase() + d.slice(1);
 };
 
-type Filtro = 'todos' | TipoRegistro | 'aguardando' | 'meus';
+type Filtro = 'todos' | TipoRegistro | 'aguardando' | 'meus' | 'vencendo';
 const vazio = {
   tipo: '' as TipoRegistro | '', protocolo: '', assunto: '', descricao: '',
   quem: '' as QuemAutorizou | 'ninguem' | '', nome: '', cargo: '', setor: '',
@@ -43,9 +43,11 @@ const vazio = {
  * 31 e 33); a tela só antecipa o que vai acontecer.
  */
 export default function DiarioDeBordo({
-  registros, nomes, pessoaId, ehGestor, aprova, concluiDireto, hoje, filtroInicial,
+  registros, renovacoes, nomes, pessoaId, ehGestor, aprova, concluiDireto, hoje, filtroInicial,
 }: {
   registros: RegistroDiario[];
+  /** Renovações de validade, da mais recente à mais antiga. */
+  renovacoes: RenovacaoDiario[];
   nomes: Record<string, string>;
   pessoaId: string;
   ehGestor: boolean;
@@ -63,10 +65,11 @@ export default function DiarioDeBordo({
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [filtro, setFiltro] = useState<Filtro>(
-    (['aguardando', 'meus', 'processo', 'treinamento', 'autorizacao', 'excecao'] as string[]).includes(filtroInicial ?? '')
+    (['aguardando', 'vencendo', 'meus', 'processo', 'treinamento', 'autorizacao', 'excecao'] as string[]).includes(filtroInicial ?? '')
       ? filtroInicial as Filtro : 'todos');
   const [busca, setBusca] = useState('');
   const [devolvendo, setDevolvendo] = useState<{ id: string; texto: string } | null>(null);
+  const [renovando, setRenovando] = useState<{ id: string; ate: string } | null>(null);
 
   const achadas = palavrasEncontradas(`${f.assunto} ${f.descricao}`);
   const exigeQuem = f.tipo === 'autorizacao' || f.tipo === 'excecao';
@@ -148,6 +151,16 @@ export default function DiarioDeBordo({
     router.refresh();
   }
 
+  async function renovar(id: string, ate: string) {
+    setOcupado(true); setErro(null); setAviso(null);
+    const { error } = await criarClienteNavegador().rpc('renovar_registro_diario', { p_registro: id, p_ate: ate });
+    setOcupado(false);
+    if (error) { setErro(error.message); return; }
+    setRenovando(null);
+    setAviso('Validade renovada.');
+    router.refresh();
+  }
+
   async function excluir(r: RegistroDiario) {
     if (!confirm(`Excluir o registro "${r.assunto}"${r.protocolo ? ` (protocolo ${r.protocolo})` : ''}? Não dá para desfazer.`)) return;
     setOcupado(true); setErro(null);
@@ -158,12 +171,14 @@ export default function DiarioDeBordo({
   }
 
   const aguardando = registros.filter((r) => r.situacao === 'aguardando').length;
+  const vencendo = registros.filter((r) => validade(r, hoje)?.vencendo).length;
   const termo = busca.trim().toLocaleLowerCase('pt-BR');
   const lista = useMemo(() => registros.filter((r) =>
     (filtro === 'todos' || (filtro === 'aguardando' ? r.situacao === 'aguardando'
+      : filtro === 'vencendo' ? !!validade(r, hoje)?.vencendo
       : filtro === 'meus' ? r.pessoa_id === pessoaId : r.tipo === filtro))
     && (!termo || [r.protocolo ?? '', r.assunto, r.descricao, nomes[r.pessoa_id] ?? '', r.autorizado_por_nome ?? '']
-      .some((t) => t.toLocaleLowerCase('pt-BR').includes(termo)))), [registros, filtro, termo, pessoaId, nomes]);
+      .some((t) => t.toLocaleLowerCase('pt-BR').includes(termo)))), [registros, filtro, termo, pessoaId, nomes, hoje]);
   const porDia = [...lista.reduce((m, r) => m.set(r.data, [...(m.get(r.data) ?? []), r]), new Map<string, RegistroDiario[]>())];
 
   return (
@@ -298,12 +313,13 @@ export default function DiarioDeBordo({
         </div>
         <div className="mb-2 flex flex-wrap gap-1.5">
           {([['todos', 'Todos'], ['processo', 'Processos'], ['treinamento', 'Treinamentos'], ['autorizacao', 'Autorizações'],
-            ['excecao', 'Exceções'], ['meus', 'Meus'], ['aguardando', `Aguardando aprovação${aguardando ? ` · ${aguardando}` : ''}`]] as const)
+            ['excecao', 'Exceções'], ['meus', 'Meus'], ['aguardando', `Aguardando aprovação${aguardando ? ` · ${aguardando}` : ''}`],
+            ['vencendo', `Vencendo${vencendo ? ` · ${vencendo}` : ''}`]] as const)
             .map(([k, r]) => (
               <button key={k} type="button" aria-pressed={filtro === k} onClick={() => setFiltro(k)}
                       className={`rounded-full border px-3 py-0.5 text-xs ${filtro === k
                         ? 'border-marca-600 bg-marca-600/10 text-marca-700 dark:text-marca-400'
-                        : k === 'aguardando' && aguardando ? 'border-amber-500/50 text-amber-700 dark:text-amber-300'
+                        : (k === 'aguardando' && aguardando) || (k === 'vencendo' && vencendo) ? 'border-amber-500/50 text-amber-700 dark:text-amber-300'
                           : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
                 {r}
               </button>
@@ -331,19 +347,21 @@ export default function DiarioDeBordo({
                   </div>
                   <p className="whitespace-pre-line text-sm text-slate-700">{r.descricao}</p>
                   <p className="text-xs text-slate-500">
-                    {nomeCurto(nomes[r.pessoa_id] ?? '—')} · {hora(r.criado_em)}
+                    {nomeCurto(nomes[r.pessoa_id] ?? '—')} · {registradoEm(r)}
                     {r.autorizado_por && ` · autorizado por ${ROTULO_QUEM[r.autorizado_por]}${r.autorizado_por_nome ? ` (${r.autorizado_por_nome})` : ''}`}
                     {/* Quem conclui direto fica como "decidido por" si mesmo: não é aprovação. */}
                     {r.situacao === 'concluido' && r.decidido_por && r.decidido_por !== r.pessoa_id
                       && ` · aprovado por ${nomeCurto(nomes[r.decidido_por] ?? '—')}`}
                   </p>
+                  <UltimaRenovacao lista={renovacoes.filter((x) => x.registro_id === r.id)} nomes={nomes} />
                   {r.situacao === 'devolvido' && r.comentario_decisao && (
                     <p className="rounded-lg bg-rose-50 px-3 py-1.5 text-xs text-rose-800 ring-1 ring-rose-600/20">
                       Devolvido por {nomeCurto(nomes[r.decidido_por ?? ''] ?? 'gestor')}: {r.comentario_decisao}
                     </p>
                   )}
 
-                  {(ehGestor || aprova || (r.pessoa_id === pessoaId && r.situacao === 'devolvido')) && (
+                  {(ehGestor || (aprova && (r.situacao === 'aguardando' || validade(r, hoje)?.vencendo))
+                    || (r.pessoa_id === pessoaId && r.situacao === 'devolvido')) && (
                     <div className="mt-1 flex flex-wrap items-center gap-2">
                       {r.pessoa_id === pessoaId && r.situacao === 'devolvido' && (
                         <button type="button" onClick={() => corrigir(r)} className={botaoSecundario}>Corrigir e reenviar</button>
@@ -372,6 +390,26 @@ export default function DiarioDeBordo({
                           <button type="button" onClick={() => setDevolvendo(null)} className="text-sm text-slate-500 hover:underline">cancelar</button>
                         </span>
                       )}
+                      {aprova && validade(r, hoje)?.vencendo && renovando?.id !== r.id && (
+                        <button type="button" disabled={ocupado} onClick={() => setRenovando({ id: r.id, ate: '' })} className={botaoSecundario}>
+                          Renovar validade
+                        </button>
+                      )}
+                      {aprova && renovando?.id === r.id && (
+                        <span className="flex w-full flex-wrap items-center gap-2 text-sm text-slate-600">
+                          Passa a valer até
+                          {/* A nova data é depois da validade atual. */}
+                          <input type="date" autoFocus value={renovando.ate} disabled={ocupado} min={diaSeguinte(r.valido_ate!)}
+                                 onChange={(e) => setRenovando({ id: r.id, ate: e.target.value })}
+                                 className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm outline-none focus:border-marca-600" />
+                          <button type="button" disabled={ocupado || !renovando.ate || renovando.ate <= r.valido_ate!}
+                                  onClick={() => renovar(r.id, renovando.ate)}
+                                  className="rounded-lg bg-marca-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-marca-700 disabled:opacity-40">
+                            Renovar
+                          </button>
+                          <button type="button" onClick={() => setRenovando(null)} className="text-sm text-slate-500 hover:underline">cancelar</button>
+                        </span>
+                      )}
                       {ehGestor && (
                         <button type="button" disabled={ocupado} onClick={() => excluir(r)}
                                 className="ml-auto text-xs text-slate-400 hover:text-rose-700 hover:underline">
@@ -396,8 +434,37 @@ function SeloValidade({ r, hoje }: { r: RegistroDiario; hoje: string }) {
   if (!v) return null;
   return (
     <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${v.vencido
-      ? 'bg-slate-500/15 text-slate-500 line-through decoration-slate-400' : 'bg-sky-500/15 text-sky-700 dark:text-sky-300'}`}>
+      ? 'bg-slate-500/15 text-slate-500 line-through decoration-slate-400'
+      : v.vencendo ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+      : 'bg-sky-500/15 text-sky-700 dark:text-sky-300'}`}>
       {v.texto}
     </span>
+  );
+}
+
+const diaSeguinte = (iso: string) => new Date(Date.parse(iso) + 86_400_000).toISOString().slice(0, 10);
+const dataBR = (iso: string) => iso.slice(0, 10).split('-').reverse().join('/');
+
+/**
+ * Quando foi registrado. O registro fica no dia do ocorrido, que a gestão pode
+ * pôr para trás; aí a data original do registro aparece junto com a hora.
+ */
+function registradoEm(r: RegistroDiario) {
+  const dia = new Date(r.criado_em).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+  return dia === r.data ? hora(r.criado_em) : `registrado em ${dataBR(dia)} às ${hora(r.criado_em)}`;
+}
+
+/** A renovação mais recente do registro — a validade antiga fica à vista. */
+function UltimaRenovacao({ lista, nomes }: { lista: RenovacaoDiario[]; nomes: Record<string, string> }) {
+  const ultima = lista[0];
+  if (!ultima) return null;
+  return (
+    <p className="text-xs text-slate-500">
+      Renovado em {new Date(ultima.renovado_em).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
+      {ultima.renovado_por ? ` por ${nomeCurto(nomes[ultima.renovado_por] ?? '—')}` : ''}
+      {/* A lista vem da mais recente à mais antiga: a última guarda a validade de origem. */}
+      {' '}· validade original {dataBR(lista[lista.length - 1].valia_ate)}
+      {lista.length > 1 ? ` · ${lista.length} renovações` : ''}
+    </p>
   );
 }

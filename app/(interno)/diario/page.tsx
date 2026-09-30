@@ -18,6 +18,8 @@ const nomeCurto = (nome: string) => nome.trim().split(/\s+/).slice(0, 2).join(' 
  * protocolo, antes de monitorar, e cada registro mostra se o protocolo já
  * caiu em monitoria e se o monitor disse que impactou.
  */
+const registradoNoDia = (iso: string) => new Date(iso).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+
 export default async function ConsultaDoDiario({
   searchParams,
 }: {
@@ -114,7 +116,13 @@ export default async function ConsultaDoDiario({
                 const cit = citacoesDe(r.id);
                 return (
                   <tr key={r.id} className="align-top">
-                    <Td className="whitespace-nowrap tabular-nums">{formatarData(r.data)}</Td>
+                    <Td className="whitespace-nowrap tabular-nums">
+                      {formatarData(r.data)}
+                      {/* Dia do ocorrido posto para trás pela gestão: a data original do registro vem junto. */}
+                      {registradoNoDia(r.criado_em) !== r.data && (
+                        <span className="block text-xs text-slate-500">registrado em {formatarData(registradoNoDia(r.criado_em))}</span>
+                      )}
+                    </Td>
                     <Td className="font-semibold tabular-nums">{r.protocolo ? `#${r.protocolo}` : '—'}</Td>
                     <Td><span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${COR_TIPO[r.tipo]}`}>{ROTULO_TIPO[r.tipo]}</span></Td>
                     <Td>

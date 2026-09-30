@@ -1,7 +1,7 @@
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import DiarioDeBordo from '@/componentes/DiarioDeBordo';
 import { hojeNoBrasil } from '@/lib/formatar';
-import type { RegistroDiario } from '@/lib/diario';
+import type { RegistroDiario, RenovacaoDiario } from '@/lib/diario';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +22,7 @@ export default async function Diario({
   const { filtro } = await searchParams;
   const db = await criarClienteServidor();
 
-  const [{ data: registros }, { data: pessoas }, { data: aprova }, { data: concluiDireto }] = await Promise.all([
+  const [{ data: registros }, { data: pessoas }, { data: aprova }, { data: concluiDireto }, { data: renovacoes }] = await Promise.all([
     // Os últimos 500: bastam para a consulta do dia a dia. A busca por um
     // protocolo antigo está na consulta do site de Monitorias.
     db.from('diario_registros').select('*')
@@ -34,6 +34,8 @@ export default async function Diario({
     // Analista concluem a própria autorização da gestão sem aprovação.
     db.rpc('aprova_diario'),
     db.rpc('conclui_diario_direto'),
+    db.from('diario_renovacoes').select('registro_id, valia_ate, passa_a_valer, renovado_por, renovado_em')
+      .order('renovado_em', { ascending: false }),
   ]);
 
   return (
@@ -48,6 +50,7 @@ export default async function Diario({
 
       <DiarioDeBordo
         registros={(registros ?? []) as RegistroDiario[]}
+        renovacoes={(renovacoes ?? []) as RenovacaoDiario[]}
         nomes={Object.fromEntries((pessoas ?? []).map((p: { id: string; nome: string }) => [p.id, p.nome]))}
         pessoaId={perfil.id}
         ehGestor={perfil.papel === 'gestor'}

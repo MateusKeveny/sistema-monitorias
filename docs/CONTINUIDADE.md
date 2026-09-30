@@ -11,9 +11,9 @@ Escrito em 28/09/2026, atualizado em 29/09/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.27.0** · Monitorias **4.15.0** (deploy de 30/09/2026) |
+| Publicado | Performance **1.28.0** · Monitorias **4.15.1** (deploy de 30/09/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
-| Migrações no banco | 01 a 36, todas aplicadas |
+| Migrações no banco | 01 a 37, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
 
 ### Revisão de design (28/09/2026)
@@ -165,6 +165,15 @@ Três versões, cada uma publicada e conferida antes da próxima:
   registro continua no diário, na consulta e no aviso da monitoria, com o
   selo "Vencido em". Para os demais, o banco grava hoje e sem validade; na
   correção de um devolvido, dia e validade ficam como estavam.
+- **1.28.0 / Monitorias 4.15.1** (publicada): **renovar a validade** (migração
+  37). Nos 7 dias antes de vencer, o selo fica âmbar ("Vence em N dias") e
+  gestor e Pleno veem "Renovar validade" (função `renovar_registro_diario`);
+  vencido não se renova. Cada renovação fica em `diario_renovacoes`, e o
+  registro mostra a última e a validade original. Filtro "Vencendo" no diário
+  e pendência "vencem em até 7 dias" no Início do gestor e do Pleno. O
+  registro com dia do ocorrido para trás mostra também quando foi registrado.
+  A janela de 7 dias está na migração 37 e em `DIAS_PARA_RENOVAR`
+  (lib/diario.ts): mudar nos dois.
 
 Visão de celular fica fora da revisão, por decisão do gestor.
 
