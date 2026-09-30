@@ -231,6 +231,7 @@ Três versões, cada uma publicada e conferida antes da próxima:
   resolve ou reabre. Número no botão: respostas novas (autor, apagado ao
   abrir) ou reports novos (gestor). Pendência no Início do gestor e quinto
   aviso do Teams, "reporte_novo". Testado com o Teste de acesso e o gestor.
+  Aviso no Teams configurado e conferido pelo gestor no site publicado.
 
 Visão de celular fica fora da revisão, por decisão do gestor.
 
