@@ -217,7 +217,18 @@ export default function ImportadorAvaliacoes({
       }
     }
 
-    setSucesso(`${analise.novas.length} avaliações importadas de "${arquivo.name}".`);
+    // Avisa Pleno e qualidade no Teams que as monitorias da semana podem
+    // começar (migração 40). Falha no aviso não desfaz a importação.
+    let avisou = false;
+    if (analise.novas.length && analise.periodo) {
+      const { data } = await db.rpc('aviso_relatorio_importado', {
+        p_ate: analise.periodo[1], p_quantidade: analise.novas.length,
+      });
+      avisou = data === true;
+    }
+
+    setSucesso(`${analise.novas.length} avaliações importadas de "${arquivo.name}".`
+      + (avisou ? ' A monitoria foi avisada no Teams.' : ''));
     setAnalise(null); setAbas(null); setArquivo(null);
     setOcupado(null);
     router.refresh();

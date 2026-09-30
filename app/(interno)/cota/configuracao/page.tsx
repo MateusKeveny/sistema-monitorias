@@ -3,6 +3,7 @@ import MatrizDePesos from '@/componentes/MatrizDePesos';
 import ReguasDeFaixa from '@/componentes/ReguasDeFaixa';
 import PainelRegras from '@/componentes/PainelRegras';
 import Abas from '@/componentes/Abas';
+import AvisosTeams, { type SituacaoAviso } from '@/componentes/AvisosTeams';
 import { hojeNoBrasil, mesDeCompetencia } from '@/lib/formatar';
 import type { Cargo, CargoDaPessoa, PesoCargo, Pessoa, ReferenciaCargo, RegraCota } from '@/lib/tipos';
 
@@ -27,7 +28,7 @@ export default async function ConfiguracaoDaCota({
 
   const [
     { data: pessoas }, { data: cargos }, { data: regras },
-    { data: pesos }, { data: referencias }, { data: historico },
+    { data: pesos }, { data: referencias }, { data: historico }, { data: avisos },
   ] = await Promise.all([
     db.from('pessoas').select('id, ativo, desligado_em'),
     db.from('cargos').select('*').eq('ativo', true).order('ordem'),
@@ -35,6 +36,8 @@ export default async function ConfiguracaoDaCota({
     db.from('pesos_por_cargo').select('cargo_id, regra, peso, ativo'),
     db.from('cargos_referencia').select('*'),
     db.from('cargos_da_pessoa').select('*'),
+    // Avisos no Teams (migração 40).
+    db.rpc('situacao_dos_avisos'),
   ]);
 
   const listaCargos = (cargos ?? []) as Cargo[];
@@ -95,6 +98,11 @@ export default async function ConfiguracaoDaCota({
                 <PainelRegras regras={listaRegras} />
               </div>
             ),
+          },
+          {
+            chave: 'avisos',
+            rotulo: 'Avisos no Teams',
+            conteudo: <AvisosTeams situacao={(avisos ?? []) as SituacaoAviso[]} />,
           },
         ]}
       />

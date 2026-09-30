@@ -11,9 +11,9 @@ Escrito em 28/09/2026, atualizado em 29/09/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.29.0** · Monitorias **4.15.1** (deploy de 30/09/2026) |
+| Publicado | Performance **1.30.0** · Monitorias **4.15.1** (deploy de 30/09/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
-| Migrações no banco | 01 a 39, todas aplicadas |
+| Migrações no banco | 01 a 40, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
 
 ### Revisão de design (28/09/2026)
@@ -188,6 +188,19 @@ Três versões, cada uma publicada e conferida antes da próxima:
   Testado com o Teste de acesso nos 3 processos reais da Suyara (confirmações
   de teste apagadas). A migração 39 marca o Teste de acesso como
   `perfil_de_teste`, fora da leitura. Conferida pelo gestor no site publicado.
+- **1.30.0** (publicada; Monitorias sem mudança): **avisos no Teams**
+  (migração 40). O banco posta cartões (Adaptive Card) em Workflows do Teams
+  via pg_net: "Semana encerrada" (canal da equipe) e "Lembrete de fechamento"
+  (só o gestor, diário até `fechamentos_cota` ter a competência anterior)
+  pela rotina `avisos_das_oito` no pg_cron às 11h UTC (8h de Brasília);
+  "Monitorias liberadas" (Pleno e qualidade) pela tela Importar, via
+  `aviso_relatorio_importado`, quando entram avaliações novas. Endereços em
+  `avisos_teams` (só gestor), colados em Configuração › Avisos no Teams, com
+  "Enviar teste" e a resposta HTTP do último envio (`situacao_dos_avisos`,
+  lê `net._http_response`, que o Supabase guarda por poucas horas).
+  `avisos_enviados` impede repetir a mesma semana ou o mesmo dia. Os links
+  dos cartões usam `endereco_do_site()`: se os endereços dos sites mudarem,
+  ajustar ali. Falta criar os Workflows no Teams e conferir os testes.
 
 Visão de celular fica fora da revisão, por decisão do gestor.
 
