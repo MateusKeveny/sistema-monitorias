@@ -11,9 +11,9 @@ Escrito em 28/09/2026, atualizado em 29/09/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.30.0** · Monitorias **4.15.1** (deploy de 30/09/2026) |
+| Publicado | Performance **1.31.0** · Monitorias **4.15.1** (deploy de 30/09/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
-| Migrações no banco | 01 a 40, todas aplicadas |
+| Migrações no banco | 01 a 41, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
 
 ### Revisão de design (28/09/2026)
@@ -201,6 +201,11 @@ Três versões, cada uma publicada e conferida antes da próxima:
   `avisos_enviados` impede repetir a mesma semana ou o mesmo dia. Os links
   dos cartões usam `endereco_do_site()`: se os endereços dos sites mudarem,
   ajustar ali. Falta criar os Workflows no Teams e conferir os testes.
+- **1.31.0** (publicada): **aviso de mês fechado** (migração 41). Gatilho em
+  `fechamentos_cota` posta "Setembro fechado" no endereço do aviso
+  "semana_encerrada" (canal da equipe), uma vez por competência, com link
+  para o extrato do mês. Textos da tela de avisos com os nomes reais dos
+  modelos do Teams ("Enviar alertas de webhook para um canal/chat").
 
 Visão de celular fica fora da revisão, por decisão do gestor.
 

@@ -14,8 +14,8 @@ export type SituacaoAviso = {
 };
 
 const AVISOS: { chave: SituacaoAviso['chave']; titulo: string; quando: string }[] = [
-  { chave: 'semana_encerrada', titulo: 'Semana encerrada',
-    quando: 'Canal da equipe · às 8h do dia seguinte ao fim de cada semana do ciclo' },
+  { chave: 'semana_encerrada', titulo: 'Semana encerrada e mês fechado',
+    quando: 'Canal da equipe · às 8h do dia seguinte ao fim de cada semana do ciclo, e quando o gestor fecha o mês' },
   { chave: 'monitorias_liberadas', titulo: 'Monitorias liberadas',
     quando: 'Pleno e qualidade · quando o gestor importa o relatório de atendimentos' },
   { chave: 'lembrete_fechamento', titulo: 'Lembrete de fechamento',
@@ -137,13 +137,14 @@ export default function AvisosTeams({ situacao }: { situacao: SituacaoAviso[] })
         <h2 className="text-base font-semibold text-slate-800">Como criar o endereço no Teams</h2>
         <p className="mb-3 text-sm text-slate-500">Uma vez para cada destino.</p>
         <ol className="grid list-decimal gap-1.5 pl-5 text-sm leading-relaxed text-slate-700">
-          <li>No canal (ou chat) que vai receber o aviso, clique em <b>…</b> › <b>Workflows</b>.</li>
-          <li>Escolha <b>&quot;Postar em um canal quando uma solicitação de webhook for recebida&quot;</b> (no chat: &quot;Postar em um chat…&quot;).</li>
-          <li>Dê um nome, como <i>Painel de Performance</i>, confira a equipe e o canal e clique em <b>Adicionar fluxo de trabalho</b>.</li>
+          <li>No canal (ou chat) que vai receber o aviso, clique em <b>…</b> › <b>Fluxos de trabalho</b> e busque <b>webhook</b>.</li>
+          <li>Escolha <b>&quot;Enviar alertas de webhook para um canal&quot;</b> (equipe) ou <b>&quot;… para um chat&quot;</b> (monitoria e lembrete).
+            Não use os modelos &quot;de pessoas específicas&quot; ou &quot;de uma organização&quot;: eles exigem login e recusam o painel.</li>
+          <li>Dê um nome, como <i>Painel de Performance</i>, confira o destino e clique em <b>Adicionar fluxo de trabalho</b>.</li>
           <li>Copie o endereço que aparece no fim e cole no aviso correspondente.</li>
           <li>Clique em <b>Enviar teste</b>: um cartão de teste deve chegar no destino.</li>
         </ol>
-        <p className="mt-3 text-xs text-slate-500">Se a opção Workflows não aparecer, a TI precisa liberar o Power Automate no Teams.</p>
+        <p className="mt-3 text-xs text-slate-500">Se a busca não trouxer esses modelos, a TI precisa liberar o Power Automate no Teams.</p>
       </section>
     </div>
   );
