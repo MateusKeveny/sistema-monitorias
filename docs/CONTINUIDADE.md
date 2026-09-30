@@ -13,7 +13,7 @@ Escrito em 28/09/2026, atualizado em 29/09/2026. Para o modelo de dados completo
 |---|---|
 | Publicado | Performance **1.29.0** · Monitorias **4.15.1** (deploy de 30/09/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
-| Migrações no banco | 01 a 38 aplicadas; **39 (perfil de teste) a rodar** |
+| Migrações no banco | 01 a 39, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
 
 ### Revisão de design (28/09/2026)
