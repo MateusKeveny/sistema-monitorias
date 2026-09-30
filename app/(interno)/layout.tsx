@@ -25,6 +25,14 @@ export default async function LayoutInterno({ children }: { children: React.Reac
     pendentes = count ?? 0;
   }
 
+  // Reportar problema (1.33.0): o ponto no botão — respostas novas para quem
+  // reportou, reports novos para o gestor (migração 44).
+  const dbReportes = await criarClienteServidor();
+  const { count: avisosReporte } = perfil.papel === 'gestor'
+    ? await dbReportes.from('reportes').select('id', { count: 'exact', head: true }).eq('situacao', 'novo')
+    : await dbReportes.from('reportes').select('id', { count: 'exact', head: true })
+        .eq('pessoa_id', perfil.id).eq('lido_pelo_autor', false);
+
   // Performance (1.15.0): menu lateral em tela larga e conteúdo na largura
   // toda — limitado a 7xl, sobrava meia tela vazia em monitor grande. Em
   // janela estreita volta o cabeçalho do topo. As Monitorias seguem como
@@ -56,10 +64,10 @@ export default async function LayoutInterno({ children }: { children: React.Reac
 
     return (
       <div className="lg:grid lg:min-h-screen lg:grid-cols-[15rem_1fr]">
-        <MenuLateral perfil={perfil} versao={VERSAO_COTA} />
+        <MenuLateral perfil={perfil} versao={VERSAO_COTA} avisosReporte={avisosReporte ?? 0} />
         <div className="min-w-0">
           <div className="lg:hidden">
-            <Navegacao perfil={perfil} pendentes={pendentes} sistema={sistema} versao={VERSAO_COTA} />
+            <Navegacao perfil={perfil} pendentes={pendentes} sistema={sistema} versao={VERSAO_COTA} avisosReporte={avisosReporte ?? 0} />
           </div>
           <main className="max-w-[1680px] px-6 py-8 lg:px-9">{children}</main>
         </div>
@@ -74,6 +82,7 @@ export default async function LayoutInterno({ children }: { children: React.Reac
         pendentes={pendentes}
         sistema={sistema}
         versao={VERSAO_MONITORIAS}
+        avisosReporte={avisosReporte ?? 0}
       />
       <main className="mx-auto max-w-7xl px-6 py-8">{children}</main>
     </>

@@ -9,6 +9,12 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 4.16.0
+
+- **Reportar problema**: botão no menu. Conte o que aconteceu e, se quiser,
+  cole um print (Ctrl+V). A tela, a versão e o navegador vão junto. Em
+  "Reports" você acompanha a resposta da gestão; o gestor vê todos.
+
 ## 4.15.1
 
 - Consulta do diário: nos 7 dias antes de vencer, a validade aparece como

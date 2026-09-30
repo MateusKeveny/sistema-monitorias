@@ -35,8 +35,12 @@ export const INICIO_COTA = '/cota';
  */
 const EXCLUSIVOS_DA_COTA = ['/cota', '/api/cota'];
 
-/** Caminhos que o site de cota atende; todo o resto é das monitorias. */
-const CAMINHOS_COTA = [...EXCLUSIVOS_DA_COTA, '/login', '/auth', '/definir-senha'];
+/**
+ * Caminhos que o site de cota atende; todo o resto é das monitorias.
+ * `/reportes` (1.33.0) é dos dois: o botão "Reportar problema" está nos dois
+ * menus e cada um abre a lista no próprio site.
+ */
+const CAMINHOS_COTA = [...EXCLUSIVOS_DA_COTA, '/login', '/auth', '/definir-senha', '/reportes'];
 
 export function sistemaDoHost(host: string | null | undefined): Sistema {
   if (host?.toLowerCase().startsWith('painel-performance.')) return 'cota';

@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import BotaoTema from '@/componentes/BotaoTema';
+import BotaoReportar from '@/componentes/BotaoReportar';
 import { NOMES_PAPEL, type Perfil } from '@/lib/tipos';
 import { NOME_SISTEMA, type Sistema } from '@/lib/sistema';
 
@@ -27,6 +28,7 @@ export const ITENS: Record<Sistema, Item[]> = {
     { href: '/relatorios', rotulo: 'Relatórios', papeis: ['gestor', 'qualidade'] },
     { href: '/diario', rotulo: 'Diário de bordo', papeis: ['gestor', 'qualidade'] },
     { href: '/configuracoes', rotulo: 'Configurações', papeis: ['gestor'] },
+    { href: '/reportes', rotulo: 'Reports', papeis: ['gestor'] },
   ],
   cota: [
     { href: '/cota', rotulo: 'Início', papeis: ['gestor', 'qualidade', 'operador'] },
@@ -40,12 +42,15 @@ export const ITENS: Record<Sistema, Item[]> = {
     { href: '/cota/fechamento', rotulo: 'Fechamento', papeis: ['gestor'] },
     { href: '/cota/atendentes', rotulo: 'Atendentes', papeis: ['gestor'], grupo: 'Administrar' },
     { href: '/cota/configuracao', rotulo: 'Configuração', papeis: ['gestor'], grupo: 'Administrar' },
+    { href: '/reportes', rotulo: 'Reports de problemas', papeis: ['gestor'], grupo: 'Administrar' },
   ],
 };
 
 export default function Navegacao({
-  perfil, pendentes = 0, sistema, versao,
+  perfil, pendentes = 0, sistema, versao, avisosReporte = 0,
 }: {
+  /** Respostas novas (autor) ou reports novos (gestor), no botão de reportar. */
+  avisosReporte?: number;
   perfil: Perfil;
   /** Qual dos dois sites está sendo servido (ver lib/sistema.ts). */
   sistema: Sistema;
@@ -172,6 +177,8 @@ export default function Navegacao({
             <span className="block font-medium text-slate-800">{perfil.nome}</span>
             <span className="block text-xs text-slate-500">{NOMES_PAPEL[perfil.papel]}</span>
           </span>
+          <BotaoReportar sistema={sistema === 'cota' ? 'performance' : 'monitorias'} versao={versao ?? ''}
+                         pessoaId={perfil.id} ehGestor={perfil.papel === 'gestor'} avisos={avisosReporte} variante="topo" />
           <BotaoTema />
           <button
             onClick={sair}

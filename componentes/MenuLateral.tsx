@@ -4,6 +4,7 @@ import Link from '@/componentes/Link';
 import { usePathname, useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import BotaoTema from '@/componentes/BotaoTema';
+import BotaoReportar from '@/componentes/BotaoReportar';
 import { ITENS, type Item } from '@/componentes/Navegacao';
 import { NOMES_PAPEL, type Perfil } from '@/lib/tipos';
 
@@ -20,6 +21,7 @@ const ICONES: Record<string, React.ReactNode> = {
   '/cota/importar': <path d="M10 3v9m0 0-3-3m3 3 3-3M4 14v2h12v-2" />,
   '/cota/fechamento': <><rect x="4" y="9" width="12" height="8" rx="1.5" /><path d="M7 9V6.5a3 3 0 0 1 6 0V9" /></>,
   '/cota/atendentes': <><circle cx="7" cy="8" r="2.5" /><circle cx="14" cy="8" r="2.5" /><path d="M2.5 16c.7-2.3 2.4-3.5 4.5-3.5s3.8 1.2 4.5 3.5M11 12.6c.9-.1 2-.1 3 0 1.9.3 3 1.3 3.5 3.4" /></>,
+  '/reportes': <path d="M5 17V3.5M5 4h9l-2 3.5 2 3.5H5" />,
   '/cota/configuracao': <><circle cx="10" cy="10" r="2.5" /><path d="M10 3v2m0 10v2m7-7h-2M5 10H3m11.9-4.9-1.4 1.4M6.5 13.5l-1.4 1.4m9.8 0-1.4-1.4M6.5 6.5 5.1 5.1" /></>,
 };
 
@@ -34,7 +36,7 @@ const ICONES: Record<string, React.ReactNode> = {
  * O Fechamento não tem grupo no menu do topo — cabe sozinho —, mas aqui ganha
  * o seu: é uma etapa do mês, não uma consulta.
  */
-export default function MenuLateral({ perfil, versao }: { perfil: Perfil; versao: string }) {
+export default function MenuLateral({ perfil, versao, avisosReporte = 0 }: { perfil: Perfil; versao: string; avisosReporte?: number }) {
   const caminho = usePathname();
   const router = useRouter();
 
@@ -87,7 +89,11 @@ export default function MenuLateral({ perfil, versao }: { perfil: Perfil; versao
       <div className="mt-auto border-t border-slate-200 px-2.5 pt-3 text-sm">
         <p className="font-medium text-slate-900">{perfil.nome}</p>
         <p className="text-xs text-slate-500">{NOMES_PAPEL[perfil.papel]}</p>
-        <div className="mt-3 flex items-center gap-2">
+        <div className="mt-3">
+          <BotaoReportar sistema="performance" versao={versao} pessoaId={perfil.id}
+                         ehGestor={perfil.papel === 'gestor'} avisos={avisosReporte} />
+        </div>
+        <div className="mt-2 flex items-center gap-2">
           <BotaoTema />
           <button onClick={sair}
                   className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">

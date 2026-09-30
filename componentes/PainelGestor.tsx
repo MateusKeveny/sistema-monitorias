@@ -74,7 +74,7 @@ export default async function PainelGestor({
   const meses = [competencia, anterior];
   const db = await criarClienteServidor();
 
-  const [pessoas, csat, volume, criterios, cota, cargos, fechados, monitorias, valores, semCargo, conferir, diario, vencendo, leituras, privados]
+  const [pessoas, csat, volume, criterios, cota, cargos, fechados, monitorias, valores, semCargo, conferir, diario, vencendo, leituras, privados, reportes]
     = await Promise.all([
     db.from('pessoas').select('id, nome, exibir_no_painel, conta_nas_medias'),
     db.from('vw_csat_semanal').select('pessoa_id, origem, semana, avaliacoes, positivas, mes_competencia')
@@ -101,6 +101,8 @@ export default async function PainelGestor({
     db.rpc('leituras_do_diario'),
     // Registros dos atendentes com a gestão, aguardando (migração 43).
     db.from('diario_privados').select('id', { count: 'exact', head: true }).eq('situacao', 'aguardando'),
+    // Problemas reportados ainda não vistos (migração 44).
+    db.from('reportes').select('id', { count: 'exact', head: true }).eq('situacao', 'novo'),
   ]);
 
   const nome = new Map((pessoas.data ?? []).map((p) => [p.id as string, nomeCurto(p.nome as string)]));
@@ -187,6 +189,12 @@ export default async function PainelGestor({
     pendencias.push({
       texto: `${diario.count} registro${diario.count > 1 ? 's' : ''} do diário aguardando aprovação`,
       acao: 'Revisar', href: '/cota/diario?filtro=aguardando',
+    });
+  }
+  if (reportes.count) {
+    pendencias.push({
+      texto: `${reportes.count} problema${reportes.count > 1 ? 's' : ''} reportado${reportes.count > 1 ? 's' : ''} sem resposta`,
+      acao: 'Ver', href: '/reportes', grave: true,
     });
   }
   if (privados.count) {

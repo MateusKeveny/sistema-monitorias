@@ -11,9 +11,9 @@ Escrito em 28/09/2026, atualizado em 29/09/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.32.0** · Monitorias **4.15.1** (deploy de 30/09/2026) |
+| Publicado | Performance **1.33.0** · Monitorias **4.16.0** (deploy de 30/09/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
-| Migrações no banco | 01 a 43, todas aplicadas |
+| Migrações no banco | 01 a 44, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
 
 ### Revisão de design (28/09/2026)
@@ -222,6 +222,15 @@ Três versões, cada uma publicada e conferida antes da próxima:
   "Sobre" opcional que aparece na ficha da pessoa em Atendentes. Tudo na RLS;
   testado com o Teste de acesso, inclusive leitura direta pela API (vazia) e
   tentativa de gravar anotação (403).
+- **1.33.0 / Monitorias 4.16.0** (publicada): **reportar problema**
+  (migração 44). Botão no menu dos dois sites (`BotaoReportar`) com texto,
+  "o que esperava", print opcional (Ctrl+V ou arquivo, bucket privado
+  `reportes`, pasta da pessoa, 5 MB) e tela, versão e navegador automáticos.
+  `/reportes` nos dois sites (entrou em `CAMINHOS_COTA`): autor vê os
+  próprios e a resposta; gestor vê todos, responde, marca em análise,
+  resolve ou reabre. Número no botão: respostas novas (autor, apagado ao
+  abrir) ou reports novos (gestor). Pendência no Início do gestor e quinto
+  aviso do Teams, "reporte_novo". Testado com o Teste de acesso e o gestor.
 
 Visão de celular fica fora da revisão, por decisão do gestor.
 
