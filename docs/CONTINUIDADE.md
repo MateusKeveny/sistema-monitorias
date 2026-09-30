@@ -200,7 +200,8 @@ Três versões, cada uma publicada e conferida antes da próxima:
   lê `net._http_response`, que o Supabase guarda por poucas horas).
   `avisos_enviados` impede repetir a mesma semana ou o mesmo dia. Os links
   dos cartões usam `endereco_do_site()`: se os endereços dos sites mudarem,
-  ajustar ali. Falta criar os Workflows no Teams e conferir os testes.
+  ajustar ali. Workflows criados no Teams e testados pelo gestor no site
+  publicado.
 - **1.31.0** (publicada): **aviso de mês fechado** (migração 41). Gatilho em
   `fechamentos_cota` posta "Setembro fechado" no endereço do aviso
   "semana_encerrada" (canal da equipe), uma vez por competência, com link
