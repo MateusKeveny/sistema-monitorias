@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { mesRotulo } from '@/lib/formatar';
 import { NOMES_PAPEL, type Cargo, type CargoDaPessoa, type Pessoa, type Saida } from '@/lib/tipos';
-import { ROTULO_TIPO, type LeituraDaPessoa } from '@/lib/diario';
+import { ROTULO_TIPO, type AnotacaoGestor, type LeituraDaPessoa } from '@/lib/diario';
 
 const entrada = `rounded-lg border border-slate-300 bg-superficie px-2.5 py-1.5 text-sm outline-none
                  focus:border-marca-600 disabled:opacity-50`;
@@ -42,8 +42,10 @@ type Recorte = 'todos' | 'operadores' | 'gestao';
  * sistemas.
  */
 export default function PainelAtendentes({
-  pessoas, saidas, cargos, historico, leituras, competencia, inicioDoCicloAnterior,
+  pessoas, saidas, cargos, historico, leituras, anotacoes, competencia, inicioDoCicloAnterior,
 }: {
+  /** Anotações do gestor feitas "Sobre" alguém (migração 43). */
+  anotacoes: AnotacaoGestor[];
   pessoas: Pessoa[];
   saidas: Saida[];
   cargos: Cargo[];
@@ -212,6 +214,8 @@ export default function PainelAtendentes({
         {pessoa ? (
           <Ficha key={pessoa.id} pessoa={pessoa} cargos={cargos} linhas={linhasDe(pessoa.id)}
                  competencia={competencia} pendencias={pendencias(pessoa)} leitura={leituras[pessoa.id]}
+                 anotacoes={anotacoes.filter((a) => a.sobre_pessoa_id === pessoa.id)}
+                 autores={Object.fromEntries(pessoas.map((p) => [p.id, p.nome]))}
                  saida={saidas.filter((s) => s.pessoa_id === pessoa.id && !s.revertida_em)
                    .sort((a, b) => b.data.localeCompare(a.data))[0]} />
         ) : (
@@ -282,9 +286,11 @@ const Secao = ({ titulo, children }: { titulo: string; children: React.ReactNode
 );
 
 function Ficha({
-  pessoa, cargos, linhas, competencia, pendencias, saida, leitura,
+  pessoa, cargos, linhas, competencia, pendencias, saida, leitura, anotacoes, autores,
 }: {
   pessoa: Pessoa;
+  anotacoes: AnotacaoGestor[];
+  autores: Record<string, string>;
   leitura: LeituraDaPessoa | undefined;
   cargos: Cargo[];
   linhas: CargoDaPessoa[];
@@ -429,6 +435,23 @@ function Ficha({
         ))}
         <p className="mt-1 text-xs text-slate-500">Só apresentação: não muda pontuação, média do cargo nem pagamento.</p>
       </Secao>
+
+      {anotacoes.length > 0 && (
+        <Secao titulo="Anotações do gestor">
+          <ul className="grid gap-3">
+            {anotacoes.map((a) => (
+              <li key={a.id} className="text-sm">
+                <b className="font-semibold text-slate-800">{a.assunto}</b>
+                <p className="whitespace-pre-line text-slate-700">{a.texto}</p>
+                <small className="text-xs text-slate-500">
+                  {(autores[a.autor_id] ?? '—').split(' ').slice(0, 2).join(' ')} · {data(a.data)}
+                </small>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-slate-500">Só quem tem papel de gestor vê. Escreva e edite em Diário de bordo › Anotações do gestor.</p>
+        </Secao>
+      )}
 
       <Secao titulo="Diário de bordo">
         {pessoa.papel !== 'gestor' && pessoa.auth_id && (

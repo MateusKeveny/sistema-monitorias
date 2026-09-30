@@ -154,7 +154,7 @@ export default async function InicioCota({
     // renova os que vencem em até 7 dias (37) — as pendências do gestor que
     // também são dele.
     const { data: aprova } = await db.rpc('aprova_diario');
-    const [{ count: aguardando }, { count: vencendo }, { data: leituras }] = aprova === true
+    const [{ count: aguardando }, { count: vencendo }, { data: leituras }, { count: privados }] = aprova === true
       ? await Promise.all([
           db.from('diario_registros').select('id', { count: 'exact', head: true })
             .eq('situacao', 'aguardando').neq('pessoa_id', perfil.id),
@@ -162,10 +162,15 @@ export default async function InicioCota({
             .gte('valido_ate', hojeNoBrasil()).lte('valido_ate', limiteDeRenovacao(hojeNoBrasil())),
           // E acompanha a leitura obrigatória (38).
           db.rpc('leituras_do_diario'),
+          // E os registros dos atendentes com a gestão (43).
+          db.from('diario_privados').select('id', { count: 'exact', head: true })
+            .eq('situacao', 'aguardando').neq('pessoa_id', perfil.id),
         ])
-      : [{ count: 0 }, { count: 0 }, { data: [] }];
+      : [{ count: 0 }, { count: 0 }, { data: [] }, { count: 0 }];
     const semLer = pessoasComLeituraPendente((leituras ?? []) as LeituraDiario[]);
     const pendenciasDoDiario = [
+      privados && { texto: `${privados} registro${privados > 1 ? 's' : ''} de atendente${privados > 1 ? 's' : ''} aguardando aprovação`,
+                    acao: 'Revisar', href: '/cota/diario?cat=gestao' },
       semLer && { texto: `${semLer} pessoa${semLer > 1 ? 's' : ''} com leitura pendente no diário`,
                   acao: 'Ver', href: '/cota/diario?filtro=leitura' },
       aguardando && { texto: `${aguardando} registro${aguardando > 1 ? 's' : ''} do diário aguardando aprovação`,

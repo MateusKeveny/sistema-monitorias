@@ -74,7 +74,7 @@ export default async function PainelGestor({
   const meses = [competencia, anterior];
   const db = await criarClienteServidor();
 
-  const [pessoas, csat, volume, criterios, cota, cargos, fechados, monitorias, valores, semCargo, conferir, diario, vencendo, leituras]
+  const [pessoas, csat, volume, criterios, cota, cargos, fechados, monitorias, valores, semCargo, conferir, diario, vencendo, leituras, privados]
     = await Promise.all([
     db.from('pessoas').select('id, nome, exibir_no_painel, conta_nas_medias'),
     db.from('vw_csat_semanal').select('pessoa_id, origem, semana, avaliacoes, positivas, mes_competencia')
@@ -99,6 +99,8 @@ export default async function PainelGestor({
       .gte('valido_ate', hojeNoBrasil()).lte('valido_ate', limiteDeRenovacao(hojeNoBrasil())),
     // Leitura obrigatória do diário (migração 38).
     db.rpc('leituras_do_diario'),
+    // Registros dos atendentes com a gestão, aguardando (migração 43).
+    db.from('diario_privados').select('id', { count: 'exact', head: true }).eq('situacao', 'aguardando'),
   ]);
 
   const nome = new Map((pessoas.data ?? []).map((p) => [p.id as string, nomeCurto(p.nome as string)]));
@@ -185,6 +187,12 @@ export default async function PainelGestor({
     pendencias.push({
       texto: `${diario.count} registro${diario.count > 1 ? 's' : ''} do diário aguardando aprovação`,
       acao: 'Revisar', href: '/cota/diario?filtro=aguardando',
+    });
+  }
+  if (privados.count) {
+    pendencias.push({
+      texto: `${privados.count} registro${privados.count > 1 ? 's' : ''} de atendente${privados.count > 1 ? 's' : ''} aguardando aprovação`,
+      acao: 'Revisar', href: '/cota/diario?cat=gestao',
     });
   }
   const semLer = pessoasComLeituraPendente((leituras.data ?? []) as LeituraDiario[]);

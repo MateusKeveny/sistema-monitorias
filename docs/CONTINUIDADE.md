@@ -11,9 +11,9 @@ Escrito em 28/09/2026, atualizado em 29/09/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.31.1** · Monitorias **4.15.1** (deploy de 30/09/2026) |
+| Publicado | Performance **1.32.0** · Monitorias **4.15.1** (deploy de 30/09/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
-| Migrações no banco | 01 a 42, todas aplicadas |
+| Migrações no banco | 01 a 43, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
 
 ### Revisão de design (28/09/2026)
@@ -213,6 +213,15 @@ Três versões, cada uma publicada e conferida antes da próxima:
   cartão no destino `diario_novidades`, uma vez por registro: resumo de até
   280 caracteres e botão para o painel, onde a leitura é confirmada. Configurado
   e testado pelo gestor no site publicado.
+- **1.32.0** (publicada): **abas no diário** (migração 43). "Meus registros
+  com a gestão" / "Registros dos atendentes" (`diario_privados`): texto
+  livre que só o autor e a gestão (gestor e Pleno) veem; a gestão aprova
+  (continua privado) ou devolve com comentário (`decidir_registro_privado`);
+  pendência no Início do gestor e do Pleno. "Anotações do gestor"
+  (`diario_anotacoes`): só papel gestor lê, cada um edita as próprias, com
+  "Sobre" opcional que aparece na ficha da pessoa em Atendentes. Tudo na RLS;
+  testado com o Teste de acesso, inclusive leitura direta pela API (vazia) e
+  tentativa de gravar anotação (403).
 
 Visão de celular fica fora da revisão, por decisão do gestor.
 

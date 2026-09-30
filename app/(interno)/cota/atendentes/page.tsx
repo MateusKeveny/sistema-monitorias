@@ -3,7 +3,7 @@ import PainelAtendentes from '@/componentes/PainelAtendentes';
 import { mesAnterior } from '@/lib/competencia';
 import { hojeNoBrasil, mesDeCompetencia, periodoDaSemana } from '@/lib/formatar';
 import type { Cargo, CargoDaPessoa, Pessoa, Saida } from '@/lib/tipos';
-import type { LeituraDaPessoa, LeituraDiario } from '@/lib/diario';
+import type { AnotacaoGestor, LeituraDaPessoa, LeituraDiario } from '@/lib/diario';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +20,7 @@ export default async function Atendentes() {
   const db = await criarClienteServidor();
 
   const [{ data: pessoas }, { data: saidas }, { data: cargos }, { data: historico }, { data: leituras },
-    { data: registros }, { data: confirmacoes }] = await Promise.all([
+    { data: registros }, { data: confirmacoes }, { data: anotacoes }] = await Promise.all([
     db.from('pessoas').select('*').order('nome'),
     db.from('saidas').select('*').order('data', { ascending: false }),
     db.from('cargos').select('*').eq('ativo', true).order('ordem'),
@@ -29,6 +29,9 @@ export default async function Atendentes() {
     db.rpc('leituras_do_diario'),
     db.from('diario_registros').select('id, tipo, assunto, criado_em').in('tipo', ['processo', 'treinamento']),
     db.from('diario_leituras').select('pessoa_id, ciente_em').order('ciente_em', { ascending: false }),
+    // Anotações do gestor sobre cada pessoa (migração 43; só gestor lê).
+    db.from('diario_anotacoes').select('*').not('sobre_pessoa_id', 'is', null)
+      .order('data', { ascending: false }).order('criado_em', { ascending: false }),
   ]);
 
   const registro = new Map((registros ?? []).map((r) => [r.id as string, r]));
@@ -62,6 +65,7 @@ export default async function Atendentes() {
         cargos={(cargos ?? []) as Cargo[]}
         historico={(historico ?? []) as CargoDaPessoa[]}
         leituras={leituraDe}
+        anotacoes={(anotacoes ?? []) as AnotacaoGestor[]}
         competencia={competencia}
         inicioDoCicloAnterior={inicioDoCicloAnterior}
       />

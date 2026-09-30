@@ -93,6 +93,34 @@ export type LeituraDaPessoa = {
   ultima: string | null;
 };
 
+/** Registro que o atendente faz só com a gestão (migração 43). */
+export type RegistroPrivado = {
+  id: string;
+  pessoa_id: string;
+  assunto: string;
+  texto: string;
+  situacao: 'aguardando' | 'aprovado' | 'devolvido';
+  decidido_por: string | null;
+  decidido_em: string | null;
+  comentario_decisao: string | null;
+  criado_em: string;
+};
+
+export const ROTULO_PRIVADO: Record<RegistroPrivado['situacao'], string> = {
+  aguardando: 'Aguardando aprovação', aprovado: 'Aprovado', devolvido: 'Devolvido',
+};
+
+/** Anotação do gestor, com pessoa opcional (migração 43). */
+export type AnotacaoGestor = {
+  id: string;
+  autor_id: string;
+  data: string;
+  sobre_pessoa_id: string | null;
+  assunto: string;
+  texto: string;
+  criado_em: string;
+};
+
 /** Quantas pessoas têm ao menos uma leitura pendente — a pendência do Início. */
 export const pessoasComLeituraPendente = (leituras: LeituraDiario[]) =>
   new Set(leituras.filter((l) => !l.ciente_em).map((l) => l.pessoa_id)).size;
