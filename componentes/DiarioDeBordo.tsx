@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import {
   AUTORIZADORES, COR_SITUACAO, COR_TIPO, ROTULO_QUEM, ROTULO_SITUACAO, ROTULO_TIPO, TIPOS,
-  juntarOutro, palavrasEncontradas, separarOutro, validade, type RenovacaoDiario, type QuemAutorizou, type RegistroDiario, type TipoRegistro,
+  juntarOutro, palavrasEncontradas, separarOutro, validade, type LeituraDiario, type RenovacaoDiario, type QuemAutorizou, type RegistroDiario, type TipoRegistro,
 } from '@/lib/diario';
 
 const entrada = `w-full rounded-xl border border-slate-300 bg-superficie px-3 py-2 text-sm outline-none
@@ -24,7 +24,7 @@ const diaExtenso = (iso: string, hoje: string) => {
   return d.charAt(0).toUpperCase() + d.slice(1);
 };
 
-type Filtro = 'todos' | TipoRegistro | 'aguardando' | 'meus' | 'vencendo';
+type Filtro = 'todos' | TipoRegistro | 'aguardando' | 'meus' | 'vencendo' | 'leitura';
 const vazio = {
   tipo: '' as TipoRegistro | '', protocolo: '', assunto: '', descricao: '',
   quem: '' as QuemAutorizou | 'ninguem' | '', nome: '', cargo: '', setor: '',
@@ -43,11 +43,13 @@ const vazio = {
  * 31 e 33); a tela só antecipa o que vai acontecer.
  */
 export default function DiarioDeBordo({
-  registros, renovacoes, nomes, pessoaId, ehGestor, aprova, concluiDireto, hoje, filtroInicial,
+  registros, renovacoes, leituras, nomes, pessoaId, ehGestor, aprova, concluiDireto, hoje, filtroInicial,
 }: {
   registros: RegistroDiario[];
   /** Renovações de validade, da mais recente à mais antiga. */
   renovacoes: RenovacaoDiario[];
+  /** Quem precisa ler e quem já leu — só chega para gestor e Pleno. */
+  leituras: LeituraDiario[];
   nomes: Record<string, string>;
   pessoaId: string;
   ehGestor: boolean;
@@ -65,11 +67,14 @@ export default function DiarioDeBordo({
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [filtro, setFiltro] = useState<Filtro>(
-    (['aguardando', 'vencendo', 'meus', 'processo', 'treinamento', 'autorizacao', 'excecao'] as string[]).includes(filtroInicial ?? '')
+    (['aguardando', 'vencendo', 'leitura', 'meus', 'processo', 'treinamento', 'autorizacao', 'excecao'] as string[]).includes(filtroInicial ?? '')
       ? filtroInicial as Filtro : 'todos');
   const [busca, setBusca] = useState('');
   const [devolvendo, setDevolvendo] = useState<{ id: string; texto: string } | null>(null);
   const [renovando, setRenovando] = useState<{ id: string; ate: string } | null>(null);
+  const [vendoLeitura, setVendoLeitura] = useState<string | null>(null);
+  const leiturasDe = (id: string) => leituras.filter((l) => l.registro_id === id);
+  const comLeituraPendente = new Set(leituras.filter((l) => !l.ciente_em).map((l) => l.registro_id));
 
   const achadas = palavrasEncontradas(`${f.assunto} ${f.descricao}`);
   const exigeQuem = f.tipo === 'autorizacao' || f.tipo === 'excecao';
@@ -172,13 +177,15 @@ export default function DiarioDeBordo({
 
   const aguardando = registros.filter((r) => r.situacao === 'aguardando').length;
   const vencendo = registros.filter((r) => validade(r, hoje)?.vencendo).length;
+  const leituraPendente = registros.filter((r) => comLeituraPendente.has(r.id)).length;
   const termo = busca.trim().toLocaleLowerCase('pt-BR');
   const lista = useMemo(() => registros.filter((r) =>
     (filtro === 'todos' || (filtro === 'aguardando' ? r.situacao === 'aguardando'
       : filtro === 'vencendo' ? !!validade(r, hoje)?.vencendo
+      : filtro === 'leitura' ? comLeituraPendente.has(r.id)
       : filtro === 'meus' ? r.pessoa_id === pessoaId : r.tipo === filtro))
     && (!termo || [r.protocolo ?? '', r.assunto, r.descricao, nomes[r.pessoa_id] ?? '', r.autorizado_por_nome ?? '']
-      .some((t) => t.toLocaleLowerCase('pt-BR').includes(termo)))), [registros, filtro, termo, pessoaId, nomes, hoje]);
+      .some((t) => t.toLocaleLowerCase('pt-BR').includes(termo)))), [registros, filtro, termo, pessoaId, nomes, hoje, leituras]);
   const porDia = [...lista.reduce((m, r) => m.set(r.data, [...(m.get(r.data) ?? []), r]), new Map<string, RegistroDiario[]>())];
 
   return (
@@ -314,12 +321,13 @@ export default function DiarioDeBordo({
         <div className="mb-2 flex flex-wrap gap-1.5">
           {([['todos', 'Todos'], ['processo', 'Processos'], ['treinamento', 'Treinamentos'], ['autorizacao', 'Autorizações'],
             ['excecao', 'Exceções'], ['meus', 'Meus'], ['aguardando', `Aguardando aprovação${aguardando ? ` · ${aguardando}` : ''}`],
-            ['vencendo', `Vencendo${vencendo ? ` · ${vencendo}` : ''}`]] as const)
+            ['vencendo', `Vencendo${vencendo ? ` · ${vencendo}` : ''}`],
+            ...(aprova ? [['leitura', `Leitura pendente${leituraPendente ? ` · ${leituraPendente}` : ''}`] as const] : [])] as const)
             .map(([k, r]) => (
               <button key={k} type="button" aria-pressed={filtro === k} onClick={() => setFiltro(k)}
                       className={`rounded-full border px-3 py-0.5 text-xs ${filtro === k
                         ? 'border-marca-600 bg-marca-600/10 text-marca-700 dark:text-marca-400'
-                        : (k === 'aguardando' && aguardando) || (k === 'vencendo' && vencendo) ? 'border-amber-500/50 text-amber-700 dark:text-amber-300'
+                        : (k === 'aguardando' && aguardando) || (k === 'vencendo' && vencendo) || (k === 'leitura' && leituraPendente) ? 'border-amber-500/50 text-amber-700 dark:text-amber-300'
                           : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
                 {r}
               </button>
@@ -341,6 +349,10 @@ export default function DiarioDeBordo({
                     {r.protocolo && <span className="font-semibold tabular-nums text-slate-800">#{r.protocolo}</span>}
                     <b className="font-semibold text-slate-800">{r.assunto}</b>
                     <SeloValidade r={r} hoje={hoje} />
+                    {leiturasDe(r.id).length > 0 && (
+                      <SeloLeitura lista={leiturasDe(r.id)} aberto={vendoLeitura === r.id}
+                                   alternar={() => setVendoLeitura((v) => v === r.id ? null : r.id)} />
+                    )}
                     <span className={`ml-auto rounded-md px-2 py-0.5 text-xs font-semibold ${COR_SITUACAO[r.situacao]}`}>
                       {ROTULO_SITUACAO[r.situacao]}
                     </span>
@@ -353,6 +365,7 @@ export default function DiarioDeBordo({
                     {r.situacao === 'concluido' && r.decidido_por && r.decidido_por !== r.pessoa_id
                       && ` · aprovado por ${nomeCurto(nomes[r.decidido_por] ?? '—')}`}
                   </p>
+                  {vendoLeitura === r.id && <QuemLeu lista={leiturasDe(r.id)} hoje={hoje} desde={r.criado_em} />}
                   <UltimaRenovacao lista={renovacoes.filter((x) => x.registro_id === r.id)} nomes={nomes} />
                   {r.situacao === 'devolvido' && r.comentario_decisao && (
                     <p className="rounded-lg bg-rose-50 px-3 py-1.5 text-xs text-rose-800 ring-1 ring-rose-600/20">
@@ -466,5 +479,50 @@ function UltimaRenovacao({ lista, nomes }: { lista: RenovacaoDiario[]; nomes: Re
       {' '}· validade original {dataBR(lista[lista.length - 1].valia_ate)}
       {lista.length > 1 ? ` · ${lista.length} renovações` : ''}
     </p>
+  );
+}
+
+/** "Lido por 6 de 9": âmbar enquanto falta alguém, verde quando todos leram. */
+function SeloLeitura({ lista, aberto, alternar }: { lista: LeituraDiario[]; aberto: boolean; alternar: () => void }) {
+  const leram = lista.filter((l) => l.ciente_em).length;
+  const todos = leram === lista.length;
+  return (
+    <button type="button" onClick={alternar} aria-expanded={aberto}
+            className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${todos
+              ? 'border-marca-600/45 text-marca-700 dark:text-marca-400'
+              : 'border-amber-500/50 text-amber-700 dark:text-amber-300'}`}>
+      {todos ? '✓ ' : ''}Lido por {leram} de {lista.length}
+    </button>
+  );
+}
+
+/** Quem leu (com data e hora) e quem falta (desde quando). */
+function QuemLeu({ lista, hoje, desde }: { lista: LeituraDiario[]; hoje: string; desde: string }) {
+  const quando = (iso: string) => {
+    const d = new Date(iso);
+    const dia = d.toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+    return `${dia === hoje ? 'hoje' : dataBR(dia).slice(0, 5)} ${hora(iso)}`;
+  };
+  const leram = lista.filter((l) => l.ciente_em).sort((a, b) => a.ciente_em!.localeCompare(b.ciente_em!));
+  const faltam = lista.filter((l) => !l.ciente_em).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  return (
+    <div className="mt-1 grid gap-4 rounded-xl bg-slate-50 px-4 py-3 sm:grid-cols-2">
+      <div>
+        <h4 className="mb-1 text-xs font-semibold text-slate-600">Leram ({leram.length})</h4>
+        <ul className="grid gap-0.5 text-sm text-slate-700">
+          {leram.length ? leram.map((l) => (
+            <li key={l.pessoa_id}>{nomeCurto(l.nome)} <small className="ml-1 text-slate-500">{quando(l.ciente_em!)}</small></li>
+          )) : <li className="text-xs text-slate-500">Ninguém ainda.</li>}
+        </ul>
+      </div>
+      <div>
+        <h4 className="mb-1 text-xs font-semibold text-slate-600">Faltam ({faltam.length})</h4>
+        <ul className="grid gap-0.5 text-sm text-slate-700">
+          {faltam.length ? faltam.map((l) => (
+            <li key={l.pessoa_id}>{nomeCurto(l.nome)} <small className="ml-1 text-amber-700 dark:text-amber-300">pendente desde {quando(desde)}</small></li>
+          )) : <li className="text-xs text-slate-500">Todos leram.</li>}
+        </ul>
+      </div>
+    </div>
   );
 }

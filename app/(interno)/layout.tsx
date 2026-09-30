@@ -3,6 +3,9 @@ import MenuLateral from '@/componentes/MenuLateral';
 import { VERSAO_COTA, VERSAO_MONITORIAS } from '@/lib/versoes';
 import { sistemaAtual } from '@/lib/sistema-servidor';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
+import LeituraObrigatoria from '@/componentes/LeituraObrigatoria';
+import { hojeNoBrasil } from '@/lib/formatar';
+import type { LeituraDiario, RegistroDiario } from '@/lib/diario';
 
 export default async function LayoutInterno({ children }: { children: React.ReactNode }) {
   const [perfil, sistema] = await Promise.all([exigirPerfil(), sistemaAtual()]);
@@ -27,6 +30,30 @@ export default async function LayoutInterno({ children }: { children: React.Reac
   // janela estreita volta o cabeçalho do topo. As Monitorias seguem como
   // estavam.
   if (sistema === 'cota') {
+    // Leitura obrigatória do diário (1.29.0): com processo ou treinamento
+    // ainda não lido, o painel inteiro dá lugar à leitura — vale também para
+    // quem abre uma tela pelo endereço direto. O gestor só acompanha.
+    if (perfil.papel !== 'gestor') {
+      const db = await criarClienteServidor();
+      const { data: leituras } = await db.rpc('leituras_do_diario');
+      const pendentesDeLeitura = ((leituras ?? []) as LeituraDiario[])
+        .filter((l) => l.pessoa_id === perfil.id && !l.ciente_em).map((l) => l.registro_id);
+      if (pendentesDeLeitura.length) {
+        const [{ data: registros }, { data: pessoas }] = await Promise.all([
+          db.from('diario_registros').select('*').in('id', pendentesDeLeitura)
+            .order('data', { ascending: true }).order('criado_em', { ascending: true }),
+          db.rpc('nomes_das_pessoas'),
+        ]);
+        return (
+          <LeituraObrigatoria
+            registros={(registros ?? []) as RegistroDiario[]}
+            nomes={Object.fromEntries((pessoas ?? []).map((p: { id: string; nome: string }) => [p.id, p.nome]))}
+            hoje={hojeNoBrasil()}
+          />
+        );
+      }
+    }
+
     return (
       <div className="lg:grid lg:min-h-screen lg:grid-cols-[15rem_1fr]">
         <MenuLateral perfil={perfil} versao={VERSAO_COTA} />

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { mesRotulo } from '@/lib/formatar';
 import { NOMES_PAPEL, type Cargo, type CargoDaPessoa, type Pessoa, type Saida } from '@/lib/tipos';
+import { ROTULO_TIPO, type LeituraDaPessoa } from '@/lib/diario';
 
 const entrada = `rounded-lg border border-slate-300 bg-superficie px-2.5 py-1.5 text-sm outline-none
                  focus:border-marca-600 disabled:opacity-50`;
@@ -41,12 +42,14 @@ type Recorte = 'todos' | 'operadores' | 'gestao';
  * sistemas.
  */
 export default function PainelAtendentes({
-  pessoas, saidas, cargos, historico, competencia, inicioDoCicloAnterior,
+  pessoas, saidas, cargos, historico, leituras, competencia, inicioDoCicloAnterior,
 }: {
   pessoas: Pessoa[];
   saidas: Saida[];
   cargos: Cargo[];
   historico: CargoDaPessoa[];
+  /** O que cada pessoa ainda não leu no diário (migração 38). */
+  leituras: Record<string, LeituraDaPessoa>;
   /** Competência corrente ('2026-10-01'): o "cargo em outubro". */
   competencia: string;
   /** Início do ciclo anterior: entradas e saídas a partir daí são "recentes". */
@@ -208,7 +211,7 @@ export default function PainelAtendentes({
 
         {pessoa ? (
           <Ficha key={pessoa.id} pessoa={pessoa} cargos={cargos} linhas={linhasDe(pessoa.id)}
-                 competencia={competencia} pendencias={pendencias(pessoa)}
+                 competencia={competencia} pendencias={pendencias(pessoa)} leitura={leituras[pessoa.id]}
                  saida={saidas.filter((s) => s.pessoa_id === pessoa.id && !s.revertida_em)
                    .sort((a, b) => b.data.localeCompare(a.data))[0]} />
         ) : (
@@ -279,9 +282,10 @@ const Secao = ({ titulo, children }: { titulo: string; children: React.ReactNode
 );
 
 function Ficha({
-  pessoa, cargos, linhas, competencia, pendencias, saida,
+  pessoa, cargos, linhas, competencia, pendencias, saida, leitura,
 }: {
   pessoa: Pessoa;
+  leitura: LeituraDaPessoa | undefined;
   cargos: Cargo[];
   linhas: CargoDaPessoa[];
   competencia: string;
@@ -427,6 +431,30 @@ function Ficha({
       </Secao>
 
       <Secao titulo="Diário de bordo">
+        {pessoa.papel !== 'gestor' && pessoa.auth_id && (
+          <div className="mb-3">
+            {leitura?.pendentes.length ? (
+              <>
+                <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">
+                  {leitura.pendentes.length} leitura{leitura.pendentes.length > 1 ? 's' : ''} pendente{leitura.pendentes.length > 1 ? 's' : ''}
+                </p>
+                <ul className="mt-1 grid list-disc gap-0.5 pl-5 text-sm text-slate-700">
+                  {leitura.pendentes.map((p) => (
+                    <li key={p.id}>{ROTULO_TIPO[p.tipo]} · {p.assunto}
+                      <small className="ml-1 text-slate-500">· desde {new Date(p.desde).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }).slice(0, 5)}</small></li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <p className="text-sm text-slate-600">Leitura em dia.</p>
+            )}
+            <p className="mt-1 text-xs text-slate-500">
+              Última confirmação: {leitura?.ultima
+                ? new Date(leitura.ultima).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' }).replace(',', ' às')
+                : 'nenhuma ainda'}.
+            </p>
+          </div>
+        )}
         <div className="flex items-center justify-between gap-3 py-1 text-sm text-slate-600">
           Registra autorizações sem aprovação
           <Interruptor ligado={pessoa.diario_conclui_direto ?? false} disabled={ocupado} rotulo="Registra autorizações sem aprovação"

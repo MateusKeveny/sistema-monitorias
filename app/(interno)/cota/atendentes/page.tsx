@@ -3,6 +3,7 @@ import PainelAtendentes from '@/componentes/PainelAtendentes';
 import { mesAnterior } from '@/lib/competencia';
 import { hojeNoBrasil, mesDeCompetencia, periodoDaSemana } from '@/lib/formatar';
 import type { Cargo, CargoDaPessoa, Pessoa, Saida } from '@/lib/tipos';
+import type { LeituraDaPessoa, LeituraDiario } from '@/lib/diario';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,12 +19,29 @@ export default async function Atendentes() {
   await exigirGestor();
   const db = await criarClienteServidor();
 
-  const [{ data: pessoas }, { data: saidas }, { data: cargos }, { data: historico }] = await Promise.all([
+  const [{ data: pessoas }, { data: saidas }, { data: cargos }, { data: historico }, { data: leituras },
+    { data: registros }, { data: confirmacoes }] = await Promise.all([
     db.from('pessoas').select('*').order('nome'),
     db.from('saidas').select('*').order('data', { ascending: false }),
     db.from('cargos').select('*').eq('ativo', true).order('ordem'),
     db.from('cargos_da_pessoa').select('*'),
+    // Leitura obrigatória do diário (migração 38): o que cada um ainda não leu.
+    db.rpc('leituras_do_diario'),
+    db.from('diario_registros').select('id, tipo, assunto, criado_em').in('tipo', ['processo', 'treinamento']),
+    db.from('diario_leituras').select('pessoa_id, ciente_em').order('ciente_em', { ascending: false }),
   ]);
+
+  const registro = new Map((registros ?? []).map((r) => [r.id as string, r]));
+  const leituraDe: Record<string, LeituraDaPessoa> = {};
+  for (const l of (leituras ?? []) as LeituraDiario[]) {
+    const d = (leituraDe[l.pessoa_id] ??= { pendentes: [], ultima: null });
+    const r = registro.get(l.registro_id);
+    if (!l.ciente_em && r) d.pendentes.push({ id: r.id, tipo: r.tipo, assunto: r.assunto, desde: r.criado_em });
+  }
+  for (const c of confirmacoes ?? []) {
+    const d = (leituraDe[c.pessoa_id as string] ??= { pendentes: [], ultima: null });
+    d.ultima ??= c.ciente_em as string;
+  }
 
   const competencia = mesDeCompetencia(hojeNoBrasil());
   const [inicioDoCicloAnterior] = periodoDaSemana(mesAnterior(competencia), 1);
@@ -43,6 +61,7 @@ export default async function Atendentes() {
         saidas={(saidas ?? []) as Saida[]}
         cargos={(cargos ?? []) as Cargo[]}
         historico={(historico ?? []) as CargoDaPessoa[]}
+        leituras={leituraDe}
         competencia={competencia}
         inicioDoCicloAnterior={inicioDoCicloAnterior}
       />

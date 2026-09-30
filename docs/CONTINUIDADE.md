@@ -11,9 +11,9 @@ Escrito em 28/09/2026, atualizado em 29/09/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.28.0** · Monitorias **4.15.1** (deploy de 30/09/2026) |
+| Publicado | Performance **1.29.0** · Monitorias **4.15.1** (deploy de 30/09/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
-| Migrações no banco | 01 a 37, todas aplicadas |
+| Migrações no banco | 01 a 38 aplicadas; **39 (perfil de teste) a rodar** |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
 
 ### Revisão de design (28/09/2026)
@@ -174,6 +174,20 @@ Três versões, cada uma publicada e conferida antes da próxima:
   registro com dia do ocorrido para trás mostra também quando foi registrado.
   A janela de 7 dias está na migração 37 e em `DIAS_PARA_RENOVAR`
   (lib/diario.ts): mudar nos dois. Conferida pelo gestor no site publicado.
+- **1.29.0** (publicada; Monitorias sem mudança): **leitura obrigatória do
+  diário** (migração 38). Processo novo e treinamento concluídos que ainda
+  valem (validade em dia, ou sem validade e até 30 dias) precisam de "Li e
+  estou ciente" de toda pessoa ativa com acesso, menos o gestor e o autor.
+  Com leitura pendente, o layout do Performance troca o painel inteiro pela
+  tela "Novidades do diário" (`LeituraObrigatoria`) até confirmar tudo —
+  vale para endereço direto; checado a cada carregamento. Confirmações em
+  `diario_leituras`, sem alterar nem apagar; `leituras_do_diario()` entrega
+  tudo a gestor e Pleno. Diário: "Lido por X de Y" com quem leu e quem falta
+  e filtro "Leitura pendente"; Início do gestor e do Pleno: "N pessoas com
+  leitura pendente"; ficha em Atendentes: pendências e última confirmação.
+  Testado com o Teste de acesso nos 3 processos reais da Suyara (confirmações
+  de teste apagadas). A migração 39 marca o Teste de acesso como
+  `perfil_de_teste`, fora da leitura.
 
 Visão de celular fica fora da revisão, por decisão do gestor.
 

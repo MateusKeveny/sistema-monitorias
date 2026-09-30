@@ -75,6 +75,28 @@ export const DIAS_PARA_RENOVAR = 7;
 export const limiteDeRenovacao = (hoje: string) =>
   new Date(Date.parse(hoje) + DIAS_PARA_RENOVAR * 86_400_000).toISOString().slice(0, 10);
 
+/**
+ * Quem precisa ler cada processo e treinamento, e se já leu (migração 38,
+ * função leituras_do_diario). `ciente_em` nulo = leitura pendente.
+ */
+export type LeituraDiario = {
+  registro_id: string;
+  pessoa_id: string;
+  nome: string;
+  ciente_em: string | null;
+};
+
+/** O que uma pessoa ainda não leu no diário, para a ficha em Atendentes. */
+export type LeituraDaPessoa = {
+  pendentes: { id: string; tipo: TipoRegistro; assunto: string; desde: string }[];
+  /** Última confirmação dada, de qualquer registro. */
+  ultima: string | null;
+};
+
+/** Quantas pessoas têm ao menos uma leitura pendente — a pendência do Início. */
+export const pessoasComLeituraPendente = (leituras: LeituraDiario[]) =>
+  new Set(leituras.filter((l) => !l.ciente_em).map((l) => l.pessoa_id)).size;
+
 /** Uma renovação: de quando para quando a validade passou (migração 37). */
 export type RenovacaoDiario = {
   registro_id: string;
