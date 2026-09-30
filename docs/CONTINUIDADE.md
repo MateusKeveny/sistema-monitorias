@@ -11,9 +11,9 @@ Escrito em 28/09/2026, atualizado em 29/09/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.26.0** · Monitorias **4.14.2** (deploy de 29/09/2026) |
+| Publicado | Performance **1.27.0** · Monitorias **4.15.0** (deploy de 30/09/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
-| Migrações no banco | 01 a 35, todas aplicadas |
+| Migrações no banco | 01 a 36, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
 
 ### Revisão de design (28/09/2026)
@@ -159,6 +159,12 @@ Três versões, cada uma publicada e conferida antes da próxima:
   e gravam sem protocolo; uma trava no banco (`diario_protocolo_quando_exige`)
   segue exigindo o protocolo em autorização e exceção. Na consulta do
   Monitorias, registro sem protocolo aparece com "—".
+- **1.27.0 / Monitorias 4.15.0** (publicada): **dia do ocorrido e validade**
+  (migração 36). Gestor e Pleno escolhem o dia do ocorrido (hoje ou antes) e
+  podem marcar "Tem validade" com "Vale até" (`valido_ate`). Vencido, o
+  registro continua no diário, na consulta e no aviso da monitoria, com o
+  selo "Vencido em". Para os demais, o banco grava hoje e sem validade; na
+  correção de um devolvido, dia e validade ficam como estavam.
 
 Visão de celular fica fora da revisão, por decisão do gestor.
 

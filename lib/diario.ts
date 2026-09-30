@@ -21,6 +21,8 @@ export type RegistroDiario = {
   descricao: string;
   autorizado_por: QuemAutorizou | null;
   autorizado_por_nome: string | null;
+  /** Até quando vale (migração 36). Vencido, continua no diário, só marcado. */
+  valido_ate: string | null;
   situacao: SituacaoRegistro;
   decidido_por: string | null;
   decidido_em: string | null;
@@ -47,6 +49,17 @@ export const AUTORIZADORES: Record<'gestao' | 'diretoria', string[]> = {
   diretoria: ['Luciana Freire'],
   gestao: ['Mateus Keveny', 'Suyara Martins'],
 };
+
+/**
+ * A validade para mostrar: "Vale até 15/10/2026" ou "Vencido em 15/10/2026".
+ * Nulo quando o registro não tem validade.
+ */
+export function validade(r: Pick<RegistroDiario, 'valido_ate'>, hoje: string) {
+  if (!r.valido_ate) return null;
+  const [a, m, d] = r.valido_ate.split('-');
+  const vencido = r.valido_ate < hoje;
+  return { vencido, texto: `${vencido ? 'Vencido em' : 'Vale até'} ${d}/${m}/${a}` };
+}
 
 /** "Outro" é gravado como "Nome · Cargo · Setor" no nome de quem autorizou. */
 export const juntarOutro = (nome: string, cargo: string, setor: string) =>

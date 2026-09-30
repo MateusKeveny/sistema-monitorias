@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import {
   AUTORIZADORES, COR_SITUACAO, COR_TIPO, ROTULO_QUEM, ROTULO_SITUACAO, ROTULO_TIPO, TIPOS,
-  juntarOutro, palavrasEncontradas, separarOutro, type QuemAutorizou, type RegistroDiario, type TipoRegistro,
+  juntarOutro, palavrasEncontradas, separarOutro, validade, type QuemAutorizou, type RegistroDiario, type TipoRegistro,
 } from '@/lib/diario';
 
 const entrada = `w-full rounded-xl border border-slate-300 bg-superficie px-3 py-2 text-sm outline-none
@@ -28,6 +28,8 @@ type Filtro = 'todos' | TipoRegistro | 'aguardando' | 'meus';
 const vazio = {
   tipo: '' as TipoRegistro | '', protocolo: '', assunto: '', descricao: '',
   quem: '' as QuemAutorizou | 'ninguem' | '', nome: '', cargo: '', setor: '',
+  // Só gestor e Pleno: dia do ocorrido (vazio = hoje) e validade.
+  data: '', temValidade: false, validoAte: '',
 };
 
 /**
@@ -79,6 +81,9 @@ export default function DiarioDeBordo({
     pedeQuem && (!f.quem || (exigeQuem && f.quem === 'ninguem')) && 'quem autorizou',
     pedeQuem && f.quem && !ninguem && !f.nome.trim() && 'nome de quem autorizou',
     pedeQuem && outro && !f.cargo.trim() && 'cargo', pedeQuem && outro && !f.setor.trim() && 'setor',
+    aprova && f.data > hoje && 'dia do ocorrido até hoje',
+    aprova && f.temValidade && !f.validoAte && 'até quando vale',
+    aprova && f.temValidade && f.validoAte && f.validoAte < (f.data || hoje) && 'validade depois do dia do ocorrido',
   ].filter(Boolean) as string[];
   const vaiAprovar = pedeQuem && (f.quem === 'gestao' || f.quem === 'diretoria') && !concluiDireto;
 
@@ -97,6 +102,8 @@ export default function DiarioDeBordo({
       descricao: f.descricao.trim(),
       autorizado_por: pedeQuem && !ninguem ? f.quem : null,
       autorizado_por_nome: !pedeQuem || ninguem ? null : outro ? juntarOutro(f.nome, f.cargo, f.setor) : f.nome.trim(),
+      // Para os demais, o banco grava hoje e sem validade (migração 36).
+      ...(aprova ? { data: f.data || hoje, valido_ate: f.temValidade ? f.validoAte : null } : {}),
     };
     const db = criarClienteNavegador();
     const { error } = corrigindo
@@ -118,6 +125,7 @@ export default function DiarioDeBordo({
     setF({
       tipo: r.tipo, protocolo: r.protocolo ?? '', assunto: r.assunto, descricao: r.descricao,
       quem: quem ?? '', cargo: '', setor: '',
+      data: r.data, temValidade: !!r.valido_ate, validoAte: r.valido_ate ?? '',
       // Nome que não está mais na lista (registro antigo) volta vazio, para
       // ser escolhido de novo.
       nome: quem === 'gestao' || quem === 'diretoria'
@@ -190,6 +198,26 @@ export default function DiarioDeBordo({
           <label><span className={rotulo}>O que aconteceu *</span>
             <textarea value={f.descricao} onChange={set('descricao')} disabled={ocupado} rows={4}
                       className={`${entrada} resize-y leading-relaxed`} /></label>
+
+          {aprova && (
+            <div className="grid items-end gap-3 sm:grid-cols-3">
+              <label><span className={rotulo}>Dia do ocorrido</span>
+                <input type="date" value={f.data || hoje} max={hoje} onChange={set('data')} disabled={ocupado} className={entrada} /></label>
+              <label className="flex items-center gap-2 pb-2 text-sm text-slate-700">
+                <input type="checkbox" checked={f.temValidade} disabled={ocupado}
+                       onChange={(e) => setF((s) => ({ ...s, temValidade: e.target.checked, validoAte: e.target.checked ? s.validoAte : '' }))}
+                       className="h-4 w-4 accent-marca-600" />
+                Tem validade
+              </label>
+              {f.temValidade && (
+                <label><span className={rotulo}>Vale até *</span>
+                  <input type="date" value={f.validoAte} min={f.data || hoje} onChange={set('validoAte')} disabled={ocupado} className={entrada} /></label>
+              )}
+              {f.temValidade && (
+                <p className="text-xs text-slate-500 sm:col-span-3">Depois dessa data o registro continua no diário, marcado como vencido.</p>
+              )}
+            </div>
+          )}
 
           {pedeQuem && (
             <div className="surgir rounded-2xl border border-amber-500/45 bg-amber-50 px-4 py-3">
@@ -296,6 +324,7 @@ export default function DiarioDeBordo({
                     <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${COR_TIPO[r.tipo]}`}>{ROTULO_TIPO[r.tipo]}</span>
                     {r.protocolo && <span className="font-semibold tabular-nums text-slate-800">#{r.protocolo}</span>}
                     <b className="font-semibold text-slate-800">{r.assunto}</b>
+                    <SeloValidade r={r} hoje={hoje} />
                     <span className={`ml-auto rounded-md px-2 py-0.5 text-xs font-semibold ${COR_SITUACAO[r.situacao]}`}>
                       {ROTULO_SITUACAO[r.situacao]}
                     </span>
@@ -358,5 +387,17 @@ export default function DiarioDeBordo({
         ))}
       </section>
     </div>
+  );
+}
+
+/** "Vale até" ou "Vencido em": o vencido continua no diário, só marcado. */
+function SeloValidade({ r, hoje }: { r: RegistroDiario; hoje: string }) {
+  const v = validade(r, hoje);
+  if (!v) return null;
+  return (
+    <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${v.vencido
+      ? 'bg-slate-500/15 text-slate-500 line-through decoration-slate-400' : 'bg-sky-500/15 text-sky-700 dark:text-sky-300'}`}>
+      {v.texto}
+    </span>
   );
 }

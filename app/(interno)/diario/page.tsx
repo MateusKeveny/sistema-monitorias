@@ -3,7 +3,7 @@ import { criarClienteServidor, exigirVisaoDoTime } from '@/lib/supabase/servidor
 import { Cartao, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import { codigoMonitoria, data as formatarData, hojeNoBrasil, mesDeCompetencia, periodoDaSemana } from '@/lib/formatar';
 import {
-  COR_SITUACAO, COR_TIPO, ROTULO_QUEM, ROTULO_SITUACAO, ROTULO_TIPO, TIPOS,
+  COR_SITUACAO, COR_TIPO, ROTULO_QUEM, ROTULO_SITUACAO, ROTULO_TIPO, TIPOS, validade,
   type RegistroDiario, type TipoRegistro,
 } from '@/lib/diario';
 
@@ -55,6 +55,7 @@ export default async function ConsultaDoDiario({
   const citacoesDe = (id: string) => todasCitacoes.filter((c) => c.registro_id === id);
   const impactaram = todasCitacoes.filter((c) => c.impacta).length;
   const lista = (registros ?? []) as RegistroDiario[];
+  const hoje = hojeNoBrasil();
 
   const Numero = ({ titulo, valor, detalhe, alerta }: { titulo: string; valor: number; detalhe?: string; alerta?: boolean }) => (
     <div className={`rounded-2xl px-5 py-4 shadow-sm ${alerta ? 'bg-amber-50' : 'bg-superficie'}`}>
@@ -118,6 +119,12 @@ export default async function ConsultaDoDiario({
                     <Td><span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${COR_TIPO[r.tipo]}`}>{ROTULO_TIPO[r.tipo]}</span></Td>
                     <Td>
                       <span className="font-medium text-slate-800">{r.assunto}</span>
+                      {validade(r, hoje) && (
+                        <span className={`ml-2 rounded-md px-1.5 py-0.5 text-xs ${validade(r, hoje)!.vencido
+                          ? 'bg-slate-500/15 text-slate-500' : 'bg-sky-500/15 text-sky-700 dark:text-sky-300'}`}>
+                          {validade(r, hoje)!.texto}
+                        </span>
+                      )}
                       <span className="block max-w-xl whitespace-pre-line text-xs text-slate-500">{r.descricao}</span>
                       {r.autorizado_por && (
                         <span className="block text-xs text-slate-500">

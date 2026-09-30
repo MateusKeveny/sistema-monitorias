@@ -9,6 +9,14 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 4.15.0
+
+- Consulta do diário e aviso na monitoria mostram a **validade** do registro:
+  "Vale até" enquanto vale, "Vencido em" depois. O vencido continua na
+  consulta.
+- A data do registro pode ser a do dia do ocorrido, escolhida pela gestão
+  no Painel de Performance.
+
 ## 4.14.2
 
 - Consulta do diário: processo novo e treinamento podem não ter protocolo; a

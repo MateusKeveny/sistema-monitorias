@@ -11,7 +11,7 @@ import {
 } from '@/lib/formatar';
 import type { Canal, Criterio, Operador } from '@/lib/tipos';
 import {
-  ROTULO_QUEM, ROTULO_TIPO, TIPOS_QUE_AVISAM_NA_MONITORIA, type RegistroDiario,
+  ROTULO_QUEM, ROTULO_TIPO, TIPOS_QUE_AVISAM_NA_MONITORIA, validade, type RegistroDiario,
 } from '@/lib/diario';
 
 type Resposta = { conforme: boolean | null; observacao: string };
@@ -343,6 +343,7 @@ export default function FormularioMonitoria({
                   <div key={r.id}>
                     <div className="rounded-r-xl border-l-4 border-amber-500 bg-slate-50 px-4 py-3 text-sm text-slate-700">
                       <b className="text-slate-900">{r.assunto}</b> · {ROTULO_TIPO[r.tipo].toLowerCase()} · {formatarDataBR(r.data)}
+                      {r.valido_ate && ` · ${validade(r, hojeNoBrasil())!.texto.toLowerCase()}`}
                       <span className="mt-1 block whitespace-pre-line">{r.descricao}</span>
                       {r.autorizado_por && (
                         <span className="mt-1 block text-xs text-slate-500">
