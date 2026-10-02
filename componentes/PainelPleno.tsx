@@ -2,7 +2,7 @@ import Link from '@/componentes/Link';
 import { BarraDeMeta, Quadro } from '@/componentes/ui';
 import { criarClienteServidor } from '@/lib/supabase/servidor';
 import { mesRotulo } from '@/lib/formatar';
-import { REGRA_MEDIA, REGRA_META } from '@/lib/tipos';
+import { REGRA_MEDIA, REGRA_MEDIA_REALIZADO, REGRA_META } from '@/lib/tipos';
 
 const num = (v: number, casas = 0) => Number(v).toLocaleString('pt-BR', { maximumFractionDigits: casas });
 const nomeCurto = (nome: string) => nome.trim().split(/\s+/).slice(0, 2).join(' ');
@@ -61,8 +61,11 @@ export default async function PainelPleno({
 
   const media = linhas.find((l) => l.regra === REGRA_MEDIA);
   const multiplicador = Number((pesos.data ?? []).find((p) => p.regra === REGRA_MEDIA)?.peso ?? media?.peso ?? 1);
-  const demandasLinhas = linhas.filter((l) => l.regra !== REGRA_MEDIA);
+  const demandasLinhas = linhas.filter((l) => l.regra !== REGRA_MEDIA && l.regra !== REGRA_MEDIA_REALIZADO);
   const somaDemandas = demandasLinhas.reduce((a, l) => a + l.cota, 0);
+  // Desde a migração 48 a conta é (média + demandas) × multiplicador. Mês
+  // fechado antes disso guarda a conta antiga: média × multiplicador + demandas.
+  const contaNova = !congelado || linhas.some((l) => l.regra === REGRA_MEDIA_REALIZADO);
 
   // Demandas: o que aconteceu no mês, somado por regra, e as que pontuam para
   // cima no cargo e ainda não aconteceram, em cinza — o que ela pode buscar.
@@ -127,16 +130,32 @@ export default async function PainelPleno({
             </div>
 
             <dl className="grid gap-2 text-sm">
-              {media && (
+              {contaNova ? (
                 <>
-                  <div className="flex justify-between gap-3"><dt className="text-slate-600">{rotuloMedia} no mês</dt><dd className="font-semibold">{num(media.quantidade)}</dd></div>
-                  <div className="flex justify-between gap-3"><dt className="text-slate-600">× {num(multiplicador, 2)} do seu cargo</dt><dd className="font-semibold">{num(media.cota)}</dd></div>
+                  <div className="flex justify-between gap-3"><dt className="text-slate-600">{rotuloMedia} no mês</dt><dd className="font-semibold">{num(media?.quantidade ?? 0)}</dd></div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-slate-600">{somaDemandas >= 0 ? '+' : '−'} Sua pontuação realizada</dt>
+                    <dd className="font-semibold">{num(Math.abs(somaDemandas))}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3 border-t border-slate-100 pt-2">
+                    <dt className="text-slate-600">= Soma</dt><dd className="font-semibold">{num((media?.quantidade ?? 0) + somaDemandas)}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3"><dt className="text-slate-600">× {num(multiplicador, 2)} do seu cargo</dt><dd /></div>
+                </>
+              ) : (
+                <>
+                  {media && (
+                    <>
+                      <div className="flex justify-between gap-3"><dt className="text-slate-600">{rotuloMedia} no mês</dt><dd className="font-semibold">{num(media.quantidade)}</dd></div>
+                      <div className="flex justify-between gap-3"><dt className="text-slate-600">× {num(multiplicador, 2)} do seu cargo</dt><dd className="font-semibold">{num(media.cota)}</dd></div>
+                    </>
+                  )}
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-slate-600">{somaDemandas >= 0 ? '+' : '−'} Suas demandas</dt>
+                    <dd className="font-semibold">{num(Math.abs(somaDemandas))}</dd>
+                  </div>
                 </>
               )}
-              <div className="flex justify-between gap-3">
-                <dt className="text-slate-600">{somaDemandas >= 0 ? '+' : '−'} Suas demandas</dt>
-                <dd className="font-semibold">{num(Math.abs(somaDemandas))}</dd>
-              </div>
               <div className="flex justify-between gap-3 border-t border-slate-200 pt-2">
                 <dt className="text-slate-600">Total</dt>
                 <dd className="text-base font-semibold text-marca-700 dark:text-marca-400">{num(resultado)} pts</dd>
@@ -145,8 +164,8 @@ export default async function PainelPleno({
 
             <p className="text-[13px] leading-relaxed text-slate-500">
               A maior parte vem da <strong className="text-slate-700">{rotuloMedia.toLowerCase()}</strong>: quando a equipe
-              sobe, você sobe junto. Cada <strong className="text-slate-700">100 pts</strong> a mais na média viram{' '}
-              <strong className="text-slate-700">{num(100 * multiplicador)}</strong> para você.
+              sobe, você sobe junto. Cada <strong className="text-slate-700">100 pts</strong> a mais na média ou no seu
+              realizado viram <strong className="text-slate-700">{num(100 * multiplicador)}</strong> para você.
               <span className="mt-2 block">{congelado ? 'Competência fechada: valores congelados no fechamento.' : 'O valor sai no fechamento.'}</span>
             </p>
           </div>

@@ -11,9 +11,9 @@ Escrito em 28/09/2026, atualizado em 29/09/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.35.0** · Monitorias **4.16.1** (deploy de 02/10/2026) |
+| Publicado | Performance **1.35.1** · Monitorias **4.16.1** (deploy de 02/10/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
-| Migrações no banco | 01 a 47, todas aplicadas |
+| Migrações no banco | 01 a 48, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
 
 ### Revisão de design (28/09/2026)
@@ -253,6 +253,13 @@ Três versões, cada uma publicada e conferida antes da próxima:
   47** corrige o aviso do diário: registro sem validade e com dia do
   ocorrido antigo passava no filtro (comparação nula no IF) e avisava — um
   cartão de teste saiu no canal da equipe em 02/10.
+- **1.35.1** (correção de cálculo, migração 48): quem recebe pela média
+  passa a ter **(média + pontuação realizada) × peso** — Pleno, 1,2. No
+  extrato, linha `media_sobre_realizado` = realizado × (peso − 1), ao lado
+  da média; `media_do_cargo` usa a mesma regra quando um cargo de
+  referência também recebe pela média. Tela do Pleno mostra Média +
+  Realizado = Soma × 1,2; meses fechados antes mantêm a conta antiga.
+  Setembro da Suyara: 8.007,63 → 8.223,63.
 
 Visão de celular fica fora da revisão, por decisão do gestor.
 

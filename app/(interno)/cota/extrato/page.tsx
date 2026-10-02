@@ -131,6 +131,9 @@ export default async function Extrato({
   // Quando o cargo recebe por média, mostra de quem é a média: o resultado de
   // cada pessoa dos cargos de referência, a média e o multiplicador aplicado.
   const linhaMedia = linhas.find((l) => l.regra === 'media_da_equipe');
+  // O mesmo multiplicador sobre a pontuação realizada (migração 48).
+  const linhaRealizado = linhas.find((l) => l.regra === 'media_sobre_realizado');
+  const totalMedia = Number(linhaMedia?.cota ?? 0) + Number(linhaRealizado?.cota ?? 0);
   let composicao: { pessoa: string; cargo: string | null; resultado: number }[] = [];
   if (linhaMedia && cargoId) {
     const [referencias, cargos, resultados] = await Promise.all([
@@ -462,7 +465,7 @@ export default async function Extrato({
                 className="xl:col-span-3"
                 titulo="Como a média foi formada"
                 acao={<span className="text-sm font-semibold tabular-nums text-slate-900">
-                  {num(Number(linhaMedia.cota))} pts
+                  {num(totalMedia)} pts
                 </span>}
               >
                 {composicao.length === 0 ? (
@@ -500,13 +503,28 @@ export default async function Extrato({
                         ({Number(linhaMedia.peso) >= 1 ? '+' : ''}{Math.round((Number(linhaMedia.peso) - 1) * 100)}% sobre a média)
                       </span>
                     </div>
+                    {linhaRealizado && (
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                        <span className="text-slate-600">Pontuação realizada</span>
+                        <span className="font-semibold tabular-nums text-slate-800">{num(Number(linhaRealizado.quantidade))}</span>
+                        <span className="text-slate-400">×</span>
+                        <span className="font-semibold tabular-nums text-slate-800">{num(Number(linhaRealizado.peso))}</span>
+                        <span className="text-slate-400">=</span>
+                        <span className="text-lg font-semibold tabular-nums text-marca-700 dark:text-marca-400">
+                          {num(Number(linhaRealizado.cota))} pts
+                        </span>
+                        <span className="text-xs text-slate-500">
+                          (o mesmo multiplicador vale para o realizado: (média + realizado) × {num(Number(linhaMedia.peso))})
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
               </Quadro>
             )}
 
-            {canaisDe(linhas.filter((l) => l.regra !== 'media_da_equipe')).map((canal) => {
-              const doCanal = linhas.filter((l) => chaveCanal(l.origem) === canal && l.regra !== 'media_da_equipe');
+            {canaisDe(linhas.filter((l) => l.regra !== 'media_da_equipe' && l.regra !== 'media_sobre_realizado')).map((canal) => {
+              const doCanal = linhas.filter((l) => chaveCanal(l.origem) === canal && l.regra !== 'media_da_equipe' && l.regra !== 'media_sobre_realizado');
               const soma = doCanal.reduce((a, l) => a + Number(l.cota), 0);
 
               // Cada categoria somada no mês; o C-SAT tem tratamento próprio.

@@ -223,6 +223,8 @@ export const INICIO_PRESENCIAL = '2026-09-26';
 /** Chaves de regra com tratamento especial nas telas. */
 export const REGRA_META = 'meta';
 export const REGRA_MEDIA = 'media_da_equipe';
+/** O mesmo multiplicador da média sobre a pontuação realizada (migração 48). */
+export const REGRA_MEDIA_REALIZADO = 'media_sobre_realizado';
 
 export const NOMES_PAPEL: Record<PapelUsuario, string> = {
   gestor: 'Gestor',
