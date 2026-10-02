@@ -11,9 +11,9 @@ Escrito em 28/09/2026, atualizado em 29/09/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.34.0** · Monitorias **4.16.0** (deploy de 30/09/2026) |
+| Publicado | Performance **1.35.0** · Monitorias **4.16.1** (deploy de 02/10/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
-| Migrações no banco | 01 a 45, todas aplicadas |
+| Migrações no banco | 01 a 47, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
 
 ### Revisão de design (28/09/2026)
@@ -244,6 +244,15 @@ Três versões, cada uma publicada e conferida antes da próxima:
   (`salvar_nome_hub`) atribui sozinho as guardadas com o nome e avisa se
   tocou mês fechado — o fechamento não muda. Agosto não tem avaliações de
   Diretores no banco e não deve ser importado (decisão do gestor).
+- **1.35.0 / Monitorias 4.16.1** (publicada): **problema operacional no
+  diário** (migração 46). Tipo `problema` com subcategoria obrigatória
+  (`diario_subcategorias`, editável em Configuração › Diário de bordo:
+  incluir, renomear, reordenar, desativar — sem excluir). Só gestor e Pleno
+  registram (RLS), toda a equipe vê; sem protocolo, validade opcional, sem
+  leitura obrigatória; avisa no Teams em "Novidades do diário". **Migração
+  47** corrige o aviso do diário: registro sem validade e com dia do
+  ocorrido antigo passava no filtro (comparação nula no IF) e avisava — um
+  cartão de teste saiu no canal da equipe em 02/10.
 
 Visão de celular fica fora da revisão, por decisão do gestor.
 

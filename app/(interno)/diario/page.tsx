@@ -42,13 +42,15 @@ export default async function ConsultaDoDiario({
   if (tipoFiltro) consulta = consulta.eq('tipo', tipoFiltro);
 
   const [inicioDoMes] = periodoDaSemana(mesDeCompetencia(hojeNoBrasil()), 1);
-  const [{ data: registros }, { data: pessoas }, { data: citacoes }, noMes, aguardando, criticos] = await Promise.all([
+  const [{ data: registros }, { data: pessoas }, { data: citacoes }, noMes, aguardando, criticos, { data: subcategorias }] = await Promise.all([
     consulta,
     db.from('pessoas').select('id, nome'),
     db.from('diario_citacoes').select('registro_id, impacta, monitoria_id, monitorias(codigo)'),
     db.from('diario_registros').select('id', { count: 'exact', head: true }).gte('data', inicioDoMes),
     db.from('diario_registros').select('id', { count: 'exact', head: true }).eq('situacao', 'aguardando'),
     db.from('diario_registros').select('id', { count: 'exact', head: true }).gte('data', inicioDoMes).in('tipo', ['autorizacao', 'excecao']),
+    // Subcategorias de problema operacional (migração 46).
+    db.from('diario_subcategorias').select('id, nome'),
   ]);
 
   const nome = new Map((pessoas ?? []).map((p) => [p.id as string, nomeCurto(p.nome as string)]));
@@ -124,7 +126,7 @@ export default async function ConsultaDoDiario({
                       )}
                     </Td>
                     <Td className="font-semibold tabular-nums">{r.protocolo ? `#${r.protocolo}` : '—'}</Td>
-                    <Td><span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${COR_TIPO[r.tipo]}`}>{ROTULO_TIPO[r.tipo]}</span></Td>
+                    <Td><span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${COR_TIPO[r.tipo]}`}>{ROTULO_TIPO[r.tipo]}{r.tipo === 'problema' && r.subcategoria_id ? ` · ${(subcategorias ?? []).find((s) => s.id === r.subcategoria_id)?.nome ?? "—"}` : ""}</span></Td>
                     <Td>
                       <span className="font-medium text-slate-800">{r.assunto}</span>
                       {validade(r, hoje) && (

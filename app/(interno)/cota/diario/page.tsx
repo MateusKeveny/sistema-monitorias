@@ -5,7 +5,7 @@ import AnotacoesDoGestor from '@/componentes/AnotacoesDoGestor';
 import Abas from '@/componentes/Abas';
 import { hojeNoBrasil } from '@/lib/formatar';
 import type {
-  AnotacaoGestor, LeituraDiario, RegistroDiario, RegistroPrivado, RenovacaoDiario,
+  AnotacaoGestor, LeituraDiario, RegistroDiario, RegistroPrivado, RenovacaoDiario, Subcategoria,
 } from '@/lib/diario';
 
 export const dynamic = 'force-dynamic';
@@ -33,7 +33,7 @@ export default async function Diario({
   const ehGestor = perfil.papel === 'gestor';
 
   const [{ data: registros }, { data: pessoas }, { data: aprova }, { data: concluiDireto }, { data: renovacoes },
-    { data: leituras }, { data: privados }, { data: anotacoes }, { data: equipe }] = await Promise.all([
+    { data: leituras }, { data: privados }, { data: anotacoes }, { data: equipe }, { data: subcategorias }] = await Promise.all([
     // Os últimos 500: bastam para a consulta do dia a dia. A busca por um
     // protocolo antigo está na consulta do site de Monitorias.
     db.from('diario_registros').select('*')
@@ -58,6 +58,8 @@ export default async function Diario({
     ehGestor
       ? db.from('pessoas').select('id, nome').eq('ativo', true).is('desligado_em', null).order('nome')
       : Promise.resolve({ data: [] }),
+    // Subcategorias de problema operacional (migração 46).
+    db.from('diario_subcategorias').select('*').order('ordem'),
   ]);
 
   const nomes: Record<string, string> = Object.fromEntries(
@@ -71,6 +73,7 @@ export default async function Diario({
       registros={(registros ?? []) as RegistroDiario[]}
       renovacoes={(renovacoes ?? []) as RenovacaoDiario[]}
       leituras={aprova === true ? (leituras ?? []) as LeituraDiario[] : []}
+      subcategorias={(subcategorias ?? []) as Subcategoria[]}
       nomes={nomes}
       pessoaId={perfil.id}
       ehGestor={ehGestor}

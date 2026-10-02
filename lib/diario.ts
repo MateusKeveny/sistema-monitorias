@@ -6,7 +6,7 @@
  * monitoria. As regras de quem grava o quê ficam no banco (migração 31).
  */
 
-export type TipoRegistro = 'processo' | 'treinamento' | 'autorizacao' | 'excecao';
+export type TipoRegistro = 'processo' | 'treinamento' | 'autorizacao' | 'excecao' | 'problema';
 export type QuemAutorizou = 'gestao' | 'diretoria' | 'outro';
 export type SituacaoRegistro = 'concluido' | 'aguardando' | 'devolvido';
 
@@ -21,6 +21,8 @@ export type RegistroDiario = {
   descricao: string;
   autorizado_por: QuemAutorizou | null;
   autorizado_por_nome: string | null;
+  /** Só em problema operacional (migração 46). */
+  subcategoria_id: number | null;
   /** Até quando vale (migração 36). Vencido, continua no diário, só marcado. */
   valido_ate: string | null;
   situacao: SituacaoRegistro;
@@ -35,7 +37,12 @@ export const TIPOS: { chave: TipoRegistro; rotulo: string; dica: string }[] = [
   { chave: 'treinamento', rotulo: 'Treinamento', dica: 'o que foi ensinado' },
   { chave: 'autorizacao', rotulo: 'Autorização', dica: 'alguém liberou algo' },
   { chave: 'excecao', rotulo: 'Exceção', dica: 'fora da regra' },
+  // Só gestor e Pleno registram (migração 46); toda a equipe vê.
+  { chave: 'problema', rotulo: 'Problema operacional', dica: 'algo fora do normal' },
 ];
+
+/** Subcategoria de problema operacional: lista que o gestor mantém (migração 46). */
+export type Subcategoria = { id: number; nome: string; ordem: number; ativo: boolean };
 export const ROTULO_TIPO = Object.fromEntries(TIPOS.map((t) => [t.chave, t.rotulo])) as Record<TipoRegistro, string>;
 
 export const ROTULO_QUEM: Record<QuemAutorizou, string> = { gestao: 'Gestão', diretoria: 'Diretoria', outro: 'Outro' };
@@ -152,6 +159,7 @@ export const COR_TIPO: Record<TipoRegistro, string> = {
   treinamento: 'bg-violet-500/15 text-violet-700 dark:text-violet-300',
   autorizacao: 'bg-marca-600/15 text-marca-700 dark:text-marca-400',
   excecao: 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
+  problema: 'bg-rose-500/15 text-rose-700 dark:text-rose-300',
 };
 export const COR_SITUACAO: Record<SituacaoRegistro, string> = {
   concluido: 'bg-marca-600/15 text-marca-700 dark:text-marca-400',

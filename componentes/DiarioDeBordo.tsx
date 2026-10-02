@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import {
   AUTORIZADORES, COR_SITUACAO, COR_TIPO, ROTULO_QUEM, ROTULO_SITUACAO, ROTULO_TIPO, TIPOS,
-  juntarOutro, palavrasEncontradas, separarOutro, validade, type LeituraDiario, type RenovacaoDiario, type QuemAutorizou, type RegistroDiario, type TipoRegistro,
+  juntarOutro, palavrasEncontradas, separarOutro, validade, type LeituraDiario, type RenovacaoDiario, type Subcategoria, type QuemAutorizou, type RegistroDiario, type TipoRegistro,
 } from '@/lib/diario';
 
 const entrada = `w-full rounded-xl border border-slate-300 bg-superficie px-3 py-2 text-sm outline-none
@@ -30,6 +30,7 @@ const vazio = {
   quem: '' as QuemAutorizou | 'ninguem' | '', nome: '', cargo: '', setor: '',
   // Só gestor e Pleno: dia do ocorrido (vazio = hoje) e validade.
   data: '', temValidade: false, validoAte: '',
+  subcategoria: '',
 };
 
 /**
@@ -43,13 +44,15 @@ const vazio = {
  * 31 e 33); a tela só antecipa o que vai acontecer.
  */
 export default function DiarioDeBordo({
-  registros, renovacoes, leituras, nomes, pessoaId, ehGestor, aprova, concluiDireto, hoje, filtroInicial,
+  registros, renovacoes, leituras, subcategorias, nomes, pessoaId, ehGestor, aprova, concluiDireto, hoje, filtroInicial,
 }: {
   registros: RegistroDiario[];
   /** Renovações de validade, da mais recente à mais antiga. */
   renovacoes: RenovacaoDiario[];
   /** Quem precisa ler e quem já leu — só chega para gestor e Pleno. */
   leituras: LeituraDiario[];
+  /** Subcategorias de problema operacional, ativas e desativadas. */
+  subcategorias: Subcategoria[];
   nomes: Record<string, string>;
   pessoaId: string;
   ehGestor: boolean;
@@ -67,7 +70,7 @@ export default function DiarioDeBordo({
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [filtro, setFiltro] = useState<Filtro>(
-    (['aguardando', 'vencendo', 'leitura', 'meus', 'processo', 'treinamento', 'autorizacao', 'excecao'] as string[]).includes(filtroInicial ?? '')
+    (['aguardando', 'vencendo', 'leitura', 'meus', 'processo', 'treinamento', 'autorizacao', 'excecao', 'problema'] as string[]).includes(filtroInicial ?? '')
       ? filtroInicial as Filtro : 'todos');
   const [busca, setBusca] = useState('');
   const [devolvendo, setDevolvendo] = useState<{ id: string; texto: string } | null>(null);
@@ -78,13 +81,16 @@ export default function DiarioDeBordo({
 
   const achadas = palavrasEncontradas(`${f.assunto} ${f.descricao}`);
   const exigeQuem = f.tipo === 'autorizacao' || f.tipo === 'excecao';
-  const pedeQuem = exigeQuem || achadas.length > 0;
+  const ehProblema = f.tipo === 'problema';
+  // Problema operacional é da gestão: não pede quem autorizou.
+  const pedeQuem = exigeQuem || (achadas.length > 0 && !ehProblema);
+  const nomeSub = (id: number | null) => subcategorias.find((s) => s.id === id)?.nome ?? '—';
   // Em processo e treinamento a palavra pode aparecer sem ter havido
   // autorização ("não foi autorizado"): aí vale responder "ninguém".
   const ninguem = !exigeQuem && f.quem === 'ninguem';
   const outro = f.quem === 'outro';
   const faltam = [
-    !f.tipo && 'tipo', exigeQuem && !f.protocolo.trim() && 'protocolo', !f.assunto.trim() && 'assunto',
+    !f.tipo && 'tipo', ehProblema && !f.subcategoria && 'subcategoria', exigeQuem && !f.protocolo.trim() && 'protocolo', !f.assunto.trim() && 'assunto',
     !f.descricao.trim() && 'o que aconteceu',
     pedeQuem && (!f.quem || (exigeQuem && f.quem === 'ninguem')) && 'quem autorizou',
     pedeQuem && f.quem && !ninguem && !f.nome.trim() && 'nome de quem autorizou',
@@ -110,6 +116,7 @@ export default function DiarioDeBordo({
       descricao: f.descricao.trim(),
       autorizado_por: pedeQuem && !ninguem ? f.quem : null,
       autorizado_por_nome: !pedeQuem || ninguem ? null : outro ? juntarOutro(f.nome, f.cargo, f.setor) : f.nome.trim(),
+      subcategoria_id: ehProblema ? Number(f.subcategoria) : null,
       // Para os demais, o banco grava hoje e sem validade (migração 36).
       ...(aprova ? { data: f.data || hoje, valido_ate: f.temValidade ? f.validoAte : null } : {}),
     };
@@ -132,6 +139,7 @@ export default function DiarioDeBordo({
     const quem = r.autorizado_por;
     setF({
       tipo: r.tipo, protocolo: r.protocolo ?? '', assunto: r.assunto, descricao: r.descricao,
+      subcategoria: r.subcategoria_id ? String(r.subcategoria_id) : '',
       quem: quem ?? '', cargo: '', setor: '',
       data: r.data, temValidade: !!r.valido_ate, validoAte: r.valido_ate ?? '',
       // Nome que não está mais na lista (registro antigo) volta vazio, para
@@ -197,7 +205,7 @@ export default function DiarioDeBordo({
 
         <form onSubmit={registrar} className="grid gap-3">
           <div className="grid grid-cols-2 gap-2 2xl:grid-cols-4" role="radiogroup" aria-label="Tipo do registro">
-            {TIPOS.map((t) => (
+            {TIPOS.filter((t) => t.chave !== 'problema' || aprova).map((t) => (
               <button key={t.chave} type="button" role="radio" aria-checked={f.tipo === t.chave} disabled={ocupado}
                       onClick={() => setF((s) => ({ ...s, tipo: t.chave }))}
                       className={`rounded-xl border-2 px-3 py-2 text-left transition ${f.tipo === t.chave
@@ -207,6 +215,15 @@ export default function DiarioDeBordo({
               </button>
             ))}
           </div>
+
+          {ehProblema && (
+            <label><span className={rotulo}>Subcategoria *</span>
+              <select value={f.subcategoria} onChange={set('subcategoria')} disabled={ocupado} className={entrada}>
+                <option value="">Escolha…</option>
+                {subcategorias.filter((s) => s.ativo || String(s.id) === f.subcategoria)
+                  .map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
+              </select></label>
+          )}
 
           {/* Protocolo só em autorização e exceção: processo e treinamento não têm. */}
           <div className={`grid gap-3 ${exigeQuem ? 'sm:grid-cols-[11rem_1fr]' : ''}`}>
@@ -320,7 +337,7 @@ export default function DiarioDeBordo({
         </div>
         <div className="mb-2 flex flex-wrap gap-1.5">
           {([['todos', 'Todos'], ['processo', 'Processos'], ['treinamento', 'Treinamentos'], ['autorizacao', 'Autorizações'],
-            ['excecao', 'Exceções'], ['meus', 'Meus'], ['aguardando', `Aguardando aprovação${aguardando ? ` · ${aguardando}` : ''}`],
+            ['excecao', 'Exceções'], ['problema', 'Problemas'], ['meus', 'Meus'], ['aguardando', `Aguardando aprovação${aguardando ? ` · ${aguardando}` : ''}`],
             ['vencendo', `Vencendo${vencendo ? ` · ${vencendo}` : ''}`],
             ...(aprova ? [['leitura', `Leitura pendente${leituraPendente ? ` · ${leituraPendente}` : ''}`] as const] : [])] as const)
             .map(([k, r]) => (
@@ -345,7 +362,9 @@ export default function DiarioDeBordo({
               {doDia.map((r) => (
                 <li key={r.id} className="grid gap-1 py-3.5">
                   <div className="flex flex-wrap items-center gap-2 text-sm">
-                    <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${COR_TIPO[r.tipo]}`}>{ROTULO_TIPO[r.tipo]}</span>
+                    <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${COR_TIPO[r.tipo]}`}>
+                      {ROTULO_TIPO[r.tipo]}{r.tipo === 'problema' ? ` · ${nomeSub(r.subcategoria_id)}` : ''}
+                    </span>
                     {r.protocolo && <span className="font-semibold tabular-nums text-slate-800">#{r.protocolo}</span>}
                     <b className="font-semibold text-slate-800">{r.assunto}</b>
                     <SeloValidade r={r} hoje={hoje} />

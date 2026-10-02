@@ -9,6 +9,11 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 4.16.1
+
+- Consulta do diário: o tipo novo "Problema operacional" aparece com a
+  subcategoria (ex.: "Problema operacional · Hub").
+
 ## 4.16.0
 
 - **Reportar problema**: botão no menu. Conte o que aconteceu e, se quiser,

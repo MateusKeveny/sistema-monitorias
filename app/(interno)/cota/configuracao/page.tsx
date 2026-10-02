@@ -4,6 +4,8 @@ import ReguasDeFaixa from '@/componentes/ReguasDeFaixa';
 import PainelRegras from '@/componentes/PainelRegras';
 import Abas from '@/componentes/Abas';
 import AvisosTeams, { type SituacaoAviso } from '@/componentes/AvisosTeams';
+import SubcategoriasDiario from '@/componentes/SubcategoriasDiario';
+import type { Subcategoria } from '@/lib/diario';
 import { hojeNoBrasil, mesDeCompetencia } from '@/lib/formatar';
 import type { Cargo, CargoDaPessoa, PesoCargo, Pessoa, ReferenciaCargo, RegraCota } from '@/lib/tipos';
 
@@ -28,7 +30,7 @@ export default async function ConfiguracaoDaCota({
 
   const [
     { data: pessoas }, { data: cargos }, { data: regras },
-    { data: pesos }, { data: referencias }, { data: historico }, { data: avisos },
+    { data: pesos }, { data: referencias }, { data: historico }, { data: avisos }, { data: subcategorias }, { data: usosSub },
   ] = await Promise.all([
     db.from('pessoas').select('id, ativo, desligado_em'),
     db.from('cargos').select('*').eq('ativo', true).order('ordem'),
@@ -38,7 +40,13 @@ export default async function ConfiguracaoDaCota({
     db.from('cargos_da_pessoa').select('*'),
     // Avisos no Teams (migração 40).
     db.rpc('situacao_dos_avisos'),
+    // Subcategorias de problema operacional e quantos registros usam cada uma (migração 46).
+    db.from('diario_subcategorias').select('*').order('ordem'),
+    db.from('diario_registros').select('subcategoria_id').not('subcategoria_id', 'is', null),
   ]);
+
+  const usos: Record<number, number> = {};
+  for (const u of (usosSub ?? []) as { subcategoria_id: number }[]) usos[u.subcategoria_id] = (usos[u.subcategoria_id] ?? 0) + 1;
 
   const listaCargos = (cargos ?? []) as Cargo[];
   const listaPesos = (pesos ?? []) as PesoCargo[];
@@ -103,6 +111,11 @@ export default async function ConfiguracaoDaCota({
             chave: 'avisos',
             rotulo: 'Avisos no Teams',
             conteudo: <AvisosTeams situacao={(avisos ?? []) as SituacaoAviso[]} />,
+          },
+          {
+            chave: 'diario',
+            rotulo: 'Diário de bordo',
+            conteudo: <SubcategoriasDiario subcategorias={(subcategorias ?? []) as Subcategoria[]} usos={usos} />,
           },
         ]}
       />
