@@ -66,7 +66,10 @@ function NovoLancamento({
 
   // O efeito no extrato antes de lançar: quantidade × peso do cargo, ou o
   // valor digitado nas regras de valor manual.
-  const efeito = !regra || !f.pessoa ? null
+  // Atestado (migração 49): lança-se em dias; o desconto sai da pontuação do
+  // mês e muda até o fechamento — não dá para mostrar o valor agora.
+  const ehAtestado = regra?.chave === 'atestado';
+  const efeito = !regra || !f.pessoa || ehAtestado ? null
     : regra.valor_manual ? (f.pontos === '' ? null : Number(f.pontos))
       : f.quantidade === '' ? null : Number(f.quantidade) * (pesoNoCargo.get(regra.chave) ?? 0);
 
@@ -136,7 +139,7 @@ function NovoLancamento({
             <option value="">{f.pessoa ? 'Selecione…' : 'Escolha a pessoa primeiro'}</option>
             {disponiveis.map((r) => (
               <option key={r.chave} value={r.chave}>
-                {r.rotulo}{r.valor_manual ? ' (valor digitado)' : ` · ${numero(pesoNoCargo.get(r.chave)!)} pts`}
+                {r.rotulo}{r.chave === 'atestado' ? '' : r.valor_manual ? ' (valor digitado)' : ` · ${numero(pesoNoCargo.get(r.chave)!)} pts`}
               </option>
             ))}
           </select>
@@ -144,9 +147,9 @@ function NovoLancamento({
 
         {regra && !regra.valor_manual && (
           <label>
-            <span className={rotuloCampo}>Quantidade</span>
-            <input type="number" step="any" value={f.quantidade} onChange={set('quantidade')}
-                   disabled={ocupado} className={entrada} required />
+            <span className={rotuloCampo}>{ehAtestado ? 'Dias de afastamento' : 'Quantidade'}</span>
+            <input type="number" step={ehAtestado ? 1 : 'any'} min={ehAtestado ? 1 : undefined} value={f.quantidade}
+                   onChange={set('quantidade')} disabled={ocupado} className={entrada} required />
           </label>
         )}
         {regra?.valor_manual && (
@@ -168,6 +171,12 @@ function NovoLancamento({
         </div>
       </form>
 
+      {ehAtestado && f.pessoa && (
+        <p className="mt-2 text-sm text-slate-500">
+          O desconto é a <strong>pontuação do mês</strong> de {nomePessoa.get(f.pessoa)?.split(' ')[0]} ÷ os dias do ciclo
+          × os dias de afastamento. Ele aparece no extrato e acompanha o mês até o fechamento.
+        </p>
+      )}
       {efeito != null && Number.isFinite(efeito) && (
         <p className="mt-2 text-sm text-slate-500">
           Vai {efeito < 0 ? 'tirar' : 'somar'}{' '}
@@ -216,7 +225,7 @@ function NovoLancamento({
                   <Td>{l.semana ? `${l.semana}ª` : 'mês'}</Td>
                   <Td>{rotuloRegra.get(l.regra) ?? l.regra}</Td>
                   <Td className="text-right tabular-nums">
-                    {l.pontos_manuais != null ? `${numero(Number(l.pontos_manuais))} pts` : numero(Number(l.quantidade))}
+                    {l.pontos_manuais != null ? `${numero(Number(l.pontos_manuais))} pts` : `${numero(Number(l.quantidade))}${l.regra === 'atestado' ? ' dia(s)' : ''}`}
                   </Td>
                   <Td className="text-xs text-slate-500">{l.observacao ?? ''}</Td>
                   <Td className="text-xs text-slate-500">{l.lancado_por_nome ?? '—'}</Td>

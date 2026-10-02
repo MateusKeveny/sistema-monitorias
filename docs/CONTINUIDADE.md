@@ -11,9 +11,9 @@ Escrito em 28/09/2026, atualizado em 29/09/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.35.1** · Monitorias **4.16.1** (deploy de 02/10/2026) |
+| Publicado | Performance **1.35.2** · Monitorias **4.16.1** (deploy de 02/10/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
-| Migrações no banco | 01 a 48, todas aplicadas |
+| Migrações no banco | 01 a 49, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
 
 ### Revisão de design (28/09/2026)
@@ -260,6 +260,13 @@ Três versões, cada uma publicada e conferida antes da próxima:
   referência também recebe pela média. Tela do Pleno mostra Média +
   Realizado = Soma × 1,2; meses fechados antes mantêm a conta antiga.
   Setembro da Suyara: 8.007,63 → 8.223,63.
+- **1.35.2** (correção de cálculo, migração 49): **atestado por dias**. O
+  lançamento é em dias (`regras.valor_manual` = false); o desconto é
+  (pontuação do mês, antes do atestado ÷ dias do ciclo 26–25) × dias,
+  arredondado uma vez só — exemplo 6.500 ÷ 30 × 3 = 650. Calculado em
+  `vw_extrato_cota` (CTE `base` sem o atestado + linha do atestado); a média
+  dos cargos de referência não leva o atestado. Nenhum atestado lançado até
+  então.
 
 Visão de celular fica fora da revisão, por decisão do gestor.
 
