@@ -11,7 +11,7 @@ Escrito em 28/09/2026, atualizado em 29/09/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.35.2** · Monitorias **4.16.1** (deploy de 02/10/2026) |
+| Publicado | Performance **1.35.3** · Monitorias **4.16.1** (deploy de 02/10/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
 | Migrações no banco | 01 a 50, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
@@ -275,6 +275,15 @@ Três versões, cada uma publicada e conferida antes da próxima:
   `pontuacao_antes_do_atestado(pessoa, mês)`, chamada só nas linhas de
   atestado. **Cuidado futuro: não usar CTE referenciada mais de uma vez nessa
   view.**
+- **1.35.3** (correção da exportação para o portal, `/api/cota/exportar`):
+  o portal parava de ler a linha na primeira célula ausente — setembro chegou
+  só até "Tempo de resposta acima de 1h00". Agora nenhuma célula fica vazia
+  (C-SAT sem avaliação = "-", como o histórico do portal; quantidades = 0), e
+  `lib/xlsx-escrever` escreve texto em coluna numérica em vez de omitir.
+  Três colunas novas **no fim** (para não deslocar as que o portal lê): TME
+  Médio Equipe até 15 / até 30 / acima de 30 min (Huggy), com os
+  atendimentos de cada faixa. Semana sem TME lançado não entra em faixa.
+  Falta: reenviar setembro ao portal com o arquivo novo.
 
 Visão de celular fica fora da revisão, por decisão do gestor.
 

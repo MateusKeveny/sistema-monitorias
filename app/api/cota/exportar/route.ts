@@ -72,6 +72,11 @@ const COLUNAS_RESUMO: { cabecalho: string; regra?: string; canal?: 'huggy' | 'di
   { cabecalho: 'Tratativa de chamados', regra: 'chamados_tratados' },
   { cabecalho: 'SLA < 2', regra: 'chamados_sla_ate_2d' },
   { cabecalho: 'SLA > 2', regra: 'chamados_sla_acima_2d' },
+  // TME de Expansão por faixa (1.35.3), no fim para não deslocar as colunas
+  // que o portal já lê. Como no C-SAT: atendimentos da semana na faixa do TME.
+  { cabecalho: 'TME Médio Equipe - até 15 min (Huggy)', regra: 'tme_ate_10', canal: 'huggy' },
+  { cabecalho: 'TME Médio Equipe - até 30 min (Huggy)', regra: 'tme_ate_30', canal: 'huggy' },
+  { cabecalho: 'TME Médio Equipe - acima de 30 min (Huggy)', regra: 'tme_acima_30', canal: 'huggy' },
 ];
 
 /**
@@ -142,6 +147,16 @@ export async function GET(requisicao: NextRequest) {
     }
     for (const c of COLUNAS_RESUMO) {
       if (c.regra) registro[`${c.regra}|${c.canal ?? ''}`] = soma(c.regra, c.canal);
+    }
+    // Nenhuma célula vazia (1.35.3): o portal de destino parava de ler a linha
+    // na primeira célula ausente — setembro chegou só até "Tempo de resposta
+    // acima de 1h00". Como no histórico que ele já tem, C-SAT sem avaliação
+    // vai como "-" e quantidade sem registro, como 0.
+    for (const c of COLUNAS_RESUMO) {
+      const chave = c.campo ?? `${c.regra}|${c.canal ?? ''}`;
+      if (registro[chave] == null || Number.isNaN(registro[chave])) {
+        registro[chave] = c.campo?.startsWith('csat_') ? '-' : 0;
+      }
     }
     return registro;
   });

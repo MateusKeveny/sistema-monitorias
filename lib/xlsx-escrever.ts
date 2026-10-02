@@ -148,8 +148,10 @@ function montarAba(aba: Aba): string {
       const ref = `${letraColuna(i)}${numero}`;
       if (valor === null || valor === undefined || valor === '') return '';
 
-      if (coluna.formato === 'percentual' || coluna.formato === 'numero') {
-        const n = Number(valor);
+      // Texto numa coluna de número (ex.: "-" no C-SAT sem avaliação) sai como
+      // texto, em vez de sumir: há destino que para de ler na célula ausente.
+      const n = Number(valor);
+      if ((coluna.formato === 'percentual' || coluna.formato === 'numero') && (Number.isFinite(n) || typeof valor !== 'string')) {
         if (!Number.isFinite(n)) return '';
         const estilo = coluna.formato === 'percentual' ? ESTILO.percentual : ESTILO.padrao;
         return `<c r="${ref}" s="${estilo}"><v>${n}</v></c>`;
