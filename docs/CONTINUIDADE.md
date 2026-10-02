@@ -13,7 +13,7 @@ Escrito em 28/09/2026, atualizado em 29/09/2026. Para o modelo de dados completo
 |---|---|
 | Publicado | Performance **1.35.2** · Monitorias **4.16.1** (deploy de 02/10/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
-| Migrações no banco | 01 a 49, todas aplicadas |
+| Migrações no banco | 01 a 50, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
 
 ### Revisão de design (28/09/2026)
@@ -267,6 +267,14 @@ Três versões, cada uma publicada e conferida antes da próxima:
   `vw_extrato_cota` (CTE `base` sem o atestado + linha do atestado); a média
   dos cargos de referência não leva o atestado. Nenhum atestado lançado até
   então.
+- **Migração 50** (só banco, 02/10): a 49 usava CTEs referenciadas duas vezes
+  na `vw_extrato_cota`; o Postgres as materializava e cada consulta montava o
+  extrato de todos em todos os meses — o "Fechar setembro" deu *statement
+  timeout* (nada foi fechado). A view voltou ao formato da 48 (partes unidas,
+  filtro chegando a cada uma) e o atestado sai de
+  `pontuacao_antes_do_atestado(pessoa, mês)`, chamada só nas linhas de
+  atestado. **Cuidado futuro: não usar CTE referenciada mais de uma vez nessa
+  view.**
 
 Visão de celular fica fora da revisão, por decisão do gestor.
 
