@@ -11,9 +11,9 @@ Escrito em 28/09/2026, atualizado em 29/09/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.35.3** · Monitorias **4.16.1** (deploy de 02/10/2026) |
+| Publicado | Performance **1.35.4** · Monitorias **4.16.1** (deploy de 05/10/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
-| Migrações no banco | 01 a 50, todas aplicadas |
+| Migrações no banco | 01 a 51, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
 
 ### Revisão de design (28/09/2026)
@@ -284,6 +284,15 @@ Três versões, cada uma publicada e conferida antes da próxima:
   Médio Equipe até 15 / até 30 / acima de 30 min (Huggy), com os
   atendimentos de cada faixa. Semana sem TME lançado não entra em faixa.
   Falta: reenviar setembro ao portal com o arquivo novo.
+- **1.35.4** (migração 51): **problema operacional só da gestão** — gestor e
+  Pleno registram e veem (RLS `diario_leitura`), sem aviso no Teams; filtro
+  "Problemas" só para a gestão. **Error 1102 em 05/10**: o Performance passou
+  a estourar o limite de 10 ms de CPU por requisição do plano gratuito do
+  Workers (logs: `exceededCpu`, até a tela de login gasta 11 a 360 ms). Na
+  1.35.4: `public/favicon.ico` (antes cada página gerava uma segunda chamada
+  ao Worker para um 404 de ~50 ms) e o middleware não chama o Supabase quando
+  não há cookie de sessão. Isso só reduz: a solução é o **Workers Paid**
+  (US$ 5/mês, 30 s de CPU) — decisão do gestor.
 
 Visão de celular fica fora da revisão, por decisão do gestor.
 

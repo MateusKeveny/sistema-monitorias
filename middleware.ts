@@ -19,6 +19,19 @@ export async function middleware(requisicao: NextRequest) {
     return NextResponse.redirect(destino);
   }
 
+  const publica = caminho.startsWith('/login') || caminho.startsWith('/auth');
+
+  // Sem cookie de sessão não há o que conferir nem renovar (1.35.4): poupa
+  // criar o cliente e ir ao Supabase. Cada milissegundo conta — o plano
+  // gratuito do Worker corta a requisição em 10 ms de CPU (erro 1102).
+  if (!requisicao.cookies.getAll().some((c) => c.name.startsWith('sb-') && c.name.includes('-auth-token'))) {
+    if (publica) return NextResponse.next();
+    const destino = requisicao.nextUrl.clone();
+    destino.pathname = '/login';
+    destino.searchParams.set('proximo', caminho);
+    return NextResponse.redirect(destino);
+  }
+
   let resposta = NextResponse.next({ request: requisicao });
 
   const db = createServerClient(
@@ -37,7 +50,6 @@ export async function middleware(requisicao: NextRequest) {
   );
 
   const { data: { user } } = await db.auth.getUser();
-  const publica = caminho.startsWith('/login') || caminho.startsWith('/auth');
 
   if (!user && !publica) {
     const destino = requisicao.nextUrl.clone();

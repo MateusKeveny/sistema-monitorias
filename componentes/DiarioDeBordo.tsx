@@ -337,7 +337,7 @@ export default function DiarioDeBordo({
         </div>
         <div className="mb-2 flex flex-wrap gap-1.5">
           {([['todos', 'Todos'], ['processo', 'Processos'], ['treinamento', 'Treinamentos'], ['autorizacao', 'Autorizações'],
-            ['excecao', 'Exceções'], ['problema', 'Problemas'], ['meus', 'Meus'], ['aguardando', `Aguardando aprovação${aguardando ? ` · ${aguardando}` : ''}`],
+            ['excecao', 'Exceções'], ...(aprova ? [['problema', 'Problemas'] as const] : []), ['meus', 'Meus'], ['aguardando', `Aguardando aprovação${aguardando ? ` · ${aguardando}` : ''}`],
             ['vencendo', `Vencendo${vencendo ? ` · ${vencendo}` : ''}`],
             ...(aprova ? [['leitura', `Leitura pendente${leituraPendente ? ` · ${leituraPendente}` : ''}`] as const] : [])] as const)
             .map(([k, r]) => (
