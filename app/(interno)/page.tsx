@@ -4,8 +4,9 @@ import { Quadro, Indicador, EtiquetaNota, Tabela, Th, Td, Vazio } from '@/compon
 import EvolucaoMensal from '@/componentes/GraficoEvolucao';
 import CoberturaDoCiclo from '@/componentes/CoberturaDoCiclo';
 import SolicitacoesDeExclusao, { type Solicitacao } from '@/componentes/SolicitacoesDeExclusao';
+import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
 import { nota, mesRotulo, mesCurto, percentual, data as formatarData, hojeNoBrasil, mesDeCompetencia } from '@/lib/formatar';
-import { ateOMesAberto, mesAbertoDasMonitorias } from '@/lib/mes-aberto';
+import { ateOMesAberto, mesAbertoDasMonitorias, mesCompleto } from '@/lib/mes-aberto';
 import type { LinhaRanking, LinhaCriterio, Monitoria } from '@/lib/tipos';
 
 export const dynamic = 'force-dynamic';
@@ -16,7 +17,8 @@ export default async function Painel({
   searchParams: Promise<{ mes?: string }>;
 }) {
   const perfil = await exigirPerfil();
-  const escolhido = (await searchParams).mes;
+  // As setas mandam "2026-09"; a lista de meses guarda "2026-09-01" (5.2.0).
+  const escolhido = mesCompleto((await searchParams).mes);
   const db = await criarClienteServidor();
 
   // O ranking completo é pequeno — uma linha por operador por mês — e resolve
@@ -192,7 +194,7 @@ export default async function Painel({
             {ehOperador ? 'Meu desempenho' : 'Painel de qualidade'}
           </h1>
           <p className="text-sm text-sobre-fundo-suave">
-            Referência: {mesRotulo(mes)}
+            {total} monitoria{total === 1 ? '' : 's'} avaliada{total === 1 ? '' : 's'}
             {mes !== meses[0] && ' · mês anterior ao atual'}
           </p>
           {/* Para quem lança e acompanha: por que o mês novo ainda não aparece. */}
@@ -203,27 +205,13 @@ export default async function Painel({
           )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Sem JavaScript: trocar o mês é uma navegação, então o endereço
-              reflete o que está na tela e pode ser compartilhado. */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* O mês troca pelas setas, como no Performance (5.2.0). Era um campo
+              com o botão "Ver": dois cliques para ir ao mês vizinho, que é
+              quase sempre o que se quer. Continua sendo navegação, então o
+              endereço reflete o que está na tela e pode ser compartilhado. */}
           {meses.length > 1 && (
-            <form className="flex items-center gap-2">
-              <label htmlFor="mes" className="text-sm text-sobre-fundo-suave">Mês</label>
-              <select
-                id="mes" name="mes" defaultValue={mes}
-                className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
-                           outline-none focus:border-marca-600"
-              >
-                {meses.map((m) => <option key={m} value={m}>{mesRotulo(m)}</option>)}
-              </select>
-              <button
-                type="submit"
-                className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
-                           font-medium text-slate-700 hover:bg-slate-50"
-              >
-                Ver
-              </button>
-            </form>
+            <SetasDeCompetencia competencia={mes} atual={meses[0]} caminho="/" disponiveis={meses} compacto />
           )}
 
           <Link

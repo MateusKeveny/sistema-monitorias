@@ -9,6 +9,15 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 5.2.0
+
+- **O mês troca pelas setas**, como no Painel de Performance, no Painel, no
+  Ranking mensal e nos Critérios mais reprovados. Saiu o campo de mês com o
+  botão "Ver": eram dois cliques para ir ao mês vizinho, que é quase sempre o
+  que se quer.
+- As setas andam só pelos meses que têm monitoria; na ponta mais antiga a seta
+  fica apagada. Nos Critérios, "Todo o período" ficou no botão ao lado.
+
 ## 5.1.0
 
 - **Nova monitoria por sorteio.** O protocolo deixou de ser digitado: escolha o

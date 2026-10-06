@@ -1,9 +1,10 @@
 import Link from '@/componentes/Link';
+import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
 import { criarClienteServidor, exigirVisaoDoTime } from '@/lib/supabase/servidor';
 import { Quadro, EtiquetaNota, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import { mesRotulo, mesCurto, nota, percentual } from '@/lib/formatar';
 import type { LinhaRanking } from '@/lib/tipos';
-import { ateOMesAberto, mesAbertoDasMonitorias } from '@/lib/mes-aberto';
+import { ateOMesAberto, mesAbertoDasMonitorias, mesCompleto } from '@/lib/mes-aberto';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +14,8 @@ export default async function RelatorioRanking({
   searchParams: Promise<{ mes?: string }>;
 }) {
   await exigirVisaoDoTime();
-  const { mes: mesEscolhido } = await searchParams;
+  // As setas mandam "2026-09"; a lista de meses guarda "2026-09-01" (5.2.0).
+  const mesEscolhido = mesCompleto((await searchParams).mes);
   const db = await criarClienteServidor();
 
   const { data: tudo } = await db
@@ -52,25 +54,20 @@ export default async function RelatorioRanking({
           </Link>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">Ranking mensal por operador</h1>
           <p className="text-sm text-sobre-fundo-suave">
-            {mesRotulo(mes)} · {totalMonitorias} monitorias · média geral {nota(mediaGeral)}
+            {totalMonitorias} monitorias · média geral {nota(mediaGeral)}
           </p>
         </div>
 
-        <form className="flex items-center gap-2">
-          <select name="mes" defaultValue={mes}
-            className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm">
-            {meses.map((m) => <option key={m} value={m}>{mesRotulo(m)}</option>)}
-          </select>
-          <button className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
-                             font-medium text-slate-700 hover:bg-slate-50">
-            Ver
-          </button>
+        <div className="flex items-center gap-3">
+          {/* O mês pelas setas, como no Performance (5.2.0). */}
+          <SetasDeCompetencia competencia={mes} atual={meses[0]} caminho="/relatorios/ranking"
+                              disponiveis={meses} compacto />
           <Link href={`/api/exportar?formato=csv&relatorio=ranking&mes=${mes}`}
             className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
                        font-medium text-slate-700 hover:bg-slate-50">
             CSV
           </Link>
-        </form>
+        </div>
       </div>
 
       <Quadro>

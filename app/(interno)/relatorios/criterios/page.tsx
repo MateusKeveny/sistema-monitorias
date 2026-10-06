@@ -1,9 +1,10 @@
 import Link from '@/componentes/Link';
+import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
 import { criarClienteServidor, exigirVisaoDoTime } from '@/lib/supabase/servidor';
 import { Quadro, Tabela, Th, Td, Vazio, Indicador } from '@/componentes/ui';
 import { mesRotulo, percentual, nota } from '@/lib/formatar';
 import type { LinhaCriterio } from '@/lib/tipos';
-import { ateOMesAberto, mesAbertoDasMonitorias } from '@/lib/mes-aberto';
+import { ateOMesAberto, mesAbertoDasMonitorias, mesCompleto } from '@/lib/mes-aberto';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +14,8 @@ export default async function RelatorioCriterios({
   searchParams: Promise<{ mes?: string }>;
 }) {
   await exigirVisaoDoTime();
-  const { mes: mesEscolhido } = await searchParams;
+  // As setas mandam "2026-09"; a lista de meses guarda "2026-09-01" (5.2.0).
+  const mesEscolhido = mesCompleto((await searchParams).mes);
   const db = await criarClienteServidor();
 
   const { data } = await db
@@ -67,22 +69,23 @@ export default async function RelatorioCriterios({
           </Link>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">Critérios mais reprovados</h1>
           <p className="text-sm text-sobre-fundo-suave">
-            {mes === 'todos' ? 'Todo o período' : mesRotulo(mes)} ·
-            {' '}{avaliacoes} atendimentos avaliados por critério
+            {mes === 'todos' && 'Todo o período · '}{avaliacoes} atendimentos avaliados por critério
           </p>
         </div>
 
-        <form className="flex items-center gap-2">
-          <select name="mes" defaultValue={mes}
-            className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm">
-            <option value="todos">Todo o período</option>
-            {meses.map((m) => <option key={m} value={m}>{mesRotulo(m)}</option>)}
-          </select>
-          <button className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
-                             font-medium text-slate-700 hover:bg-slate-50">
-            Ver
-          </button>
-        </form>
+        {/* O mês pelas setas, como no Performance (5.2.0). "Todo o período"
+            não cabe numa seta, então fica no link ao lado. */}
+        <div className="flex items-center gap-3">
+          {mes !== 'todos' && (
+            <SetasDeCompetencia competencia={mes} atual={meses[0]} caminho="/relatorios/criterios"
+                                disponiveis={meses} compacto />
+          )}
+          <Link href={mes === 'todos' ? `/relatorios/criterios?mes=${meses[0]}` : '/relatorios/criterios?mes=todos'}
+            className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
+                       font-medium text-slate-700 hover:bg-slate-50">
+            {mes === 'todos' ? mesRotulo(meses[0]) : 'Todo o período'}
+          </Link>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">

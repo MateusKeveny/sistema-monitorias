@@ -25,3 +25,13 @@ export const ateOMesAberto = (meses: string[], aberto: string) => meses.filter((
 
 /** '2026-09-01' → último dia que ainda pertence ao mês aberto ('2026-09-25'). */
 export const ultimoDiaDoMesAberto = (aberto: string) => `${aberto.slice(0, 8)}25`;
+
+/**
+ * "2026-09" → "2026-09-01"; o resto passa como veio (5.2.0).
+ *
+ * As setas de competência põem só ano e mês no endereço, mas as telas das
+ * Monitorias comparam com `mes_referencia`, que é uma data. Sem isto, trocar
+ * de mês pela seta caía de volta no mês mais recente, em silêncio.
+ */
+export const mesCompleto = (mes?: string) =>
+  (/^\d{4}-\d{2}$/.test(mes ?? '') ? `${mes}-01` : mes);

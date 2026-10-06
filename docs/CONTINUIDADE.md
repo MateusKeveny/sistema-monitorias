@@ -11,7 +11,7 @@ Escrito em 28/09/2026, atualizado em 29/09/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.36.0** · Monitorias **5.1.0** (deploy de 06/10/2026) |
+| Publicado | Performance **1.36.0** · Monitorias **5.2.0** (deploy de 06/10/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
 | Migrações no banco | 01 a 51, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
@@ -343,6 +343,17 @@ Três versões, cada uma publicada e conferida antes da próxima:
   monitor.
   Conferido com 3 monitorias de teste em Ibson Santos, que fecharam a 1ª semana
   e foram excluídas em seguida (ficam em Monitorias › Excluídas).
+- **Monitorias 5.2.0** (só telas, sem migração): **o mês pelas setas** no
+  Painel, no Ranking mensal e nos Critérios mais reprovados, no lugar do campo
+  com o botão "Ver". `SetasDeCompetencia` ganhou `disponiveis?: string[]`: com
+  a lista, anda só pelos meses que têm monitoria e apaga a seta na ponta — sem
+  ela, segue de mês em mês como na cota, que não mudou.
+  **Pegadinha que custou uma rodada:** as setas põem `?mes=2026-09` no endereço
+  e as telas das Monitorias comparam com `mes_referencia`, que é `2026-09-01`;
+  o mês não trocava e caía no mais recente **em silêncio**. Daí o `mesCompleto`
+  em `lib/mes-aberto.ts` — a cota já resolvia isso no `resolverCompetencia`.
+  O mês virou `h2` ao lado do título da tela, e o subtítulo passou a trazer o
+  volume, que antes repetia o mês.
 
 Visão de celular fica fora da revisão, por decisão do gestor.
 
