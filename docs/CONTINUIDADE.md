@@ -11,7 +11,7 @@ Escrito em 28/09/2026, atualizado em 29/09/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.36.0** · Monitorias **5.0.0** (deploy de 06/10/2026) |
+| Publicado | Performance **1.36.0** · Monitorias **5.1.0** (deploy de 06/10/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
 | Migrações no banco | 01 a 51, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
@@ -319,9 +319,30 @@ Três versões, cada uma publicada e conferida antes da próxima:
   **O 1º número aqui marca a virada de visual, não mudança de cálculo** — a
   regra abaixo reserva o MAJOR para o que obriga a refazer envio, e nenhum
   número de ninguém mudou. Decisão do gestor.
-  Falta, combinado para depois: **reformular a tela de Nova monitoria**, que
-  na palavra dele "ficou algo de semi pronto, sem um cuidado" — é o fluxo de
-  preenchimento, não a moldura.
+- **Monitorias 5.1.0** (só telas, sem migração): **Nova monitoria por sorteio**,
+  a reformulação que ficou pendente da 5.0.0. O protocolo não é mais digitado:
+  o monitor escolhe o atendente e a semana, e o painel sorteia um atendimento
+  de `avaliacoes` — a tabela que recebe o relatório do Hub, que a qualidade já
+  lê pela RLS `ve_o_time()`. Ao escolher o atendente, duas consultas trazem o
+  ciclo inteiro (`avaliacoes` entre a 1ª e a 4ª semana da competência aberta, e
+  as `monitorias` dela), e a tela agrupa por semana com `semanaDoCiclo`.
+  Fora do bolo: protocolo já monitorado e os descartados na sessão (nada é
+  gravado; em outra sessão voltam).
+  Cada semana mostra seu estado: `cheia` (4 lançadas), `vazia` (nenhum
+  atendimento importado), `futura` (ainda não começou — só essa fica
+  desabilitada; **a semana em curso é selecionável**, senão não dava para
+  avaliar o atendimento do dia) ou o normal. A tela abre na primeira que ainda
+  dá para monitorar.
+  **Com a semana concluída não há sorteio nem campo manual** — era por ali que
+  dava para furar o limite de 4 por semana. O campo manual (protocolo + data)
+  só aparece quando a semana ainda cabe monitoria.
+  Um critério marcado **Não só conta como respondido com a evidência escrita**
+  (`semEvidencia`); só em lançamento novo, para não travar a edição de uma
+  monitoria antiga. O relatório de avaliações **não traz TMA**: o importador lê
+  data, protocolo, atendente, nota e tabulação, e o tempo segue digitado pelo
+  monitor.
+  Conferido com 3 monitorias de teste em Ibson Santos, que fecharam a 1ª semana
+  e foram excluídas em seguida (ficam em Monitorias › Excluídas).
 
 Visão de celular fica fora da revisão, por decisão do gestor.
 

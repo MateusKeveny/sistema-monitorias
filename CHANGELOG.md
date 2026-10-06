@@ -9,6 +9,24 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 5.1.0
+
+- **Nova monitoria por sorteio.** O protocolo deixou de ser digitado: escolha o
+  atendente e a semana do ciclo, e o painel sorteia um atendimento já importado
+  do Hub. O cartão traz o protocolo, com botão de copiar e de sortear outro, a
+  data, a semana, o nº da monitoria e a tabulação que o atendente registrou.
+- Cada semana mostra como está: quantas monitorias já tem, **concluída**,
+  **sem atendimentos** importados, ou ainda não começou. A tela abre na
+  primeira semana que ainda dá para monitorar.
+- Com a semana concluída não há sorteio **nem campo para digitar** — era por
+  ali que dava para passar das 4 monitorias da semana.
+- Digitar o protocolo à mão continua possível enquanto a semana couber
+  monitoria, para um atendimento específico ou quando o relatório da semana
+  ainda não foi importado.
+- Um critério marcado como **Não só conta como respondido depois que a
+  evidência estiver escrita**, e o contador mostra quanto falta. Vale para
+  monitorias novas; editar uma antiga não fica travado por isso.
+
 ## 5.0.0
 
 - **Visual novo**, igual ao do Painel de Performance. O menu saiu do topo e

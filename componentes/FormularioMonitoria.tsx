@@ -6,8 +6,8 @@ import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { Quadro } from '@/componentes/ui';
 import {
   nota as formatarNota, faixa, percentual,
-  semanaDoCiclo, mesDeCompetencia, mesRotulo, hojeNoBrasil,
-  data as formatarDataBR,
+  semanaDoCiclo, periodoDaSemana, mesDeCompetencia, mesRotulo, hojeNoBrasil,
+  data as formatarDataBR, diaMes,
 } from '@/lib/formatar';
 import type { Canal, Criterio, Operador } from '@/lib/tipos';
 import {
@@ -15,6 +15,11 @@ import {
 } from '@/lib/diario';
 
 type Resposta = { conforme: boolean | null; observacao: string };
+
+/** Um atendimento já importado do Hub, candidato ao sorteio (5.1.0). */
+type Atendimento = { protocolo: string; data: string; tabulacao: string | null };
+
+const POR_SEMANA = 4;
 
 const rotuloCampo = 'mb-1 block text-sm font-medium text-slate-700';
 const campo = `w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none
@@ -112,11 +117,108 @@ export default function FormularioMonitoria({
     return () => { cancelado = true; };
   }, [operadorId, competencia, semana, emEdicao]);
 
-  const POR_SEMANA = 4;
   const livres = ocupados === null
     ? []
     : [1, 2, 3, 4].filter((n) => !ocupados.includes(n));
   const semanaCheia = ocupados !== null && livres.length === 0;
+
+  // ------------------------------------------------------------ o sorteio
+  // Em lançamento novo o protocolo deixou de ser digitado (5.1.0): o monitor
+  // escolhe o atendente e a semana, e o painel sorteia um atendimento que já
+  // veio no relatório do Hub (`avaliacoes`). Digitar à mão continua possível,
+  // mas só enquanto a semana ainda couber monitoria — com as 4 lançadas, o
+  // campo some, senão ele seria o caminho para furar o limite da semana.
+  const competenciaAberta = mesAberto ?? mesDeCompetencia(hojeNoBrasil());
+  const [semanaEscolhida, setSemanaEscolhida] = useState<number | null>(null);
+  const [doCiclo, setDoCiclo] = useState<
+    { avaliacoes: Atendimento[]; monitorados: string[]; feitasPorSemana: number[] } | null>(null);
+  const [descartados, setDescartados] = useState<string[]>([]);
+  const [sorteado, setSorteado] = useState<Atendimento | null>(null);
+  const [manual, setManual] = useState(false);
+  const [copiado, setCopiado] = useState(false);
+
+  useEffect(() => {
+    if (editando || !operadorId) { setDoCiclo(null); return; }
+
+    let cancelado = false;
+    setDoCiclo(null); setSorteado(null); setDescartados([]); setManual(false);
+    setSemanaEscolhida(null); setProtocolo(''); setDataAtendimento('');
+
+    (async () => {
+      const db = criarClienteNavegador();
+      const [inicio] = periodoDaSemana(competenciaAberta, 1);
+      const [, fim] = periodoDaSemana(competenciaAberta, POR_SEMANA);
+      const [{ data: avaliacoes }, { data: monitorias }] = await Promise.all([
+        db.from('avaliacoes').select('protocolo, data, tabulacao')
+          .eq('pessoa_id', operadorId).gte('data', inicio).lte('data', fim)
+          .not('protocolo', 'is', null),
+        db.from('monitorias').select('protocolo, semana_mes')
+          .eq('operador_id', operadorId).eq('mes_referencia', competenciaAberta),
+      ]);
+      if (cancelado) return;
+
+      const feitasPorSemana = [0, 0, 0, 0];
+      for (const m of (monitorias ?? []) as { semana_mes: number }[]) {
+        if (m.semana_mes >= 1 && m.semana_mes <= POR_SEMANA) feitasPorSemana[m.semana_mes - 1]++;
+      }
+      setDoCiclo({
+        avaliacoes: (avaliacoes ?? []) as Atendimento[],
+        monitorados: (monitorias ?? []).map((m) => (m as { protocolo: string }).protocolo),
+        feitasPorSemana,
+      });
+    })();
+
+    return () => { cancelado = true; };
+  }, [operadorId, competenciaAberta, editando]);
+
+  const hoje = hojeNoBrasil();
+  /**
+   * Como está cada semana do ciclo para este atendente.
+   *
+   * `futura` é a semana que ainda não começou — não a que está correndo, que o
+   * monitor precisa poder avaliar no dia. `vazia` é a semana sem nenhum
+   * atendimento importado: não há o que sortear, mas ainda cabe monitoria.
+   */
+  const semanas = [1, 2, 3, 4].map((n) => {
+    const [de, ate] = periodoDaSemana(competenciaAberta, n);
+    const doBolo = (doCiclo?.avaliacoes ?? []).filter((a) => semanaDoCiclo(a.data) === n);
+    const feitas = doCiclo?.feitasPorSemana[n - 1] ?? 0;
+    const estado = de > hoje ? 'futura'
+      : feitas >= POR_SEMANA ? 'cheia'
+        : doBolo.length === 0 ? 'vazia' : 'ok';
+    return { n, de, ate, feitas, total: doBolo.length, estado } as const;
+  });
+
+  // Abre na primeira semana que ainda dá para monitorar, em vez de cair numa
+  // já concluída; se nenhuma der, na primeira que já começou.
+  const semanaPadrao = (semanas.find((s) => s.estado === 'ok')
+    ?? semanas.find((s) => s.estado !== 'futura') ?? semanas[0]).n;
+  const semanaAtiva = semanaEscolhida ?? semanaPadrao;
+  const aSemana = semanas[semanaAtiva - 1];
+  /** Com a semana concluída nem o sorteio nem o campo manual aparecem. */
+  const cabeMonitoria = aSemana.estado === 'ok' || aSemana.estado === 'vazia';
+
+  function sortear(alemDestes: string[] = []) {
+    if (!doCiclo) return;
+    const fora = new Set([...doCiclo.monitorados, ...descartados, ...alemDestes]);
+    const bolo = doCiclo.avaliacoes.filter(
+      (a) => semanaDoCiclo(a.data) === semanaAtiva && !fora.has(a.protocolo));
+    if (bolo.length === 0) {
+      setErro('Todos os atendimentos desta semana já foram sorteados ou monitorados.');
+      return;
+    }
+    const escolhido = bolo[Math.floor(Math.random() * bolo.length)];
+    setErro(null);
+    setSorteado(escolhido);
+    setProtocolo(escolhido.protocolo);
+    setDataAtendimento(escolhido.data);
+  }
+
+  function trocarSemana(n: number) {
+    setSemanaEscolhida(n);
+    setSorteado(null); setManual(false);
+    setProtocolo(''); setDataAtendimento(''); setErro(null);
+  }
 
   // Em edição o número original é preservado; em lançamento novo, o primeiro livre.
   const numero = emEdicao ? emEdicao.numero_monitoria : (livres[0] ?? POR_SEMANA);
@@ -133,21 +235,35 @@ export default function FormularioMonitoria({
     ])));
 
   // Mesma fórmula da planilha: zerado -> 0; senão 1 - soma dos pesos reprovados.
-  const { notaPrevia, reprovados, pendentes } = useMemo(() => {
+  //
+  // Um "Não" sem a evidência escrita não conta como respondido (5.1.0): é o que
+  // mais pesa na nota, e sem o motivo o atendente leva o desconto sem saber por
+  // quê. Ele fica como pendência até o campo ser preenchido.
+  const { notaPrevia, reprovados, semResposta, semEvidencia } = useMemo(() => {
     let perdido = 0;
     const reprovados: Criterio[] = [];
-    let pendentes = 0;
+    let semResposta = 0;
+    let semEvidencia = 0;
     for (const c of criterios) {
       const r = respostas[c.id];
-      if (!r || r.conforme === null) { pendentes++; continue; }
-      if (!r.conforme) { perdido += Number(c.peso); reprovados.push(c); }
+      if (!r || r.conforme === null) { semResposta++; continue; }
+      if (!r.conforme) {
+        perdido += Number(c.peso);
+        reprovados.push(c);
+        if (!r.observacao.trim()) semEvidencia++;
+      }
     }
     return {
       notaPrevia: zerado ? 0 : Math.max(0, Number((1 - perdido).toFixed(4))),
       reprovados,
-      pendentes,
+      semResposta,
+      semEvidencia,
     };
   }, [respostas, criterios, zerado]);
+  // Só no lançamento: numa edição a regra travaria quem só quer corrigir outro
+  // campo de uma monitoria antiga, lançada quando a evidência não era exigida.
+  const faltaEvidencia = editando ? 0 : semEvidencia;
+  const pendentes = semResposta + faltaEvidencia;
 
   function responder(id: string, valor: Partial<Resposta>) {
     setRespostas((atual) => ({ ...atual, [id]: { ...atual[id], ...valor } }));
@@ -189,10 +305,13 @@ export default function FormularioMonitoria({
   function validar(): boolean {
     const falha = (m: string) => { setErro(m); return false; };
 
-    if (!temData) return falha('Informe a data do atendimento.');
     if (!operadorId) return falha('Selecione o operador avaliado.');
+    if (!protocolo.trim()) return falha('Sorteie um atendimento ou informe o protocolo.');
+    if (!temData) return falha('Informe a data do atendimento.');
     if (semanaCheia) return falha('Esta semana já tem as 4 monitorias do operador. Escolha outra data ou outro operador.');
-    if (pendentes > 0) return falha(`Faltam ${pendentes} critério(s) sem resposta.`);
+    if (semResposta > 0) return falha(`Faltam ${semResposta} critério(s) sem resposta.`);
+    if (faltaEvidencia > 0)
+      return falha(`Faltam ${faltaEvidencia} critério(s) reprovados sem a evidência do que aconteceu.`);
     if (zerado && !motivoZeramento.trim())
       return falha('Descreva o motivo do zeramento por falha crítica.');
     return true;
@@ -437,6 +556,184 @@ export default function FormularioMonitoria({
         </p>
       )}
 
+      {!editando && (
+        <Quadro titulo="O atendimento"
+                subtitulo="O sorteio usa os protocolos já importados do Hub, na semana escolhida.">
+          <div className="grid gap-4 lg:grid-cols-[minmax(14rem,1fr)_2fr]">
+            <label>
+              <span className={rotuloCampo}>Atendente</span>
+              <select required value={operadorId} onChange={(e) => setOperadorId(e.target.value)}
+                className={campo}>
+                <option value="">Selecione…</option>
+                {operadores.map((o) => <option key={o.id} value={o.id}>{o.nome}</option>)}
+              </select>
+            </label>
+
+            <div>
+              <span className={rotuloCampo}>Semana do ciclo · {mesRotulo(competenciaAberta)}</span>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {semanas.map((s) => (
+                  <button
+                    key={s.n} type="button" disabled={!operadorId || s.estado === 'futura'}
+                    aria-pressed={s.n === semanaAtiva}
+                    onClick={() => trocarSemana(s.n)}
+                    className={`rounded-xl border-2 px-2.5 py-2 text-left transition disabled:opacity-50 ${
+                      s.n === semanaAtiva ? 'border-marca-600 bg-marca-50' : 'border-slate-200 hover:border-slate-300'}`}
+                  >
+                    <span className="block text-sm font-semibold text-slate-800">{s.n}ª semana</span>
+                    <span className="block text-xs text-slate-500">{diaMes(s.de)} a {diaMes(s.ate)}</span>
+                    <span className={`mt-1 inline-block rounded-full px-1.5 text-[11px] font-semibold ${
+                      !operadorId || doCiclo === null ? 'bg-slate-100 text-slate-500'
+                        : s.estado === 'cheia' ? 'bg-emerald-100 text-emerald-800'
+                          : s.estado === 'vazia' ? 'bg-amber-100 text-amber-900'
+                            : s.estado === 'futura' ? 'bg-slate-100 font-normal text-slate-500'
+                              : 'bg-slate-100 font-normal text-slate-500'}`}>
+                      {!operadorId ? '—' : doCiclo === null ? '…'
+                        : s.estado === 'cheia' ? 'concluída'
+                          : s.estado === 'vazia' ? 'sem atendimentos'
+                            : s.estado === 'futura' ? 'ainda não começou'
+                              : `${s.feitas} de ${POR_SEMANA}`}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {!operadorId ? (
+            <p className="mt-4 text-sm text-slate-500">Escolha o atendente para ver as semanas.</p>
+          ) : doCiclo === null ? (
+            <p className="mt-4 text-sm text-slate-500">Procurando os atendimentos do ciclo…</p>
+          ) : sorteado ? (
+            <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
+              <div className="flex flex-wrap items-center gap-3 bg-marca-50 px-5 py-4">
+                <div>
+                  <span className="block text-xs text-slate-500">Protocolo sorteado</span>
+                  <span className="font-mono text-2xl font-bold tracking-tight text-slate-900">
+                    {sorteado.protocolo}
+                  </span>
+                </div>
+                <div className="ml-auto flex gap-2">
+                  <button type="button"
+                    onClick={() => {
+                      navigator.clipboard?.writeText(sorteado.protocolo).catch(() => {});
+                      setCopiado(true);
+                      setTimeout(() => setCopiado(false), 1600);
+                    }}
+                    className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
+                               font-medium text-slate-700 hover:bg-slate-50">
+                    {copiado ? 'Copiado ✓' : 'Copiar'}
+                  </button>
+                  <button type="button" onClick={() => sortear([sorteado.protocolo])}
+                    className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
+                               font-medium text-slate-700 hover:bg-slate-50">
+                    Sortear outro
+                  </button>
+                </div>
+              </div>
+              <dl className="grid gap-x-6 gap-y-3 px-5 py-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                  <dt className="text-xs text-slate-500">Data do atendimento</dt>
+                  <dd className="text-sm font-semibold text-slate-800">{formatarDataBR(sorteado.data)}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-slate-500">Semana do ciclo</dt>
+                  <dd className="text-sm font-semibold text-slate-800">
+                    {semana}ª · competência {competencia && mesRotulo(competencia)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-slate-500">Nº da monitoria</dt>
+                  <dd className="text-sm font-semibold text-slate-800">{numero}ª de {POR_SEMANA} na semana</dd>
+                </div>
+                <div className="sm:col-span-2 lg:col-span-4 lg:border-t lg:border-slate-100 lg:pt-3">
+                  <dt className="text-xs text-slate-500">Tabulação registrada pelo atendente</dt>
+                  <dd className="text-sm font-semibold text-slate-800">
+                    {sorteado.tabulacao?.trim() || <span className="font-normal text-slate-500">sem tabulação</span>}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          ) : aSemana.estado === 'cheia' ? (
+            <p className="mt-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-slate-700 ring-1 ring-emerald-600/20">
+              <strong className="text-emerald-800">Semana concluída.</strong> Este atendente já tem as {POR_SEMANA} monitorias
+              da {aSemana.n}ª semana ({diaMes(aSemana.de)} a {diaMes(aSemana.ate)}). Escolha outra semana ou outro atendente.
+            </p>
+          ) : aSemana.estado === 'futura' ? (
+            <p className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-slate-700 ring-1 ring-amber-600/20">
+              <strong className="text-amber-800">Semana ainda não começou.</strong> O período de{' '}
+              {diaMes(aSemana.de)} a {diaMes(aSemana.ate)} começa depois de hoje.
+            </p>
+          ) : (
+            <>
+              {aSemana.estado === 'vazia' ? (
+                <p className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-slate-700 ring-1 ring-amber-600/20">
+                  <strong className="text-amber-800">Nenhum atendimento importado.</strong> Não há protocolos deste
+                  atendente entre {diaMes(aSemana.de)} e {diaMes(aSemana.ate)}, então não há o que sortear.
+                  Importe o relatório da semana ou informe o protocolo abaixo.
+                </p>
+              ) : (
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <button type="button" onClick={() => sortear()}
+                    className="rounded-lg bg-marca-600 px-4 py-2 text-sm font-semibold text-white hover:bg-marca-700">
+                    Sortear protocolo
+                  </button>
+                  <span className="text-sm text-slate-500">
+                    {aSemana.total} atendimento{aSemana.total === 1 ? '' : 's'} nesta semana,
+                    {' '}{aSemana.feitas} já monitorado{aSemana.feitas === 1 ? '' : 's'}.
+                  </span>
+                </div>
+              )}
+
+              {/* Só enquanto a semana ainda couber monitoria: com as 4 lançadas,
+                  digitar à mão seria o caminho para furar o limite. */}
+              {cabeMonitoria && (
+                <div className="mt-4">
+                  <button type="button" onClick={() => setManual((m) => !m)}
+                    className="text-sm text-marca-700 underline dark:text-marca-400">
+                    {manual ? 'Voltar ao sorteio' : 'Prefiro digitar o protocolo'}
+                  </button>
+                  {manual && (
+                    <div className="mt-3 grid max-w-xl gap-4 sm:grid-cols-2">
+                      <label>
+                        <span className={rotuloCampo}>Protocolo</span>
+                        <input value={protocolo} onChange={(e) => setProtocolo(e.target.value)}
+                          className={campo} placeholder="20261006-05596" />
+                      </label>
+                      <label>
+                        <span className={rotuloCampo}>Data do atendimento</span>
+                        <input type="date" value={dataAtendimento} max={ultimoDia ?? undefined}
+                          onChange={(e) => setDataAtendimento(e.target.value)} className={campo} />
+                      </label>
+                      <p className="text-xs text-slate-500 sm:col-span-2">
+                        Para avaliar um atendimento específico, ou quando o relatório da semana ainda não foi
+                        importado. Os 8 primeiros dígitos do protocolo são a data: 20261006 é 06/10/2026.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+
+          <div className="mt-5 grid gap-4 border-t border-slate-100 pt-5 sm:grid-cols-2 lg:grid-cols-3">
+            <label>
+              <span className={rotuloCampo}>Canal de atendimento</span>
+              <select value={canalId} onChange={(e) => setCanalId(e.target.value)} className={campo}>
+                <option value="">—</option>
+                {canais.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+              </select>
+            </label>
+            <label>
+              <span className={rotuloCampo}>Tempo de atendimento (min)</span>
+              <input type="number" min="0" step="1" value={tempo}
+                onChange={(e) => setTempo(e.target.value)} className={campo} placeholder="opcional" />
+            </label>
+          </div>
+        </Quadro>
+      )}
+
+      {editando && (
       <Quadro titulo="Identificação do atendimento">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <label>
@@ -512,11 +809,20 @@ export default function FormularioMonitoria({
           </label>
         </div>
       </Quadro>
+      )}
 
       <Quadro
-        titulo={`Critérios de atendimento (${criterios.length})`}
+        titulo="Critérios de atendimento"
+        subtitulo="Marque Não só no que falhou. O critério só conta como respondido depois que a evidência estiver escrita."
         acao={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="flex items-center gap-2 text-xs text-slate-500">
+              <span className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100">
+                <span className="block h-full rounded-full bg-marca-600 transition-all"
+                      style={{ width: `${((criterios.length - pendentes) / Math.max(1, criterios.length)) * 100}%` }} />
+              </span>
+              {criterios.length - pendentes} de {criterios.length} respondidos
+            </span>
             <button type="button" onClick={() => marcarTodos(true)}
               className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium
                          text-slate-700 hover:bg-slate-50">
@@ -540,6 +846,11 @@ export default function FormularioMonitoria({
                     <p className="text-sm font-medium text-slate-800">
                       <span className="mr-2 tabular-nums text-slate-400">{c.ordem}.</span>
                       {c.nome}
+                      {!editando && r?.conforme === false && !r.observacao.trim() && (
+                        <span className="ml-2 rounded-full bg-amber-100 px-1.5 text-[11px] font-semibold text-amber-900">
+                          falta a evidência
+                        </span>
+                      )}
                     </p>
                     <p className="mt-0.5 text-xs text-slate-500">
                       Vale {percentual(Number(c.peso))} da nota
@@ -623,12 +934,18 @@ export default function FormularioMonitoria({
             </span>
           </div>
 
+          {/* O que falta vem antes do que já está feito: é o que impede salvar. */}
           <p className="min-w-0 flex-1 text-xs text-slate-500">
-            {zerado
-              ? 'Zerada por falha crítica.'
-              : reprovados.length === 0
-                ? 'Nenhum critério reprovado.'
-                : `Descontos: ${reprovados.map((c) => `${c.nome} (−${percentual(Number(c.peso))})`).join(', ')}`}
+            {pendentes > 0
+              ? `Faltam ${pendentes} critério${pendentes === 1 ? '' : 's'}: ${[
+                semResposta && `${semResposta} sem resposta`,
+                faltaEvidencia && `${faltaEvidencia} sem a evidência`,
+              ].filter(Boolean).join(' e ')}.`
+              : zerado
+                ? 'Zerada por falha crítica.'
+                : reprovados.length === 0
+                  ? 'Nenhum critério reprovado.'
+                  : `Descontos: ${reprovados.map((c) => `${c.nome} (−${percentual(Number(c.peso))})`).join(', ')}`}
           </p>
 
           {erro && (
@@ -638,7 +955,9 @@ export default function FormularioMonitoria({
             </p>
           )}
 
-          <button type="submit" disabled={salvando || semanaCheia || Boolean(ultimoDia && dataAtendimento > ultimoDia)}
+          <button type="submit"
+            disabled={salvando || semanaCheia || pendentes > 0 || !protocolo.trim()
+                      || Boolean(ultimoDia && dataAtendimento > ultimoDia)}
             className="rounded-lg bg-marca-600 px-5 py-2.5 text-sm font-semibold text-white
                        hover:bg-marca-700 disabled:opacity-60">
             {salvando ? 'Salvando…' : editando ? 'Salvar alterações' : 'Salvar monitoria'}
