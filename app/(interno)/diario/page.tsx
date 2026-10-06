@@ -1,6 +1,6 @@
 import Link from '@/componentes/Link';
 import { criarClienteServidor, exigirVisaoDoTime } from '@/lib/supabase/servidor';
-import { Cartao, Tabela, Th, Td, Vazio } from '@/componentes/ui';
+import { Quadro, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import { codigoMonitoria, data as formatarData, hojeNoBrasil, mesDeCompetencia, periodoDaSemana } from '@/lib/formatar';
 import {
   COR_SITUACAO, COR_TIPO, ROTULO_QUEM, ROTULO_SITUACAO, ROTULO_TIPO, TIPOS, validade,
@@ -72,7 +72,7 @@ export default async function ConsultaDoDiario({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-sobre-fundo">Diário de bordo</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">Diário de bordo</h1>
         <p className="text-sm text-sobre-fundo-suave">
           Consulta para gestão e qualidade. Os registros são feitos no Painel de Performance.
         </p>
@@ -86,7 +86,7 @@ export default async function ConsultaDoDiario({
                 detalhe={todasCitacoes.length ? `${impactaram} impactaram · ${todasCitacoes.length - impactaram} não` : undefined} />
       </div>
 
-      <Cartao titulo="Registros">
+      <Quadro titulo="Registros">
         <form className="mb-4 flex flex-wrap items-end gap-2">
           <label className="min-w-64 flex-1">
             <span className="mb-1 block text-xs font-medium text-slate-600">Protocolo, assunto ou texto</span>
@@ -107,10 +107,13 @@ export default async function ConsultaDoDiario({
         {lista.length === 0 ? (
           <Vazio>{termo || tipoFiltro ? 'Nenhum registro encontrado.' : 'Nenhum registro no diário ainda.'}</Vazio>
         ) : (
-          <Tabela>
+          <Tabela noQuadro>
             <thead>
               <tr>
-                <Th>Data</Th><Th>Protocolo</Th><Th>Tipo</Th><Th>Assunto</Th><Th>Registrado por</Th><Th>Situação</Th><Th>Na monitoria</Th>
+                {/* O assunto é o texto da linha: sem um mínimo, as outras colunas o
+                    espremiam numa coluna de três palavras por linha. */}
+                <Th>Data</Th><Th>Protocolo</Th><Th>Tipo</Th><Th className="min-w-[20rem]">Assunto</Th>
+                <Th>Registrado por</Th><Th>Situação</Th><Th>Na monitoria</Th>
               </tr>
             </thead>
             <tbody>
@@ -161,7 +164,7 @@ export default async function ConsultaDoDiario({
             </tbody>
           </Tabela>
         )}
-      </Cartao>
+      </Quadro>
     </div>
   );
 }

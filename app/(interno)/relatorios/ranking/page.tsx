@@ -1,6 +1,6 @@
 import Link from '@/componentes/Link';
 import { criarClienteServidor, exigirVisaoDoTime } from '@/lib/supabase/servidor';
-import { Cartao, EtiquetaNota, Tabela, Th, Td, Vazio } from '@/componentes/ui';
+import { Quadro, EtiquetaNota, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import { mesRotulo, mesCurto, nota, percentual } from '@/lib/formatar';
 import type { LinhaRanking } from '@/lib/tipos';
 import { ateOMesAberto, mesAbertoDasMonitorias } from '@/lib/mes-aberto';
@@ -40,7 +40,7 @@ export default async function RelatorioRanking({
     : null;
 
   if (!mes) {
-    return <Cartao titulo="Ranking mensal"><Vazio>Ainda não há monitorias registradas.</Vazio></Cartao>;
+    return <Quadro titulo="Ranking mensal"><Vazio>Ainda não há monitorias registradas.</Vazio></Quadro>;
   }
 
   return (
@@ -50,7 +50,7 @@ export default async function RelatorioRanking({
           <Link href="/relatorios" className="text-sm text-sobre-fundo-suave hover:underline">
             ← Relatórios
           </Link>
-          <h1 className="mt-1 text-xl font-semibold text-sobre-fundo">Ranking mensal por operador</h1>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">Ranking mensal por operador</h1>
           <p className="text-sm text-sobre-fundo-suave">
             {mesRotulo(mes)} · {totalMonitorias} monitorias · média geral {nota(mediaGeral)}
           </p>
@@ -73,11 +73,11 @@ export default async function RelatorioRanking({
         </form>
       </div>
 
-      <Cartao>
+      <Quadro>
         {doMes.length === 0 ? (
           <Vazio>Nenhuma monitoria neste mês.</Vazio>
         ) : (
-          <Tabela>
+          <Tabela noQuadro>
             <thead>
               <tr>
                 <Th className="w-10">#</Th>
@@ -130,7 +130,7 @@ export default async function RelatorioRanking({
             </tbody>
           </Tabela>
         )}
-      </Cartao>
+      </Quadro>
     </div>
   );
 }

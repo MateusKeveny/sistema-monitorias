@@ -1,6 +1,6 @@
 import Link from '@/componentes/Link';
 import { criarClienteServidor, exigirVisaoDoTime } from '@/lib/supabase/servidor';
-import { Cartao, Tabela, Th, Td, Vazio, Indicador } from '@/componentes/ui';
+import { Quadro, Tabela, Th, Td, Vazio, Indicador } from '@/componentes/ui';
 import { mesRotulo, percentual, nota } from '@/lib/formatar';
 import type { LinhaCriterio } from '@/lib/tipos';
 import { ateOMesAberto, mesAbertoDasMonitorias } from '@/lib/mes-aberto';
@@ -30,12 +30,12 @@ export default async function RelatorioCriterios({
 
   if (!mes) {
     return (
-      <Cartao titulo="Critérios mais reprovados">
+      <Quadro titulo="Critérios mais reprovados">
         <Vazio>
           Ainda não há monitorias com detalhe por critério. Lance uma monitoria no sistema
           para este relatório começar a existir.
         </Vazio>
-      </Cartao>
+      </Quadro>
     );
   }
 
@@ -65,7 +65,7 @@ export default async function RelatorioCriterios({
           <Link href="/relatorios" className="text-sm text-sobre-fundo-suave hover:underline">
             ← Relatórios
           </Link>
-          <h1 className="mt-1 text-xl font-semibold text-sobre-fundo">Critérios mais reprovados</h1>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">Critérios mais reprovados</h1>
           <p className="text-sm text-sobre-fundo-suave">
             {mes === 'todos' ? 'Todo o período' : mesRotulo(mes)} ·
             {' '}{avaliacoes} atendimentos avaliados por critério
@@ -103,11 +103,11 @@ export default async function RelatorioCriterios({
         />
       </div>
 
-      <Cartao>
+      <Quadro>
         {linhas.length === 0 ? (
           <Vazio>Sem dados de critérios neste período.</Vazio>
         ) : (
-          <Tabela>
+          <Tabela noQuadro>
             <thead>
               <tr>
                 <Th>Critério</Th>
@@ -149,7 +149,7 @@ export default async function RelatorioCriterios({
             </tbody>
           </Tabela>
         )}
-      </Cartao>
+      </Quadro>
 
       <p className="text-xs leading-relaxed text-slate-500">
         <strong>Nota perdida</strong> multiplica cada reprovação pelo peso do critério: é o

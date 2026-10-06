@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
-import { Cartao } from '@/componentes/ui';
+import { Quadro } from '@/componentes/ui';
 import { data as formatarData, dataHora, nota } from '@/lib/formatar';
 
 export type Solicitacao = {
@@ -55,7 +55,7 @@ export default function SolicitacoesDeExclusao({ pendentes }: { pendentes: Solic
   if (pendentes.length === 0) return null;
 
   return (
-    <Cartao
+    <Quadro
       titulo={`Exclusões aguardando sua decisão (${pendentes.length})`}
       className="ring-1 ring-amber-500/40"
     >
@@ -141,6 +141,6 @@ export default function SolicitacoesDeExclusao({ pendentes }: { pendentes: Solic
         Aprovar apaga a monitoria e o histórico dela. Fica registrado o que foi excluído,
         quem pediu, quem aprovou e por quê — em <strong>Monitorias excluídas</strong>.
       </p>
-    </Cartao>
+    </Quadro>
   );
 }

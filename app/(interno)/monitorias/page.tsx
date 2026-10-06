@@ -1,6 +1,6 @@
 import Link from '@/componentes/Link';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
-import { Cartao, EtiquetaNota, Tabela, Th, Td, Vazio } from '@/componentes/ui';
+import { Quadro, EtiquetaNota, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import { data as formatarData, mesRotulo, codigoMonitoria } from '@/lib/formatar';
 import type { Monitoria, Operador } from '@/lib/tipos';
 import { ateOMesAberto, mesAbertoDasMonitorias } from '@/lib/mes-aberto';
@@ -143,7 +143,7 @@ export default async function ListaMonitorias({
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-sobre-fundo">Monitorias</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">Monitorias</h1>
           <p className="text-sm text-sobre-fundo-suave">
             {total} registro{total === 1 ? '' : 's'}
             {ultimaPagina > 1 && ` · página ${pagina} de ${ultimaPagina}`}
@@ -218,11 +218,11 @@ export default async function ListaMonitorias({
         </Link>
       </form>
 
-      <Cartao>
+      <Quadro>
         {monitorias.length === 0 ? (
           <Vazio>Nenhuma monitoria encontrada com esses filtros.</Vazio>
         ) : (
-          <Tabela>
+          <Tabela noQuadro>
             <thead>
               <tr>
                 {([
@@ -296,7 +296,7 @@ export default async function ListaMonitorias({
             </tbody>
           </Tabela>
         )}
-      </Cartao>
+      </Quadro>
 
       {ultimaPagina > 1 && (
         <nav className="flex items-center justify-between gap-4">

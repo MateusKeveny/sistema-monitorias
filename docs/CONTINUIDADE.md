@@ -11,7 +11,7 @@ Escrito em 28/09/2026, atualizado em 29/09/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.36.0** · Monitorias **4.16.1** (deploy de 06/10/2026) |
+| Publicado | Performance **1.36.0** · Monitorias **5.0.0** (deploy de 06/10/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
 | Migrações no banco | 01 a 51, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
@@ -302,8 +302,26 @@ Três versões, cada uma publicada e conferida antes da próxima:
   cobertura do ciclo. O nome no ranking abre as monitorias da pessoa, e de lá
   o link "‹ Equipe toda" volta. O seletor do topo escolhe atendente e mês
   (`?pessoa=` e `?mes=`, navegação pura, sem JavaScript). O operador segue
-  vendo só as próprias. `CoberturaDoCiclo` ganhou `noPerformance` para usar o
-  Quadro do Performance em vez do Cartao das Monitorias.
+  vendo só as próprias.
+- **Monitorias 5.0.0** (só telas, sem migração): **repaginação das Monitorias**
+  no visual do Performance, decidida pelo gestor para o site inteiro de uma
+  vez. `MenuLateral` passou a servir os dois sistemas (recebe `sistema`, lê
+  `ITENS[sistema]`, mostra o contador de exclusões) e o `layout.tsx` deixou de
+  ter dois caminhos. O `Cartao` saiu do `ui.tsx`: todas as telas usam `Quadro`,
+  e as tabelas dentro dele levam `noQuadro` — por isso `CoberturaDoCiclo` não
+  precisa mais do `noPerformance` da 1.36.0. `Indicador` e os esqueletos
+  ficaram iguais aos cartões de lá. No menu, acende só o endereço mais
+  específico; antes "Monitorias" e "Nova monitoria" acendiam juntas.
+  A tela de uma monitoria ganhou os três `Indicador` do topo, e a ficha
+  deixou de repetir operador, data e canal. Corrigidos junto: a barra fixa da
+  Nova monitoria passava por cima do menu (`lg:left-60`) e a coluna Assunto do
+  diário ficava espremida (`min-w-[20rem]`).
+  **O 1º número aqui marca a virada de visual, não mudança de cálculo** — a
+  regra abaixo reserva o MAJOR para o que obriga a refazer envio, e nenhum
+  número de ninguém mudou. Decisão do gestor.
+  Falta, combinado para depois: **reformular a tela de Nova monitoria**, que
+  na palavra dele "ficou algo de semi pronto, sem um cuidado" — é o fluxo de
+  preenchimento, não a moldura.
 
 Visão de celular fica fora da revisão, por decisão do gestor.
 

@@ -19,7 +19,7 @@ export default async function Configuracoes() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-sobre-fundo">Configurações</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">Configurações</h1>
         <p className="text-sm text-sobre-fundo-suave">
           Critérios e pesos, cadastro de pessoas e canais.
         </p>

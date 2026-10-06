@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
-import { Cartao, Tabela, Th, Td, Vazio } from '@/componentes/ui';
+import { Quadro, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 
 type Registro = { id: string; nome: string; email?: string | null; ativo: boolean };
 
@@ -123,7 +123,7 @@ export default function PainelCadastro({
                    focus:border-marca-600 disabled:bg-slate-50 disabled:text-slate-400`;
 
   return (
-    <Cartao
+    <Quadro
       titulo={`${titulo} (${registros.length})`}
       acao={
         <button
@@ -151,7 +151,7 @@ export default function PainelCadastro({
       {registros.length === 0 ? (
         <Vazio>Nenhum registro cadastrado.</Vazio>
       ) : (
-        <Tabela>
+        <Tabela noQuadro>
           <thead>
             <tr>
               <Th>Nome</Th>
@@ -247,6 +247,6 @@ export default function PainelCadastro({
         {' '}Para tirar alguém de circulação sem perder o histórico, desmarque
         <strong> Ativo</strong> — deixa de aparecer nas listas e continua nos relatórios.
       </p>
-    </Cartao>
+    </Quadro>
   );
 }

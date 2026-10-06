@@ -1,6 +1,6 @@
 import Link from '@/componentes/Link';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
-import { Cartao, Indicador, EtiquetaNota, Tabela, Th, Td, Vazio } from '@/componentes/ui';
+import { Quadro, Indicador, EtiquetaNota, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import EvolucaoMensal from '@/componentes/GraficoEvolucao';
 import CoberturaDoCiclo from '@/componentes/CoberturaDoCiclo';
 import SolicitacoesDeExclusao, { type Solicitacao } from '@/componentes/SolicitacoesDeExclusao';
@@ -38,21 +38,21 @@ export default async function Painel({
   // instalação não é assunto de quem está sendo avaliado.
   if (meses.length === 0) {
     return perfil.papel === 'operador' ? (
-      <Cartao titulo="Nenhuma monitoria por enquanto">
+      <Quadro titulo="Nenhuma monitoria por enquanto">
         <Vazio>
           Você ainda não tem monitorias registradas. Assim que a Qualidade avaliar
           um atendimento seu, o resultado aparece aqui.
         </Vazio>
-      </Cartao>
+      </Quadro>
     ) : (
-      <Cartao titulo="Nenhuma monitoria registrada">
+      <Quadro titulo="Nenhuma monitoria registrada">
         <Vazio>
           Nenhuma monitoria foi lançada ainda. Comece em{' '}
           <Link href="/monitorias/nova" className="text-marca-700 dark:text-marca-400 underline">
             Nova monitoria
           </Link>.
         </Vazio>
-      </Cartao>
+      </Quadro>
     );
   }
 
@@ -188,7 +188,7 @@ export default async function Painel({
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-sobre-fundo">
+          <h1 className="text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">
             {ehOperador ? 'Meu desempenho' : 'Painel de qualidade'}
           </h1>
           <p className="text-sm text-sobre-fundo-suave">
@@ -238,11 +238,11 @@ export default async function Painel({
 
       {perfil.papel === 'gestor' && (
         erroSolicitacoes ? (
-          <Cartao titulo="Exclusões aguardando sua decisão">
+          <Quadro titulo="Exclusões aguardando sua decisão">
             <p className="text-sm text-rose-800">
               Não foi possível carregar a fila: {erroSolicitacoes.message}
             </p>
-          </Cartao>
+          </Quadro>
         ) : (
           <SolicitacoesDeExclusao pendentes={pendentes} />
         )
@@ -282,16 +282,16 @@ export default async function Painel({
       </div>
 
       {serie.length > 1 && (
-        <Cartao titulo="Evolução da nota média">
+        <Quadro titulo="Evolução da nota média">
           <EvolucaoMensal dados={serie} />
-        </Cartao>
+        </Quadro>
       )}
 
       <div className="grid gap-6 lg:grid-cols-5">
         {/* Para o operador, o ranking mostraria uma linha só — ele mesmo. No
             lugar dele vão as últimas avaliações, que é o que ele quer ver. */}
         {ehOperador ? (
-          <Cartao
+          <Quadro
             titulo="Minhas últimas monitorias"
             className="lg:col-span-3"
             acao={
@@ -304,7 +304,7 @@ export default async function Painel({
             {minhasUltimas.length === 0 ? (
               <Vazio>Nenhuma monitoria registrada ainda.</Vazio>
             ) : (
-              <Tabela>
+              <Tabela noQuadro>
                 <thead>
                   <tr>
                     <Th>Data</Th>
@@ -337,9 +337,9 @@ export default async function Painel({
                 </tbody>
               </Tabela>
             )}
-          </Cartao>
+          </Quadro>
         ) : (
-          <Cartao
+          <Quadro
             titulo="Ranking do mês"
             className="lg:col-span-3"
             acao={
@@ -352,7 +352,7 @@ export default async function Painel({
             {linhas.length === 0 ? (
               <Vazio>Nenhuma monitoria neste mês.</Vazio>
             ) : (
-              <Tabela>
+              <Tabela noQuadro>
                 <thead>
                   <tr>
                     <Th className="w-10">#</Th>
@@ -378,10 +378,10 @@ export default async function Painel({
                 </tbody>
               </Tabela>
             )}
-          </Cartao>
+          </Quadro>
         )}
 
-        <Cartao
+        <Quadro
           titulo={ehOperador ? 'Meus pontos de atenção' : 'Critérios de maior impacto na nota'}
           className="lg:col-span-2"
           acao={ehOperador ? undefined : (
@@ -420,7 +420,7 @@ export default async function Painel({
               ))}
             </ul>
           )}
-        </Cartao>
+        </Quadro>
       </div>
 
       {!ehOperador && (

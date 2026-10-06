@@ -1,4 +1,4 @@
-import { Cartao } from '@/componentes/ui';
+import { Quadro } from '@/componentes/ui';
 import { dataHora } from '@/lib/formatar';
 
 export type PedidoDeExclusao = {
@@ -30,7 +30,7 @@ export default function PedidosDeExclusao({ pedidos }: { pedidos: PedidoDeExclus
   if (pedidos.length === 0) return null;
 
   return (
-    <Cartao titulo={`Pedidos de exclusão (${pedidos.length})`}>
+    <Quadro titulo={`Pedidos de exclusão (${pedidos.length})`}>
       <ul className="space-y-3">
         {pedidos.map((p) => {
           const aparencia = APARENCIA[p.status];
@@ -58,6 +58,6 @@ export default function PedidosDeExclusao({ pedidos }: { pedidos: PedidoDeExclus
           );
         })}
       </ul>
-    </Cartao>
+    </Quadro>
   );
 }

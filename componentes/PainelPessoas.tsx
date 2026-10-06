@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
-import { Cartao, Tabela, Th, Td, Vazio } from '@/componentes/ui';
+import { Quadro, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import { NOMES_PAPEL, type PapelUsuario, type Pessoa } from '@/lib/tipos';
 
 type Rascunho = { nome: string; email: string };
@@ -113,7 +113,7 @@ export default function PainelPessoas({ pessoas }: { pessoas: Pessoa[] }) {
                    outline-none focus:border-marca-600 disabled:opacity-50`;
 
   return (
-    <Cartao
+    <Quadro
       titulo={`Pessoas (${pessoas.length})`}
       acao={
         <button
@@ -144,7 +144,7 @@ export default function PainelPessoas({ pessoas }: { pessoas: Pessoa[] }) {
       {pessoas.length === 0 ? (
         <Vazio>Ninguém cadastrado.</Vazio>
       ) : (
-        <Tabela>
+        <Tabela noQuadro>
           <thead>
             <tr>
               <Th>Nome</Th>
@@ -282,6 +282,6 @@ export default function PainelPessoas({ pessoas }: { pessoas: Pessoa[] }) {
         monitorias apontam para o registro, não para o texto, então o histórico inteiro
         acompanha.
       </p>
-    </Cartao>
+    </Quadro>
   );
 }

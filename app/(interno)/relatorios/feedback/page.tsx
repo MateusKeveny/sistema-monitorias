@@ -1,6 +1,6 @@
 import Link from '@/componentes/Link';
 import { criarClienteServidor, exigirVisaoDoTime } from '@/lib/supabase/servidor';
-import { Cartao, Vazio } from '@/componentes/ui';
+import { Quadro, Vazio } from '@/componentes/ui';
 import BotaoImprimir from '@/componentes/BotaoImprimir';
 import { mesRotulo, data as formatarData, nota, percentual } from '@/lib/formatar';
 import type { LinhaFeedback, Operador } from '@/lib/tipos';
@@ -58,10 +58,10 @@ export default async function FolhaFeedback({
           <Link href="/relatorios" className="text-sm text-sobre-fundo-suave hover:underline">
             ← Relatórios
           </Link>
-          <h1 className="mt-1 text-xl font-semibold text-sobre-fundo">Folha de feedback individual</h1>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">Folha de feedback individual</h1>
         </div>
         {seletor}
-        <Cartao><Vazio>Escolha o operador e o mês para gerar a folha.</Vazio></Cartao>
+        <Quadro><Vazio>Escolha o operador e o mês para gerar a folha.</Vazio></Quadro>
       </div>
     );
   }
@@ -110,7 +110,7 @@ export default async function FolhaFeedback({
           <Link href="/relatorios" className="text-sm text-sobre-fundo-suave hover:underline">
             ← Relatórios
           </Link>
-          <h1 className="mt-1 text-xl font-semibold text-sobre-fundo">Folha de feedback individual</h1>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">Folha de feedback individual</h1>
         </div>
         <div className="flex items-center gap-2">
           {seletor}
@@ -119,7 +119,7 @@ export default async function FolhaFeedback({
       </div>
 
       {monitorias.length === 0 ? (
-        <Cartao><Vazio>Sem monitorias para {nomeOperador} em {mesRotulo(mes)}.</Vazio></Cartao>
+        <Quadro><Vazio>Sem monitorias para {nomeOperador} em {mesRotulo(mes)}.</Vazio></Quadro>
       ) : (
         <article className="rounded-xl border border-slate-200 bg-superficie p-8 shadow-sm print:border-0 print:p-0 print:shadow-none">
           <header className="border-b border-slate-200 pb-4">

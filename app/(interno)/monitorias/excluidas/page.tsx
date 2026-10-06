@@ -1,6 +1,6 @@
 import Link from '@/componentes/Link';
 import { criarClienteServidor, exigirVisaoDoTime } from '@/lib/supabase/servidor';
-import { Cartao, EtiquetaNota, Tabela, Th, Td, Vazio } from '@/componentes/ui';
+import { Quadro, EtiquetaNota, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import { data as formatarData, dataHora, codigoMonitoria } from '@/lib/formatar';
 
 export const dynamic = 'force-dynamic';
@@ -44,7 +44,7 @@ export default async function MonitoriasExcluidas() {
         <Link href="/monitorias" className="text-sm text-sobre-fundo-suave hover:underline">
           ← Monitorias
         </Link>
-        <h1 className="mt-1 text-xl font-semibold text-sobre-fundo">Monitorias excluídas</h1>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">Monitorias excluídas</h1>
         <p className="text-sm text-sobre-fundo-suave">
           {excluidas.length} registro{excluidas.length === 1 ? '' : 's'} · o que foi apagado,
           por quem e por quê
@@ -52,17 +52,17 @@ export default async function MonitoriasExcluidas() {
       </div>
 
       {error ? (
-        <Cartao>
+        <Quadro>
           <p className="text-sm text-rose-800">Não foi possível carregar: {error.message}</p>
-        </Cartao>
+        </Quadro>
       ) : excluidas.length === 0 ? (
-        <Cartao>
+        <Quadro>
           <Vazio>Nenhuma monitoria foi excluída até agora.</Vazio>
-        </Cartao>
+        </Quadro>
       ) : (
         <>
-          <Cartao>
-            <Tabela>
+          <Quadro>
+            <Tabela noQuadro>
               <thead>
                 <tr>
                   <Th>Código</Th>
@@ -102,7 +102,7 @@ export default async function MonitoriasExcluidas() {
                 ))}
               </tbody>
             </Tabela>
-          </Cartao>
+          </Quadro>
 
           <p className="text-xs leading-relaxed text-slate-500">
             O registro guarda também as respostas dos {19} critérios de cada monitoria apagada,

@@ -1,7 +1,7 @@
 import Link from '@/componentes/Link';
 import { notFound } from 'next/navigation';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
-import { Cartao, EtiquetaNota, Vazio } from '@/componentes/ui';
+import { Indicador, Quadro, EtiquetaNota, Vazio } from '@/componentes/ui';
 import BotaoExcluirMonitoria from '@/componentes/BotaoExcluirMonitoria';
 import PedidosDeExclusao, { type PedidoDeExclusao } from '@/componentes/PedidosDeExclusao';
 import { data as formatarData, dataHora, duracao, percentual, nota, codigoMonitoria } from '@/lib/formatar';
@@ -62,15 +62,13 @@ export default async function DetalheMonitoria({
     .sort((a, b) => a.criterios!.ordem - b.criterios!.ordem);
   const reprovados = avaliados.filter((i) => !i.conforme);
 
+  // Só o que não está no cabeçalho nem nos três cartões (5.0.0): repetir
+  // operador, data e canal aqui embaixo era puro eco.
   const ficha: [string, string][] = [
     ['Código', codigoMonitoria(m.codigo)],
     ['Protocolo', m.protocolo],
-    ['Data do atendimento', formatarData(m.data_atendimento)],
-    ['Operador(a)', m.operador],
-    ['Canal', m.canal ?? '—'],
-    ['Semana / nº', `${m.semana_mes}ª semana · ${m.numero_monitoria}ª monitoria`],
+    ['Nº da monitoria', `${m.numero_monitoria}ª do operador no mês`],
     ['Tempo de atendimento', duracao(m.tempo_atendimento_seg)],
-    ['Monitor responsável', m.monitor ?? '—'],
   ];
 
   return (
@@ -80,25 +78,30 @@ export default async function DetalheMonitoria({
           <Link href="/monitorias" className="text-sm text-sobre-fundo-suave hover:underline">
             ← Monitorias
           </Link>
-          <h1 className="mt-1 text-xl font-semibold text-sobre-fundo">
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">
             Monitoria {codigoMonitoria(m.codigo)}
           </h1>
           <p className="text-sm text-sobre-fundo-suave">
-            {m.operador} · {formatarData(m.data_atendimento)}
+            Protocolo {m.protocolo} · {formatarData(m.data_atendimento)} · {m.semana_mes}ª semana
+            {m.canal && ` · ${m.canal}`}
           </p>
         </div>
+      </div>
 
-        <div className="text-right">
-          <p className="text-xs uppercase tracking-wide text-sobre-fundo-suave">Nota final</p>
-          <p className="text-3xl font-semibold tabular-nums text-sobre-fundo">
-            {nota(Number(m.nota_final))}
-          </p>
-          {m.zerado && (
-            <p className="mt-1 text-xs font-semibold text-rose-700">
-              Zerada por falha crítica
-            </p>
-          )}
-        </div>
+      {/* Os três números que resumem a monitoria (5.0.0). A nota saiu do canto
+          do cabeçalho: ali competia com o título e sumia em tela estreita. */}
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Indicador
+          rotulo="Nota final" valor={nota(Number(m.nota_final))}
+          tom={m.zerado || Number(m.nota_final) < 0.85 ? 'ruim' : Number(m.nota_final) < 0.95 ? 'alerta' : 'bom'}
+          detalhe={m.zerado ? 'zerada por falha crítica' : Number(m.nota_final) < 0.85 ? 'abaixo do piso de 85%' : undefined}
+        />
+        <Indicador rotulo="Operador(a)" valor={m.operador} detalhe={m.monitor ? `avaliado por ${m.monitor}` : undefined} />
+        <Indicador
+          rotulo="Critérios reprovados" valor={String(reprovados.length)}
+          tom={reprovados.length > 0 ? 'ruim' : 'bom'}
+          detalhe={avaliados.length ? `de ${avaliados.length} avaliados` : 'sem detalhe por critério'}
+        />
       </div>
 
       {m.zerado && m.motivo_zeramento && (
@@ -111,18 +114,18 @@ export default async function DetalheMonitoria({
       )}
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <Cartao titulo="Identificação">
+        <Quadro titulo="Identificação">
           <dl className="space-y-3">
             {ficha.map(([rotulo, valor]) => (
               <div key={rotulo}>
-                <dt className="text-xs uppercase tracking-wide text-slate-500">{rotulo}</dt>
+                <dt className="text-xs text-slate-500">{rotulo}</dt>
                 <dd className="text-sm font-medium text-slate-800">{valor}</dd>
               </div>
             ))}
           </dl>
-        </Cartao>
+        </Quadro>
 
-        <Cartao titulo={`Critérios avaliados (${avaliados.length})`} className="lg:col-span-2">
+        <Quadro titulo={`Critérios avaliados (${avaliados.length})`} className="lg:col-span-2">
           {avaliados.length === 0 ? (
             <Vazio>
               Esta monitoria veio da planilha sem o detalhe por critério — só a nota final.
@@ -151,19 +154,19 @@ export default async function DetalheMonitoria({
               ))}
             </ul>
           )}
-        </Cartao>
+        </Quadro>
       </div>
 
       {(m.parecer || reprovados.length > 0) && (
-        <Cartao titulo="Parecer geral">
+        <Quadro titulo="Parecer geral">
           <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
             {m.parecer || 'Sem parecer registrado.'}
           </p>
-        </Cartao>
+        </Quadro>
       )}
 
       {alteracoes.length > 0 && (
-        <Cartao titulo={`Histórico de alterações (${alteracoes.length})`}>
+        <Quadro titulo={`Histórico de alterações (${alteracoes.length})`}>
           <ul className="divide-y divide-slate-100">
             {alteracoes.map((a) => (
               <li key={a.id} className="py-2.5 first:pt-0 text-sm">
@@ -183,7 +186,7 @@ export default async function DetalheMonitoria({
               </li>
             ))}
           </ul>
-        </Cartao>
+        </Quadro>
       )}
 
       <PedidosDeExclusao pedidos={pedidosDeExclusao} />

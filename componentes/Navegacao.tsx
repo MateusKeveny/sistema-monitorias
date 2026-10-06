@@ -24,11 +24,11 @@ export const ITENS: Record<Sistema, Item[]> = {
   monitorias: [
     { href: '/', rotulo: 'Painel', papeis: ['gestor', 'qualidade', 'operador'] },
     { href: '/monitorias', rotulo: 'Monitorias', papeis: ['gestor', 'qualidade', 'operador'] },
-    { href: '/monitorias/nova', rotulo: 'Nova monitoria', papeis: ['gestor', 'qualidade'] },
+    { href: '/monitorias/nova', rotulo: 'Nova monitoria', papeis: ['gestor', 'qualidade'], grupo: 'Registrar' },
+    { href: '/diario', rotulo: 'Diário de bordo', papeis: ['gestor', 'qualidade'], grupo: 'Registrar' },
     { href: '/relatorios', rotulo: 'Relatórios', papeis: ['gestor', 'qualidade'] },
-    { href: '/diario', rotulo: 'Diário de bordo', papeis: ['gestor', 'qualidade'] },
-    { href: '/configuracoes', rotulo: 'Configurações', papeis: ['gestor'] },
-    { href: '/reportes', rotulo: 'Reports', papeis: ['gestor'] },
+    { href: '/configuracoes', rotulo: 'Configurações', papeis: ['gestor'], grupo: 'Administrar' },
+    { href: '/reportes', rotulo: 'Reports', papeis: ['gestor'], grupo: 'Administrar' },
   ],
   cota: [
     { href: '/cota', rotulo: 'Início', papeis: ['gestor', 'qualidade', 'operador'] },

@@ -1,26 +1,5 @@
 import { CORES_FAIXA, faixa, nota as formatarNota, percentual } from '@/lib/formatar';
 
-export function Cartao({
-  titulo, acao, children, className = '',
-}: {
-  titulo?: string;
-  acao?: React.ReactNode;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <section className={`rounded-xl border border-slate-200 bg-superficie shadow-sm ${className}`}>
-      {(titulo || acao) && (
-        <header className="flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-3">
-          {titulo && <h2 className="text-sm font-semibold text-slate-800">{titulo}</h2>}
-          {acao}
-        </header>
-      )}
-      <div className="p-5">{children}</div>
-    </section>
-  );
-}
-
 /**
  * Uma superfície para a tela inteira, com seções separadas por linha fina.
  *
@@ -62,9 +41,9 @@ export function Secao({
 }
 
 /**
- * Um quadro no formato novo (1.18.0): superfície com seção, no mesmo uso do
- * Cartao. As telas do Performance trocam Cartao por Quadro; as Monitorias
- * seguem com o Cartao, que é outro sistema com outro público.
+ * Um quadro no formato novo (1.18.0): superfície com uma seção dentro.
+ * Começou no Performance e, na repaginação das Monitorias (5.0.0), passou a
+ * ser o quadro dos dois sistemas — o antigo Cartao saiu junto.
  */
 export function Quadro({ titulo, subtitulo, acao, children, className = '' }: {
   titulo?: string;
@@ -95,10 +74,12 @@ export function Indicador({
     ruim: 'text-rose-700',
   };
   return (
-    <div className="rounded-xl border border-slate-200 bg-superficie px-5 py-4 shadow-sm">
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{rotulo}</p>
-      <p className={`mt-1 text-2xl font-semibold tabular-nums ${tons[tom]}`}>{valor}</p>
-      {detalhe && <p className="mt-0.5 text-xs text-slate-500">{detalhe}</p>}
+    // Na repaginação (5.0.0) ficou igual ao cartão de resumo do Performance:
+    // sem borda e sem caixa-alta, que faziam o rótulo competir com o número.
+    <div className="rounded-2xl bg-superficie px-5 py-4 shadow-sm">
+      <p className="text-sm text-slate-500">{rotulo}</p>
+      <p className={`text-2xl font-semibold tracking-tight tabular-nums ${tons[tom]}`}>{valor}</p>
+      {detalhe && <p className="text-xs text-slate-500">{detalhe}</p>}
     </div>
   );
 }
@@ -169,9 +150,9 @@ export function Vazio({ children }: { children: React.ReactNode }) {
 
 /**
  * Tabela que encosta nas bordas do quadro. As margens negativas desfazem o
- * recuo de quem a contém: o Cartao (p-5) ou, com `noQuadro`, o Quadro
- * (px-6/7, com o título acima e às vezes um botão abaixo — por isso só nas
- * laterais).
+ * recuo de quem a contém: com `noQuadro`, o Quadro (px-6/7, com o título
+ * acima e às vezes um botão abaixo — por isso só nas laterais); sem ele, uma
+ * caixa de p-5, como as do importador.
  */
 export function Tabela({ children, noQuadro = false }: { children: React.ReactNode; noQuadro?: boolean }) {
   return (

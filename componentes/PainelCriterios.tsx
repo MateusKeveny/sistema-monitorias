@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
-import { Cartao, Tabela, Th, Td } from '@/componentes/ui';
+import { Quadro, Tabela, Th, Td } from '@/componentes/ui';
 import { percentual } from '@/lib/formatar';
 import type { Criterio } from '@/lib/tipos';
 
@@ -142,7 +142,7 @@ export default function PainelCriterios({ criterios }: { criterios: Criterio[] }
                        tabular-nums outline-none focus:border-marca-600 disabled:bg-slate-50`;
 
   return (
-    <Cartao
+    <Quadro
       titulo={`Critérios e pesos (${ativos.length} ativos)`}
       acao={
         <div className="flex items-center gap-3">
@@ -177,7 +177,7 @@ export default function PainelCriterios({ criterios }: { criterios: Criterio[] }
                       ring-1 ring-emerald-600/20">{aviso}</p>
       )}
 
-      <Tabela>
+      <Tabela noQuadro>
         <thead>
           <tr>
             <Th className="w-12">Ordem</Th>
@@ -296,6 +296,6 @@ export default function PainelCriterios({ criterios }: { criterios: Criterio[] }
         dada ao operador. <strong>Remover</strong> tira o critério das próximas monitorias sem
         apagar as respostas antigas; ele fica na lista abaixo e pode voltar.
       </p>
-    </Cartao>
+    </Quadro>
   );
 }

@@ -1,4 +1,4 @@
-import { Cartao, Quadro, Tabela, Th, Td, Vazio } from '@/componentes/ui';
+import { Quadro, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 
 export type LinhaCobertura = {
   operador_id: string;
@@ -18,15 +18,12 @@ const POR_SEMANA = 4;
  * fazem qualquer erro pesar muito mais.
  */
 export default function CoberturaDoCiclo({
-  linhas, semanasEncerradas, noPerformance = false,
+  linhas, semanasEncerradas,
 }: {
   linhas: LinhaCobertura[];
   /** Quantas semanas do ciclo já terminaram (0 a 4). */
   semanasEncerradas: number;
-  /** Na tela de Monitorias do Performance (1.36.0): no quadro de lá, não no cartão. */
-  noPerformance?: boolean;
 }) {
-  const Moldura = noPerformance ? Quadro : Cartao;
   // Só cobra o que já venceu: num ciclo em andamento, semana que ainda não
   // aconteceu não é lacuna. Sem isso o quadro apontaria falha em todo mês novo.
   const meta = POR_SEMANA * semanasEncerradas;
@@ -43,7 +40,7 @@ export default function CoberturaDoCiclo({
           : 'bg-emerald-100 text-emerald-800';
 
   return (
-    <Moldura
+    <Quadro
       titulo="Cobertura do ciclo"
       acao={
         <span className="text-xs text-slate-500">
@@ -59,7 +56,7 @@ export default function CoberturaDoCiclo({
         <Vazio>Nenhum operador ativo cadastrado.</Vazio>
       ) : (
         <>
-          <Tabela noQuadro={noPerformance}>
+          <Tabela noQuadro>
             <thead>
               <tr>
                 <Th>Operador</Th>
@@ -110,6 +107,6 @@ export default function CoberturaDoCiclo({
           </p>
         </>
       )}
-    </Moldura>
+    </Quadro>
   );
 }

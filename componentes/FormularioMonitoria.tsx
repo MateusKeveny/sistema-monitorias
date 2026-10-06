@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
-import { Cartao } from '@/componentes/ui';
+import { Quadro } from '@/componentes/ui';
 import {
   nota as formatarNota, faixa, percentual,
   semanaDoCiclo, mesDeCompetencia, mesRotulo, hojeNoBrasil,
@@ -437,7 +437,7 @@ export default function FormularioMonitoria({
         </p>
       )}
 
-      <Cartao titulo="Identificação do atendimento">
+      <Quadro titulo="Identificação do atendimento">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <label>
             <span className={rotuloCampo}>ID / Protocolo</span>
@@ -511,9 +511,9 @@ export default function FormularioMonitoria({
               onChange={(e) => setTempo(e.target.value)} className={campo} placeholder="opcional" />
           </label>
         </div>
-      </Cartao>
+      </Quadro>
 
-      <Cartao
+      <Quadro
         titulo={`Critérios de atendimento (${criterios.length})`}
         acao={
           <div className="flex gap-2">
@@ -575,9 +575,9 @@ export default function FormularioMonitoria({
             );
           })}
         </ul>
-      </Cartao>
+      </Quadro>
 
-      <Cartao titulo="Fechamento">
+      <Quadro titulo="Fechamento">
         <div className="space-y-4">
           <label className="flex items-start gap-3 rounded-lg bg-rose-50 p-3 ring-1 ring-rose-600/10">
             <input type="checkbox" checked={zerado} onChange={(e) => setZerado(e.target.checked)}
@@ -606,11 +606,13 @@ export default function FormularioMonitoria({
               className={campo} placeholder="Feedback que será entregue ao operador." />
           </label>
         </div>
-      </Cartao>
+      </Quadro>
 
-      {/* Barra fixa com a nota calculada em tempo real */}
-      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-slate-200 bg-superficie/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-6 py-3">
+      {/* Barra fixa com a nota calculada em tempo real. Começa depois do menu
+          lateral (5.0.0): presa à janela inteira, ela passava por cima dele e
+          cobria o botão de sair. */}
+      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-slate-200 bg-superficie/95 backdrop-blur lg:left-60">
+        <div className="flex max-w-[1680px] flex-wrap items-center gap-x-6 gap-y-2 px-6 py-3 lg:px-9">
           <div>
             <span className="block text-xs uppercase tracking-wide text-slate-500">
               Nota calculada

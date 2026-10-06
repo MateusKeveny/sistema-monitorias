@@ -33,15 +33,16 @@ export default async function LayoutInterno({ children }: { children: React.Reac
     : await dbReportes.from('reportes').select('id', { count: 'exact', head: true })
         .eq('pessoa_id', perfil.id).eq('lido_pelo_autor', false);
 
-  // Performance (1.15.0): menu lateral em tela larga e conteúdo na largura
-  // toda — limitado a 7xl, sobrava meia tela vazia em monitor grande. Em
-  // janela estreita volta o cabeçalho do topo. As Monitorias seguem como
-  // estavam.
-  if (sistema === 'cota') {
+  // Menu lateral em tela larga e conteúdo na largura toda — limitado a 7xl,
+  // sobrava meia tela vazia em monitor grande. Em janela estreita volta o
+  // cabeçalho do topo. Veio no Performance (1.15.0) e passou a valer também
+  // nas Monitorias na repaginação delas (5.0.0).
+  {
     // Leitura obrigatória do diário (1.29.0): com processo ou treinamento
     // ainda não lido, o painel inteiro dá lugar à leitura — vale também para
-    // quem abre uma tela pelo endereço direto. O gestor só acompanha.
-    if (perfil.papel !== 'gestor') {
+    // quem abre uma tela pelo endereço direto. O gestor só acompanha. Só no
+    // Performance: é lá que o diário da equipe vive.
+    if (sistema === 'cota' && perfil.papel !== 'gestor') {
       const db = await criarClienteServidor();
       const { data: leituras } = await db.rpc('leituras_do_diario');
       const pendentesDeLeitura = ((leituras ?? []) as LeituraDiario[])
@@ -62,29 +63,18 @@ export default async function LayoutInterno({ children }: { children: React.Reac
       }
     }
 
+    const versao = sistema === 'cota' ? VERSAO_COTA : VERSAO_MONITORIAS;
     return (
       <div className="lg:grid lg:min-h-screen lg:grid-cols-[15rem_1fr]">
-        <MenuLateral perfil={perfil} versao={VERSAO_COTA} avisosReporte={avisosReporte ?? 0} />
+        <MenuLateral perfil={perfil} versao={versao} sistema={sistema}
+                     avisosReporte={avisosReporte ?? 0} pendentes={pendentes} />
         <div className="min-w-0">
           <div className="lg:hidden">
-            <Navegacao perfil={perfil} pendentes={pendentes} sistema={sistema} versao={VERSAO_COTA} avisosReporte={avisosReporte ?? 0} />
+            <Navegacao perfil={perfil} pendentes={pendentes} sistema={sistema} versao={versao} avisosReporte={avisosReporte ?? 0} />
           </div>
           <main className="max-w-[1680px] px-6 py-8 lg:px-9">{children}</main>
         </div>
       </div>
     );
   }
-
-  return (
-    <>
-      <Navegacao
-        perfil={perfil}
-        pendentes={pendentes}
-        sistema={sistema}
-        versao={VERSAO_MONITORIAS}
-        avisosReporte={avisosReporte ?? 0}
-      />
-      <main className="mx-auto max-w-7xl px-6 py-8">{children}</main>
-    </>
-  );
 }

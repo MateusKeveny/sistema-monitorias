@@ -9,6 +9,23 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 5.0.0
+
+- **Visual novo**, igual ao do Painel de Performance. O menu saiu do topo e
+  virou uma coluna à esquerda, com os grupos Registrar, Analisar e
+  Administrar. Os quadros ficaram arredondados e sem borda, as tabelas
+  encostam na borda do quadro e o conteúdo ocupa a tela toda em monitor
+  grande. Em janela estreita o menu do topo continua como era.
+- A tela de uma monitoria abre com três números em destaque — nota final,
+  operador e critérios reprovados. A nota saiu do canto do cabeçalho, onde
+  sumia em tela estreita, e a ficha deixou de repetir o que já está acima.
+- Correções que vieram junto: na Nova monitoria, a barra da nota calculada
+  não passa mais por cima do menu; na consulta do diário, a coluna Assunto
+  não fica mais espremida.
+
+O 1º número mudou por ser a virada de visual do sistema inteiro: nenhuma
+conta mudou, e nenhuma nota ou pontuação já reportada foi alterada.
+
 ## 4.16.1
 
 - Consulta do diário: o tipo novo "Problema operacional" aparece com a
