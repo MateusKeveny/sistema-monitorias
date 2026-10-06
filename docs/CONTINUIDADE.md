@@ -11,7 +11,7 @@ Escrito em 28/09/2026, atualizado em 29/09/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.35.4** · Monitorias **4.16.1** (deploy de 05/10/2026) |
+| Publicado | Performance **1.36.0** · Monitorias **4.16.1** (deploy de 06/10/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
 | Migrações no banco | 01 a 51, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
@@ -293,6 +293,17 @@ Três versões, cada uma publicada e conferida antes da próxima:
   ao Worker para um 404 de ~50 ms) e o middleware não chama o Supabase quando
   não há cookie de sessão. Isso só reduz: a solução é o **Workers Paid**
   (US$ 5/mês, 30 s de CPU) — decisão do gestor.
+- **1.36.0** (só telas, sem migração): **Monitorias no menu do Performance**.
+  O item leva a `/cota/monitorias`, que já existia desde a 1.17.0 mas só era
+  alcançada pelo Comparativo. Para gestor e qualidade/Pleno a tela abre agora
+  na **equipe toda**, com o mesmo resumo da tela inicial das Monitorias — nota
+  média do mês, comparação com o mês anterior, zeradas, quantos estão abaixo
+  de 85%, a linha mês a mês, o ranking, os critérios de maior impacto e a
+  cobertura do ciclo. O nome no ranking abre as monitorias da pessoa, e de lá
+  o link "‹ Equipe toda" volta. O seletor do topo escolhe atendente e mês
+  (`?pessoa=` e `?mes=`, navegação pura, sem JavaScript). O operador segue
+  vendo só as próprias. `CoberturaDoCiclo` ganhou `noPerformance` para usar o
+  Quadro do Performance em vez do Cartao das Monitorias.
 
 Visão de celular fica fora da revisão, por decisão do gestor.
 
