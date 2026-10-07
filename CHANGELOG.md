@@ -9,6 +9,17 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 5.3.0
+
+- **A Cobertura do ciclo destaca a semana atual.** A coluna da semana em
+  andamento mostra o andamento de cada pessoa ("2 de 4", ou "4 de 4 ✓" em
+  verde) e o topo do quadro diz quantos já completaram a semana. Ela continua
+  fora da cobrança: o "No prazo" olha só as semanas encerradas.
+- Cada semana traz as datas no cabeçalho.
+- **O nome leva à Nova monitoria** com a pessoa já escolhida, na primeira
+  semana que ainda tem vaga. No Performance o destaque aparece igual, mas sem
+  o link — lá a tela é de consulta.
+
 ## 5.2.0
 
 - **O mês troca pelas setas**, como no Painel de Performance, no Painel, no

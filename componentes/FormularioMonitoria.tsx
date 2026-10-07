@@ -41,7 +41,7 @@ export type MonitoriaEmEdicao = {
 };
 
 export default function FormularioMonitoria({
-  perfilId, criterios, operadores, canais, emEdicao, mesAberto,
+  perfilId, criterios, operadores, canais, emEdicao, mesAberto, operadorInicial,
 }: {
   perfilId: string;
   criterios: Criterio[];
@@ -55,6 +55,8 @@ export default function FormularioMonitoria({
    * dentro do mês aberto e o formulário avisa antes de salvar.
    */
   mesAberto?: string;
+  /** Atendente já escolhido ao chegar pelo nome na Cobertura do ciclo (5.3.0). */
+  operadorInicial?: string;
 }) {
   const router = useRouter();
   const editando = Boolean(emEdicao);
@@ -66,7 +68,7 @@ export default function FormularioMonitoria({
   // de hoje, ela era salva sem ser conferida e a monitoria caía na semana ou no
   // mês errado. O analista informa a data do atendimento que está avaliando.
   const [dataAtendimento, setDataAtendimento] = useState(emEdicao?.data_atendimento ?? '');
-  const [operadorId, setOperadorId] = useState(emEdicao?.operador_id ?? '');
+  const [operadorId, setOperadorId] = useState(emEdicao?.operador_id ?? operadorInicial ?? '');
   const [canalId, setCanalId] = useState(emEdicao?.canal_id ?? canais[0]?.id ?? '');
   const [tempo, setTempo] = useState(
     emEdicao?.tempo_atendimento_seg ? String(Math.round(emEdicao.tempo_atendimento_seg / 60)) : '');

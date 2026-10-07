@@ -412,7 +412,7 @@ export default async function Painel({
       </div>
 
       {!ehOperador && (
-        <CoberturaDoCiclo linhas={cobertura} semanasEncerradas={semanasEncerradas} />
+        <CoberturaDoCiclo linhas={cobertura} semanasEncerradas={semanasEncerradas} competencia={mes} comLink />
       )}
     </div>
   );

@@ -374,7 +374,7 @@ async function Equipe({ lista, mesPedido }: { lista: { id: string; nome: string 
         </Quadro>
       </div>
 
-      <CoberturaDoCiclo linhas={cobertura} semanasEncerradas={semanasEncerradas} />
+      <CoberturaDoCiclo linhas={cobertura} semanasEncerradas={semanasEncerradas} competencia={mes} />
     </div>
   );
 }

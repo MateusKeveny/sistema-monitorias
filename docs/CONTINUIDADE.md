@@ -11,7 +11,7 @@ Escrito em 28/09/2026, atualizado em 29/09/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.36.0** · Monitorias **5.2.0** (deploy de 06/10/2026) |
+| Publicado | Performance **1.36.1** · Monitorias **5.3.0** (deploy de 07/10/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
 | Migrações no banco | 01 a 51, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
@@ -354,8 +354,18 @@ Três versões, cada uma publicada e conferida antes da próxima:
   em `lib/mes-aberto.ts` — a cota já resolvia isso no `resolverCompetencia`.
   O mês virou `h2` ao lado do título da tela, e o subtítulo passou a trazer o
   volume, que antes repetia o mês.
+- **Monitorias 5.3.0 · Performance 1.36.1** (só telas, sem migração):
+  **semana atual na Cobertura do ciclo**. `CoberturaDoCiclo` ganhou
+  `competencia` (para as datas de cada semana, via `periodoDaSemana`) e
+  `comLink`. A semana atual é a primeira não encerrada que já começou; num mês
+  passado não há semana atual, nem link. Com `comLink` (só na tela inicial do
+  Monitorias) o nome abre `/monitorias/nova?operador=<id>`; a página só repassa
+  o id se ele estiver entre os avaliados ativos, e o formulário abre na
+  primeira semana com vaga (`semanaPadrao`). No Performance o quadro vem sem
+  link.
 
-Visão de celular fica fora da revisão, por decisão do gestor.
+Visão de celular fica fora da revisão, por decisão do gestor. Os painéis são
+usados só no computador.
 
 ---
 
