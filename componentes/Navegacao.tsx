@@ -42,6 +42,7 @@ export const ITENS: Record<Sistema, Item[]> = {
     { href: '/cota/importar', rotulo: 'Importar', papeis: ['gestor'], grupo: 'Registrar' },
     { href: '/cota/fechamento', rotulo: 'Fechamento', papeis: ['gestor'] },
     { href: '/cota/atendentes', rotulo: 'Atendentes', papeis: ['gestor'], grupo: 'Administrar' },
+    { href: '/cota/acessos', rotulo: 'Acessos', papeis: ['gestor'], grupo: 'Administrar' },
     { href: '/cota/configuracao', rotulo: 'Configuração', papeis: ['gestor'], grupo: 'Administrar' },
     { href: '/reportes', rotulo: 'Reports de problemas', papeis: ['gestor'], grupo: 'Administrar' },
   ],

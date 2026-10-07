@@ -9,6 +9,12 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 5.3.1
+
+- Cada abertura do painel passa a ser registrada (migração 52), para a tela
+  **Acessos** do Painel de Performance, que só o gestor vê. Nada muda na tela
+  das Monitorias.
+
 ## 5.3.0
 
 - **A Cobertura do ciclo destaca a semana atual.** A coluna da semana em

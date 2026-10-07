@@ -11,7 +11,7 @@ Escrito em 28/09/2026, atualizado em 29/09/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.36.1** · Monitorias **5.3.0** (deploy de 07/10/2026) |
+| Publicado | Performance **1.37.0** · Monitorias **5.3.1** (deploy de 07/10/2026, migração 52) |
 | Branch | `painel-performance` (a `main` segue intocada) |
 | Migrações no banco | 01 a 51, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
@@ -363,6 +363,17 @@ Três versões, cada uma publicada e conferida antes da próxima:
   o id se ele estiver entre os avaliados ativos, e o formulário abre na
   primeira semana com vaga (`semanaPadrao`). No Performance o quadro vem sem
   link.
+- **Performance 1.37.0 · Monitorias 5.3.1** (migração 52): **Acessos**. Tabela
+  `acessos` com uma linha por pessoa, sistema e dia (primeiro, último,
+  aberturas). `RegistrarAcesso`, no layout interno (também na leitura
+  obrigatória), chama `registrar_acesso(sistema)` do navegador direto no
+  banco, para não gastar CPU do Worker; o layout não remonta ao trocar de
+  tela, então cada carregamento conta uma abertura. Só o gestor lê (RLS
+  `eh_gestor()`). Tela `/cota/acessos`, só no Performance (Administrar), com
+  seletor Performance | Monitorias por `?sistema=`; quem está parado há mais
+  de 30 dias vem de `vw_ultimo_acesso` (security_invoker), e quem nunca
+  acessou mostra o último login de `ultimo_login_das_pessoas()`. O histórico
+  começa em 07/10/2026.
 
 Visão de celular fica fora da revisão, por decisão do gestor. Os painéis são
 usados só no computador.

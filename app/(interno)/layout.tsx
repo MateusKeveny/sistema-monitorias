@@ -4,6 +4,7 @@ import { VERSAO_COTA, VERSAO_MONITORIAS } from '@/lib/versoes';
 import { sistemaAtual } from '@/lib/sistema-servidor';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import LeituraObrigatoria from '@/componentes/LeituraObrigatoria';
+import RegistrarAcesso from '@/componentes/RegistrarAcesso';
 import { hojeNoBrasil } from '@/lib/formatar';
 import type { LeituraDiario, RegistroDiario } from '@/lib/diario';
 
@@ -54,11 +55,15 @@ export default async function LayoutInterno({ children }: { children: React.Reac
           db.rpc('nomes_das_pessoas'),
         ]);
         return (
+          <>
+          {/* Quem abre o painel para ler também acessou (migração 52). */}
+          <RegistrarAcesso sistema={sistema} />
           <LeituraObrigatoria
             registros={(registros ?? []) as RegistroDiario[]}
             nomes={Object.fromEntries((pessoas ?? []).map((p: { id: string; nome: string }) => [p.id, p.nome]))}
             hoje={hojeNoBrasil()}
           />
+          </>
         );
       }
     }
@@ -66,6 +71,8 @@ export default async function LayoutInterno({ children }: { children: React.Reac
     const versao = sistema === 'cota' ? VERSAO_COTA : VERSAO_MONITORIAS;
     return (
       <div className="lg:grid lg:min-h-screen lg:grid-cols-[15rem_1fr]">
+        {/* Uma abertura do painel por carregamento (migração 52, tela Acessos). */}
+        <RegistrarAcesso sistema={sistema} />
         <MenuLateral perfil={perfil} versao={versao} sistema={sistema}
                      avisosReporte={avisosReporte ?? 0} pendentes={pendentes} />
         <div className="min-w-0">

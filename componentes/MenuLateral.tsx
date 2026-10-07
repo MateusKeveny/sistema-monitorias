@@ -31,6 +31,8 @@ const ICONES: Record<string, React.ReactNode> = {
   '/cota/importar': <path d="M10 3v9m0 0-3-3m3 3 3-3M4 14v2h12v-2" />,
   '/cota/fechamento': <><rect x="4" y="9" width="12" height="8" rx="1.5" /><path d="M7 9V6.5a3 3 0 0 1 6 0V9" /></>,
   '/cota/atendentes': <><circle cx="7" cy="8" r="2.5" /><circle cx="14" cy="8" r="2.5" /><path d="M2.5 16c.7-2.3 2.4-3.5 4.5-3.5s3.8 1.2 4.5 3.5M11 12.6c.9-.1 2-.1 3 0 1.9.3 3 1.3 3.5 3.4" /></>,
+  // Relógio: quem acessa e quando (1.37.0).
+  '/cota/acessos': <><circle cx="10" cy="10" r="6.5" /><path d="M10 6.5V10l2.5 1.5" /></>,
   '/reportes': <path d="M5 17V3.5M5 4h9l-2 3.5 2 3.5H5" />,
   '/cota/configuracao': <><circle cx="10" cy="10" r="2.5" /><path d="M10 3v2m0 10v2m7-7h-2M5 10H3m11.9-4.9-1.4 1.4M6.5 13.5l-1.4 1.4m9.8 0-1.4-1.4M6.5 6.5 5.1 5.1" /></>,
 };
