@@ -393,6 +393,12 @@ Três versões, cada uma publicada e conferida antes da próxima:
   eram média × 1,2 e realizado × 0,2 em linhas separadas, e o total do
   quadro (7.143,6) não era o resultado dela (8.223,6). Sem demanda, como o
   Gestor, segue média × multiplicador.
+  Na mesma versão, "De onde vieram os pontos" de quem recebe pela média mostra
+  os valores antes do multiplicador (média recebida e cada demanda) e a conta
+  embaixo; saiu a linha "Multiplicador sobre a pontuação realizada". Os
+  cartões das semanas só mostram C-SAT e Monitoria para quem é medido por
+  eles; os demais veem o que a semana teve (ex.: Atendimento presencial 4×).
+  E as tabelas por canal não listam mais faixa de C-SAT ou categoria vazia.
 
 Visão de celular fica fora da revisão, por decisão do gestor. Os painéis são
 usados só no computador.

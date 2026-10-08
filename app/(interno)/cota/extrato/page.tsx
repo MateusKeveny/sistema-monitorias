@@ -255,10 +255,22 @@ export default async function Extrato({
     o.vezes += 1;
     porOrigem.set(chave, o);
   }
+  // Quem recebe pela média (08/10): a média entra pelo valor recebido e as
+  // demandas pelo que fizeram, sem o multiplicador; a conta aparece embaixo,
+  // (média + demanda) × peso. Antes a média vinha já × 1,2 e o multiplicador
+  // do realizado era uma linha à parte, e nada batia com nada.
+  if (linhaMedia) {
+    porOrigem.delete('media_sobre_realizado');
+    const m = porOrigem.get('media_da_equipe');
+    if (m) {
+      m.rotulo = 'Média da equipe recebida';
+      m.cota = Number(linhaMedia.quantidade);
+    }
+  }
   const origens = [...porOrigem.values()].filter((o) => Math.abs(o.cota) >= 0.005).map((o) => ({
     ...o,
     detalhe: o.grupo === 'monitoria' ? `média ${percentual(o.quantidade / o.vezes)}`
-      : o.grupo === 'media' ? '' : `${num(o.quantidade, 0)}×`,
+      : o.grupo === 'media' ? (composicao.length ? `${composicao.length} pessoa(s)` : '') : `${num(o.quantidade, 0)}×`,
   }));
   const somou = origens.filter((o) => o.cota > 0).sort((a, b) => b.cota - a.cota);
   const tirou = origens.filter((o) => o.cota < 0).sort((a, b) => a.cota - b.cota);
@@ -370,7 +382,11 @@ export default async function Extrato({
               os dois canais e a monitoria juntos, do que mais somou ao que
               mais tirou. Responde "por que deu isso" antes das tabelas. */}
           <Quadro titulo="De onde vieram os pontos"
-                  subtitulo="Cada categoria no mês, do que mais somou ao que mais tirou — os dois canais e a monitoria juntos.">
+                  subtitulo={linhaMedia
+                    ? (demanda
+                      ? 'A média da equipe e a demanda tratada no mês, somadas, e o multiplicador do cargo sobre a soma.'
+                      : 'A média da equipe recebida e o multiplicador do cargo sobre ela.')
+                    : 'Cada categoria no mês, do que mais somou ao que mais tirou — os dois canais e a monitoria juntos.'}>
             <div className="grid gap-x-12 gap-y-6 lg:grid-cols-2">
               {([
                 ['O que somou', somou, '+'],
@@ -379,7 +395,9 @@ export default async function Extrato({
                 <div key={titulo}>
                   <h3 className="mb-2 text-[13px] font-semibold text-slate-500">
                     {titulo}
-                    {itens.length > 0 && ` · ${sinal}${num(Math.abs(itens.reduce((a, i) => a + i.cota, 0)), 1)}`}
+                    {itens.length > 0 && (linhaMedia && sinal === '+'
+                      ? ` · ${um(itens.reduce((a, i) => a + i.cota, 0))} antes do multiplicador`
+                      : ` · ${sinal}${num(Math.abs(itens.reduce((a, i) => a + i.cota, 0)), 1)}`)}
                   </h3>
                   {itens.length === 0 ? (
                     <p className="text-sm text-slate-500">Nada neste mês.</p>
@@ -393,7 +411,7 @@ export default async function Extrato({
                           </span>
                           <span className={`text-right font-semibold tabular-nums ${
                             i.cota < 0 ? 'text-rose-700 dark:text-rose-300' : 'text-marca-700 dark:text-marca-400'}`}>
-                            {i.cota < 0 ? '−' : '+'}{num(Math.abs(i.cota), 1)}
+                            {linhaMedia && i.cota > 0 ? um(i.cota) : <>{i.cota < 0 ? '−' : '+'}{num(Math.abs(i.cota), 1)}</>}
                           </span>
                           <span className="col-span-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
                             <span className={`crescer-x block h-full origin-left rounded-full ${
@@ -403,6 +421,18 @@ export default async function Extrato({
                         </li>
                       ))}
                     </ul>
+                  )}
+                  {linhaMedia && sinal === '+' && itens.length > 0 && (
+                    <dl className="mt-4 grid grid-cols-[1fr_auto] gap-y-1 border-t border-slate-100 pt-3 text-sm tabular-nums">
+                      <dt className="text-slate-600">{demanda ? 'Média + demanda tratada' : 'Média da equipe recebida'}</dt>
+                      <dd className="text-right text-slate-800">{um(Number(linhaMedia.quantidade) + demanda)}</dd>
+                      <dt className="text-slate-600">Multiplicador do cargo</dt>
+                      <dd className="text-right text-slate-800">× {num(Number(linhaMedia.peso))}</dd>
+                      <dt className="font-semibold text-slate-900">{tirou.length ? 'Com o multiplicador' : 'Resultado'}</dt>
+                      <dd className="text-right text-base font-semibold text-marca-700 dark:text-marca-400">
+                        {um(contaComDemanda ?? totalMedia)} pts
+                      </dd>
+                    </dl>
                   )}
                 </div>
               ))}
@@ -418,29 +448,42 @@ export default async function Extrato({
               const soma = daSemana.reduce((a, l) => a + Number(l.cota), 0);
               const monitoria = daSemana.find((l) => l.grupo === 'monitoria');
               const canais = canaisDe(daSemana);
+              // C-SAT e Monitoria só para quem é medido por eles; para os demais
+              // (Pleno, Analista, Gestor), o que a semana teve (08/10).
+              const temCsat = semanal.some((c) => c.semana === semana);
+              const medeMonitoria = (pesoDaFaixa.get('monitoria') ?? 0) !== 0;
+              const doQue = [...new Map(daSemana.filter((l) => Math.abs(Number(l.cota)) >= 0.005)
+                .map((l) => [l.regra, l])).values()]
+                .map((l) => ({ rotulo: l.rotulo, vezes: daSemana.filter((x) => x.regra === l.regra)
+                  .reduce((a, x) => a + Number(x.quantidade), 0) }));
               return {
                 chave: `s${semana}`,
                 // Fragmento na raiz, como na tela inicial: com <div> o React acusa
                 // lista sem chave ao hidratar o cartão vindo do servidor.
                 bloco: (
                   <>
-                    <p className="tabular-nums text-[13px] text-slate-500">{semana}ª semana</p>
+                    <p className="tabular-nums text-[13px] text-slate-500">{semana}ª semana{linhaMedia ? ' · demanda' : ''}</p>
                     <p className={`tabular-nums text-2xl font-semibold ${soma < 0 ? 'text-rose-700' : 'text-slate-900'}`}>
                       {num(soma, 0)} pts
                     </p>
-                    <p className="tabular-nums mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
-                      C-SAT
-                      {etiquetaCsat('huggy', semana)}
-                      {etiquetaCsat('diretores', semana)}
-                    </p>
-                    <p className="tabular-nums mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
+                    {temCsat && (
+                      <p className="tabular-nums mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
+                        C-SAT
+                        {etiquetaCsat('huggy', semana)}
+                        {etiquetaCsat('diretores', semana)}
+                      </p>
+                    )}
+                    {!temCsat && !medeMonitoria && doQue.map((d) => (
+                      <p key={d.rotulo} className="tabular-nums mt-1 text-xs text-slate-600">{d.rotulo} {num(d.vezes, 0)}×</p>
+                    ))}
+                    {medeMonitoria && <p className="tabular-nums mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
                       Monitoria
                       {monitoria ? (
                         <span className={`rounded-md px-1.5 py-px font-semibold ${tomMonitoria(Number(monitoria.quantidade))}`}>
                           {percentual(Number(monitoria.quantidade))}
                         </span>
                       ) : <span className="text-slate-400">—</span>}
-                    </p>
+                    </p>}
                   </>
                 ),
                 detalhe: (
@@ -549,7 +592,8 @@ export default async function Extrato({
               // Cada categoria somada no mês; o C-SAT tem tratamento próprio.
               // A monitoria é a média das semanas (cada semana já é a média
               // das monitorias dela), não a soma; a cota, essa sim, soma.
-              const categorias = [...new Map(doCanal.filter((l) => l.grupo !== 'csat')
+              const categorias = [...new Map(doCanal.filter((l) => l.grupo !== 'csat'
+                && (Number(l.quantidade) !== 0 || Math.abs(Number(l.cota)) >= 0.005))
                 .map((l) => [l.regra, l])).values()]
                 .map((base) => {
                   const iguais = doCanal.filter((l) => l.regra === base.regra);
@@ -561,7 +605,9 @@ export default async function Extrato({
                   };
                 });
 
-              // Todas as faixas de C-SAT, marcando em quais semanas pontuou.
+              // Só as faixas em que a pessoa caiu em alguma semana, marcando quais.
+              // Faixa vazia não aparece (08/10): para quem não tem C-SAT no canal,
+              // como o Pleno, eram cinco linhas de zeros.
               const semanasDoCanal = canal === 'geral' ? []
                 : semanal.filter((c) => c.origem === canal as Canal);
               const linhasFaixa = canal === 'geral' ? [] : faixas.map((f) => {
@@ -574,7 +620,7 @@ export default async function Extrato({
                   peso: doExtrato[0]?.peso != null ? Number(doExtrato[0].peso) : pesoDaFaixa.get(f.chave) ?? 0,
                   cota: doExtrato.reduce((a, l) => a + Number(l.cota), 0),
                 };
-              });
+              }).filter((f) => f.semanas.length > 0 || f.quantidade !== 0 || Math.abs(f.cota) >= 0.005);
 
               const csatMes = semanasDoCanal.length
                 ? semanasDoCanal.reduce((a, c) => a + c.positivas, 0)
