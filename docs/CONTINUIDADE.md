@@ -11,7 +11,7 @@ Escrito em 28/09/2026, atualizado em 08/10/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.37.0** · Monitorias **5.3.1** (deploy de 07/10/2026, migração 52) |
+| Publicado | Performance **1.37.1** · Monitorias **5.3.1** (deploy de 08/10/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
 | Migrações no banco | 01 a 52, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
@@ -374,6 +374,16 @@ Três versões, cada uma publicada e conferida antes da próxima:
   de 30 dias vem de `vw_ultimo_acesso` (security_invoker), e quem nunca
   acessou mostra o último login de `ultimo_login_das_pessoas()`. O histórico
   começa em 07/10/2026.
+- **Performance 1.37.1** (correção de tela, sem migração): **"Como a média
+  foi formada" volta a fechar com a média**, no extrato e na tela do Pleno.
+  Em mês fechado, a média vinha do fechamento e os nomes da lista do cálculo
+  de hoje: o peso de tratativa do Analista (20 → 15 em 08/10) derrubou o
+  Matheus de 12.250 para 8.960 na lista de setembro, e a média seguiu 6.582,65.
+  E a média não leva o atestado (migração 49), mas a lista mostrava o
+  resultado com ele (Rayssa, 1 dia: 6.533 na média, 6.322 no resultado).
+  `lib/resultado-na-media.ts` devolve o valor que cada um levou para a
+  média — congelado em mês fechado, sem o atestado — e a lista mostra
+  "6.322 com o atestado" embaixo. Nada muda em pontuação nem em pagamento.
 
 Visão de celular fica fora da revisão, por decisão do gestor. Os painéis são
 usados só no computador.

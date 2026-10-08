@@ -4,6 +4,7 @@ import { mesRotulo, percentual } from '@/lib/formatar';
 import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
 import SeletorDeDetalhe from '@/componentes/SeletorDeDetalhe';
 import { resolverCompetencia } from '@/lib/competencia';
+import { resultadosNaMedia } from '@/lib/resultado-na-media';
 import type { Pessoa } from '@/lib/tipos';
 
 export const dynamic = 'force-dynamic';
@@ -134,24 +135,32 @@ export default async function Extrato({
   // O mesmo multiplicador sobre a pontuação realizada (migração 48).
   const linhaRealizado = linhas.find((l) => l.regra === 'media_sobre_realizado');
   const totalMedia = Number(linhaMedia?.cota ?? 0) + Number(linhaRealizado?.cota ?? 0);
-  let composicao: { pessoa: string; cargo: string | null; resultado: number }[] = [];
+  let composicao: { pessoa: string; cargo: string | null; resultado: number; comAtestado: number | null }[] = [];
   if (linhaMedia && cargoId) {
     const [referencias, cargos, resultados] = await Promise.all([
       db.from('cargos_referencia').select('referencia_id').eq('cargo_id', cargoId),
       db.from('cargos').select('id, nome'),
-      db.from('vw_cota_mensal').select('pessoa, cargo, resultado, compoe_media')
+      db.from('vw_cota_mensal').select('pessoa_id, pessoa, cargo, resultado, compoe_media')
         .eq('mes_competencia', competencia),
     ]);
     const nomesReferencia = new Set(((referencias.data ?? []) as { referencia_id: number }[])
       .map((r) => ((cargos.data ?? []) as { id: number; nome: string }[])
         .find((c) => c.id === r.referencia_id)?.nome)
       .filter(Boolean) as string[]);
-    composicao = ((resultados.data ?? []) as
-      { pessoa: string; cargo: string | null; resultado: number; compoe_media: boolean }[])
+    const daMedia = ((resultados.data ?? []) as
+      { pessoa_id: string; pessoa: string; cargo: string | null; resultado: number; compoe_media: boolean }[])
       // Quem trabalhou a competência pela metade não entra na média (migração
       // 23) e por isso não aparece aqui: listá-lo faria a conta não fechar.
-      .filter((r) => r.compoe_media && r.cargo && nomesReferencia.has(r.cargo))
-      .map((r) => ({ ...r, resultado: Number(r.resultado) }))
+      .filter((r) => r.compoe_media && r.cargo && nomesReferencia.has(r.cargo));
+    // O valor que cada um levou para a média: congelado em mês fechado e sem
+    // o atestado — senão a lista não fecha com a média (setembro/2026).
+    const naMedia = await resultadosNaMedia(db, competencia, Boolean(congelado),
+      new Map(daMedia.map((r) => [r.pessoa_id, Number(r.resultado)])));
+    composicao = daMedia
+      .map((r) => {
+        const m = naMedia.get(r.pessoa_id);
+        return { ...r, resultado: m?.valor ?? Number(r.resultado), comAtestado: m?.comAtestado ?? null };
+      })
       .sort((a, b) => b.resultado - a.resultado);
   }
 
@@ -482,7 +491,10 @@ export default async function Extrato({
                                        ring-1 ring-slate-200">
                           <span className="min-w-0">
                             <span className="block truncate text-sm text-slate-700">{nomeCurto(c.pessoa)}</span>
-                            <span className="block text-[10px] text-slate-400">{c.cargo}</span>
+                            <span className="block text-[10px] text-slate-400">
+                              {c.cargo}
+                              {c.comAtestado != null && ` · ${num(c.comAtestado, 0)} com o atestado`}
+                            </span>
                           </span>
                           <span className="font-semibold tabular-nums text-slate-800">{num(c.resultado, 0)}</span>
                         </li>

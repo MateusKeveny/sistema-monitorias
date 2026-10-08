@@ -2,6 +2,7 @@ import Link from '@/componentes/Link';
 import { BarraDeMeta, Quadro } from '@/componentes/ui';
 import { criarClienteServidor } from '@/lib/supabase/servidor';
 import { mesRotulo } from '@/lib/formatar';
+import { resultadosNaMedia } from '@/lib/resultado-na-media';
 import { REGRA_MEDIA, REGRA_MEDIA_REALIZADO, REGRA_META } from '@/lib/tipos';
 
 const num = (v: number, casas = 0) => Number(v).toLocaleString('pt-BR', { maximumFractionDigits: casas });
@@ -90,9 +91,17 @@ export default async function PainelPleno({
     ? await db.from('vw_cota_mensal').select('pessoa_id, pessoa, cargo, resultado, compoe_media')
       .eq('mes_competencia', competencia).in('cargo', nomesReferencia)
     : { data: [] };
-  const composicao = ((daEquipe ?? []) as { pessoa_id: string; pessoa: string; resultado: number; compoe_media: boolean }[])
-    .filter((p) => p.compoe_media)
-    .map((p) => ({ ...p, resultado: Number(p.resultado) }))
+  const daMedia = ((daEquipe ?? []) as { pessoa_id: string; pessoa: string; resultado: number; compoe_media: boolean }[])
+    .filter((p) => p.compoe_media);
+  // O valor que cada um levou para a média: congelado em mês fechado e sem o
+  // atestado — senão a lista não fecha com a média (setembro/2026).
+  const naMedia = await resultadosNaMedia(db, competencia, Boolean(congelado),
+    new Map(daMedia.map((p) => [p.pessoa_id, Number(p.resultado)])));
+  const composicao = daMedia
+    .map((p) => {
+      const m = naMedia.get(p.pessoa_id);
+      return { ...p, resultado: m?.valor ?? Number(p.resultado), comAtestado: m?.comAtestado ?? null };
+    })
     .sort((a, b) => b.resultado - a.resultado);
   const escala = Math.max(meta ?? 0, ...composicao.map((p) => p.resultado), 1) * 1.05;
   const referenciaNome = nomesReferencia.map((n) => n.replace(/^Atendente\s+/, '')).join(' e ');
@@ -237,7 +246,12 @@ export default async function PainelPleno({
                   <li key={p.pessoa_id}>
                     <Link href={`/cota/extrato?pessoa=${p.pessoa_id}&mes=${competencia.slice(0, 7)}`}
                           className="grid grid-cols-[8.5rem_1fr_3.5rem] items-center gap-3 rounded-lg text-sm hover:bg-slate-50">
-                      <span className="truncate text-slate-700">{nomeCurto(p.pessoa)}</span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-slate-700">{nomeCurto(p.pessoa)}</span>
+                        {p.comAtestado != null && (
+                          <span className="block truncate text-[10px] text-slate-400">{num(p.comAtestado)} com o atestado</span>
+                        )}
+                      </span>
                       <span className="relative h-2 rounded-full bg-slate-100">
                         <span className={`crescer-x absolute inset-0 origin-left rounded-full ${tom}`}
                               style={{ transform: `scaleX(${p.resultado / escala})` }} />
