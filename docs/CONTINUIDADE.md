@@ -11,7 +11,7 @@ Escrito em 28/09/2026, atualizado em 08/10/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.37.1** · Monitorias **5.3.1** (deploy de 08/10/2026) |
+| Publicado | Performance **1.37.2** · Monitorias **5.3.1** (deploy de 08/10/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
 | Migrações no banco | 01 a 52, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
@@ -384,6 +384,9 @@ Três versões, cada uma publicada e conferida antes da próxima:
   `lib/resultado-na-media.ts` devolve o valor que cada um levou para a
   média — congelado em mês fechado, sem o atestado — e a lista mostra
   "6.322 com o atestado" embaixo. Nada muda em pontuação nem em pagamento.
+- **Performance 1.37.2** (só tela): o quadro "Como a média foi formada" (extrato)
+  e a lista da média do Pleno mostram **uma casa decimal fixa** — cartões,
+  média e totais (9.873,97 → 9.874,0) —, para a conta fechar à vista.
 
 Visão de celular fica fora da revisão, por decisão do gestor. Os painéis são
 usados só no computador.

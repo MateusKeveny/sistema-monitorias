@@ -192,3 +192,17 @@ export function mesDeCompetencia(iso: string): string {
   }
   return `${ano}-${String(mes).padStart(2, '0')}-01`;
 }
+
+/**
+ * Uma casa decimal sempre, mesmo zero (9.873,97 → 9.874,0), no arredondamento
+ * comum: 0 a 4 mantém, 5 a 9 sobe.
+ *
+ * O `toLocaleString` sozinho arredonda o número como o computador o guarda, e
+ * 6.582,65 fica guardado como 6.582,6499999… — caía para 6.582,6. Aqui o valor
+ * é fixado em 6 casas antes de arredondar.
+ */
+export function umaCasa(v: number): string {
+  const n = Number(v);
+  const arredondado = (Math.sign(n) * Math.round(Number((Math.abs(n) * 10).toFixed(6)))) / 10;
+  return arredondado.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+}

@@ -1,6 +1,6 @@
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { BarraDeMeta, Quadro, Vazio } from '@/componentes/ui';
-import { mesRotulo, percentual } from '@/lib/formatar';
+import { mesRotulo, percentual, umaCasa } from '@/lib/formatar';
 import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
 import SeletorDeDetalhe from '@/componentes/SeletorDeDetalhe';
 import { resolverCompetencia } from '@/lib/competencia';
@@ -36,6 +36,7 @@ const NOME_CANAL: Record<string, string> = {
 const reais = (v: number, casas = 2) =>
   Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: casas });
 const num = (v: number, casas = 2) => Number(v).toLocaleString('pt-BR', { maximumFractionDigits: casas });
+const um = umaCasa;
 const chaveCanal = (o: Canal | null) => o ?? 'geral';
 const nomeCurto = (nome: string) => nome.trim().split(' ').slice(0, 2).join(' ');
 
@@ -474,12 +475,12 @@ export default async function Extrato({
                 className="xl:col-span-3"
                 titulo="Como a média foi formada"
                 acao={<span className="text-sm font-semibold tabular-nums text-slate-900">
-                  {num(totalMedia)} pts
+                  {um(totalMedia)} pts
                 </span>}
               >
                 {composicao.length === 0 ? (
                   <p className="text-sm text-slate-600">
-                    Média dos cargos de referência: <strong className="tabular-nums">{num(Number(linhaMedia.quantidade))}</strong> pts.
+                    Média dos cargos de referência: <strong className="tabular-nums">{um(Number(linhaMedia.quantidade))}</strong> pts.
                     O resultado de cada pessoa não aparece para o seu acesso.
                   </p>
                 ) : (
@@ -493,23 +494,23 @@ export default async function Extrato({
                             <span className="block truncate text-sm text-slate-700">{nomeCurto(c.pessoa)}</span>
                             <span className="block text-[10px] text-slate-400">
                               {c.cargo}
-                              {c.comAtestado != null && ` · ${num(c.comAtestado, 0)} com o atestado`}
+                              {c.comAtestado != null && ` · ${um(c.comAtestado)} com o atestado`}
                             </span>
                           </span>
-                          <span className="font-semibold tabular-nums text-slate-800">{num(c.resultado, 0)}</span>
+                          <span className="font-semibold tabular-nums text-slate-800">{um(c.resultado)}</span>
                         </li>
                       ))}
                     </ul>
 
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-slate-100 pt-3 text-sm">
                       <span className="text-slate-600">Média de {composicao.length} pessoa(s)</span>
-                      <span className="font-semibold tabular-nums text-slate-800">{num(Number(linhaMedia.quantidade))}</span>
+                      <span className="font-semibold tabular-nums text-slate-800">{um(Number(linhaMedia.quantidade))}</span>
                       <span className="text-slate-400">×</span>
                       <span className="text-slate-600">multiplicador</span>
                       <span className="font-semibold tabular-nums text-slate-800">{num(Number(linhaMedia.peso))}</span>
                       <span className="text-slate-400">=</span>
                       <span className="text-lg font-semibold tabular-nums text-marca-700 dark:text-marca-400">
-                        {num(Number(linhaMedia.cota))} pts
+                        {um(Number(linhaMedia.cota))} pts
                       </span>
                       <span className="text-xs text-slate-500">
                         ({Number(linhaMedia.peso) >= 1 ? '+' : ''}{Math.round((Number(linhaMedia.peso) - 1) * 100)}% sobre a média)
@@ -518,12 +519,12 @@ export default async function Extrato({
                     {linhaRealizado && (
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                         <span className="text-slate-600">Pontuação realizada</span>
-                        <span className="font-semibold tabular-nums text-slate-800">{num(Number(linhaRealizado.quantidade))}</span>
+                        <span className="font-semibold tabular-nums text-slate-800">{um(Number(linhaRealizado.quantidade))}</span>
                         <span className="text-slate-400">×</span>
                         <span className="font-semibold tabular-nums text-slate-800">{num(Number(linhaRealizado.peso))}</span>
                         <span className="text-slate-400">=</span>
                         <span className="text-lg font-semibold tabular-nums text-marca-700 dark:text-marca-400">
-                          {num(Number(linhaRealizado.cota))} pts
+                          {um(Number(linhaRealizado.cota))} pts
                         </span>
                         <span className="text-xs text-slate-500">
                           (o mesmo multiplicador vale para o realizado: (média + realizado) × {num(Number(linhaMedia.peso))})

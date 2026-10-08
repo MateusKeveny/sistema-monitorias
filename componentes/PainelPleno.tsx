@@ -1,11 +1,12 @@
 import Link from '@/componentes/Link';
 import { BarraDeMeta, Quadro } from '@/componentes/ui';
 import { criarClienteServidor } from '@/lib/supabase/servidor';
-import { mesRotulo } from '@/lib/formatar';
+import { mesRotulo, umaCasa } from '@/lib/formatar';
 import { resultadosNaMedia } from '@/lib/resultado-na-media';
 import { REGRA_MEDIA, REGRA_MEDIA_REALIZADO, REGRA_META } from '@/lib/tipos';
 
 const num = (v: number, casas = 0) => Number(v).toLocaleString('pt-BR', { maximumFractionDigits: casas });
+const um = umaCasa;
 const nomeCurto = (nome: string) => nome.trim().split(/\s+/).slice(0, 2).join(' ');
 /** "Rinaldo da Rocha Nunes" → "Rinaldo Nunes": primeiro e último nome. */
 const primeiroEUltimo = (nome: string) => {
@@ -245,11 +246,11 @@ export default async function PainelPleno({
                 return (
                   <li key={p.pessoa_id}>
                     <Link href={`/cota/extrato?pessoa=${p.pessoa_id}&mes=${competencia.slice(0, 7)}`}
-                          className="grid grid-cols-[8.5rem_1fr_3.5rem] items-center gap-3 rounded-lg text-sm hover:bg-slate-50">
+                          className="grid grid-cols-[8.5rem_1fr_4.5rem] items-center gap-3 rounded-lg text-sm hover:bg-slate-50">
                       <span className="min-w-0">
                         <span className="block truncate text-slate-700">{nomeCurto(p.pessoa)}</span>
                         {p.comAtestado != null && (
-                          <span className="block truncate text-[10px] text-slate-400">{num(p.comAtestado)} com o atestado</span>
+                          <span className="block truncate text-[10px] text-slate-400">{um(p.comAtestado)} com o atestado</span>
                         )}
                       </span>
                       <span className="relative h-2 rounded-full bg-slate-100">
@@ -260,7 +261,7 @@ export default async function PainelPleno({
                                 style={{ left: `${(meta / escala) * 100}%` }} />
                         )}
                       </span>
-                      <span className="text-right font-semibold text-slate-800">{num(p.resultado)}</span>
+                      <span className="text-right font-semibold text-slate-800">{um(p.resultado)}</span>
                     </Link>
                   </li>
                 );
