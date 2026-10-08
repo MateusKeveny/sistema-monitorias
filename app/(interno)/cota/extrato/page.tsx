@@ -136,6 +136,10 @@ export default async function Extrato({
   // O mesmo multiplicador sobre a pontuação realizada (migração 48).
   const linhaRealizado = linhas.find((l) => l.regra === 'media_sobre_realizado');
   const totalMedia = Number(linhaMedia?.cota ?? 0) + Number(linhaRealizado?.cota ?? 0);
+  // Com demanda tratada, a conta aparece inteira: (média + demanda) × peso.
+  // Em duas linhas (média × peso, depois demanda × 0,2) ela confundia (08/10).
+  const demanda = Number(linhaRealizado?.quantidade ?? 0);
+  const contaComDemanda = linhaRealizado ? totalMedia + demanda : null;
   let composicao: { pessoa: string; cargo: string | null; resultado: number; comAtestado: number | null }[] = [];
   if (linhaMedia && cargoId) {
     const [referencias, cargos, resultados] = await Promise.all([
@@ -475,7 +479,7 @@ export default async function Extrato({
                 className="xl:col-span-3"
                 titulo="Como a média foi formada"
                 acao={<span className="text-sm font-semibold tabular-nums text-slate-900">
-                  {um(totalMedia)} pts
+                  {um(contaComDemanda ?? totalMedia)} pts
                 </span>}
               >
                 {composicao.length === 0 ? (
@@ -502,32 +506,34 @@ export default async function Extrato({
                       ))}
                     </ul>
 
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-slate-100 pt-3 text-sm">
-                      <span className="text-slate-600">Média de {composicao.length} pessoa(s)</span>
-                      <span className="font-semibold tabular-nums text-slate-800">{um(Number(linhaMedia.quantidade))}</span>
-                      <span className="text-slate-400">×</span>
-                      <span className="text-slate-600">multiplicador</span>
-                      <span className="font-semibold tabular-nums text-slate-800">{num(Number(linhaMedia.peso))}</span>
-                      <span className="text-slate-400">=</span>
-                      <span className="text-lg font-semibold tabular-nums text-marca-700 dark:text-marca-400">
-                        {um(Number(linhaMedia.cota))} pts
-                      </span>
-                      <span className="text-xs text-slate-500">
-                        ({Number(linhaMedia.peso) >= 1 ? '+' : ''}{Math.round((Number(linhaMedia.peso) - 1) * 100)}% sobre a média)
-                      </span>
-                    </div>
-                    {linhaRealizado && (
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                        <span className="text-slate-600">Pontuação realizada</span>
-                        <span className="font-semibold tabular-nums text-slate-800">{um(Number(linhaRealizado.quantidade))}</span>
+                    {contaComDemanda != null ? (
+                      <dl className="grid grid-cols-[auto_1fr] items-baseline gap-x-6 gap-y-1.5 border-t border-slate-100 pt-3 text-sm">
+                        <dt className="text-slate-600">Média da equipe recebida</dt>
+                        <dd className="font-semibold tabular-nums text-slate-800">
+                          {um(Number(linhaMedia.quantidade))}
+                          <span className="ml-2 text-xs font-normal text-slate-500">média de {composicao.length} pessoa(s)</span>
+                        </dd>
+                        <dt className="text-slate-600">Demanda tratada</dt>
+                        <dd className="font-semibold tabular-nums text-slate-800">{um(demanda)}</dd>
+                        <dt className="text-slate-600">Cálculo</dt>
+                        <dd className="tabular-nums text-slate-800">
+                          ({um(Number(linhaMedia.quantidade))} + {um(demanda)}) × {num(Number(linhaMedia.peso))} ={' '}
+                          <span className="text-lg font-semibold text-marca-700 dark:text-marca-400">{um(contaComDemanda)} pts</span>
+                        </dd>
+                      </dl>
+                    ) : (
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-slate-100 pt-3 text-sm">
+                        <span className="text-slate-600">Média de {composicao.length} pessoa(s)</span>
+                        <span className="font-semibold tabular-nums text-slate-800">{um(Number(linhaMedia.quantidade))}</span>
                         <span className="text-slate-400">×</span>
-                        <span className="font-semibold tabular-nums text-slate-800">{num(Number(linhaRealizado.peso))}</span>
+                        <span className="text-slate-600">multiplicador</span>
+                        <span className="font-semibold tabular-nums text-slate-800">{num(Number(linhaMedia.peso))}</span>
                         <span className="text-slate-400">=</span>
                         <span className="text-lg font-semibold tabular-nums text-marca-700 dark:text-marca-400">
-                          {um(Number(linhaRealizado.cota))} pts
+                          {um(Number(linhaMedia.cota))} pts
                         </span>
                         <span className="text-xs text-slate-500">
-                          (o mesmo multiplicador vale para o realizado: (média + realizado) × {num(Number(linhaMedia.peso))})
+                          ({Number(linhaMedia.peso) >= 1 ? '+' : ''}{Math.round((Number(linhaMedia.peso) - 1) * 100)}% sobre a média)
                         </span>
                       </div>
                     )}

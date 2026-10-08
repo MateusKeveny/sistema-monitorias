@@ -11,7 +11,7 @@ Escrito em 28/09/2026, atualizado em 08/10/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.37.2** · Monitorias **5.3.1** (deploy de 08/10/2026) |
+| Publicado | Performance **1.37.3** · Monitorias **5.3.1** (deploy de 08/10/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
 | Migrações no banco | 01 a 52, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
@@ -387,6 +387,12 @@ Três versões, cada uma publicada e conferida antes da próxima:
 - **Performance 1.37.2** (só tela): o quadro "Como a média foi formada" (extrato)
   e a lista da média do Pleno mostram **uma casa decimal fixa** — cartões,
   média e totais (9.873,97 → 9.874,0) —, para a conta fechar à vista.
+- **Performance 1.37.3** (só tela): no extrato de quem recebe pela média com
+  demanda tratada (Pleno), a conta virou três linhas — Média da equipe
+  recebida, Demanda tratada e Cálculo: (média + demanda) × 1,2 = total. Antes
+  eram média × 1,2 e realizado × 0,2 em linhas separadas, e o total do
+  quadro (7.143,6) não era o resultado dela (8.223,6). Sem demanda, como o
+  Gestor, segue média × multiplicador.
 
 Visão de celular fica fora da revisão, por decisão do gestor. Os painéis são
 usados só no computador.
