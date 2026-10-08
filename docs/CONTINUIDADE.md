@@ -1,19 +1,19 @@
 # Continuidade — Painel de Performance
 
 Onde o trabalho parou, o que já vale como regra e o que ficou pendente.
-Escrito em 28/09/2026, atualizado em 29/09/2026. Para o modelo de dados completo, ver
+Escrito em 28/09/2026, atualizado em 08/10/2026. Para o modelo de dados completo, ver
 [MODELO-PAINEL.md](MODELO-PAINEL.md); para infraestrutura,
 [HOSPEDAGEM.md](HOSPEDAGEM.md).
 
 ---
 
-## Estado em 29/09/2026
+## Estado em 08/10/2026
 
 | | |
 |---|---|
 | Publicado | Performance **1.37.0** · Monitorias **5.3.1** (deploy de 07/10/2026, migração 52) |
 | Branch | `painel-performance` (a `main` segue intocada) |
-| Migrações no banco | 01 a 51, todas aplicadas |
+| Migrações no banco | 01 a 52, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
 
 ### Revisão de design (28/09/2026)
@@ -283,7 +283,7 @@ Três versões, cada uma publicada e conferida antes da próxima:
   Três colunas novas **no fim** (para não deslocar as que o portal lê): TME
   Médio Equipe até 15 / até 30 / acima de 30 min (Huggy), com os
   atendimentos de cada faixa. Semana sem TME lançado não entra em faixa.
-  Falta: reenviar setembro ao portal com o arquivo novo.
+  Setembro foi reenviado ao portal com o arquivo novo e fechado.
 - **1.35.4** (migração 51): **problema operacional só da gestão** — gestor e
   Pleno registram e veem (RLS `diario_leitura`), sem aviso no Teams; filtro
   "Problemas" só para a gestão. **Error 1102 em 05/10**: o Performance passou
@@ -490,22 +490,19 @@ redistribuído pelo gestor.
 
 ## Pendências
 
-**Antes de divulgar à equipe**
-
-- trocar as senhas ainda padrão;
-- criar o monitor do Performance no Better Stack (o de Monitorias já existe).
+Resolvidos ou decididos pelo gestor em 08/10/2026 — não voltar a cobrar:
+senhas padrão trocadas; monitor do Performance criado no Better Stack;
+setembro reimportado, reenviado ao portal e fechado; Workers Paid só depois
+da migração para os servidores internos; Protocolos_Detalhado segue o padrão
+já estabelecido; a importação do Hub acompanha a semana (semana em andamento
+não tem o que importar); origem do fechamento descartada (só agosto foi
+importado).
 
 **Trabalho em aberto**
 
-- **Reimportar as avaliações de setembro** até 25/09 antes do fechamento: a
-  última importação foi em 23/09, e a 4ª semana está parcial nos dois canais
-  (145 em Expansão, 70 em Diretores-Expansão). O volume já está lançado;
-- **marcar a origem do fechamento** (calculado × importado), para a tela
-  mostrar detalhe semanal só de quem foi calculado pelo painel;
-- **documentação**: MODELO-PAINEL e HOSPEDAGEM estão na 1.4.0, e o documento
-  de apresentação também. Atualizar quando a sequência estabilizar;
-- **reconferir o limite de CPU da Cloudflare** antes de entregar o material à
-  TI: o documento afirma 10 ms, mas medições de 24/09 mostraram folga maior;
+- **documento de apresentação**: ainda na 1.4.0. MODELO-PAINEL e HOSPEDAGEM
+  foram atualizados em 08/10/2026 (Performance 1.37.0, Monitorias 5.3.1), com
+  o limite de 10 ms confirmado pelo Error 1102 de 05/10;
 - **migrar para servidores internos** — pacotes e guia já entregues.
 
 ---

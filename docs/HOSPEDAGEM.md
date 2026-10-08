@@ -1,7 +1,7 @@
 # Hospedagem — Monitorias de Qualidade e Painel de Performance
 
 Documento para a equipe de TI avaliar a migração para servidores internos da
-IGreen. Situação em 24/09/2026.
+IGreen. Situação em 08/10/2026.
 
 ---
 
@@ -13,8 +13,8 @@ sistema.
 
 | Sistema | Endereço atual | Versão | Para que serve |
 |---|---|---|---|
-| Monitorias de Qualidade | `painel-monitorias.expansao.workers.dev` | 4.11.2 | Avaliação de qualidade (C-SAT) dos atendimentos |
-| Painel de Performance | `painel-performance.expansao.workers.dev` | 1.4.0 | Cota de pontos por cargo: importação, lançamentos, extrato, fechamento, exportação e cadastro de atendentes |
+| Monitorias de Qualidade | `painel-monitorias.expansao.workers.dev` | 5.3.1 | Monitorias de qualidade dos atendimentos: lançamento por sorteio de protocolo, painel, relatórios e consulta ao diário de bordo |
+| Painel de Performance | `painel-performance.expansao.workers.dev` | 1.37.0 | Cota de pontos por cargo: importação, lançamentos, extrato, fechamento, pagamento, exportação para o portal, atendentes, diário de bordo, consulta das monitorias e acessos |
 
 Qual sistema cada publicação mostra é decidido em `lib/sistema.ts`:
 
@@ -48,14 +48,17 @@ Navegador ──HTTPS──► Cloudflare Workers (2 Workers, plano gratuito)
                           └──HTTPS──► Supabase (PostgreSQL + login)
                                         projeto uahkplwssonbxzydjytb
 
-Better Stack ──► /api/saude  (monitoramento de queda)
+Better Stack ──► /api/saude  (monitoramento de queda, nos dois sites)
+
+Supabase ──HTTPS──► Microsoft Teams (avisos automáticos, pg_net + pg_cron)
 ```
 
 | Camada | Serviço | Plano | Observação |
 |---|---|---|---|
 | Aplicação | Cloudflare Workers — `painel-monitorias` e `painel-performance` | Gratuito | Conta da operação Expansão |
 | Banco de dados | Supabase (PostgreSQL 15+) | Verificar no painel do Supabase | Também faz o **login** dos usuários |
-| Monitoramento | Better Stack | Gratuito | Vigia `/api/saude` do site de Monitorias |
+| Monitoramento | Better Stack | Gratuito | Vigia `/api/saude` dos dois sites |
+| Avisos | Microsoft Teams (Workflows) | — | O **banco** posta os cartões: semana encerrada, mês fechado, lembrete de fechamento, novidades do diário, report novo |
 
 ### Por que migrar
 
@@ -64,6 +67,13 @@ telas foram otimizadas para caber nisso, mas é um teto baixo:
 
 - em 01/09/2026 o sistema caiu (erro 1102) quando várias páginas foram
   carregadas ao mesmo tempo;
+- em 05/10/2026 o erro 1102 voltou no Performance, agora no uso normal: os
+  registros da Cloudflare mostraram páginas gastando de 11 a 360 ms, a tela
+  de login inclusive. A versão 1.35.4 reduziu o consumo (ícone do site servido
+  como arquivo e menos consultas ao banco por acesso), mas o limite de 10 ms
+  **está confirmado** e o sistema já opera no teto;
+- a alternativa sem migrar é o plano pago dos Workers (US$ 5/mês, 30 s de
+  processamento por acesso). Decisão do gestor: aguardar a migração;
 - a leitura de planilhas teve de ser feita no navegador do usuário, e não no
   servidor, para não estourar o limite;
 - recursos futuros ficam limitados por esse teto.
@@ -79,7 +89,7 @@ Num servidor próprio esse limite **não existe**.
 | Sistema | Linux ou Windows Server com **Node.js 20 ou superior** (testado no 24) |
 | Memória | estimativa: ~512 MB por instância (duas instâncias: ~1 GB) |
 | Disco | estimativa: ~500 MB por instância, com as dependências |
-| Rede de saída | HTTPS (443) para `*.supabase.co`, se o banco continuar no Supabase |
+| Rede de saída | HTTPS (443) para `*.supabase.co`, se o banco continuar no Supabase. Com o banco interno, o **servidor do banco** precisa de saída HTTPS para os endereços de Workflows do Microsoft Teams (avisos) |
 | Rede de entrada | HTTPS obrigatório, com proxy reverso (Nginx, IIS, Apache) na frente do Node |
 | Endereços | Dois nomes internos, um por sistema. Ex.: `monitorias.igreen.local` e `performance.igreen.local` |
 
@@ -181,7 +191,7 @@ migração leva os dois de uma vez.
 ### Estrutura
 
 As migrações estão em `supabase/`, numeradas na ordem em que foram aplicadas
-(01 a 23). O banco de produção já está com **todas aplicadas**.
+(01 a 52). O banco de produção já está com **todas aplicadas**.
 
 - `00-instalar-tudo.sql` é um atalho antigo que junta as primeiras migrações;
   não usar junto com elas.
@@ -190,12 +200,31 @@ As migrações estão em `supabase/`, numeradas na ordem em que foram aplicadas
   Por isso a migração é por **cópia do banco atual**, como descrito acima, e
   não rodando as migrações do zero.
 
+### Recursos do Supabase além do banco
+
+O banco novo precisa oferecer, além do PostgreSQL e do login:
+
+- **pg_net e pg_cron** (migração 40). O próprio banco posta os avisos no
+  Teams e roda a rotina diária das 8h (horário de Brasília). Sem essas
+  extensões, os avisos param; o resto do sistema segue funcionando. Os
+  endereços dos Workflows ficam na tabela `avisos_teams` e vão junto na cópia.
+- **Storage** (migração 44). O bucket privado `reportes` guarda os prints
+  anexados em "Reportar problema". A cópia do banco **não** leva os arquivos:
+  eles precisam ser copiados à parte, ou os reports antigos ficam sem imagem.
+- **Endereço dos sites no banco.** Os links dos cartões do Teams saem de
+  `endereco_do_site()`. Com endereços novos, ajustar a função.
+
 ### Segurança dos dados
 
 - As permissões são aplicadas **dentro do banco** (Row Level Security): um
   operador só recebe os próprios dados, mesmo que acesse a API diretamente.
 - Os papéis são Gestor, Qualidade e Operador, definidos na tabela `pessoas`.
 - Os dois sistemas usam as mesmas contas: o mesmo e-mail e senha valem nos dois.
+- Senha esquecida é redefinida pelo gestor, na tela Atendentes: o sistema gera
+  uma senha temporária, encerra as sessões abertas e obriga a troca no
+  próximo acesso. Cada redefinição fica registrada.
+- Cada abertura dos painéis fica registrada (tabela `acessos`, migração 52) e
+  só o gestor consulta, na tela Acessos do Performance.
 
 ---
 
@@ -204,7 +233,7 @@ As migrações estão em `supabase/`, numeradas na ordem em que foram aplicadas
 `GET /api/saude` consulta o banco de verdade e responde:
 
 ```json
-{"estado":"ok","sistema":"cota","versao":"4.11.2","versoes":{"monitorias":"4.11.2","cota":"1.4.0"},"ms":95}
+{"estado":"ok","sistema":"cota","versao":"1.37.0","versoes":{"monitorias":"5.3.1","cota":"1.37.0"},"ms":95}
 ```
 
 - `200` com `"estado":"ok"`: aplicação e banco funcionando;

@@ -398,3 +398,60 @@ Regra daqui em diante, para os dois sistemas:
 - **MINOR** — recurso novo;
 - **PATCH** — correção, sem mudar número de ninguém;
 - **commit e tag antes do deploy**, sempre.
+
+## Situação em 08/10/2026 (Performance 1.37.0)
+
+O que mudou no modelo desde a 1.4.0. O detalhe de cada versão está em
+[CONTINUIDADE.md](CONTINUIDADE.md); aqui fica o que altera tabela, view ou
+regra de cálculo. As pendências "antes de divulgar" das seções anteriores
+foram cumpridas: senhas trocadas, monitor do Performance no Better Stack e
+versão 1.0.0 em diante.
+
+**Pagamento** (24 a 26). Valor por ponto por competência, informado pelo
+gestor. A meta é porta: abaixo dela não se calcula valor. Bônus de equipe =
+10% da média dos Juniores, só quando todos com direito (Juniores e Analista)
+batem a meta; Pleno e Gestor não recebem, porque já têm multiplicador. Tudo
+sai do fechamento, e a conta coletiva roda em `bonus_da_competencia`
+(*security definer*), para não depender de quem está olhando.
+
+**Exibição e contagem** (27). `exibir_no_painel` e `conta_nas_medias` por
+pessoa. Valem só para a tela inicial do gestor; não tocam em pontuação.
+
+**Atendimento presencial** (28, 29). O operador registra data, ID e nome do
+cliente e demanda, com prazo de 2 dias úteis. Conta no extrato a partir de
+26/08/2026.
+
+**Mês aberto das Monitorias** (30). O mês seguinte ao último fechamento da
+cota. Monitoria de competência posterior é recusada pelo banco (gatilho
+`monitorias_mes_aberto`); fechar a cota libera o mês seguinte.
+
+**Quem recebe pela média** (48, correção de cálculo). Passa a receber
+**(média do cargo de referência + pontuação realizada) × peso**. No extrato,
+a linha `media_sobre_realizado` = realizado × (peso − 1). Meses fechados antes
+mantêm a conta antiga.
+
+**Atestado por dias** (49, 50). Lançado em dias; o desconto é (pontuação do mês
+antes do atestado ÷ dias do ciclo) × dias, arredondado uma vez. Sai de
+`pontuacao_antes_do_atestado(pessoa, mês)`, chamada só nas linhas de atestado.
+**Não usar CTE referenciada mais de uma vez em `vw_extrato_cota`**: o
+Postgres a materializa e a view passa a montar o extrato de todos em todos os
+meses (foi o *statement timeout* do fechamento de setembro).
+
+**Importação** (45). Vários arquivos de uma vez; a mesma avaliação (data +
+protocolo) entra uma vez. Nota de atendente não reconhecido vai para
+`avaliacoes_guardadas`, fora da cota, até ser atribuída ou descartada. Grafias
+alternativas do nome em `pessoas.nomes_hub_extras`.
+
+**Fora da cota** — tabelas de apoio que não entram no cálculo:
+
+| Migrações | Tabelas | Para quê |
+|---|---|---|
+| 31 a 39, 43, 46, 47, 51 | `diario_registros`, `diario_leituras`, `diario_renovacoes`, `diario_citacoes`, `diario_privados`, `diario_anotacoes`, `diario_subcategorias` | Diário de bordo: processos, treinamentos, autorizações, exceções e problemas operacionais, com leitura obrigatória |
+| 32 | `redefinicoes_de_senha` | Senha temporária gerada pelo gestor |
+| 40 a 42 | `avisos_teams`, `avisos_enviados` | Avisos no Teams postados pelo banco (pg_net, pg_cron) |
+| 44 | `reportes` e o bucket `reportes` | Reportar problema, com print |
+| 52 | `acessos`, `vw_ultimo_acesso` | Quem abre cada painel e quando; só o gestor lê |
+
+**Exportação para o portal** (1.35.3). Nenhuma célula fica vazia: o portal
+para de ler a linha na primeira ausente. Colunas novas entram sempre **no
+fim**, para não deslocar as que o portal já lê.
