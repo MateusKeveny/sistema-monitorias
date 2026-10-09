@@ -11,9 +11,9 @@ Escrito em 28/09/2026, atualizado em 08/10/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.37.3** · Monitorias **5.3.1** (deploy de 08/10/2026) |
+| Publicado | Performance **1.38.0** · Monitorias **5.3.1** (deploy de 09/10/2026, migrações 53 e 54) |
 | Branch | `painel-performance` (a `main` segue intocada) |
-| Migrações no banco | 01 a 52, todas aplicadas |
+| Migrações no banco | 01 a 54, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
 
 ### Revisão de design (28/09/2026)
@@ -399,6 +399,34 @@ Três versões, cada uma publicada e conferida antes da próxima:
   cartões das semanas só mostram C-SAT e Monitoria para quem é medido por
   eles; os demais veem o que a semana teve (ex.: Atendimento presencial 4×).
   E as tabelas por canal não listam mais faixa de C-SAT ou categoria vazia.
+- **Performance 1.38.0** (migração 53): **chamados do Analista importados do
+  painel ELO**, no lugar do lançamento manual de tratativas e SLA. Importar
+  ganhou abas internas — Avaliações (Hub) e Chamados (ELO). A exportação do
+  ELO é lida no navegador (aba "Chamados (N)") e vai para
+  `importar_chamados`: protocolo é a chave, chamado novo entra, o que mudou é
+  atualizado. Ciclo pela abertura (26 a 25), não pelo corte do ELO. Conta só
+  resolvido: com conclusão e não Cancelado (Recusado conta, foi analisado).
+  Prazo de 2 dias úteis completos sobre o tempo total: no prazo com tempo
+  útil < 3,0 (o ELO conta dia útil de 24 h, sem sábado e domingo). Fora do
+  prazo vai para a **fila de atrasos** (Importar → Chamados), com a divisão
+  entre o tempo de quem trata (abertura → ClickUp, `tempo_interno`) e o do TI
+  (`tempo_ti`), o motivo do ELO e a **justificativa** que quem tratou escreve
+  no próprio extrato (`justificar_atraso_chamado`), que chega na hora; a
+  gestão decide manter ou retirar o desconto (`decidir_atraso_chamado`), e a
+  pendência aparece em "Precisa de você". Os pontos saem das regras de sempre
+  (`chamados_tratados`, `chamados_sla_ate_2d`, `chamados_sla_acima_2d`): a
+  importação escreve as quantidades em `lancamentos` com `gerado_por =
+  chamados_elo` e `recalcular_chamados(mês)` as refaz a cada importação ou
+  decisão; mês fechado não muda. A conferência de faixas ignora as geradas.
+  O responsável casa com `pessoas.nome_elo` ("Matheus Scariot" = Matheus
+  Camargo); outro nome fica para redistribuição. Extrato de quem tem chamados
+  ganha a aba **Chamados**: tempo médio total, de quem trata e do TI,
+  repasses lentos, por semana, atrasos com justificativa e a lista do mês.
+  Tempos em horas (`tempoUtil`: 0,30 → 7h12; 3,43 → 3 dias úteis e 10h).
+  **Migração 54**: a importação é em três passos, como a do Hub — escolher,
+  conferir (`conferir_chamados`, que compara com o banco sem gravar: novos,
+  mudados, sem mudança, e na cota resolvidos, no prazo, fora do prazo, em
+  aberto, cancelados, de mês fechado, responsável fora) e só então Importar.
 
 Visão de celular fica fora da revisão, por decisão do gestor. Os painéis são
 usados só no computador.

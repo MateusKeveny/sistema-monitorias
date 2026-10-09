@@ -5,6 +5,8 @@ import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
 import SeletorDeDetalhe from '@/componentes/SeletorDeDetalhe';
 import { resolverCompetencia } from '@/lib/competencia';
 import { resultadosNaMedia } from '@/lib/resultado-na-media';
+import ChamadosDaPessoa from '@/componentes/ChamadosDaPessoa';
+import Link from '@/componentes/Link';
 import type { Pessoa } from '@/lib/tipos';
 
 export const dynamic = 'force-dynamic';
@@ -55,10 +57,10 @@ const faixaDo = (csat: number, faixas: Faixa[]) => faixas.find((f) =>
 export default async function Extrato({
   searchParams,
 }: {
-  searchParams: Promise<{ mes?: string; pessoa?: string }>;
+  searchParams: Promise<{ mes?: string; pessoa?: string; aba?: string }>;
 }) {
   const perfil = await exigirPerfil();
-  const { mes, pessoa: pessoaPedida } = await searchParams;
+  const { mes, pessoa: pessoaPedida, aba } = await searchParams;
   const { competencia, atual, emAberto } = await resolverCompetencia(mes);
   const veOTime = perfil.papel !== 'operador';
 
@@ -71,6 +73,12 @@ export default async function Extrato({
   const lista = (pessoas ?? []) as Pick<Pessoa, 'id' | 'nome'>[];
   const pessoaId = veOTime && pessoaPedida && lista.some((p) => p.id === pessoaPedida)
     ? pessoaPedida : perfil.id;
+
+  // Aba Chamados (migração 53): só para quem tem chamados importados no mês.
+  const { count: chamadosNoMes } = await db.from('chamados_elo').select('protocolo', { count: 'exact', head: true })
+    .eq('pessoa_id', pessoaId).eq('mes_competencia', competencia);
+  const temChamados = (chamadosNoMes ?? 0) > 0;
+  const abaChamados = temChamados && aba === 'chamados';
 
   const [extrato, cota, csat, faixasCsat, fechamento, pago] = await Promise.all([
     db.from('vw_extrato_cota')
@@ -374,7 +382,27 @@ export default async function Extrato({
         </Quadro>
       )}
 
-      {linhas.length === 0 ? (
+      {temChamados && (
+        <div role="tablist" className="inline-flex rounded-xl bg-superficie p-1 shadow-sm">
+          {([['pontos', 'Pontos'], ['chamados', 'Chamados']] as const).map(([chave, rotulo]) => {
+            const ativa = (chave === 'chamados') === abaChamados;
+            const q = new URLSearchParams({ mes: competencia.slice(0, 7), ...(veOTime ? { pessoa: pessoaId } : {}),
+              ...(chave === 'chamados' ? { aba: 'chamados' } : {}) });
+            return (
+              <Link key={chave} role="tab" aria-selected={ativa} href={`/cota/extrato?${q}`}
+                    className={`rounded-lg px-4 py-1.5 text-sm font-medium ${ativa
+                      ? 'bg-marca-600 font-semibold text-white' : 'text-slate-600 hover:text-slate-900'}`}>
+                {rotulo}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+
+      {abaChamados ? (
+        <ChamadosDaPessoa pessoaId={pessoaId} competencia={competencia}
+                          podeJustificar={pessoaId === perfil.id || perfil.papel === 'gestor'} />
+      ) : linhas.length === 0 ? (
         <Quadro titulo="Extrato"><Vazio>Nenhum ponto nesta competência.</Vazio></Quadro>
       ) : (
         <>
@@ -699,12 +727,12 @@ export default async function Extrato({
         </>
       )}
 
-      <p className="text-xs leading-relaxed text-sobre-fundo-suave">
+      {!abaChamados && <p className="text-xs leading-relaxed text-sobre-fundo-suave">
         Cada linha é <strong>quantidade × peso</strong>, com o peso do cargo vigente na competência.
         No C-SAT, o percentual da semana define a faixa, e a faixa multiplica os atendimentos
         finalizados. A monitoria só pontua com média acima de 85%, e as regras de valor digitado
         usam o valor informado pelo gestor.
-      </p>
+      </p>}
     </div>
   );
 }

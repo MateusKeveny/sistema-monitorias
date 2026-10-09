@@ -1,5 +1,8 @@
 import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
 import ImportadorAvaliacoes from '@/componentes/ImportadorAvaliacoes';
+import ImportadorChamados from '@/componentes/ImportadorChamados';
+import FilaDeAtrasos, { type ChamadoAtrasado } from '@/componentes/FilaDeAtrasos';
+import Link from '@/componentes/Link';
 import NotasGuardadas, { type NotaGuardada } from '@/componentes/NotasGuardadas';
 import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
 import { Quadro } from '@/componentes/ui';
@@ -19,15 +22,54 @@ const SEMANAS = [1, 2, 3, 4];
 export default async function ImportarAvaliacoes({
   searchParams,
 }: {
-  searchParams: Promise<{ mes?: string }>;
+  searchParams: Promise<{ mes?: string; aba?: string }>;
 }) {
   const perfil = await exigirGestor();
-  const { mes } = await searchParams;
+  const { mes, aba } = await searchParams;
   const hoje = hojeNoBrasil();
   const atual = mesDeCompetencia(hoje);
   const competencia = /^\d{4}-\d{2}$/.test(mes ?? '') ? `${mes}-01` : atual;
 
   const db = await criarClienteServidor();
+
+  // Abas internas (migração 53): cada relatório na sua. Chamados do ELO não
+  // dependem das contagens do Hub, então a aba deles sai antes delas.
+  const abas = (
+    <div role="tablist" className="inline-flex rounded-xl bg-superficie p-1 shadow-sm">
+      {([['hub', 'Avaliações (Hub)'], ['chamados', 'Chamados (ELO)']] as const).map(([chave, rotulo]) => {
+        const ativa = (aba === 'chamados') === (chave === 'chamados');
+        return (
+          <Link key={chave} role="tab" aria-selected={ativa}
+                href={chave === 'chamados' ? '/cota/importar?aba=chamados' : '/cota/importar'}
+                className={`rounded-lg px-4 py-1.5 text-sm font-medium ${ativa
+                  ? 'bg-marca-600 font-semibold text-white' : 'text-slate-600 hover:text-slate-900'}`}>
+            {rotulo}
+          </Link>
+        );
+      })}
+    </div>
+  );
+
+  if (aba === 'chamados') {
+    const campos = 'protocolo, titulo, responsavel, aberto_em, concluido_em, tempo_util, tempo_interno, tempo_ti, motivo_atraso, observacao, justificativa, justificado_por_nome, justificado_em, decisao, decidido_por_nome, decidido_em';
+    const [{ data: pendentes }, { data: decididos }] = await Promise.all([
+      db.from('chamados_elo').select(campos).gte('tempo_util', 3).not('concluido_em', 'is', null)
+        .neq('status', 'Cancelado').not('pessoa_id', 'is', null).is('decisao', null).order('aberto_em'),
+      db.from('chamados_elo').select(campos).not('decisao', 'is', null).eq('mes_competencia', atual)
+        .order('decidido_em', { ascending: false }),
+    ]);
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">Importar</h1>
+          <p className="mt-1 text-sm text-sobre-fundo-suave">Cada relatório na sua aba. A planilha é lida no seu computador.</p>
+          <div className="mt-3">{abas}</div>
+        </div>
+        <ImportadorChamados />
+        <FilaDeAtrasos pendentes={(pendentes ?? []) as ChamadoAtrasado[]} decididos={(decididos ?? []) as ChamadoAtrasado[]} />
+      </div>
+    );
+  }
 
   // Contagem por célula com `head`: a view tem milhares de linhas, e ler as
   // linhas esbarraria no teto de 1.000 do PostgREST.
@@ -58,7 +100,8 @@ export default async function ImportarAvaliacoes({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">Importar avaliações</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">Importar</h1>
+        <div className="mt-3">{abas}</div>
         <div className="mt-1.5">
           <SetasDeCompetencia competencia={competencia} atual={atual} caminho="/cota/importar" compacto />
         </div>

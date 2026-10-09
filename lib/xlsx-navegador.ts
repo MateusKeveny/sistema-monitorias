@@ -109,3 +109,13 @@ export async function lerPlanilha(arquivo: File): Promise<Map<string, Linha[]>> 
 export function dataDoExcel(serial: number): string {
   return new Date(Date.UTC(1899, 11, 30) + Math.round(serial) * 86_400_000).toISOString().slice(0, 10);
 }
+
+/**
+ * Número serial com hora do Excel para um instante no fuso da operação:
+ * 46303.4615 → '2026-10-08T11:04:37-03:00'. O ELO exporta no horário de
+ * Brasília, sem fuso; sem o -03:00, o banco leria como UTC.
+ */
+export function dataHoraDoExcel(serial: number): string {
+  const ms = Math.round((serial - 25_569) * 86_400_000);
+  return `${new Date(ms).toISOString().slice(0, 19)}-03:00`;
+}

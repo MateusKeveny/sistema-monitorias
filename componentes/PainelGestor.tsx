@@ -74,7 +74,7 @@ export default async function PainelGestor({
   const meses = [competencia, anterior];
   const db = await criarClienteServidor();
 
-  const [pessoas, csat, volume, criterios, cota, cargos, fechados, monitorias, valores, semCargo, conferir, diario, vencendo, leituras, privados, reportes]
+  const [pessoas, csat, volume, criterios, cota, cargos, fechados, monitorias, valores, semCargo, conferir, diario, vencendo, leituras, privados, reportes, atrasos]
     = await Promise.all([
     db.from('pessoas').select('id, nome, exibir_no_painel, conta_nas_medias'),
     db.from('vw_csat_semanal').select('pessoa_id, origem, semana, avaliacoes, positivas, mes_competencia')
@@ -103,6 +103,10 @@ export default async function PainelGestor({
     db.from('diario_privados').select('id', { count: 'exact', head: true }).eq('situacao', 'aguardando'),
     // Problemas reportados ainda não vistos (migração 44).
     db.from('reportes').select('id', { count: 'exact', head: true }).eq('situacao', 'novo'),
+    // Chamados fora do prazo esperando decisão da gestão (migração 53).
+    db.from('chamados_elo').select('protocolo', { count: 'exact', head: true })
+      .gte('tempo_util', 3).not('concluido_em', 'is', null).neq('status', 'Cancelado')
+      .not('pessoa_id', 'is', null).is('decisao', null),
   ]);
 
   const nome = new Map((pessoas.data ?? []).map((p) => [p.id as string, nomeCurto(p.nome as string)]));
@@ -214,6 +218,12 @@ export default async function PainelGestor({
     pendencias.push({
       texto: `${vencendo.count} registro${vencendo.count > 1 ? 's' : ''} do diário vence${vencendo.count > 1 ? 'm' : ''} em até 7 dias`,
       acao: 'Renovar', href: '/cota/diario?filtro=vencendo',
+    });
+  }
+  if (atrasos.count) {
+    pendencias.push({
+      texto: `${atrasos.count} chamado${atrasos.count > 1 ? 's' : ''} fora do prazo esperando decisão`,
+      acao: 'Decidir', href: '/cota/importar?aba=chamados',
     });
   }
   if ((conferir.data ?? []).length) {

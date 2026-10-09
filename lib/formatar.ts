@@ -206,3 +206,22 @@ export function umaCasa(v: number): string {
   const arredondado = (Math.sign(n) * Math.round(Number((Math.abs(n) * 10).toFixed(6)))) / 10;
   return arredondado.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 }
+
+/**
+ * Tempo em dias úteis (como o ELO conta: dia de 24 h, sem sábado e domingo)
+ * em palavras: abaixo de um dia, horas e minutos (0,30 → "7h12"; 0,03 →
+ * "43min"); a partir de um dia, dias úteis e horas (3,43 → "3 dias úteis e 10h").
+ */
+export function tempoUtil(dias: number | null | undefined): string {
+  if (dias == null || Number.isNaN(Number(dias))) return '—';
+  const minutos = Math.round(Number(dias) * 24 * 60);
+  if (minutos < 60) return `${minutos}min`;
+  if (minutos < 24 * 60) {
+    const h = Math.floor(minutos / 60), m = minutos % 60;
+    return m ? `${h}h${String(m).padStart(2, '0')}` : `${h}h`;
+  }
+  const d = Math.floor(minutos / (24 * 60));
+  const h = Math.round((minutos - d * 24 * 60) / 60);
+  const dd = h === 24 ? d + 1 : d, hh = h === 24 ? 0 : h;
+  return `${dd} dia${dd === 1 ? '' : 's'} út${dd === 1 ? 'il' : 'eis'}${hh ? ` e ${hh}h` : ''}`;
+}
