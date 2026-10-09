@@ -11,9 +11,9 @@ Escrito em 28/09/2026, atualizado em 08/10/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.38.1** · Monitorias **5.3.1** (deploy de 09/10/2026) |
+| Publicado | Performance **1.38.2** · Monitorias **5.3.1** (deploy de 09/10/2026, migração 55) |
 | Branch | `painel-performance` (a `main` segue intocada) |
-| Migrações no banco | 01 a 54, todas aplicadas |
+| Migrações no banco | 01 a 55, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
 
 ### Revisão de design (28/09/2026)
@@ -432,6 +432,15 @@ Três versões, cada uma publicada e conferida antes da próxima:
   trocava); pelo endereço direto abria. As abas internas de Extrato e Importar
   passaram a ser `<a>` (página inteira) em vez de `Link`. Não reproduziu com o
   acesso de gestor — se voltar a acontecer com outro `Link`, é o mesmo caso.
+- **Performance 1.38.2** (migração 55): **chamados lidos direto pela cota, como
+  o Hub.** Na 53 a importação gravava as quantidades em `lancamentos`, que
+  apareciam na tela de Lançamentos e podiam ser editadas por engano. Agora
+  `vw_extrato_quantidades` lê `chamados_elo` (a partir de outubro/2026; o
+  corpo é o da 29, mais a parte dos chamados), as linhas geradas foram
+  apagadas e `recalcular_chamados` não grava mais. Mesmos números: outubro
+  do Analista segue 232 tratativas e 230 no prazo. As regras de SLA viram
+  "Resolvidos no prazo (2 dias úteis)" e "Resolvidos fora do prazo". HOSPEDAGEM e MODELO-PAINEL
+  atualizados para a 1.38.2.
 
 Visão de celular fica fora da revisão, por decisão do gestor. Os painéis são
 usados só no computador.

@@ -1,7 +1,7 @@
 # Hospedagem — Monitorias de Qualidade e Painel de Performance
 
 Documento para a equipe de TI avaliar a migração para servidores internos da
-IGreen. Situação em 08/10/2026.
+IGreen. Situação em 09/10/2026.
 
 ---
 
@@ -14,7 +14,7 @@ sistema.
 | Sistema | Endereço atual | Versão | Para que serve |
 |---|---|---|---|
 | Monitorias de Qualidade | `painel-monitorias.expansao.workers.dev` | 5.3.1 | Monitorias de qualidade dos atendimentos: lançamento por sorteio de protocolo, painel, relatórios e consulta ao diário de bordo |
-| Painel de Performance | `painel-performance.expansao.workers.dev` | 1.37.0 | Cota de pontos por cargo: importação, lançamentos, extrato, fechamento, pagamento, exportação para o portal, atendentes, diário de bordo, consulta das monitorias e acessos |
+| Painel de Performance | `painel-performance.expansao.workers.dev` | 1.38.2 | Cota de pontos por cargo: importação das avaliações (Hub) e dos chamados do Analista (painel ELO), lançamentos, extrato, fechamento, pagamento, exportação para o portal, atendentes, diário de bordo, consulta das monitorias e acessos |
 
 Qual sistema cada publicação mostra é decidido em `lib/sistema.ts`:
 
@@ -191,7 +191,7 @@ migração leva os dois de uma vez.
 ### Estrutura
 
 As migrações estão em `supabase/`, numeradas na ordem em que foram aplicadas
-(01 a 52). O banco de produção já está com **todas aplicadas**.
+(01 a 55). O banco de produção já está com **todas aplicadas**.
 
 - `00-instalar-tudo.sql` é um atalho antigo que junta as primeiras migrações;
   não usar junto com elas.
@@ -223,6 +223,7 @@ O banco novo precisa oferecer, além do PostgreSQL e do login:
 - Senha esquecida é redefinida pelo gestor, na tela Atendentes: o sistema gera
   uma senha temporária, encerra as sessões abertas e obriga a troca no
   próximo acesso. Cada redefinição fica registrada.
+- Os chamados do Analista vêm da exportação do painel ELO, importada pelo gestor (tabela `chamados_elo`, migrações 53 a 55); a planilha é lida no navegador, como a do Hub.
 - Cada abertura dos painéis fica registrada (tabela `acessos`, migração 52) e
   só o gestor consulta, na tela Acessos do Performance.
 
@@ -233,7 +234,7 @@ O banco novo precisa oferecer, além do PostgreSQL e do login:
 `GET /api/saude` consulta o banco de verdade e responde:
 
 ```json
-{"estado":"ok","sistema":"cota","versao":"1.37.0","versoes":{"monitorias":"5.3.1","cota":"1.37.0"},"ms":95}
+{"estado":"ok","sistema":"cota","versao":"1.38.2","versoes":{"monitorias":"5.3.1","cota":"1.38.2"},"ms":95}
 ```
 
 - `200` com `"estado":"ok"`: aplicação e banco funcionando;

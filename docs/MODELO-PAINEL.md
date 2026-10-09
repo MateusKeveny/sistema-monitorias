@@ -399,7 +399,7 @@ Regra daqui em diante, para os dois sistemas:
 - **PATCH** — correção, sem mudar número de ninguém;
 - **commit e tag antes do deploy**, sempre.
 
-## Situação em 08/10/2026 (Performance 1.37.0)
+## Situação em 09/10/2026 (Performance 1.38.2)
 
 O que mudou no modelo desde a 1.4.0. O detalhe de cada versão está em
 [CONTINUIDADE.md](CONTINUIDADE.md); aqui fica o que altera tabela, view ou
@@ -441,6 +441,13 @@ meses (foi o *statement timeout* do fechamento de setembro).
 protocolo) entra uma vez. Nota de atendente não reconhecido vai para
 `avaliacoes_guardadas`, fora da cota, até ser atribuída ou descartada. Grafias
 alternativas do nome em `pessoas.nomes_hub_extras`.
+
+**Chamados do Analista** (53 a 55). Saem da exportação do painel ELO, importada
+em `chamados_elo` (protocolo como chave), e `vw_extrato_quantidades` os lê
+direto, como as avaliações do Hub: `chamados_tratados` (resolvido, Recusado
+conta, Cancelado não), `chamados_sla_ate_2d` (menos de 3,0 dias úteis, isto é,
+2 dias úteis completos) e `chamados_sla_acima_2d` (fora do prazo com o
+desconto mantido pela gestão). A partir de outubro/2026; setembro foi manual.
 
 **Fora da cota** — tabelas de apoio que não entram no cálculo:
 
