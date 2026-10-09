@@ -11,7 +11,7 @@ Escrito em 28/09/2026, atualizado em 08/10/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.38.0** · Monitorias **5.3.1** (deploy de 09/10/2026, migrações 53 e 54) |
+| Publicado | Performance **1.38.1** · Monitorias **5.3.1** (deploy de 09/10/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
 | Migrações no banco | 01 a 54, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
@@ -427,6 +427,11 @@ Três versões, cada uma publicada e conferida antes da próxima:
   conferir (`conferir_chamados`, que compara com o banco sem gravar: novos,
   mudados, sem mudança, e na cota resolvidos, no prazo, fora do prazo, em
   aberto, cancelados, de mês fechado, responsável fora) e só então Importar.
+- **Performance 1.38.1** (correção): no acesso do Analista, o clique na aba
+  Chamados do extrato não completava (o servidor respondia 200, a tela não
+  trocava); pelo endereço direto abria. As abas internas de Extrato e Importar
+  passaram a ser `<a>` (página inteira) em vez de `Link`. Não reproduziu com o
+  acesso de gestor — se voltar a acontecer com outro `Link`, é o mesmo caso.
 
 Visão de celular fica fora da revisão, por decisão do gestor. Os painéis são
 usados só no computador.

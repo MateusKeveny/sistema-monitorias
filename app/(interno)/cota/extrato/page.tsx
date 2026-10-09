@@ -6,7 +6,6 @@ import SeletorDeDetalhe from '@/componentes/SeletorDeDetalhe';
 import { resolverCompetencia } from '@/lib/competencia';
 import { resultadosNaMedia } from '@/lib/resultado-na-media';
 import ChamadosDaPessoa from '@/componentes/ChamadosDaPessoa';
-import Link from '@/componentes/Link';
 import type { Pessoa } from '@/lib/tipos';
 
 export const dynamic = 'force-dynamic';
@@ -389,11 +388,13 @@ export default async function Extrato({
             const q = new URLSearchParams({ mes: competencia.slice(0, 7), ...(veOTime ? { pessoa: pessoaId } : {}),
               ...(chave === 'chamados' ? { aba: 'chamados' } : {}) });
             return (
-              <Link key={chave} role="tab" aria-selected={ativa} href={`/cota/extrato?${q}`}
+              // <a> e não Link: carrega a página inteira. Pelo Link, a troca de aba
+            // não completava no navegador do Analista (1.38.1); o endereço direto abria.
+            <a key={chave} role="tab" aria-selected={ativa} href={`/cota/extrato?${q}`}
                     className={`rounded-lg px-4 py-1.5 text-sm font-medium ${ativa
                       ? 'bg-marca-600 font-semibold text-white' : 'text-slate-600 hover:text-slate-900'}`}>
                 {rotulo}
-              </Link>
+              </a>
             );
           })}
         </div>

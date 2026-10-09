@@ -2,7 +2,6 @@ import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
 import ImportadorAvaliacoes from '@/componentes/ImportadorAvaliacoes';
 import ImportadorChamados from '@/componentes/ImportadorChamados';
 import FilaDeAtrasos, { type ChamadoAtrasado } from '@/componentes/FilaDeAtrasos';
-import Link from '@/componentes/Link';
 import NotasGuardadas, { type NotaGuardada } from '@/componentes/NotasGuardadas';
 import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
 import { Quadro } from '@/componentes/ui';
@@ -39,12 +38,14 @@ export default async function ImportarAvaliacoes({
       {([['hub', 'Avaliações (Hub)'], ['chamados', 'Chamados (ELO)']] as const).map(([chave, rotulo]) => {
         const ativa = (aba === 'chamados') === (chave === 'chamados');
         return (
-          <Link key={chave} role="tab" aria-selected={ativa}
+          // <a> e não Link: carrega a página inteira. Pelo Link, a troca de aba
+            // não completava no navegador do Analista (1.38.1); o endereço direto abria.
+            <a key={chave} role="tab" aria-selected={ativa}
                 href={chave === 'chamados' ? '/cota/importar?aba=chamados' : '/cota/importar'}
                 className={`rounded-lg px-4 py-1.5 text-sm font-medium ${ativa
                   ? 'bg-marca-600 font-semibold text-white' : 'text-slate-600 hover:text-slate-900'}`}>
             {rotulo}
-          </Link>
+          </a>
         );
       })}
     </div>
