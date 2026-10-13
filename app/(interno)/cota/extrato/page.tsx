@@ -5,6 +5,8 @@ import { mesRotulo, percentual, umaCasa } from '@/lib/formatar';
 import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
 import SeletorDeDetalhe from '@/componentes/SeletorDeDetalhe';
 import { resolverCompetencia } from '@/lib/competencia';
+import { fonteDoMes, situacaoDoResumo } from '@/lib/resumo';
+import CarimboDoResumo from '@/componentes/CarimboDoResumo';
 import { ajustesDaMedia, aplicarNaMedia, equipeCongelada } from '@/lib/resultado-na-media';
 import ChamadosDaPessoa from '@/componentes/ChamadosDaPessoa';
 import type { Pessoa } from '@/lib/tipos';
@@ -62,10 +64,16 @@ export default async function Extrato({
   // As consultas saem em poucas rodadas (1.39.4): eram nove, uma esperando a
   // outra, e o extrato de quem recebe pela média levava ~4 s.
   const { mes, pessoa: pessoaPedida, aba } = await searchParams;
-  const [perfil, { competencia, atual, emAberto }] = await Promise.all([exigirPerfil(), resolverCompetencia(mes)]);
+  // A situação do resumo do mês (migração 58) sai junto: é uma consulta leve.
+  const [perfil, { competencia, atual, emAberto }] = await Promise.all([
+    exigirPerfil(), resolverCompetencia(mes), situacaoDoResumo(),
+  ]);
   const veOTime = perfil.papel !== 'operador';
 
   const db = await criarClienteServidor();
+  // O mês aberto vem do resumo quando ele está em dia (migração 58); senão,
+  // das views, como antes.
+  const fonte = await fonteDoMes(competencia);
 
   // A pessoa pedida é conferida na lista depois, junto com o resto.
   const pessoaId = veOTime && pessoaPedida ? pessoaPedida : perfil.id;
@@ -75,11 +83,11 @@ export default async function Extrato({
   // aberto ~0,8 s mais lento — as consultas pesadas saíam todas juntas na 2ª
   // e disputavam o banco. Nos outros meses, só depois de saber se fechou.
   const aoVivoDaPessoa = () => Promise.all([
-    db.from('vw_extrato_cota')
+    db.from(fonte.extrato)
       .select('semana, origem, regra, rotulo, grupo, ordem, cargo_id, quantidade, peso, cota')
       .eq('pessoa_id', pessoaId).eq('mes_competencia', competencia)
       .order('semana', { nullsFirst: false }).order('ordem'),
-    db.from('vw_cota_mensal').select('resultado, meta, cargo, pessoa')
+    db.from(fonte.mensal).select('resultado, meta, cargo, pessoa')
       .eq('pessoa_id', pessoaId).eq('mes_competencia', competencia).maybeSingle(),
   ]);
   const aoVivoAntecipado = competencia === atual ? aoVivoDaPessoa() : null;
@@ -168,10 +176,10 @@ export default async function Extrato({
         ...((vivo) => [vivo.then(([e]) => e), vivo.then(([, c]) => c)] as const)(aoVivoAntecipado ?? aoVivoDaPessoa()),
         Promise.resolve(null),
         recebePelaMedia
-          ? db.from('vw_cota_mensal').select('pessoa_id, pessoa, cargo, resultado, compoe_media')
+          ? db.from(fonte.mensal).select('pessoa_id, pessoa, cargo, resultado, compoe_media')
             .eq('mes_competencia', competencia).then((r) => (r.data ?? []) as DaEquipe[])
           : Promise.resolve([] as DaEquipe[]),
-        recebePelaMedia ? ajustesDaMedia(db, competencia, false) : Promise.resolve(null),
+        recebePelaMedia ? ajustesDaMedia(db, competencia, false, fonte.extrato) : Promise.resolve(null),
       ]);
 
   const aoVivo = (extrato.data ?? []) as Linha[];
@@ -339,6 +347,10 @@ export default async function Extrato({
             {(congelado?.cargo ?? cota.data?.cargo) && <span>{congelado?.cargo ?? cota.data?.cargo}</span>}
             {congelado && <span className="font-semibold text-emerald-200">Competência fechada · valores congelados no fechamento</span>}
             {emAberto && <span className="opacity-75">{mesRotulo(atual)} ainda sem lançamentos</span>}
+            {!congelado && fonte.resumo && (
+              <CarimboDoResumo competencia={competencia} atualizadoEm={fonte.resumo.atualizadoEm}
+                               pendente={fonte.resumo.pendente} />
+            )}
           </p>
         </div>
 

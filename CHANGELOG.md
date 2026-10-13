@@ -9,6 +9,20 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 5.4.0
+
+- **Resumo do mês aberto (migração 58).** O resultado do mês aberto fica
+  guardado pronto, em vez de ser recalculado a cada abertura de tela. O banco
+  recalcula sozinho em até 1 minuto depois de qualquer importação,
+  lançamento, monitoria ou mudança de peso e cadastro. Extrato, Início e
+  Comparativo leem o resumo: o Extrato de quem recebe pela média caiu de
+  ~3,2 s para ~0,5 s; o Início do gestor, de ~2,5 s para ~1 s (local).
+- **"Atualizado às HH:MM"** ao lado do mês. Com mudança pendente vira
+  "Atualizando…", e a tela troca os números sozinha quando o resumo fica
+  pronto, realçando por um instante o que mudou.
+- O fechamento e a exportação continuam no cálculo ao vivo. Se o resumo não
+  estiver em dia (mais de 40 min), as telas voltam ao cálculo ao vivo.
+
 ## 5.3.8
 
 - **Extrato do mês corrente de volta ao tempo da 5.3.6.** A 5.3.7 deixou o

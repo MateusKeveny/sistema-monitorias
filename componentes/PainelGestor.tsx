@@ -6,6 +6,7 @@ import { BarraDeMeta, Painel, Secao, Vazio } from '@/componentes/ui';
 import { criarClienteServidor } from '@/lib/supabase/servidor';
 import { corDoCsat, hojeNoBrasil, percentual, semanaDoCiclo } from '@/lib/formatar';
 import { mesAnterior } from '@/lib/competencia';
+import { fonteDoMes } from '@/lib/resumo';
 import { limiteDeRenovacao, pessoasComLeituraPendente, type LeituraDiario } from '@/lib/diario';
 
 const CANAIS: Canal[] = ['huggy', 'diretores'];
@@ -73,6 +74,8 @@ export default async function PainelGestor({
   const anterior = mesAnterior(competencia);
   const meses = [competencia, anterior];
   const db = await criarClienteServidor();
+  // O resultado de todos no mês: do resumo (migração 58), que era ~2 s ao vivo.
+  const fonte = await fonteDoMes(competencia);
 
   const [pessoas, csat, volume, criterios, cota, cargos, fechados, monitorias, valores, semCargo, conferir, diario, vencendo, leituras, privados, reportes, atrasos]
     = await Promise.all([
@@ -84,14 +87,14 @@ export default async function PainelGestor({
     db.from('vw_criterios_reprovados').select('criterio, avaliacoes, reprovacoes, taxa_reprovacao')
       .eq('mes_referencia', competencia).gt('reprovacoes', 0)
       .order('reprovacoes', { ascending: false }).limit(8),
-    db.from('vw_cota_mensal').select('pessoa_id, pessoa, cargo, resultado, meta, compoe_media')
+    db.from(fonte.mensal).select('pessoa_id, pessoa, cargo, resultado, meta, compoe_media')
       .eq('mes_competencia', competencia).order('resultado', { ascending: false }),
     db.from('cargos').select('nome, recebe_bonus'),
     db.from('fechamentos_cota').select('pessoa_id, mes_competencia, resultado, meta, cargo')
       .in('mes_competencia', meses),
     db.from('vw_monitorias').select('operador_id, nota_final, mes_referencia').in('mes_referencia', meses),
     db.from('valores_da_cota').select('mes_competencia').in('mes_competencia', meses),
-    db.from('vw_sem_cargo').select('nome').eq('mes_competencia', competencia),
+    db.from(fonte.semCargo).select('nome').eq('mes_competencia', competencia),
     db.from('vw_lancamentos_a_conferir').select('bloco').eq('mes_competencia', competencia),
     db.from('diario_registros').select('id', { count: 'exact', head: true }).eq('situacao', 'aguardando'),
     // Validade nos próximos 7 dias: dá para renovar (migração 37).

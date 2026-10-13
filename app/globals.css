@@ -169,8 +169,14 @@ textarea {
 @keyframes surgir { from { opacity: 0; transform: translateY(-4px); } }
 .surgir { animation: surgir 250ms ease-out; }
 
+/* Número que mudou quando o resumo do mês se atualizou (CarimboDoResumo). */
+@keyframes realce-resumo { from { background-color: rgb(52 211 153 / .3); } to { background-color: transparent; } }
+.realce-resumo { animation: realce-resumo 1.8s ease-out; border-radius: 6px; }
+@keyframes girar { to { transform: rotate(360deg); } }
+.girar { animation: girar 1s linear infinite; }
+
 @media (prefers-reduced-motion: reduce) {
-  .crescer-y, .crescer-x, .desenhar-linha, .surgir { animation: none; }
+  .crescer-y, .crescer-x, .desenhar-linha, .surgir, .realce-resumo, .girar { animation: none; }
 }
 
 /* A folha de feedback sai sempre em papel branco, independente do tema. */

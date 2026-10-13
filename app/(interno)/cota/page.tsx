@@ -8,6 +8,8 @@ import PainelPleno from '@/componentes/PainelPleno';
 import { data as formatarData, hojeNoBrasil, mesRotulo } from '@/lib/formatar';
 import { mesAnterior, resolverCompetencia } from '@/lib/competencia';
 import { limiteDeRenovacao, pessoasComLeituraPendente, type LeituraDiario } from '@/lib/diario';
+import { fonteDoMes, situacaoDoResumo } from '@/lib/resumo';
+import CarimboDoResumo from '@/componentes/CarimboDoResumo';
 
 export const dynamic = 'force-dynamic';
 
@@ -80,8 +82,22 @@ export default async function InicioCota({
 }) {
   // O perfil e a competência saem juntos (1.39.4): um não depende do outro.
   const { canal: canalPedido, mes } = await searchParams;
-  const [perfil, { competencia, atual, emAberto }] = await Promise.all([exigirPerfil(), resolverCompetencia(mes)]);
+  const [perfil, { competencia, atual, emAberto }] = await Promise.all([
+    exigirPerfil(), resolverCompetencia(mes), situacaoDoResumo(),
+  ]);
   const outroMes = competencia !== atual;
+
+  // "Atualizado às" (migração 58): só quando os totais vêm do resumo. No mês
+  // corrente é sempre o caso; no anterior, só enquanto não fechou (fechado,
+  // os números são os congelados e não mudam mais).
+  const fonte = await fonteDoMes(competencia);
+  const fechou = fonte.resumo && outroMes
+    ? ((await (await criarClienteServidor()).from('fechamentos_cota')
+        .select('id', { count: 'exact', head: true }).eq('mes_competencia', competencia)).count ?? 0) > 0
+    : false;
+  const carimbo = fonte.resumo && !fechou
+    ? <CarimboDoResumo competencia={competencia} atualizadoEm={fonte.resumo.atualizadoEm} pendente={fonte.resumo.pendente} />
+    : null;
 
   /**
    * Topo da tela (1.15.0): a saudação primeiro; embaixo, o mês com as setas;
@@ -101,9 +117,10 @@ export default async function InicioCota({
           <SetasDeCompetencia competencia={competencia} atual={atual} caminho="/cota" compacto
                               manter={{ canal: canalPedido }} />
         </div>
-        {(selo || emAberto || outroMes) && (
+        {(selo || emAberto || outroMes || carimbo) && (
           <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1">
             {selo}
+            {carimbo && <span className="text-xs text-sobre-fundo-suave">{carimbo}</span>}
             {emAberto && (
               <span className="text-xs text-sobre-fundo-suave opacity-75">
                 {mesRotulo(atual)} ainda sem lançamentos

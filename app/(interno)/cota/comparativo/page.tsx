@@ -6,6 +6,7 @@ import { Painel, Secao, Vazio } from '@/componentes/ui';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { percentual } from '@/lib/formatar';
 import { resolverCompetencia } from '@/lib/competencia';
+import { fonteDoMes } from '@/lib/resumo';
 
 export const dynamic = 'force-dynamic';
 
@@ -96,10 +97,19 @@ export default async function Comparativo({
   type Ponto = { pessoa_id: string; mes_competencia: string; resultado: number; meta: number | null };
   const doFechamento = (fechados.data ?? []) as Ponto[];
   const abertos = meses.filter((m) => !doFechamento.some((f) => f.mes_competencia === m));
-  const { data: aoVivo } = abertos.length
-    ? await db.from('vw_cota_mensal').select('pessoa_id, mes_competencia, resultado, meta').in('mes_competencia', abertos)
-    : { data: [] };
-  const pontuacoes = [...doFechamento, ...((aoVivo ?? []) as Ponto[])];
+  // Os que estão no resumo do mês (migração 58) saem dele; os demais, da view.
+  const fontes = await Promise.all(abertos.map((m) => fonteDoMes(m)));
+  const doResumo = abertos.filter((_, i) => fontes[i].resumo);
+  const daView = abertos.filter((_, i) => !fontes[i].resumo);
+  const [{ data: resumidos }, { data: aoVivo }] = await Promise.all([
+    doResumo.length
+      ? db.from('resumo_cota_mensal').select('pessoa_id, mes_competencia, resultado, meta').in('mes_competencia', doResumo)
+      : Promise.resolve({ data: [] }),
+    daView.length
+      ? db.from('vw_cota_mensal').select('pessoa_id, mes_competencia, resultado, meta').in('mes_competencia', daView)
+      : Promise.resolve({ data: [] }),
+  ]);
+  const pontuacoes = [...doFechamento, ...((resumidos ?? []) as Ponto[]), ...((aoVivo ?? []) as Ponto[])];
 
   const nome = new Map((pessoas.data ?? []).map((p) => [p.id as string, nomeCurto(p.nome as string)]));
   // As mesmas duas decisões da tela inicial: aparecer na lista e entrar na média.

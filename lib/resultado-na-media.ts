@@ -33,7 +33,11 @@ export type AjustesDaMedia = { congelados: Map<string, number>; atestado: Map<st
  * resultados, então as telas buscam junto com eles (1.39.4) — antes era uma
  * espera a mais, de ~0,8 s, depois da lista.
  */
-export async function ajustesDaMedia(db: Db, competencia: string, congelado: boolean): Promise<AjustesDaMedia> {
+export async function ajustesDaMedia(
+  db: Db, competencia: string, congelado: boolean,
+  /** De onde vem o atestado do mês aberto: o resumo (migração 58) ou a view. */
+  extrato: 'resumo_extrato' | 'vw_extrato_cota' = 'vw_extrato_cota',
+): Promise<AjustesDaMedia> {
   const congelados = new Map<string, number>();
   const atestado = new Map<string, number>();
 
@@ -51,7 +55,7 @@ export async function ajustesDaMedia(db: Db, competencia: string, congelado: boo
       }
     }
   } else {
-    const { data: linhas } = await db.from('vw_extrato_cota').select('pessoa_id, cota')
+    const { data: linhas } = await db.from(extrato).select('pessoa_id, cota')
       .eq('mes_competencia', competencia).eq('regra', 'atestado');
     for (const l of linhas ?? []) {
       const p = l.pessoa_id as string;

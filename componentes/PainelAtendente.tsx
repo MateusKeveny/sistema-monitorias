@@ -6,6 +6,7 @@ import { BarraDeMeta, EtiquetaNota, Painel, Secao, Vazio } from '@/componentes/u
 import { criarClienteServidor } from '@/lib/supabase/servidor';
 import { codigoMonitoria, data as formatarData, percentual } from '@/lib/formatar';
 import { mesAnterior } from '@/lib/competencia';
+import { fonteDoMes } from '@/lib/resumo';
 
 const CANAIS: { chave: Canal; rotulo: string }[] = [
   { chave: 'huggy', rotulo: 'Expansão' },
@@ -81,6 +82,8 @@ export default async function PainelAtendente({
   const anterior = mesAnterior(competencia);
   const meses = [competencia, anterior];
   const db = await criarClienteServidor();
+  // O mês aberto e o anterior vêm do resumo quando ele está em dia (migração 58).
+  const [fonte, fonteAntes] = await Promise.all([fonteDoMes(competencia), fonteDoMes(anterior)]);
 
   const equipe = Promise.all(CANAIS.flatMap(({ chave }) => [1, 2, 3, 4].map((semana) =>
     db.rpc('csat_da_equipe', { p_mes: competencia, p_semana: semana, p_origem: chave }))));
@@ -90,7 +93,7 @@ export default async function PainelAtendente({
       .eq('pessoa_id', pessoaId).in('mes_competencia', meses),
     db.from('volume_semanal').select('canal, semana, finalizados, tme_seg, mes_competencia')
       .eq('pessoa_id', pessoaId).in('mes_competencia', meses),
-    db.from('vw_extrato_cota')
+    db.from(fonte.extrato)
       .select('semana, origem, regra, rotulo, grupo, cargo_id, quantidade, peso, cota')
       .eq('pessoa_id', pessoaId).eq('mes_competencia', competencia),
     db.from('vw_pagamento_mensal').select('mes_competencia, resultado, meta, atingiu_meta, valor')
@@ -100,7 +103,7 @@ export default async function PainelAtendente({
     db.from('pesos_por_cargo').select('cargo_id, regra, peso').eq('ativo', true),
     db.from('regras').select('chave, rotulo, grupo, faixa_min, ordem').eq('ativo', true).order('ordem'),
     db.from('vw_tme_equipe').select('semana, canal, tme_seg').eq('mes_competencia', competencia),
-    db.from('vw_cota_mensal').select('resultado').eq('pessoa_id', pessoaId).eq('mes_competencia', anterior).maybeSingle(),
+    db.from(fonteAntes.mensal).select('resultado').eq('pessoa_id', pessoaId).eq('mes_competencia', anterior).maybeSingle(),
     db.from('vw_monitorias')
       .select('id, codigo, protocolo, data_atendimento, mes_referencia, semana_mes, nota_final, zerado, parecer')
       .eq('operador_id', pessoaId)

@@ -11,7 +11,7 @@ Escrito em 28/09/2026, atualizado em 08/10/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.39.6** · Monitorias **5.3.8** (deploy de 13/10/2026) |
+| Publicado | Performance **1.40.0** · Monitorias **5.4.0** (deploy de 13/10/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
 | Migrações no banco | 01 a 57, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
@@ -524,6 +524,34 @@ Três versões, cada uma publicada e conferida antes da próxima:
   pessoa sai já na 1ª rodada, como na 1.39.4; nos outros meses, só depois de
   saber se fechou. Conferido: os 12 extratos de outubro e amostra de
   setembro idênticos.
+- **Performance 1.40.0 · Monitorias 5.4.0** (**migração 58**): **resumo do
+  mês aberto.** Tabelas `resumo_extrato`, `resumo_cota_mensal` e
+  `resumo_sem_cargo`, criadas a partir das views (`create table … as select
+  * from vw_… with no data`: mesmas colunas e tipos). Gatilhos por comando
+  (`resumo_mudou`) em volume_semanal, avaliacoes, monitorias, lancamentos,
+  atendimentos_presenciais, chamados_elo, regras, pesos_por_cargo, cargos,
+  cargos_da_pessoa, cargos_referencia e pessoas só inserem uma linha em
+  `resumo_mudancas` — nada trava. `atualizar_resumo()` (pg_cron
+  `resumo-do-mes`, a cada minuto; uma rodada por vez, por advisory lock)
+  apaga as mudanças que vê e recalcula os meses mantidos (competência atual e
+  anterior) se houve mudança, se nunca calculou ou se passou de 30 min.
+  `situacao_do_resumo()` diz às telas quando cada mês foi calculado e se há
+  mudança pendente; `conferir_resumo()` compara com as views linha a linha.
+  No app: `lib/resumo.ts` (`fonteDoMes`: resumo se o mês está nele e foi
+  calculado há < 40 min; senão as views) usado no Extrato, PainelGestor,
+  PainelPleno, PainelAtendente, Comparativo e em `ajustesDaMedia`;
+  `componentes/CarimboDoResumo.tsx` ("Atualizado às", "Atualizando…",
+  consulta a cada 15 s com pendência e 60 s sem, `router.refresh()` e realce
+  dos números que mudaram). Fechamento e exportação seguem nas views.
+  Conferência de 13/10: `conferir_resumo()` zero em tudo (set e out ×
+  extrato, resultado, sem cargo); 38 telas idênticas ao código anterior,
+  mais Início (set, out) e Comparativo comparados com o código publicado no
+  mesmo banco, idênticos. Local: Extrato de out do gestor ~3,2 s → ~0,5 s;
+  dos demais 0,4–0,9 s; Início ~1 s.
+  **Atenção em migração futura:** se mudar as colunas de `vw_extrato_cota`,
+  `vw_cota_mensal` ou `vw_sem_cargo`, recrie a tabela de resumo
+  correspondente (o `insert … select *` depende das mesmas colunas), e se o
+  cálculo passar a ler uma tabela nova, ponha nela o gatilho `resumo_mudou`.
 
 Visão de celular fica fora da revisão, por decisão do gestor. Os painéis são
 usados só no computador.

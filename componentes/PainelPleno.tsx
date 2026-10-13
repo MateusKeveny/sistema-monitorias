@@ -3,6 +3,7 @@ import { BarraDeMeta, Quadro } from '@/componentes/ui';
 import { criarClienteServidor } from '@/lib/supabase/servidor';
 import { mesRotulo, umaCasa } from '@/lib/formatar';
 import { ajustesDaMedia, aplicarNaMedia } from '@/lib/resultado-na-media';
+import { fonteDoMes } from '@/lib/resumo';
 import { REGRA_MEDIA, REGRA_MEDIA_REALIZADO, REGRA_META } from '@/lib/tipos';
 
 const num = (v: number, casas = 0) => Number(v).toLocaleString('pt-BR', { maximumFractionDigits: casas });
@@ -36,10 +37,12 @@ export default async function PainelPleno({
   competencia: string;
 }) {
   const db = await criarClienteServidor();
+  // O mês aberto vem do resumo quando ele está em dia (migração 58).
+  const fonte = await fonteDoMes(competencia);
   const [cota, fechamento, extrato, pesos, regras, referencias, cargos, presenciais] = await Promise.all([
-    db.from('vw_cota_mensal').select('resultado, meta').eq('pessoa_id', pessoaId).eq('mes_competencia', competencia).maybeSingle(),
+    db.from(fonte.mensal).select('resultado, meta').eq('pessoa_id', pessoaId).eq('mes_competencia', competencia).maybeSingle(),
     db.from('fechamentos_cota').select('id, resultado, meta').eq('pessoa_id', pessoaId).eq('mes_competencia', competencia).maybeSingle(),
-    db.from('vw_extrato_cota').select('semana, regra, rotulo, quantidade, peso, cota')
+    db.from(fonte.extrato).select('semana, regra, rotulo, quantidade, peso, cota')
       .eq('pessoa_id', pessoaId).eq('mes_competencia', competencia),
     db.from('pesos_por_cargo').select('regra, peso').eq('cargo_id', cargoId).eq('ativo', true),
     db.from('regras').select('chave, rotulo, manual, valor_manual, ordem').eq('ativo', true).order('ordem'),
@@ -64,10 +67,10 @@ export default async function PainelPleno({
       ? db.from('fechamento_linhas').select('semana, regra, rotulo, quantidade, peso, cota').eq('fechamento_id', congelado.id)
       : Promise.resolve({ data: null }),
     nomesReferencia.length
-      ? db.from('vw_cota_mensal').select('pessoa_id, pessoa, cargo, resultado, compoe_media')
+      ? db.from(fonte.mensal).select('pessoa_id, pessoa, cargo, resultado, compoe_media')
         .eq('mes_competencia', competencia)
       : Promise.resolve({ data: [] }),
-    ajustesDaMedia(db, competencia, Boolean(congelado)),
+    ajustesDaMedia(db, competencia, Boolean(congelado), fonte.extrato),
   ]);
   const linhas = ((linhasFechadas ?? extrato.data ?? []) as Linha[])
     .map((l) => ({ ...l, quantidade: Number(l.quantidade), peso: Number(l.peso), cota: Number(l.cota) }));
