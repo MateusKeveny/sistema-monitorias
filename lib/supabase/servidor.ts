@@ -65,7 +65,13 @@ export const obterPerfil = cache(async (): Promise<Perfil | null> => {
  */
 export async function exigirPerfil(): Promise<Perfil> {
   const perfil = await obterPerfil();
-  if (!perfil) redirect('/login?erro=perfil-ausente');
+  if (!perfil) {
+    // Sem usuário, a sessão do cookie não vale mais no Supabase (encerrada ou
+    // expirada): o middleware só lê a validade do cookie (1.39.2). Com usuário
+    // e sem perfil, é cadastro faltando.
+    const { data: { user } } = await (await criarClienteServidor()).auth.getUser();
+    redirect(user ? '/login?erro=perfil-ausente' : '/login?erro=sessao-encerrada');
+  }
   if (!perfil.ativo) redirect('/login?erro=inativo');
   if (!perfil.senha_definida) redirect('/definir-senha');
   return perfil;

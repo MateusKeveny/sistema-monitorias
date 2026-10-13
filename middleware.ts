@@ -1,10 +1,10 @@
-import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { INICIO_COTA, caminhoForaDoSistema, sistemaDoHost } from '@/lib/sistema';
+import { temCookieDeSessao, validadeDaSessao } from '@/lib/sessao-cookie';
 
 /**
- * Renova o cookie de sessão a cada navegação e barra o acesso
- * às páginas internas de quem não está logado.
+ * Barra as páginas internas para quem não está logado e manda renovar a
+ * sessão vencida — sem ir ao Supabase (1.39.2, ver lib/sessao-cookie.ts).
  */
 export async function middleware(requisicao: NextRequest) {
   const caminho = requisicao.nextUrl.pathname;
@@ -20,52 +20,41 @@ export async function middleware(requisicao: NextRequest) {
   }
 
   const publica = caminho.startsWith('/login') || caminho.startsWith('/auth');
+  const cookies = requisicao.cookies.getAll();
 
-  // Sem cookie de sessão não há o que conferir nem renovar (1.35.4): poupa
-  // criar o cliente e ir ao Supabase. Cada milissegundo conta — o plano
-  // gratuito do Worker corta a requisição em 10 ms de CPU (erro 1102).
-  if (!requisicao.cookies.getAll().some((c) => c.name.startsWith('sb-') && c.name.includes('-auth-token'))) {
+  // Sem cookie de sessão não há ninguém logado: vai ao login (1.35.4).
+  if (!temCookieDeSessao(cookies)) {
     if (publica) return NextResponse.next();
-    const destino = requisicao.nextUrl.clone();
-    destino.pathname = '/login';
-    destino.searchParams.set('proximo', caminho);
-    return NextResponse.redirect(destino);
+    return irPara(requisicao, '/login', caminho);
   }
 
-  let resposta = NextResponse.next({ request: requisicao });
-
-  const db = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll: () => requisicao.cookies.getAll(),
-        setAll: (lista) => {
-          lista.forEach(({ name, value }) => requisicao.cookies.set(name, value));
-          resposta = NextResponse.next({ request: requisicao });
-          lista.forEach(({ name, value, options }) => resposta.cookies.set(name, value, options));
-        },
-      },
-    },
-  );
-
-  const { data: { user } } = await db.auth.getUser();
-
-  if (!user && !publica) {
-    const destino = requisicao.nextUrl.clone();
-    destino.pathname = '/login';
-    destino.searchParams.set('proximo', caminho);
-    return NextResponse.redirect(destino);
+  // Com cookie, só a validade é lida — sem ir ao Supabase e sem renovar aqui
+  // (1.39.2). Renovar no servidor troca o passe e devolve o novo na resposta;
+  // com o erro 1102 cortando a resposta, o passe novo se perdia, o antigo já
+  // estava invalidado, e a pessoa caía no login. Quem renova é o navegador,
+  // direto com o Supabase: o ManterSessao enquanto a tela está aberta e
+  // /auth/renovar quando a pessoa volta com o passe vencido. Quem confere a
+  // pessoa de verdade continua sendo cada tela (getUser em exigirPerfil).
+  // O login não manda mais quem "já está logado" para o início: pelo cookie
+  // não dá para saber se a sessão ainda vale no Supabase (encerrada pelo
+  // gestor, por exemplo), e a tela mandaria de volta ao login — um laço.
+  if (publica) return NextResponse.next();
+  const validade = validadeDaSessao(cookies);
+  if (validade == null || validade <= Date.now() / 1000 + MARGEM_SEG) {
+    return irPara(requisicao, '/auth/renovar', caminho + requisicao.nextUrl.search);
   }
+  return NextResponse.next();
+}
 
-  if (user && caminho === '/login') {
-    const destino = requisicao.nextUrl.clone();
-    destino.pathname = '/';
-    destino.search = '';
-    return NextResponse.redirect(destino);
-  }
+/** Renova um pouco antes de vencer, para a tela não pegar o passe no limite. */
+const MARGEM_SEG = 60;
 
-  return resposta;
+function irPara(requisicao: NextRequest, caminho: string, proximo?: string) {
+  const destino = requisicao.nextUrl.clone();
+  destino.pathname = caminho;
+  destino.search = '';
+  if (proximo) destino.searchParams.set('proximo', proximo);
+  return NextResponse.redirect(destino);
 }
 
 export const config = {

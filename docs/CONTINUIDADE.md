@@ -11,7 +11,7 @@ Escrito em 28/09/2026, atualizado em 08/10/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.39.1** · Monitorias **5.3.3** (deploy de 13/10/2026) |
+| Publicado | Performance **1.39.2** · Monitorias **5.3.4** (deploy de 13/10/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
 | Migrações no banco | 01 a 57, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
@@ -456,6 +456,21 @@ Três versões, cada uma publicada e conferida antes da próxima:
   mesmo quando virava update (uma "criação" falsa e o motivo perdido). Agora
   são dois gatilhos: BEFORE UPDATE (registra com o motivo e limpa a coluna) e
   AFTER INSERT (só criação de verdade). As linhas do teste de 09/10 saíram.
+- **Performance 1.39.2 · Monitorias 5.3.4** (correção, sem migração): **a sessão
+  não cai mais com o erro 1102.** Teste de 13/10 com perfil de operador: o 1102
+  vem e vai (telas de 300 ms passam, o login com 11 ms foi barrado), e um corte
+  durante a renovação do login no middleware deixava a pessoa deslogada — o
+  passe novo se perdia e o antigo já estava invalidado. Agora o middleware não
+  chama o Supabase: lê só a validade do cookie (`lib/sessao-cookie.ts`, que
+  junta os pedaços `.0/.1` e decodifica o "base64-"); vencido ou a 60 s de
+  vencer, manda para `/auth/renovar`, que renova no navegador (`getSession`) e
+  volta ao destino. `ManterSessao` no layout liga a renovação automática do
+  cliente do navegador. O atalho "login com sessão vai para o início" saiu do
+  middleware (sem o Supabase, causaria laço com sessão encerrada), e
+  `exigirPerfil` separa "sessão encerrada" de "perfil ausente". Testado no
+  local: passe vencido renova e volta à tela com os parâmetros; passe recusado
+  vai ao login com a mensagem certa, sem laço. **O 1102 continua** — o plano
+  gratuito segue no limite —, mas não derruba mais a sessão.
 
 Visão de celular fica fora da revisão, por decisão do gestor. Os painéis são
 usados só no computador.

@@ -5,6 +5,7 @@ import { sistemaAtual } from '@/lib/sistema-servidor';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import LeituraObrigatoria from '@/componentes/LeituraObrigatoria';
 import RegistrarAcesso from '@/componentes/RegistrarAcesso';
+import ManterSessao from '@/componentes/ManterSessao';
 import { hojeNoBrasil } from '@/lib/formatar';
 import type { LeituraDiario, RegistroDiario } from '@/lib/diario';
 
@@ -58,6 +59,7 @@ export default async function LayoutInterno({ children }: { children: React.Reac
           <>
           {/* Quem abre o painel para ler também acessou (migração 52). */}
           <RegistrarAcesso sistema={sistema} />
+          <ManterSessao />
           <LeituraObrigatoria
             registros={(registros ?? []) as RegistroDiario[]}
             nomes={Object.fromEntries((pessoas ?? []).map((p: { id: string; nome: string }) => [p.id, p.nome]))}
@@ -73,6 +75,7 @@ export default async function LayoutInterno({ children }: { children: React.Reac
       <div className="lg:grid lg:min-h-screen lg:grid-cols-[15rem_1fr]">
         {/* Uma abertura do painel por carregamento (migração 52, tela Acessos). */}
         <RegistrarAcesso sistema={sistema} />
+          <ManterSessao />
         <MenuLateral perfil={perfil} versao={versao} sistema={sistema}
                      avisosReporte={avisosReporte ?? 0} pendentes={pendentes} />
         <div className="min-w-0">

@@ -5,6 +5,7 @@ import { sistemaAtual } from '@/lib/sistema-servidor';
 const MENSAGENS: Record<string, string> = {
   'perfil-ausente': 'Seu usuário existe, mas ainda não tem perfil liberado. Fale com a Qualidade.',
   inativo: 'Seu acesso está inativo. Fale com a Qualidade.',
+  'sessao-encerrada': 'Sua sessão foi encerrada. Entre de novo.',
 };
 
 /**

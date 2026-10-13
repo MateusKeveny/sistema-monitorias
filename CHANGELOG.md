@@ -9,6 +9,14 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 5.3.4
+
+- **A sessão não cai mais por causa do erro 1102.** Quem renova o login agora é
+  o navegador, direto com o Supabase; o servidor só lê a validade. Quem volta
+  com a sessão vencida passa por uma renovação rápida e segue para a tela, sem
+  pedir login. Sessão encerrada pelo gestor leva ao login com a mensagem "Sua
+  sessão foi encerrada".
+
 ## 5.3.3
 
 - **"Falha crítica" no lugar de "zeramento"** em todo o sistema: no formulário
