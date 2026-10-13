@@ -9,6 +9,12 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 5.3.8
+
+- **Extrato do mês corrente de volta ao tempo da 5.3.6.** A 5.3.7 deixou o
+  mês aberto ~0,8 s mais lento: o extrato ao vivo esperava saber se o mês
+  estava fechado. No mês corrente ele volta a sair logo de início.
+
 ## 5.3.7
 
 - **Extrato de mês fechado sem recalcular.** Os números já vinham do

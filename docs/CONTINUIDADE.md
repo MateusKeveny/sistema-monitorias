@@ -11,7 +11,7 @@ Escrito em 28/09/2026, atualizado em 08/10/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.39.5** · Monitorias **5.3.7** (deploy de 13/10/2026) |
+| Publicado | Performance **1.39.6** · Monitorias **5.3.8** (deploy de 13/10/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
 | Migrações no banco | 01 a 57, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
@@ -515,6 +515,15 @@ Três versões, cada uma publicada e conferida antes da próxima:
   agosto, mês importado da planilha externa em que ele não tem pontos no
   sistema; o gestor decidiu manter como era. Conferência: os 24 extratos de
   ago/set (12 pessoas) idênticos. Setembro do gestor: ~4 s → ~1 s (local).
+  No site publicado: agosto ~1,3 s, setembro ~1,5 s — mas outubro (aberto)
+  piorou de ~3,2 s para ~4 s: o extrato ao vivo passou a esperar o
+  fechamento e as quatro consultas pesadas saíam juntas na 2ª rodada,
+  disputando o banco.
+- **Performance 1.39.6 · Monitorias 5.3.8** (correção, sem migração): no mês
+  corrente (`competencia === atual`, nunca fechado) o extrato ao vivo da
+  pessoa sai já na 1ª rodada, como na 1.39.4; nos outros meses, só depois de
+  saber se fechou. Conferido: os 12 extratos de outubro e amostra de
+  setembro idênticos.
 
 Visão de celular fica fora da revisão, por decisão do gestor. Os painéis são
 usados só no computador.

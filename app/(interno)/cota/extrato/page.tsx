@@ -70,8 +70,21 @@ export default async function Extrato({
   // A pessoa pedida é conferida na lista depois, junto com o resto.
   const pessoaId = veOTime && pessoaPedida ? pessoaPedida : perfil.id;
 
-  // 1ª rodada: só tabelas leves. O cálculo ao vivo (as views do extrato) vem
-  // depois, e só em mês aberto — mês fechado não recalcula nada (1.39.5).
+  // O extrato ao vivo da pessoa. No mês corrente, que nunca está fechado, sai
+  // já na 1ª rodada (1.39.6): esperar o fechamento para pedir deixava o mês
+  // aberto ~0,8 s mais lento — as consultas pesadas saíam todas juntas na 2ª
+  // e disputavam o banco. Nos outros meses, só depois de saber se fechou.
+  const aoVivoDaPessoa = () => Promise.all([
+    db.from('vw_extrato_cota')
+      .select('semana, origem, regra, rotulo, grupo, ordem, cargo_id, quantidade, peso, cota')
+      .eq('pessoa_id', pessoaId).eq('mes_competencia', competencia)
+      .order('semana', { nullsFirst: false }).order('ordem'),
+    db.from('vw_cota_mensal').select('resultado, meta, cargo, pessoa')
+      .eq('pessoa_id', pessoaId).eq('mes_competencia', competencia).maybeSingle(),
+  ]);
+  const aoVivoAntecipado = competencia === atual ? aoVivoDaPessoa() : null;
+
+  // 1ª rodada: tabelas leves. Mês fechado não recalcula nada (1.39.5).
   const [pessoas, chamados, csat, faixasCsat, fechamento, pago, pesosDosCargos, referencias, cargos, cargoDaPessoa]
     = await Promise.all([
     veOTime
@@ -152,12 +165,7 @@ export default async function Extrato({
         recebePelaMedia ? ajustesDaMedia(db, competencia, true) : Promise.resolve(null),
       ])
     : await Promise.all([
-        db.from('vw_extrato_cota')
-          .select('semana, origem, regra, rotulo, grupo, ordem, cargo_id, quantidade, peso, cota')
-          .eq('pessoa_id', pessoaId).eq('mes_competencia', competencia)
-          .order('semana', { nullsFirst: false }).order('ordem'),
-        db.from('vw_cota_mensal').select('resultado, meta, cargo, pessoa')
-          .eq('pessoa_id', pessoaId).eq('mes_competencia', competencia).maybeSingle(),
+        ...((vivo) => [vivo.then(([e]) => e), vivo.then(([, c]) => c)] as const)(aoVivoAntecipado ?? aoVivoDaPessoa()),
         Promise.resolve(null),
         recebePelaMedia
           ? db.from('vw_cota_mensal').select('pessoa_id, pessoa, cargo, resultado, compoe_media')
