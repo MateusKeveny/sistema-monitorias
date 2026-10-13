@@ -5,6 +5,7 @@ import PainelRegras from '@/componentes/PainelRegras';
 import Abas from '@/componentes/Abas';
 import AvisosTeams, { type SituacaoAviso } from '@/componentes/AvisosTeams';
 import SubcategoriasDiario from '@/componentes/SubcategoriasDiario';
+import HistoricoDePesos, { type AlteracaoDePeso } from '@/componentes/HistoricoDePesos';
 import type { Subcategoria } from '@/lib/diario';
 import { hojeNoBrasil, mesDeCompetencia } from '@/lib/formatar';
 import type { Cargo, CargoDaPessoa, PesoCargo, Pessoa, ReferenciaCargo, RegraCota } from '@/lib/tipos';
@@ -30,7 +31,7 @@ export default async function ConfiguracaoDaCota({
 
   const [
     { data: pessoas }, { data: cargos }, { data: regras },
-    { data: pesos }, { data: referencias }, { data: historico }, { data: avisos }, { data: subcategorias }, { data: usosSub },
+    { data: pesos }, { data: referencias }, { data: historico }, { data: avisos }, { data: subcategorias }, { data: usosSub }, { data: alteracoes },
   ] = await Promise.all([
     db.from('pessoas').select('id, ativo, desligado_em'),
     db.from('cargos').select('*').eq('ativo', true).order('ordem'),
@@ -43,6 +44,8 @@ export default async function ConfiguracaoDaCota({
     // Subcategorias de problema operacional e quantos registros usam cada uma (migração 46).
     db.from('diario_subcategorias').select('*').order('ordem'),
     db.from('diario_registros').select('subcategoria_id').not('subcategoria_id', 'is', null),
+    // Histórico de alteração de pesos (migração 56).
+    db.from('pesos_historico').select('*').order('alterado_em', { ascending: false }).limit(300),
   ]);
 
   const usos: Record<number, number> = {};
@@ -95,6 +98,11 @@ export default async function ConfiguracaoDaCota({
                 pessoasPorCargo={pessoasPorCargo}
               />
             ),
+          },
+          {
+            chave: 'historico',
+            rotulo: 'Histórico de alterações',
+            conteudo: <HistoricoDePesos alteracoes={(alteracoes ?? []) as AlteracaoDePeso[]} />,
           },
           {
             chave: 'faixas',

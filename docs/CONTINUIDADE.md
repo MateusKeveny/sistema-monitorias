@@ -11,9 +11,9 @@ Escrito em 28/09/2026, atualizado em 08/10/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.38.2** · Monitorias **5.3.1** (deploy de 09/10/2026, migração 55) |
+| Publicado | Performance **1.39.0** · Monitorias **5.3.1** (deploy de 09/10/2026, migrações 56 e 57) |
 | Branch | `painel-performance` (a `main` segue intocada) |
-| Migrações no banco | 01 a 55, todas aplicadas |
+| Migrações no banco | 01 a 57, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
 
 ### Revisão de design (28/09/2026)
@@ -441,6 +441,21 @@ Três versões, cada uma publicada e conferida antes da próxima:
   do Analista segue 232 tratativas e 230 no prazo. As regras de SLA viram
   "Resolvidos no prazo (2 dias úteis)" e "Resolvidos fora do prazo". HOSPEDAGEM e MODELO-PAINEL
   atualizados para a 1.38.2.
+- **Performance 1.39.0** (migração 56): **histórico de alteração de pesos.**
+  Gatilho em `pesos_por_cargo` registra em `pesos_historico` toda mudança de
+  peso, meta, multiplicador da média e métrica ligada/desligada — quem,
+  quando, de quanto para quanto, para qual mês (`vale_para`) e o motivo. O
+  motivo vem da tela na mesma gravação (`motivo_alteracao`), e o gatilho o
+  limpa depois de registrar. Obrigatório na matriz e no editor do cargo
+  quando muda meta ou média; cargo novo grava "Cargo criado copiando os
+  pesos de X". Só o gestor lê, em Configuração → Histórico de alterações.
+  **Sem aviso no extrato**, por decisão do gestor: o ajuste é explicado no
+  feedback de cada um. As mudanças de 09/10 (Analista: tratativa 20 → 15,
+  no prazo 5 → 3) são anteriores ao registro.
+  **Migração 57**: a tela grava com upsert, e o BEFORE INSERT da 56 disparava
+  mesmo quando virava update (uma "criação" falsa e o motivo perdido). Agora
+  são dois gatilhos: BEFORE UPDATE (registra com o motivo e limpa a coluna) e
+  AFTER INSERT (só criação de verdade). As linhas do teste de 09/10 saíram.
 
 Visão de celular fica fora da revisão, por decisão do gestor. Os painéis são
 usados só no computador.

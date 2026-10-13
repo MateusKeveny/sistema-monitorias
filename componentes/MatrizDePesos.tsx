@@ -107,6 +107,8 @@ export default function MatrizDePesos({
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  // Motivo obrigatório de cada alteração: vai para o histórico (migração 56).
+  const [motivo, setMotivo] = useState('');
 
   const mudancas = Object.keys(celulas).filter((k) =>
     celulas[k].ativo !== original[k].ativo || (celulas[k].ativo && celulas[k].peso !== original[k].peso));
@@ -137,13 +139,15 @@ export default function MatrizDePesos({
     const agora = new Date().toISOString();
     const linhas = mudancas.map((k) => {
       const [cargo, regra] = k.split('|');
-      return { cargo_id: Number(cargo), regra, peso: celulas[k].peso, ativo: celulas[k].ativo, atualizado_em: agora };
+      return { cargo_id: Number(cargo), regra, peso: celulas[k].peso, ativo: celulas[k].ativo, atualizado_em: agora,
+               motivo_alteracao: motivo.trim() };
     });
     const { error } = await criarClienteNavegador().from('pesos_por_cargo')
       .upsert(linhas, { onConflict: 'cargo_id,regra' });
     setOcupado(false);
     if (error) { setErro(error.message); return; }
     setAviso(`${linhas.length} ${linhas.length === 1 ? 'peso salvo' : 'pesos salvos'}. Meses já fechados não mudam.`);
+    setMotivo('');
     router.refresh();
   }
 
@@ -339,12 +343,20 @@ export default function MatrizDePesos({
             {' '}em {cargosAfetados.map((c) => curto(nomeCargo.get(c) ?? '')).join(', ')}
             {' '}· afeta {pessoasAfetadas} pessoa{pessoasAfetadas === 1 ? '' : 's'} nos meses em aberto
           </span>
+          <label className="flex min-w-72 flex-1 items-center gap-2">
+            <span className="whitespace-nowrap text-[#bcd6c4]">Motivo</span>
+            <input value={motivo} onChange={(e) => setMotivo(e.target.value)} disabled={ocupado}
+                   placeholder="Ex.: ajuste pedido pela diretoria"
+                   className="w-full rounded-lg border border-white/20 bg-white/5 px-2.5 py-1.5 text-sm text-[#e8f5ec]
+                              placeholder:text-[#8fa99a] outline-none focus:border-marca-400" />
+          </label>
           <span className="flex gap-2">
             <button type="button" disabled={ocupado} onClick={() => { setCelulas(original); setEditando(null); }}
                     className="rounded-lg border border-white/25 px-3 py-1.5 text-sm hover:bg-white/10 disabled:opacity-40">
               Desfazer
             </button>
-            <button type="button" disabled={ocupado} onClick={salvar} className={botaoPrimario}>
+            <button type="button" disabled={ocupado || !motivo.trim()} onClick={salvar} className={botaoPrimario}
+                    title={motivo.trim() ? undefined : 'Escreva o motivo da alteração'}>
               {ocupado ? 'Salvando…' : 'Salvar e recalcular'}
             </button>
           </span>
@@ -374,6 +386,7 @@ function EditorDoCargo({
   const [compoem, setCompoem] = useState<number[]>(referencias.map((r) => r.referencia_id));
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [motivo, setMotivo] = useState('');
   const ehBase = cargo.nome === CARGO_BASE;
 
   async function salvar() {
@@ -390,6 +403,11 @@ function EditorDoCargo({
       setErro(`Já existe um cargo chamado "${nomeNovo}".`); return;
     }
     if (!Number.isFinite(metaNum) || metaNum <= 0) { setErro('Informe uma meta maior que zero.'); return; }
+    // Mudou meta ou média: o motivo é obrigatório, como na matriz (migração 56).
+    const mudouPeso = metaNum !== Number(pesoDe.get(REGRA_META)?.peso ?? NaN)
+      || (!ehBase && (recebeMedia !== Boolean(media?.ativo)
+        || (recebeMedia && multNum !== Number(media?.peso ?? 1))));
+    if (mudouPeso && !motivo.trim()) { setErro('Escreva o motivo da alteração da meta ou da média.'); return; }
     if (recebeMedia && (!Number.isFinite(multNum) || multNum <= 0)) { setErro('Informe um multiplicador maior que zero.'); return; }
     if (recebeMedia && !compoem.length) { setErro('Escolha ao menos um cargo para compor a média.'); return; }
 
@@ -406,11 +424,13 @@ function EditorDoCargo({
       }
     }
 
-    const linhas = [{ cargo_id: cargo.id, regra: REGRA_META, peso: metaNum, ativo: true, atualizado_em: agora }];
+    const linhas = [{ cargo_id: cargo.id, regra: REGRA_META, peso: metaNum, ativo: true, atualizado_em: agora,
+                      motivo_alteracao: motivo.trim() }];
     if (!ehBase) {
       linhas.push({
         cargo_id: cargo.id, regra: REGRA_MEDIA,
         peso: recebeMedia ? multNum : Number(media?.peso ?? 1), ativo: recebeMedia, atualizado_em: agora,
+        motivo_alteracao: motivo.trim(),
       });
     }
     const { error } = await db.from('pesos_por_cargo').upsert(linhas, { onConflict: 'cargo_id,regra' });
@@ -462,7 +482,11 @@ function EditorDoCargo({
             Recebe pela média de outros cargos
           </label>
         )}
-        <span className="flex-1" />
+        <label className="min-w-56 flex-1">
+          <span className="mb-1 block text-xs font-medium text-slate-600">Motivo (obrigatório se mudar meta ou média)</span>
+          <input value={motivo} disabled={ocupado} onChange={(e) => setMotivo(e.target.value)}
+                 placeholder="Ex.: ajuste pedido pela diretoria" className={`${entrada} w-full`} />
+        </label>
         <button type="button" onClick={onFechar} disabled={ocupado} className={botaoSecundario}>Cancelar</button>
         <button type="button" onClick={salvar} disabled={ocupado} className={botaoPrimario}>
           {ocupado ? 'Salvando…' : `Salvar ${curto(cargo.nome)}`}
@@ -521,7 +545,8 @@ function NovoCargo({ cargos, pesos, onFechar }: { cargos: Cargo[]; pesos: PesoCa
     // A média não é copiada: é uma escolha própria de cada cargo.
     const copia = pesos
       .filter((p) => p.cargo_id === Number(copiarDe) && p.regra !== REGRA_MEDIA)
-      .map((p) => ({ cargo_id: data.id, regra: p.regra, peso: p.peso, ativo: p.ativo }));
+      .map((p) => ({ cargo_id: data.id, regra: p.regra, peso: p.peso, ativo: p.ativo,
+                     motivo_alteracao: `Cargo criado copiando os pesos de ${cargos.find((c) => c.id === Number(copiarDe))?.nome ?? 'outro cargo'}` }));
     if (copia.length) {
       const { error: e2 } = await db.from('pesos_por_cargo').insert(copia);
       if (e2) { setOcupado(false); setErro(e2.message); return; }
