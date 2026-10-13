@@ -9,6 +9,14 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 5.3.5
+
+- **Telas mais leves.** As consultas que rodam a cada clique (menu, avisos de
+  reporte, leitura do diário) saem juntas, e não mais uma atrás da outra. O
+  Worker passa a usar o Smart Placement da Cloudflare, rodando perto do banco
+  quando isso encurta as idas ao Supabase. Os gráficos carregam só as partes
+  usadas da biblioteca. Nada muda na tela.
+
 ## 5.3.4
 
 - **A sessão não cai mais por causa do erro 1102.** Quem renova o login agora é

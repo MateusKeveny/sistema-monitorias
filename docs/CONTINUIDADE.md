@@ -11,7 +11,7 @@ Escrito em 28/09/2026, atualizado em 08/10/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.39.2** · Monitorias **5.3.4** (deploy de 13/10/2026) |
+| Publicado | Performance **1.39.3** · Monitorias **5.3.5** (deploy de 13/10/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
 | Migrações no banco | 01 a 57, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
@@ -471,6 +471,14 @@ Três versões, cada uma publicada e conferida antes da próxima:
   local: passe vencido renova e volta à tela com os parâmetros; passe recusado
   vai ao login com a mensagem certa, sem laço. **O 1102 continua** — o plano
   gratuito segue no limite —, mas não derruba mais a sessão.
+- **Performance 1.39.3 · Monitorias 5.3.5** (leveza, sem migração): as
+  consultas do layout (exclusões pendentes, avisos de reporte, leitura do
+  diário) rodam em paralelo com `Promise.all`; Smart Placement ligado no
+  `wrangler.jsonc` (`placement.mode = smart`, herdado pelo env performance);
+  `optimizePackageImports: ['recharts']` no `next.config.mjs`. Medição antes,
+  logado no Performance (fetch da página inteira, média de 4): Painel ~1,7 s,
+  Extrato ~1,4 s, aba Chamados ~1,2 s, saúde ~0,4 s. Próxima etapa, se valer:
+  revisar consultas repetidas do extrato e da importação.
 
 Visão de celular fica fora da revisão, por decisão do gestor. Os painéis são
 usados só no computador.

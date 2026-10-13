@@ -20,6 +20,10 @@
   "observability": {
     "enabled": true
   },
+  // Smart Placement (1.39.3): a Cloudflare passa a rodar o Worker perto do
+  // banco quando isso encurta as idas ao Supabase — cada tela faz várias.
+  // Vale para os dois sites (o env herda).
+  "placement": { "mode": "smart" },
   // Segundo site, com o mesmo código: o Painel de Performance (cota).
   // `opennextjs-cloudflare deploy --env performance` publica neste Worker.
   // Qual sistema cada site mostra é decidido pelo endereço (lib/sistema.ts),
