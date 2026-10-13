@@ -11,7 +11,7 @@ Escrito em 28/09/2026, atualizado em 08/10/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.39.4** · Monitorias **5.3.6** (deploy de 13/10/2026) |
+| Publicado | Performance **1.39.5** · Monitorias **5.3.7** (deploy de 13/10/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
 | Migrações no banco | 01 a 57, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
@@ -498,6 +498,23 @@ Três versões, cada uma publicada e conferida antes da próxima:
   lentas cada uma. A lista da média é filtrada por cargo no código (com
   `in('cargo', …)` chegou a ~6,5 s junto de outra consulta pesada). Próximo
   ganho grande só no SQL do cálculo (com conferência antes/depois).
+  Medido no site publicado com o gestor: Extrato de um Júnior ~0,9 s, Início
+  ~2,5 s, Extrato próprio de outubro ~3,2 s, de setembro ~4 s; operador ~0,4 s.
+- **Performance 1.39.5 · Monitorias 5.3.7** (leveza, sem migração): **mês
+  fechado não recalcula.** O Extrato buscava `vw_extrato_cota` e
+  `vw_cota_mensal` ao vivo também em mês fechado, só para o cargo, o nome e
+  quem compõe a média — os valores já vinham do congelado. Agora a 1ª rodada
+  é só de tabelas leves (o cargo vem de `cargos_da_pessoa`, mesma regra de
+  `cargo_na_competencia`); a 2ª depende do mês: fechado lê
+  `fechamento_linhas` e `equipeCongelada` (`lib/resultado-na-media.ts`);
+  aberto segue no cálculo ao vivo. `equipeCongelada` reproduz a lista da
+  view: resultado do fechamento, cargo do cadastro na competência (não o texto
+  do fechamento — agosto traz o Matheus como Analista), nome atual,
+  `mes_inteiro_na_operacao` em código e só quem tem pontos do mês
+  (`vw_extrato_direto`, ~0,4 s) — sem isso o Matheus entrava na lista de
+  agosto, mês importado da planilha externa em que ele não tem pontos no
+  sistema; o gestor decidiu manter como era. Conferência: os 24 extratos de
+  ago/set (12 pessoas) idênticos. Setembro do gestor: ~4 s → ~1 s (local).
 
 Visão de celular fica fora da revisão, por decisão do gestor. Os painéis são
 usados só no computador.

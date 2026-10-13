@@ -9,6 +9,14 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 5.3.7
+
+- **Extrato de mês fechado sem recalcular.** Os números já vinham do
+  congelado, mas a tela ainda pedia o cálculo ao vivo para saber o cargo e
+  quem formou a média, e descartava os valores. Agora o mês fechado lê o
+  fechamento e o cadastro. O Extrato de setembro do gestor caiu de ~4 s para
+  ~1 s. Os 24 extratos de agosto e setembro conferidos, idênticos.
+
 ## 5.3.6
 
 - **Extrato e Início do Performance mais rápidos.** As consultas saem em menos
