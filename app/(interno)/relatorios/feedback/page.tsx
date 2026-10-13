@@ -84,6 +84,15 @@ export default async function FolhaFeedback({
   }
   const monitorias = [...porMonitoria.values()];
 
+  // Motivo do zeramento (5.3.2): a view da folha não o traz, e a monitoria
+  // zerada aparecia como "todos os critérios atendidos", sem explicar o 0%.
+  const zeradas = monitorias.filter((m) => m.cabecalho.zerado).map((m) => m.cabecalho.monitoria_id);
+  const { data: motivos } = zeradas.length
+    ? await db.from('monitorias').select('id, motivo_zeramento').in('id', zeradas)
+    : { data: [] };
+  const motivoDe = new Map(((motivos ?? []) as { id: string; motivo_zeramento: string | null }[])
+    .map((m) => [m.id, m.motivo_zeramento]));
+
   const nomeOperador = monitorias[0]?.cabecalho.operador
     ?? ((operadores ?? []) as Operador[]).find((o) => o.id === operadorId)?.nome
     ?? 'Operador';
@@ -177,6 +186,8 @@ export default async function FolhaFeedback({
             <div className="mt-3 space-y-5">
               {monitorias.map(({ cabecalho, itens }) => {
                 const reprovados = itens.filter((i) => !i.conforme);
+                // Reprovados sempre; atendidos só quando têm observação.
+                const comObservacao = itens.filter((i) => !i.conforme || i.observacao?.trim());
                 return (
                   <div key={cabecalho.monitoria_id}
                     className="rounded-lg border border-slate-200 p-4">
@@ -194,32 +205,49 @@ export default async function FolhaFeedback({
                       </p>
                     </div>
 
-                    {reprovados.length > 0 ? (
-                      <ul className="mt-2 space-y-1">
-                        {reprovados.map((i) => (
-                          <li key={i.criterio} className="text-sm text-slate-700">
-                            <span className="mr-1.5 text-rose-600">✕</span>
-                            {i.criterio}
-                            <span className="ml-1 text-xs text-slate-500">
-                              (−{percentual(Number(i.peso))})
-                            </span>
-                            {i.observacao && (
-                              <span className="block pl-5 text-xs text-slate-500">{i.observacao}</span>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
+                    {cabecalho.zerado ? (
+                      <div className="mt-2 rounded-md bg-rose-500/10 px-3 py-2 text-sm text-slate-800">
+                        <span className="font-semibold text-rose-700">Motivo do zeramento: </span>
+                        <span className="whitespace-pre-wrap">
+                          {motivoDe.get(cabecalho.monitoria_id)?.trim() || 'não informado'}
+                        </span>
+                      </div>
+                    ) : reprovados.length === 0 && (
                       <p className="mt-2 text-sm text-emerald-700">
                         ✓ Todos os {itens.length} critérios atendidos.
                       </p>
                     )}
+                    {/* Cada critério com observação, reprovado ou atendido (5.3.2):
+                        antes só os reprovados apareciam, e a observação escrita
+                        num critério atendido ficava fora da folha. */}
+                    {comObservacao.length > 0 && (
+                      <ul className="mt-2 space-y-1.5">
+                        {comObservacao.map((i) => (
+                          <li key={i.criterio} className="text-sm text-slate-700">
+                            {i.conforme
+                              ? <span className="mr-1.5 text-emerald-600">✓</span>
+                              : <span className="mr-1.5 text-rose-600">✕</span>}
+                            {i.criterio}
+                            {!i.conforme && (
+                              <span className="ml-1 text-xs text-slate-500">
+                                (−{percentual(Number(i.peso))})
+                              </span>
+                            )}
+                            {i.observacao && (
+                              <span className="block whitespace-pre-wrap pl-5 text-xs text-slate-600">{i.observacao}</span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
 
                     {cabecalho.parecer && (
-                      <p className="mt-3 whitespace-pre-wrap border-l-2 border-slate-200 pl-3
-                                    text-sm leading-relaxed text-slate-600">
-                        {cabecalho.parecer}
-                      </p>
+                      <div className="mt-3 border-l-2 border-slate-200 pl-3">
+                        <p className="text-xs font-semibold text-slate-500">Observação geral</p>
+                        <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-600">
+                          {cabecalho.parecer}
+                        </p>
+                      </div>
                     )}
                   </div>
                 );

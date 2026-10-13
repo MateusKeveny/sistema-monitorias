@@ -9,6 +9,16 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 5.3.2
+
+- **Folha de feedback individual:** a monitoria zerada mostra o **motivo do
+  zeramento**. Antes aparecia "0% · zerada" com "Todos os critérios
+  atendidos", sem explicar o zero.
+- Cada critério com observação aparece no protocolo, reprovado (✕) ou atendido
+  (✓), e a observação geral ganha o título "Observação geral".
+- O CSV da lista de monitorias ganha a coluna do motivo do zeramento (o Excel
+  já trazia).
+
 ## 5.3.1
 
 - Cada abertura do painel passa a ser registrada (migração 52), para a tela

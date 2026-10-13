@@ -137,7 +137,7 @@ export async function GET(requisicao: NextRequest) {
           ? ['competencia', 'operador', 'semana_mes',
              'nota_1', 'nota_2', 'nota_3', 'nota_4', 'quantidade', 'media']
           : ['codigo', 'protocolo', 'data_atendimento', 'operador', 'canal',
-             'semana_mes', 'numero_monitoria', 'nota_final', 'zerado', 'parecer'];
+             'semana_mes', 'numero_monitoria', 'nota_final', 'zerado', 'motivo_zeramento', 'parecer'];
 
     const linhas =
       relatorio === 'ranking'
