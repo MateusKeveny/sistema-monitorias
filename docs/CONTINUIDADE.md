@@ -11,7 +11,7 @@ Escrito em 28/09/2026, atualizado em 08/10/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.39.3** · Monitorias **5.3.5** (deploy de 13/10/2026) |
+| Publicado | Performance **1.39.4** · Monitorias **5.3.6** (deploy de 13/10/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
 | Migrações no banco | 01 a 57, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
@@ -479,6 +479,25 @@ Três versões, cada uma publicada e conferida antes da próxima:
   logado no Performance (fetch da página inteira, média de 4): Painel ~1,7 s,
   Extrato ~1,4 s, aba Chamados ~1,2 s, saúde ~0,4 s. Próxima etapa, se valer:
   revisar consultas repetidas do extrato e da importação.
+- **Performance 1.39.4 · Monitorias 5.3.6** (leveza, 2ª etapa, sem migração):
+  Extrato em três rodadas de consultas (eram nove): perfil ∥ competência;
+  depois tudo da pessoa junto, com os pesos de todos os cargos e
+  `cargos_referencia` inteiros (tabelas pequenas) para não esperar o cargo;
+  por fim congelado ∥ lista da média ∥ ajustes da média.
+  `lib/resultado-na-media.ts` ganhou `ajustesDaMedia` (vai ao banco, não
+  depende dos resultados) e `aplicarNaMedia`. `PainelPleno` no mesmo
+  esquema. Início: perfil ∥ competência; o selo do gestor virou componente
+  próprio (`SeloDoGestor`), que busca em paralelo com o painel; o caminho do
+  Pleno busca cargo, média e `aprova_diario` juntos. Conferência: 41 telas
+  (Início em 3 meses; Extrato de 12 pessoas × ago/set/out) e o PainelPleno da
+  Suyara × 3 meses, idênticos ao código anterior.
+  **O que a medição mostrou** (tempo de cada consulta, servidor local): o
+  limite agora é o banco. `vw_cota_mensal` de todos leva ~2 s, a de uma
+  pessoa ~0,6 s, `vw_extrato_cota` de uma pessoa ~0,6–1 s, `vw_sem_cargo`
+  ~0,9 s; consultas pesadas em paralelo disputam a CPU do banco e ficam mais
+  lentas cada uma. A lista da média é filtrada por cargo no código (com
+  `in('cargo', …)` chegou a ~6,5 s junto de outra consulta pesada). Próximo
+  ganho grande só no SQL do cálculo (com conferência antes/depois).
 
 Visão de celular fica fora da revisão, por decisão do gestor. Os painéis são
 usados só no computador.

@@ -1,10 +1,11 @@
+import { redirect } from 'next/navigation';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { BarraDeMeta, Quadro, Vazio } from '@/componentes/ui';
 import { mesRotulo, percentual, umaCasa } from '@/lib/formatar';
 import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
 import SeletorDeDetalhe from '@/componentes/SeletorDeDetalhe';
 import { resolverCompetencia } from '@/lib/competencia';
-import { resultadosNaMedia } from '@/lib/resultado-na-media';
+import { ajustesDaMedia, aplicarNaMedia } from '@/lib/resultado-na-media';
 import ChamadosDaPessoa from '@/componentes/ChamadosDaPessoa';
 import type { Pessoa } from '@/lib/tipos';
 
@@ -58,28 +59,24 @@ export default async function Extrato({
 }: {
   searchParams: Promise<{ mes?: string; pessoa?: string; aba?: string }>;
 }) {
-  const perfil = await exigirPerfil();
+  // As consultas saem em poucas rodadas (1.39.4): eram nove, uma esperando a
+  // outra, e o extrato de quem recebe pela média levava ~4 s.
   const { mes, pessoa: pessoaPedida, aba } = await searchParams;
-  const { competencia, atual, emAberto } = await resolverCompetencia(mes);
+  const [perfil, { competencia, atual, emAberto }] = await Promise.all([exigirPerfil(), resolverCompetencia(mes)]);
   const veOTime = perfil.papel !== 'operador';
 
   const db = await criarClienteServidor();
 
-  const { data: pessoas } = veOTime
-    ? await db.from('pessoas').select('id, nome').eq('ativo', true).order('nome')
-    : { data: [{ id: perfil.id, nome: perfil.nome }] };
+  // A pessoa pedida é conferida na lista depois, junto com o resto.
+  const pessoaId = veOTime && pessoaPedida ? pessoaPedida : perfil.id;
 
-  const lista = (pessoas ?? []) as Pick<Pessoa, 'id' | 'nome'>[];
-  const pessoaId = veOTime && pessoaPedida && lista.some((p) => p.id === pessoaPedida)
-    ? pessoaPedida : perfil.id;
-
-  // Aba Chamados (migração 53): só para quem tem chamados importados no mês.
-  const { count: chamadosNoMes } = await db.from('chamados_elo').select('protocolo', { count: 'exact', head: true })
-    .eq('pessoa_id', pessoaId).eq('mes_competencia', competencia);
-  const temChamados = (chamadosNoMes ?? 0) > 0;
-  const abaChamados = temChamados && aba === 'chamados';
-
-  const [extrato, cota, csat, faixasCsat, fechamento, pago] = await Promise.all([
+  const [pessoas, chamados, extrato, cota, csat, faixasCsat, fechamento, pago, pesosDosCargos, referencias, cargos] = await Promise.all([
+    veOTime
+      ? db.from('pessoas').select('id, nome').eq('ativo', true).order('nome')
+      : Promise.resolve({ data: [{ id: perfil.id, nome: perfil.nome }] }),
+    // Aba Chamados (migração 53): só para quem tem chamados importados no mês.
+    db.from('chamados_elo').select('protocolo', { count: 'exact', head: true })
+      .eq('pessoa_id', pessoaId).eq('mes_competencia', competencia),
     db.from('vw_extrato_cota')
       .select('semana, origem, regra, rotulo, grupo, ordem, cargo_id, quantidade, peso, cota')
       .eq('pessoa_id', pessoaId).eq('mes_competencia', competencia)
@@ -96,7 +93,20 @@ export default async function Extrato({
     db.from('vw_pagamento_mensal')
       .select('atingiu_meta, bonus, pontos_pagos, valor_por_ponto, valor')
       .eq('pessoa_id', pessoaId).eq('mes_competencia', competencia).maybeSingle(),
+    // Os pesos de todos os cargos (tabela pequena): o cargo da pessoa só se
+    // sabe pelo extrato, e esperar por ele era uma rodada a mais.
+    db.from('pesos_por_cargo').select('cargo_id, regra, peso').eq('ativo', true),
+    db.from('cargos_referencia').select('cargo_id, referencia_id'),
+    db.from('cargos').select('id, nome'),
   ]);
+
+  const lista = (pessoas.data ?? []) as Pick<Pessoa, 'id' | 'nome'>[];
+  // Pessoa fora da lista (inativa, ou endereço errado): o extrato é o próprio.
+  if (pessoaId !== perfil.id && !lista.some((p) => p.id === pessoaId)) {
+    redirect(`/cota/extrato?mes=${competencia.slice(0, 7)}`);
+  }
+  const temChamados = (chamados.count ?? 0) > 0;
+  const abaChamados = temChamados && aba === 'chamados';
 
   // Competência fechada mostra o que foi congelado, não o cálculo de hoje.
   // Sem isto o mesmo mês aparece com dois números — agosto/2026 chegou a
@@ -109,11 +119,34 @@ export default async function Extrato({
   const congelado = fechamento.data as
     { id: string; cargo: string | null; resultado: number; meta: number | null } | null;
 
-  const { data: linhasFechadas } = congelado
-    ? await db.from('fechamento_linhas')
-      .select('semana, origem, regra, rotulo, grupo, ordem, quantidade, peso, cota')
-      .eq('fechamento_id', congelado.id).order('semana', { nullsFirst: false }).order('ordem')
-    : { data: null };
+  // Peso de cada faixa no cargo da pessoa, para mostrar também as faixas que
+  // ela não atingiu no resumo do mês.
+  const cargoId = ((extrato.data ?? []) as Linha[])[0]?.cargo_id;
+  const pesoDaFaixa = new Map(((pesosDosCargos.data ?? []) as { cargo_id: number; regra: string; peso: number }[])
+    .filter((p) => p.cargo_id === cargoId).map((p) => [p.regra, Number(p.peso)]));
+
+  // Quando o cargo recebe por média, a lista de quem formou a média, com o
+  // congelado e o atestado buscados junto, não depois. A lista vem inteira e
+  // o filtro por cargo é feito aqui: com `in('cargo', …)` a view levava ~6,5 s
+  // em vez de ~2 s (medido em 13/10/2026).
+  const nomeCargo = new Map(((cargos.data ?? []) as { id: number; nome: string }[]).map((c) => [c.id, c.nome]));
+  const nomesReferencia = ((referencias.data ?? []) as { cargo_id: number; referencia_id: number }[])
+    .filter((r) => r.cargo_id === cargoId)
+    .map((r) => nomeCargo.get(r.referencia_id)).filter(Boolean) as string[];
+  const recebePelaMedia = nomesReferencia.length > 0;
+
+  const [{ data: linhasFechadas }, daEquipe, ajustes] = await Promise.all([
+    congelado
+      ? db.from('fechamento_linhas')
+        .select('semana, origem, regra, rotulo, grupo, ordem, quantidade, peso, cota')
+        .eq('fechamento_id', congelado.id).order('semana', { nullsFirst: false }).order('ordem')
+      : Promise.resolve({ data: null }),
+    recebePelaMedia
+      ? db.from('vw_cota_mensal').select('pessoa_id, pessoa, cargo, resultado, compoe_media')
+        .eq('mes_competencia', competencia)
+      : Promise.resolve({ data: [] }),
+    recebePelaMedia ? ajustesDaMedia(db, competencia, Boolean(congelado)) : Promise.resolve(null),
+  ]);
 
   const aoVivo = (extrato.data ?? []) as Linha[];
   const linhas: Linha[] = linhasFechadas
@@ -129,14 +162,6 @@ export default async function Extrato({
     ? (congelado.meta == null ? null : Number(congelado.meta))
     : cota.data?.meta != null ? Number(cota.data.meta) : null;
 
-  // Peso de cada faixa no cargo da pessoa, para mostrar também as faixas que
-  // ela não atingiu no resumo do mês.
-  const cargoId = linhas[0]?.cargo_id;
-  const { data: pesos } = cargoId
-    ? await db.from('pesos_por_cargo').select('regra, peso').eq('cargo_id', cargoId).eq('ativo', true)
-    : { data: [] };
-  const pesoDaFaixa = new Map((pesos ?? []).map((p) => [p.regra as string, Number(p.peso)]));
-
   // Quando o cargo recebe por média, mostra de quem é a média: o resultado de
   // cada pessoa dos cargos de referência, a média e o multiplicador aplicado.
   const linhaMedia = linhas.find((l) => l.regra === 'media_da_equipe');
@@ -148,26 +173,15 @@ export default async function Extrato({
   const demanda = Number(linhaRealizado?.quantidade ?? 0);
   const contaComDemanda = linhaRealizado ? totalMedia + demanda : null;
   let composicao: { pessoa: string; cargo: string | null; resultado: number; comAtestado: number | null }[] = [];
-  if (linhaMedia && cargoId) {
-    const [referencias, cargos, resultados] = await Promise.all([
-      db.from('cargos_referencia').select('referencia_id').eq('cargo_id', cargoId),
-      db.from('cargos').select('id, nome'),
-      db.from('vw_cota_mensal').select('pessoa_id, pessoa, cargo, resultado, compoe_media')
-        .eq('mes_competencia', competencia),
-    ]);
-    const nomesReferencia = new Set(((referencias.data ?? []) as { referencia_id: number }[])
-      .map((r) => ((cargos.data ?? []) as { id: number; nome: string }[])
-        .find((c) => c.id === r.referencia_id)?.nome)
-      .filter(Boolean) as string[]);
-    const daMedia = ((resultados.data ?? []) as
+  if (linhaMedia && ajustes) {
+    const daMedia = ((daEquipe.data ?? []) as
       { pessoa_id: string; pessoa: string; cargo: string | null; resultado: number; compoe_media: boolean }[])
       // Quem trabalhou a competência pela metade não entra na média (migração
       // 23) e por isso não aparece aqui: listá-lo faria a conta não fechar.
-      .filter((r) => r.compoe_media && r.cargo && nomesReferencia.has(r.cargo));
+      .filter((r) => r.compoe_media && r.cargo && nomesReferencia.includes(r.cargo));
     // O valor que cada um levou para a média: congelado em mês fechado e sem
     // o atestado — senão a lista não fecha com a média (setembro/2026).
-    const naMedia = await resultadosNaMedia(db, competencia, Boolean(congelado),
-      new Map(daMedia.map((r) => [r.pessoa_id, Number(r.resultado)])));
+    const naMedia = aplicarNaMedia(ajustes, new Map(daMedia.map((r) => [r.pessoa_id, Number(r.resultado)])));
     composicao = daMedia
       .map((r) => {
         const m = naMedia.get(r.pessoa_id);

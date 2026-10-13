@@ -46,6 +46,22 @@ function diaDoCiclo(atual: string) {
   return { dia: Math.round((hoje - inicio) / dia) + 1, total: Math.round((fim - inicio) / dia) + 1 };
 }
 
+/** Selo do gestor: fechado, mês atual ou aguardando fechamento. */
+async function SeloDoGestor({ competencia, atual }: { competencia: string; atual: string }) {
+  const db = await criarClienteServidor();
+  const { data: fechados } = await db.from('fechamentos_cota').select('fechado_em')
+    .eq('mes_competencia', competencia).order('fechado_em', { ascending: false }).limit(1);
+  const fechadoEm = fechados?.[0]?.fechado_em as string | undefined;
+
+  return fechadoEm ? (
+    <Selo tom="bom">Fechado em {formatarData(fechadoEm.slice(0, 10))}</Selo>
+  ) : competencia === atual ? (
+    <Selo tom="neutro">Mês atual · dia {diaDoCiclo(atual).dia} de {diaDoCiclo(atual).total} do ciclo</Selo>
+  ) : (
+    <Selo tom="atencao">Em aberto · aguardando fechamento</Selo>
+  );
+}
+
 /** "Allana Castro da Silva" → "Allana Castro". */
 const nomeCurto = (nome: string) => nome.trim().split(/\s+/).slice(0, 2).join(' ');
 
@@ -62,9 +78,9 @@ export default async function InicioCota({
 }: {
   searchParams: Promise<{ canal?: string; mes?: string }>;
 }) {
-  const perfil = await exigirPerfil();
+  // O perfil e a competência saem juntos (1.39.4): um não depende do outro.
   const { canal: canalPedido, mes } = await searchParams;
-  const { competencia, atual, emAberto } = await resolverCompetencia(mes);
+  const [perfil, { competencia, atual, emAberto }] = await Promise.all([exigirPerfil(), resolverCompetencia(mes)]);
   const outroMes = competencia !== atual;
 
   /**
@@ -103,25 +119,14 @@ export default async function InicioCota({
     </div>
   );
 
-  // Gestor: mesmo topo, com a visão da equipe no lugar da própria cota.
+  // Gestor: mesmo topo, com a visão da equipe no lugar da própria cota. O
+  // selo busca o fechamento sozinho, ao mesmo tempo que o painel (1.39.4) —
+  // antes o painel esperava por ele.
   if (perfil.papel === 'gestor') {
-    const db = await criarClienteServidor();
-    const { data: fechados } = await db.from('fechamentos_cota').select('fechado_em')
-      .eq('mes_competencia', competencia).order('fechado_em', { ascending: false }).limit(1);
-    const fechadoEm = fechados?.[0]?.fechado_em as string | undefined;
-
-    const selo = fechadoEm ? (
-      <Selo tom="bom">Fechado em {formatarData(fechadoEm.slice(0, 10))}</Selo>
-    ) : competencia === atual ? (
-      <Selo tom="neutro">Mês atual · dia {diaDoCiclo(atual).dia} de {diaDoCiclo(atual).total} do ciclo</Selo>
-    ) : (
-      <Selo tom="atencao">Em aberto · aguardando fechamento</Selo>
-    );
-
     return (
       <ProvedorDeCanal inicial={canalPedido === 'diretores' ? 'diretores' : 'huggy'}>
         <div className="space-y-6">
-          <Topo selo={selo} direita={<AbasDeCanal />} />
+          <Topo selo={<SeloDoGestor competencia={competencia} atual={atual} />} direita={<AbasDeCanal />} />
           <PainelGestor competencia={competencia} atual={atual} />
         </div>
       </ProvedorDeCanal>
@@ -140,20 +145,22 @@ export default async function InicioCota({
   // gestor), a equipe com o mesmo acompanhamento do gestor, sem as pendências
   // que levam a telas só dele. Nada aqui grava: a gestão continua só do gestor,
   // e a RLS garante isso no banco.
+  // O cargo, a média dos cargos e quem aprova o diário saem juntos (1.39.4).
   const db = await criarClienteServidor();
-  const { data: cargos } = await db.from('cargos_da_pessoa').select('cargo_id, desde')
-    .eq('pessoa_id', perfil.id).lte('desde', competencia).order('desde', { ascending: false }).limit(1);
-  const cargoId = cargos?.[0]?.cargo_id as number | undefined;
-  const { data: media } = cargoId
-    ? await db.from('pesos_por_cargo').select('ativo').eq('cargo_id', cargoId).eq('regra', 'media_da_equipe').maybeSingle()
-    : { data: null };
-
-  if (cargoId && media?.ativo) {
-    const veOTime = perfil.papel !== 'operador';
+  const [{ data: cargos }, { data: medias }, { data: aprova }] = await Promise.all([
+    db.from('cargos_da_pessoa').select('cargo_id, desde')
+      .eq('pessoa_id', perfil.id).lte('desde', competencia).order('desde', { ascending: false }).limit(1),
+    db.from('pesos_por_cargo').select('cargo_id, ativo').eq('regra', 'media_da_equipe'),
     // O Pleno aprova os registros do diário que aguardam (migração 33) e
     // renova os que vencem em até 7 dias (37) — as pendências do gestor que
     // também são dele.
-    const { data: aprova } = await db.rpc('aprova_diario');
+    db.rpc('aprova_diario'),
+  ]);
+  const cargoId = cargos?.[0]?.cargo_id as number | undefined;
+  const media = (medias ?? []).find((m) => m.cargo_id === cargoId);
+
+  if (cargoId && media?.ativo) {
+    const veOTime = perfil.papel !== 'operador';
     const [{ count: aguardando }, { count: vencendo }, { data: leituras }, { count: privados }] = aprova === true
       ? await Promise.all([
           db.from('diario_registros').select('id', { count: 'exact', head: true })

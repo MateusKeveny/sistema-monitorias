@@ -22,14 +22,26 @@ export type NaMedia = { valor: number; comAtestado: number | null };
 export async function resultadosNaMedia(
   db: Db, competencia: string, congelado: boolean, resultados: Map<string, number>,
 ): Promise<Map<string, NaMedia>> {
-  const final = new Map(resultados);
+  return aplicarNaMedia(await ajustesDaMedia(db, competencia, congelado), resultados);
+}
+
+/** O que muda o resultado ao vivo para o valor da média: congelado e atestado. */
+export type AjustesDaMedia = { congelados: Map<string, number>; atestado: Map<string, number> };
+
+/**
+ * A parte de `resultadosNaMedia` que vai ao banco. Não depende dos
+ * resultados, então as telas buscam junto com eles (1.39.4) — antes era uma
+ * espera a mais, de ~0,8 s, depois da lista.
+ */
+export async function ajustesDaMedia(db: Db, competencia: string, congelado: boolean): Promise<AjustesDaMedia> {
+  const congelados = new Map<string, number>();
   const atestado = new Map<string, number>();
 
   if (congelado) {
     const { data: fechados } = await db.from('fechamentos_cota')
       .select('id, pessoa_id, resultado').eq('mes_competencia', competencia);
     const pessoaDo = new Map((fechados ?? []).map((f) => [f.id as string, f.pessoa_id as string]));
-    for (const f of fechados ?? []) final.set(f.pessoa_id as string, Number(f.resultado));
+    for (const f of fechados ?? []) congelados.set(f.pessoa_id as string, Number(f.resultado));
     if (pessoaDo.size) {
       const { data: linhas } = await db.from('fechamento_linhas').select('fechamento_id, cota')
         .eq('regra', 'atestado').in('fechamento_id', [...pessoaDo.keys()]);
@@ -46,7 +58,15 @@ export async function resultadosNaMedia(
       atestado.set(p, (atestado.get(p) ?? 0) + Number(l.cota));
     }
   }
+  return { congelados, atestado };
+}
 
+/** Os ajustes sobre os resultados ao vivo de cada pessoa. */
+export function aplicarNaMedia(
+  { congelados, atestado }: AjustesDaMedia, resultados: Map<string, number>,
+): Map<string, NaMedia> {
+  const final = new Map(resultados);
+  for (const [p, v] of congelados) final.set(p, v);
   return new Map([...final].map(([p, valor]) => {
     const desconto = atestado.get(p) ?? 0;
     // O desconto é negativo: o valor da média é o resultado sem ele.

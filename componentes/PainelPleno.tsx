@@ -2,7 +2,7 @@ import Link from '@/componentes/Link';
 import { BarraDeMeta, Quadro } from '@/componentes/ui';
 import { criarClienteServidor } from '@/lib/supabase/servidor';
 import { mesRotulo, umaCasa } from '@/lib/formatar';
-import { resultadosNaMedia } from '@/lib/resultado-na-media';
+import { ajustesDaMedia, aplicarNaMedia } from '@/lib/resultado-na-media';
 import { REGRA_MEDIA, REGRA_MEDIA_REALIZADO, REGRA_META } from '@/lib/tipos';
 
 const num = (v: number, casas = 0) => Number(v).toLocaleString('pt-BR', { maximumFractionDigits: casas });
@@ -50,9 +50,25 @@ export default async function PainelPleno({
   ]);
 
   const congelado = fechamento.data as { id: string; resultado: number; meta: number | null } | null;
-  const { data: linhasFechadas } = congelado
-    ? await db.from('fechamento_linhas').select('semana, regra, rotulo, quantidade, peso, cota').eq('fechamento_id', congelado.id)
-    : { data: null };
+
+  // Os cargos que formam a média e quem, neles, compôs a média do mês.
+  const nomeCargo = new Map(((cargos.data ?? []) as { id: number; nome: string }[]).map((c) => [c.id, c.nome]));
+  const nomesReferencia = ((referencias.data ?? []) as { referencia_id: number }[])
+    .map((r) => nomeCargo.get(r.referencia_id)).filter(Boolean) as string[];
+
+  // O congelado, a equipe e o atestado saem juntos (1.39.4) — eram três
+  // esperas seguidas. A equipe vem inteira e o filtro por cargo é feito aqui:
+  // com `in('cargo', …)` a view levava ~6,5 s em vez de ~2 s (13/10/2026).
+  const [{ data: linhasFechadas }, { data: daEquipe }, ajustes] = await Promise.all([
+    congelado
+      ? db.from('fechamento_linhas').select('semana, regra, rotulo, quantidade, peso, cota').eq('fechamento_id', congelado.id)
+      : Promise.resolve({ data: null }),
+    nomesReferencia.length
+      ? db.from('vw_cota_mensal').select('pessoa_id, pessoa, cargo, resultado, compoe_media')
+        .eq('mes_competencia', competencia)
+      : Promise.resolve({ data: [] }),
+    ajustesDaMedia(db, competencia, Boolean(congelado)),
+  ]);
   const linhas = ((linhasFechadas ?? extrato.data ?? []) as Linha[])
     .map((l) => ({ ...l, quantidade: Number(l.quantidade), peso: Number(l.peso), cota: Number(l.cota) }));
 
@@ -84,20 +100,11 @@ export default async function PainelPleno({
     };
   }).filter((d) => d.quantidade || d.cota || (d.peso > 0 && !d.valorManual));
 
-  // Os cargos que formam a média e quem, neles, compôs a média do mês.
-  const nomeCargo = new Map(((cargos.data ?? []) as { id: number; nome: string }[]).map((c) => [c.id, c.nome]));
-  const nomesReferencia = ((referencias.data ?? []) as { referencia_id: number }[])
-    .map((r) => nomeCargo.get(r.referencia_id)).filter(Boolean) as string[];
-  const { data: daEquipe } = nomesReferencia.length
-    ? await db.from('vw_cota_mensal').select('pessoa_id, pessoa, cargo, resultado, compoe_media')
-      .eq('mes_competencia', competencia).in('cargo', nomesReferencia)
-    : { data: [] };
-  const daMedia = ((daEquipe ?? []) as { pessoa_id: string; pessoa: string; resultado: number; compoe_media: boolean }[])
-    .filter((p) => p.compoe_media);
+  const daMedia = ((daEquipe ?? []) as { pessoa_id: string; pessoa: string; cargo: string | null; resultado: number; compoe_media: boolean }[])
+    .filter((p) => p.compoe_media && p.cargo && nomesReferencia.includes(p.cargo));
   // O valor que cada um levou para a média: congelado em mês fechado e sem o
   // atestado — senão a lista não fecha com a média (setembro/2026).
-  const naMedia = await resultadosNaMedia(db, competencia, Boolean(congelado),
-    new Map(daMedia.map((p) => [p.pessoa_id, Number(p.resultado)])));
+  const naMedia = aplicarNaMedia(ajustes, new Map(daMedia.map((p) => [p.pessoa_id, Number(p.resultado)])));
   const composicao = daMedia
     .map((p) => {
       const m = naMedia.get(p.pessoa_id);

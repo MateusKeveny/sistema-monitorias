@@ -9,6 +9,15 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 5.3.6
+
+- **Extrato e Início do Performance mais rápidos.** As consultas saem em menos
+  rodadas: o Extrato fazia nove esperas seguidas e agora faz três; o perfil e a
+  competência do mês saem juntos; o selo do mês não segura mais o painel do
+  gestor. Para quem recebe pela média, o Extrato do gestor caiu de ~4,5 s para
+  ~3,3 s (medido no servidor local). Os números não mudam: 41 telas conferidas
+  antes e depois, idênticas.
+
 ## 5.3.5
 
 - **Telas mais leves.** As consultas que rodam a cada clique (menu, avisos de
