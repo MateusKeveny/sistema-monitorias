@@ -9,6 +9,14 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 5.3.3
+
+- **"Falha crítica" no lugar de "zeramento"** em todo o sistema: no formulário
+  ("Falha crítica", "Descrição da falha crítica"), na página da monitoria, na
+  folha de feedback, nos cartões e colunas ("Falhas críticas"), no filtro da
+  lista, no gráfico de evolução e no Excel. Os nomes internos no banco não
+  mudam.
+
 ## 5.3.2
 
 - **Folha de feedback individual:** a monitoria zerada mostra o **motivo do

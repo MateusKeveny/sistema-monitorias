@@ -94,7 +94,7 @@ export default async function DetalheMonitoria({
         <Indicador
           rotulo="Nota final" valor={nota(Number(m.nota_final))}
           tom={m.zerado || Number(m.nota_final) < 0.85 ? 'ruim' : Number(m.nota_final) < 0.95 ? 'alerta' : 'bom'}
-          detalhe={m.zerado ? 'zerada por falha crítica' : Number(m.nota_final) < 0.85 ? 'abaixo do piso de 85%' : undefined}
+          detalhe={m.zerado ? 'nota zero por falha crítica' : Number(m.nota_final) < 0.85 ? 'abaixo do piso de 85%' : undefined}
         />
         <Indicador rotulo="Operador(a)" valor={m.operador} detalhe={m.monitor ? `avaliado por ${m.monitor}` : undefined} />
         <Indicador
@@ -107,7 +107,7 @@ export default async function DetalheMonitoria({
       {m.zerado && m.motivo_zeramento && (
         <div className="rounded-xl bg-rose-50 px-5 py-4 ring-1 ring-rose-600/20">
           <p className="text-xs font-semibold uppercase tracking-wide text-rose-800">
-            Motivo do zeramento
+            Falha crítica
           </p>
           <p className="mt-1 text-sm text-rose-900">{m.motivo_zeramento}</p>
         </div>

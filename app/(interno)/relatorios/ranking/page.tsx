@@ -80,7 +80,7 @@ export default async function RelatorioRanking({
                 <Th className="w-10">#</Th>
                 <Th>Operador</Th>
                 <Th className="text-right">Monitorias</Th>
-                <Th className="text-right">Zeradas</Th>
+                <Th className="text-right">Falhas críticas</Th>
                 <Th className="text-right">100%</Th>
                 <Th className="text-right">Menor nota</Th>
                 <Th className="text-right">Nota média</Th>

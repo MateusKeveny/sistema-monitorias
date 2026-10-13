@@ -5,7 +5,7 @@ const RELATORIOS = [
   {
     href: '/relatorios/ranking',
     titulo: 'Ranking mensal por operador',
-    descricao: 'Nota média, número de monitorias, zeradas e evolução mês a mês de cada pessoa.',
+    descricao: 'Nota média, número de monitorias, falhas críticas e evolução mês a mês de cada pessoa.',
   },
   {
     href: '/relatorios/criterios',

@@ -315,7 +315,7 @@ export default function FormularioMonitoria({
     if (faltaEvidencia > 0)
       return falha(`Faltam ${faltaEvidencia} critério(s) reprovados sem a evidência do que aconteceu.`);
     if (zerado && !motivoZeramento.trim())
-      return falha('Descreva o motivo do zeramento por falha crítica.');
+      return falha('Descreva a falha crítica.');
     return true;
   }
 
@@ -897,7 +897,7 @@ export default function FormularioMonitoria({
               className="mt-0.5 h-4 w-4 rounded border-slate-400 text-rose-600" />
             <span>
               <span className="block text-sm font-medium text-rose-900">
-                Zerar por falha crítica
+                Falha crítica
               </span>
               <span className="block text-xs text-rose-700">
                 A nota vai a 0% independentemente dos critérios acima.
@@ -907,9 +907,9 @@ export default function FormularioMonitoria({
 
           {zerado && (
             <label className="block">
-              <span className={rotuloCampo}>Motivo do zeramento</span>
+              <span className={rotuloCampo}>Descrição da falha crítica</span>
               <input value={motivoZeramento} onChange={(e) => setMotivoZeramento(e.target.value)}
-                className={campo} placeholder="Qual falha crítica motivou o zeramento" />
+                className={campo} placeholder="Qual foi a falha crítica" />
             </label>
           )}
 
@@ -944,7 +944,7 @@ export default function FormularioMonitoria({
                 faltaEvidencia && `${faltaEvidencia} sem a evidência`,
               ].filter(Boolean).join(' e ')}.`
               : zerado
-                ? 'Zerada por falha crítica.'
+                ? 'Nota zero por falha crítica.'
                 : reprovados.length === 0
                   ? 'Nenhum critério reprovado.'
                   : `Descontos: ${reprovados.map((c) => `${c.nome} (−${percentual(Number(c.peso))})`).join(', ')}`}

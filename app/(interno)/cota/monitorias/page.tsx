@@ -296,7 +296,7 @@ async function Equipe({ lista, mesPedido }: { lista: { id: string; nome: string 
                 valor={d == null ? '—' : `${d >= 0 ? '▲' : '▼'} ${Math.abs(d).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} pt`}
                 tom={d == null ? undefined : d >= 0 ? 'melhor' : 'pior'}
                 detalhe={anterior && notaAnterior != null ? `${rotuloMes(anterior)} fechou em ${percentual(notaAnterior)}` : undefined} />
-        <Resumo rotulo="Monitorias zeradas" valor={String(zeradas)} tom={zeradas > 0 ? 'pior' : undefined}
+        <Resumo rotulo="Falhas críticas" valor={String(zeradas)} tom={zeradas > 0 ? 'pior' : undefined}
                 detalhe={total ? `${percentual(zeradas / total)} do total` : undefined} />
         <Resumo rotulo="Atendentes abaixo de 85%" valor={String(abaixo)} tom={abaixo > 0 ? 'atencao' : undefined}
                 detalhe={`de ${linhas.length} com monitoria no mês`} />
@@ -322,7 +322,7 @@ async function Equipe({ lista, mesPedido }: { lista: { id: string; nome: string 
                   <Th className="w-10">#</Th>
                   <Th>Atendente</Th>
                   <Th className="text-right">Monitorias</Th>
-                  <Th className="text-right">Zeradas</Th>
+                  <Th className="text-right">Falhas críticas</Th>
                   <Th className="text-right">Nota média</Th>
                 </tr>
               </thead>

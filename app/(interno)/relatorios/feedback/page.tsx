@@ -149,7 +149,7 @@ export default async function FolhaFeedback({
               <p className="text-2xl font-semibold tabular-nums text-slate-900">{monitorias.length}</p>
             </div>
             <div>
-              <p className="text-xs uppercase tracking-wide text-slate-500">Zeradas</p>
+              <p className="text-xs uppercase tracking-wide text-slate-500">Falhas críticas</p>
               <p className="text-2xl font-semibold tabular-nums text-slate-900">
                 {monitorias.filter((m) => m.cabecalho.zerado).length}
               </p>
@@ -201,13 +201,13 @@ export default async function FolhaFeedback({
                       <p className={`text-sm font-semibold tabular-nums ${
                         cabecalho.zerado ? 'text-rose-700' : 'text-slate-900'}`}>
                         {nota(Number(cabecalho.nota_final))}
-                        {cabecalho.zerado && ' · zerada'}
+                        {cabecalho.zerado && ' · falha crítica'}
                       </p>
                     </div>
 
                     {cabecalho.zerado ? (
                       <div className="mt-2 rounded-md bg-rose-500/10 px-3 py-2 text-sm text-slate-800">
-                        <span className="font-semibold text-rose-700">Motivo do zeramento: </span>
+                        <span className="font-semibold text-rose-700">Falha crítica: </span>
                         <span className="whitespace-pre-wrap">
                           {motivoDe.get(cabecalho.monitoria_id)?.trim() || 'não informado'}
                         </span>

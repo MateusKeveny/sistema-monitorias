@@ -243,7 +243,7 @@ export default async function Painel({
           detalhe={`${total} monitoria${total === 1 ? '' : 's'} avaliada${total === 1 ? '' : 's'}`}
         />
         <Indicador
-          rotulo="Monitorias zeradas" valor={String(zeradas)}
+          rotulo="Falhas críticas" valor={String(zeradas)}
           tom={zeradas > 0 ? 'ruim' : 'bom'}
           detalhe={total ? `${percentual(zeradas / total)} do total` : undefined}
         />
@@ -346,7 +346,7 @@ export default async function Painel({
                     <Th className="w-10">#</Th>
                     <Th>Operador</Th>
                     <Th className="text-right">Monitorias</Th>
-                    <Th className="text-right">Zeradas</Th>
+                    <Th className="text-right">Falhas críticas</Th>
                     <Th className="text-right">Nota média</Th>
                   </tr>
                 </thead>

@@ -205,7 +205,7 @@ export default async function ListaMonitorias({
 
         <select name="zeradas" defaultValue={filtros.zeradas ?? ''} className={estilo}>
           <option value="">Todas as notas</option>
-          <option value="sim">Somente zeradas</option>
+          <option value="sim">Somente com falha crítica</option>
         </select>
 
         <button type="submit"

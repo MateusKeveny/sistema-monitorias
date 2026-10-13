@@ -75,7 +75,7 @@ export default function EvolucaoMensal({ dados }: { dados: Ponto[] }) {
           <Legend wrapperStyle={{ fontSize: 12, color: cores.eixo }} />
           <Bar yAxisId="qtd" dataKey="monitorias" name="Monitorias"
             fill={cores.barra} radius={[4, 4, 0, 0]} />
-          <Bar yAxisId="qtd" dataKey="zeradas" name="Zeradas"
+          <Bar yAxisId="qtd" dataKey="zeradas" name="Falhas críticas"
             fill={cores.zeradas} radius={[4, 4, 0, 0]} />
           <Line
             yAxisId="nota" type="monotone" dataKey="nota" name="Nota média"

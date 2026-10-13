@@ -137,7 +137,7 @@ export function EtiquetaNota({ valor, zerado = false }: { valor: number | null; 
     <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs
                       font-semibold tabular-nums ring-1 ring-inset ${cor}`}>
       {formatarNota(valor)}
-      {zerado && <span className="ml-1 font-normal">zerada</span>}
+      {zerado && <span className="ml-1 font-normal">falha crítica</span>}
     </span>
   );
 }
