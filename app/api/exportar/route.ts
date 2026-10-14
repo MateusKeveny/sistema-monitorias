@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { criarClienteServidor } from '@/lib/supabase/servidor';
 import { gerarXlsx, type Aba } from '@/lib/xlsx-escrever';
+import { mesValido } from '@/lib/formatar';
 
 export const dynamic = 'force-dynamic';
 
@@ -78,7 +79,7 @@ function agruparPorSemana(linhas: Record<string, unknown>[]): LinhaSemana[] {
  *   /api/exportar?formato=csv&relatorio=ranking   -> ranking mensal em CSV
  *   /api/exportar?formato=csv&relatorio=semanal   -> operador x semana, com as notas
  *   /api/exportar?formato=csv                     -> monitorias em CSV
- * Aceita &mes=AAAA-MM-01 para filtrar.
+ * Aceita &mes=AAAA-MM-01 (ou AAAA-MM) para filtrar.
  *
  * A consulta usa a sessão do usuário, então a RLS se aplica: um operador
  * só consegue exportar os próprios dados.
@@ -92,6 +93,11 @@ export async function GET(requisicao: NextRequest) {
   const formato = p.get('formato') ?? 'xlsx';
   const relatorio = p.get('relatorio') ?? 'monitorias';
   const mes = p.get('mes');
+  // Mês inválido responde 400 (1.41.1); antes a consulta falhava no banco e a
+  // resposta era um 500 vazio. Vem como data ('2026-09-01'), do filtro da tela.
+  if (mes && !(mesValido(mes.slice(0, 7)) && ['', '-01'].includes(mes.slice(7)))) {
+    return NextResponse.json({ erro: 'Informe o mês como AAAA-MM-01.' }, { status: 400 });
+  }
 
   /**
    * Lê uma view inteira, opcionalmente restrita a um mês.
@@ -112,7 +118,7 @@ export async function GET(requisicao: NextRequest) {
 
     for (let de = 0; ; de += PAGINA) {
       let q = db.from(view).select('*');
-      if (mes) q = q.eq('mes_referencia', mes);
+      if (mes) q = q.eq('mes_referencia', `${mes.slice(0, 7)}-01`);
       for (const [coluna, ascendente] of ordem) q = q.order(coluna, { ascending: ascendente });
       q = q.range(de, de + PAGINA - 1);
 

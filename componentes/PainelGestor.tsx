@@ -8,6 +8,7 @@ import { corDoCsat, hojeNoBrasil, percentual, semanaDoCiclo } from '@/lib/format
 import { mesAnterior } from '@/lib/competencia';
 import { fonteDoMes } from '@/lib/resumo';
 import { limiteDeRenovacao, pessoasComLeituraPendente, type LeituraDiario } from '@/lib/diario';
+import { todas } from '@/lib/consultas';
 
 const CANAIS: Canal[] = ['huggy', 'diretores'];
 const META_CSAT = 0.95;
@@ -79,7 +80,7 @@ export default async function PainelGestor({
   const fonte = await fonteDoMes(competencia);
 
   const [pessoas, csat, volume, criterios, cota, cargos, fechados, monitorias, valores, semCargo, conferir, diario, vencendo, leituras, privados, reportes, atrasos]
-    = await Promise.all([
+    = await todas([
     db.from('pessoas').select('id, nome, exibir_no_painel, conta_nas_medias'),
     db.from('vw_csat_semanal').select('pessoa_id, origem, semana, avaliacoes, positivas, mes_competencia')
       .in('mes_competencia', meses),

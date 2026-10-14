@@ -25,7 +25,9 @@ export async function middleware(requisicao: NextRequest) {
   // Sem cookie de sessão não há ninguém logado: vai ao login (1.35.4).
   if (!temCookieDeSessao(cookies)) {
     if (publica) return NextResponse.next();
-    return irPara(requisicao, '/login', caminho);
+    // Com os parâmetros (1.41.1): o link do extrato de setembro de uma pessoa
+    // voltava, depois do login, no mês e na pessoa padrão.
+    return irPara(requisicao, '/login', caminho + requisicao.nextUrl.search);
   }
 
   // Com cookie, só a validade é lida — sem ir ao Supabase e sem renovar aqui

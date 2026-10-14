@@ -10,6 +10,7 @@ import CarimboDoResumo from '@/componentes/CarimboDoResumo';
 import { ajustesDaMedia, aplicarNaMedia, equipeCongelada } from '@/lib/resultado-na-media';
 import ChamadosDaPessoa from '@/componentes/ChamadosDaPessoa';
 import type { Pessoa } from '@/lib/tipos';
+import { todas, dados } from '@/lib/consultas';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,7 +66,7 @@ export default async function Extrato({
   // outra, e o extrato de quem recebe pela média levava ~4 s.
   const { mes, pessoa: pessoaPedida, aba } = await searchParams;
   // A situação do resumo do mês (migração 58) sai junto: é uma consulta leve.
-  const [perfil, { competencia, atual, emAberto }] = await Promise.all([
+  const [perfil, { competencia, atual, emAberto }] = await todas([
     exigirPerfil(), resolverCompetencia(mes), situacaoDoResumo(),
   ]);
   const veOTime = perfil.papel !== 'operador';
@@ -76,7 +77,14 @@ export default async function Extrato({
   const fonte = await fonteDoMes(competencia);
 
   // A pessoa pedida é conferida na lista depois, junto com o resto.
-  const pessoaId = veOTime && pessoaPedida ? pessoaPedida : perfil.id;
+  // Só um identificador de verdade vai ao banco (1.41.1): "?pessoa=lixo" fazia
+  // a consulta falhar, e com a falha agora virando erro a tela quebrava. Como
+  // pessoa fora da lista, volta para o próprio extrato.
+  const pessoaId = veOTime && pessoaPedida && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(pessoaPedida)
+    ? pessoaPedida : perfil.id;
+  if (veOTime && pessoaPedida && pessoaId === perfil.id && pessoaPedida !== perfil.id) {
+    redirect(`/cota/extrato?mes=${competencia.slice(0, 7)}`);
+  }
 
   // O extrato ao vivo da pessoa. No mês corrente, que nunca está fechado, sai
   // já na 1ª rodada (1.39.6): esperar o fechamento para pedir deixava o mês
@@ -94,7 +102,7 @@ export default async function Extrato({
 
   // 1ª rodada: tabelas leves. Mês fechado não recalcula nada (1.39.5).
   const [pessoas, chamados, csat, faixasCsat, fechamento, pago, pesosDosCargos, referencias, cargos, cargoDaPessoa]
-    = await Promise.all([
+    = await todas([
     veOTime
       ? db.from('pessoas').select('id, nome').eq('ativo', true).order('nome')
       : Promise.resolve({ data: [{ id: perfil.id, nome: perfil.nome }] }),
@@ -162,22 +170,22 @@ export default async function Extrato({
   // Mês aberto: o extrato ao vivo e, para a média, a lista de todos (o filtro
   // por cargo é feito aqui: com `in('cargo', …)` a view chegou a ~6,5 s).
   const [extrato, cota, linhasFechadas, daEquipe, ajustes] = congelado
-    ? await Promise.all([
+    ? await todas([
         Promise.resolve({ data: [] as Linha[] }),
         Promise.resolve({ data: null as { resultado: number; meta: number | null; cargo: string | null; pessoa: string } | null }),
         db.from('fechamento_linhas')
           .select('semana, origem, regra, rotulo, grupo, ordem, quantidade, peso, cota')
           .eq('fechamento_id', congelado.id).order('semana', { nullsFirst: false }).order('ordem')
-          .then((r) => r.data),
+          .then(dados),
         recebePelaMedia ? equipeCongelada(db, competencia) : Promise.resolve([] as DaEquipe[]),
         recebePelaMedia ? ajustesDaMedia(db, competencia, true) : Promise.resolve(null),
       ])
-    : await Promise.all([
+    : await todas([
         ...((vivo) => [vivo.then(([e]) => e), vivo.then(([, c]) => c)] as const)(aoVivoAntecipado ?? aoVivoDaPessoa()),
         Promise.resolve(null),
         recebePelaMedia
           ? db.from(fonte.mensal).select('pessoa_id, pessoa, cargo, resultado, compoe_media')
-            .eq('mes_competencia', competencia).then((r) => (r.data ?? []) as DaEquipe[])
+            .eq('mes_competencia', competencia).then((r) => (dados(r) ?? []) as DaEquipe[])
           : Promise.resolve([] as DaEquipe[]),
         recebePelaMedia ? ajustesDaMedia(db, competencia, false, fonte.extrato) : Promise.resolve(null),
       ]);

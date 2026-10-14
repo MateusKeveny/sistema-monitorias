@@ -10,6 +10,7 @@ import { mesAnterior, resolverCompetencia } from '@/lib/competencia';
 import { limiteDeRenovacao, pessoasComLeituraPendente, type LeituraDiario } from '@/lib/diario';
 import { fonteDoMes, situacaoDoResumo } from '@/lib/resumo';
 import CarimboDoResumo from '@/componentes/CarimboDoResumo';
+import { todas } from '@/lib/consultas';
 
 export const dynamic = 'force-dynamic';
 
@@ -82,7 +83,7 @@ export default async function InicioCota({
 }) {
   // O perfil e a competência saem juntos (1.39.4): um não depende do outro.
   const { canal: canalPedido, mes } = await searchParams;
-  const [perfil, { competencia, atual, emAberto }] = await Promise.all([
+  const [perfil, { competencia, atual, emAberto }] = await todas([
     exigirPerfil(), resolverCompetencia(mes), situacaoDoResumo(),
   ]);
   const outroMes = competencia !== atual;
@@ -164,7 +165,7 @@ export default async function InicioCota({
   // e a RLS garante isso no banco.
   // O cargo, a média dos cargos e quem aprova o diário saem juntos (1.39.4).
   const db = await criarClienteServidor();
-  const [{ data: cargos }, { data: medias }, { data: aprova }] = await Promise.all([
+  const [{ data: cargos }, { data: medias }, { data: aprova }] = await todas([
     db.from('cargos_da_pessoa').select('cargo_id, desde')
       .eq('pessoa_id', perfil.id).lte('desde', competencia).order('desde', { ascending: false }).limit(1),
     db.from('pesos_por_cargo').select('cargo_id, ativo').eq('regra', 'media_da_equipe'),
@@ -179,7 +180,7 @@ export default async function InicioCota({
   if (cargoId && media?.ativo) {
     const veOTime = perfil.papel !== 'operador';
     const [{ count: aguardando }, { count: vencendo }, { data: leituras }, { count: privados }] = aprova === true
-      ? await Promise.all([
+      ? await todas([
           db.from('diario_registros').select('id', { count: 'exact', head: true })
             .eq('situacao', 'aguardando').neq('pessoa_id', perfil.id),
           db.from('diario_registros').select('id', { count: 'exact', head: true })

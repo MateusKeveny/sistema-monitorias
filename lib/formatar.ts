@@ -73,6 +73,14 @@ const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
  * Rótulo padrão de mês em todo o sistema: "Agosto/2026".
  * É sempre o mês de competência, no ciclo de 26 a 25.
  */
+/**
+ * Mês da URL (`?mes=2026-09`) que existe de verdade (1.41.1): mês de 01 a 12,
+ * ano de 2000 a 2099. "2026-13" passava pelo formato e a tela mostrava
+ * "Invalid Date" no seletor de mês.
+ */
+export const mesValido = (mes?: string | null): mes is string =>
+  /^20\d{2}-(0[1-9]|1[0-2])$/.test(mes ?? '');
+
 export const mesRotulo = (iso: string) => {
   const [a, m] = iso.slice(0, 10).split('-');
   return `${MESES[Number(m) - 1]}/${a}`;

@@ -4,6 +4,7 @@ import { Quadro, Vazio } from '@/componentes/ui';
 import GraficoDeLinha, { type PontoDaLinha } from '@/componentes/GraficoDeLinha';
 import { mesRotulo, percentual } from '@/lib/formatar';
 import type { PagamentoMensal, Pessoa } from '@/lib/tipos';
+import { todas, conferida } from '@/lib/consultas';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,14 +60,14 @@ export default async function Historico({
   const db = await criarClienteServidor();
 
   const { data: pessoas } = veOTime
-    ? await db.from('pessoas').select('id, nome').order('nome')
+    ? await conferida(db.from('pessoas').select('id, nome').order('nome'))
     : { data: [{ id: perfil.id, nome: perfil.nome }] };
 
   const lista = (pessoas ?? []) as Pick<Pessoa, 'id' | 'nome'>[];
   const pessoaId = veOTime && pessoaPedida && lista.some((p) => p.id === pessoaPedida)
     ? pessoaPedida : perfil.id;
 
-  const [{ data: fechados }, { data: pagamentos }] = await Promise.all([
+  const [{ data: fechados }, { data: pagamentos }] = await todas([
     db.from('fechamentos_cota').select('id, mes_competencia, cargo, resultado, meta')
       .eq('pessoa_id', pessoaId).order('mes_competencia', { ascending: false }),
     db.from('vw_pagamento_mensal').select('*').eq('pessoa_id', pessoaId),
@@ -77,9 +78,9 @@ export default async function Historico({
     .map((p) => [p.mes_competencia, p]));
 
   const { data: detalhe } = meses.length
-    ? await db.from('fechamento_linhas')
+    ? await conferida(db.from('fechamento_linhas')
       .select('fechamento_id, semana, origem, regra, rotulo, grupo, ordem, quantidade, peso, cota')
-      .in('fechamento_id', meses.map((m) => m.id)).order('ordem')
+      .in('fechamento_id', meses.map((m) => m.id)).order('ordem'))
     : { data: [] };
 
   const linhas = (detalhe ?? []) as LinhaFechada[];

@@ -5,7 +5,7 @@ import FilaDeAtrasos, { type ChamadoAtrasado } from '@/componentes/FilaDeAtrasos
 import NotasGuardadas, { type NotaGuardada } from '@/componentes/NotasGuardadas';
 import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
 import { Quadro } from '@/componentes/ui';
-import { dataHora, diaMes, hojeNoBrasil, mesDeCompetencia, periodoDaSemana } from '@/lib/formatar';
+import { dataHora, diaMes, hojeNoBrasil, mesDeCompetencia, periodoDaSemana, mesValido } from '@/lib/formatar';
 import type { Pessoa } from '@/lib/tipos';
 
 export const dynamic = 'force-dynamic';
@@ -27,7 +27,7 @@ export default async function ImportarAvaliacoes({
   const { mes, aba } = await searchParams;
   const hoje = hojeNoBrasil();
   const atual = mesDeCompetencia(hoje);
-  const competencia = /^\d{4}-\d{2}$/.test(mes ?? '') ? `${mes}-01` : atual;
+  const competencia = mesValido(mes) ? `${mes}-01` : atual;
 
   const db = await criarClienteServidor();
 

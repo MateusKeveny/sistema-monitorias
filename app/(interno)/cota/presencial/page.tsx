@@ -2,7 +2,7 @@ import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import FormularioPresencial from '@/componentes/FormularioPresencial';
 import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
 import { Painel } from '@/componentes/ui';
-import { diaMes, hojeNoBrasil, mesDeCompetencia, periodoDaSemana } from '@/lib/formatar';
+import { diaMes, hojeNoBrasil, mesDeCompetencia, periodoDaSemana, mesValido } from '@/lib/formatar';
 import type { Presencial } from '@/lib/tipos';
 
 export const dynamic = 'force-dynamic';
@@ -23,7 +23,7 @@ export default async function AtendimentoPresencial({
   const { mes } = await searchParams;
   const hoje = hojeNoBrasil();
   const atual = mesDeCompetencia(hoje);
-  const competencia = /^\d{4}-\d{2}$/.test(mes ?? '') ? `${mes}-01` : atual;
+  const competencia = mesValido(mes) ? `${mes}-01` : atual;
   const veOTime = perfil.papel !== 'operador';
 
   const db = await criarClienteServidor();

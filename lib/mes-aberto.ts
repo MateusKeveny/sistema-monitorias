@@ -1,6 +1,7 @@
 import { cache } from 'react';
 import { criarClienteServidor } from '@/lib/supabase/servidor';
 import { hojeNoBrasil, mesDeCompetencia } from '@/lib/formatar';
+import { mesValido } from '@/lib/formatar';
 
 /**
  * Mês aberto para monitorias (Monitorias 4.12.0, migração 30).
@@ -34,4 +35,4 @@ export const ultimoDiaDoMesAberto = (aberto: string) => `${aberto.slice(0, 8)}25
  * de mês pela seta caía de volta no mês mais recente, em silêncio.
  */
 export const mesCompleto = (mes?: string) =>
-  (/^\d{4}-\d{2}$/.test(mes ?? '') ? `${mes}-01` : mes);
+  (mesValido(mes) ? `${mes}-01` : mes);

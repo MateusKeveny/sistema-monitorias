@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { criarClienteServidor, obterPerfil } from '@/lib/supabase/servidor';
 import { gerarXlsx, type Aba, type Coluna } from '@/lib/xlsx-escrever';
-import { mesRotulo } from '@/lib/formatar';
+import { mesRotulo, mesValido } from '@/lib/formatar';
 
 export const dynamic = 'force-dynamic';
 
@@ -96,7 +96,7 @@ export async function GET(requisicao: NextRequest) {
 
   const params = requisicao.nextUrl.searchParams;
   const mes = params.get('mes') ?? '';
-  if (!/^\d{4}-\d{2}$/.test(mes)) {
+  if (!mesValido(mes)) {
     return NextResponse.json({ erro: 'Informe a competência como AAAA-MM.' }, { status: 400 });
   }
   const competencia = `${mes}-01`;

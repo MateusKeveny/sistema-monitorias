@@ -7,6 +7,7 @@ import { criarClienteServidor } from '@/lib/supabase/servidor';
 import { codigoMonitoria, data as formatarData, percentual } from '@/lib/formatar';
 import { mesAnterior } from '@/lib/competencia';
 import { fonteDoMes } from '@/lib/resumo';
+import { todas, conferida } from '@/lib/consultas';
 
 const CANAIS: { chave: Canal; rotulo: string }[] = [
   { chave: 'huggy', rotulo: 'Expansão' },
@@ -83,12 +84,12 @@ export default async function PainelAtendente({
   const meses = [competencia, anterior];
   const db = await criarClienteServidor();
   // O mês aberto e o anterior vêm do resumo quando ele está em dia (migração 58).
-  const [fonte, fonteAntes] = await Promise.all([fonteDoMes(competencia), fonteDoMes(anterior)]);
+  const [fonte, fonteAntes] = await todas([fonteDoMes(competencia), fonteDoMes(anterior)]);
 
   const equipe = Promise.all(CANAIS.flatMap(({ chave }) => [1, 2, 3, 4].map((semana) =>
     db.rpc('csat_da_equipe', { p_mes: competencia, p_semana: semana, p_origem: chave }))));
 
-  const [csat, volume, extrato, fechados, pesos, regras, tmeEquipe, cotaAntes, monitorias, csatEquipe] = await Promise.all([
+  const [csat, volume, extrato, fechados, pesos, regras, tmeEquipe, cotaAntes, monitorias, csatEquipe] = await todas([
     db.from('vw_csat_semanal').select('origem, semana, avaliacoes, positivas, mes_competencia')
       .eq('pessoa_id', pessoaId).in('mes_competencia', meses),
     db.from('volume_semanal').select('canal, semana, finalizados, tme_seg, mes_competencia')
@@ -139,8 +140,8 @@ export default async function PainelAtendente({
   // ---------------------------------------------------------- monitorias
   const lista = (monitorias.data ?? []) as Monitoria[];
   const { data: itens } = lista.length
-    ? await db.from('vw_feedback_individual').select('monitoria_id, criterio, observacao')
-      .in('monitoria_id', lista.map((m) => m.id)).eq('conforme', false).order('criterio_ordem')
+    ? await conferida(db.from('vw_feedback_individual').select('monitoria_id, criterio, observacao')
+      .in('monitoria_id', lista.map((m) => m.id)).eq('conforme', false).order('criterio_ordem'))
     : { data: [] };
   const apontamentos = new Map<string, Apontamento[]>();
   for (const a of (itens ?? []) as Apontamento[]) {

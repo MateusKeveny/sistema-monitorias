@@ -1,4 +1,5 @@
 import type { criarClienteServidor } from '@/lib/supabase/servidor';
+import { todas, conferida } from '@/lib/consultas';
 
 type Db = Awaited<ReturnType<typeof criarClienteServidor>>;
 
@@ -42,21 +43,21 @@ export async function ajustesDaMedia(
   const atestado = new Map<string, number>();
 
   if (congelado) {
-    const { data: fechados } = await db.from('fechamentos_cota')
-      .select('id, pessoa_id, resultado').eq('mes_competencia', competencia);
+    const { data: fechados } = await conferida(db.from('fechamentos_cota')
+      .select('id, pessoa_id, resultado').eq('mes_competencia', competencia));
     const pessoaDo = new Map((fechados ?? []).map((f) => [f.id as string, f.pessoa_id as string]));
     for (const f of fechados ?? []) congelados.set(f.pessoa_id as string, Number(f.resultado));
     if (pessoaDo.size) {
-      const { data: linhas } = await db.from('fechamento_linhas').select('fechamento_id, cota')
-        .eq('regra', 'atestado').in('fechamento_id', [...pessoaDo.keys()]);
+      const { data: linhas } = await conferida(db.from('fechamento_linhas').select('fechamento_id, cota')
+        .eq('regra', 'atestado').in('fechamento_id', [...pessoaDo.keys()]));
       for (const l of linhas ?? []) {
         const p = pessoaDo.get(l.fechamento_id as string);
         if (p) atestado.set(p, (atestado.get(p) ?? 0) + Number(l.cota));
       }
     }
   } else {
-    const { data: linhas } = await db.from(extrato).select('pessoa_id, cota')
-      .eq('mes_competencia', competencia).eq('regra', 'atestado');
+    const { data: linhas } = await conferida(db.from(extrato).select('pessoa_id, cota')
+      .eq('mes_competencia', competencia).eq('regra', 'atestado'));
     for (const l of linhas ?? []) {
       const p = l.pessoa_id as string;
       atestado.set(p, (atestado.get(p) ?? 0) + Number(l.cota));
@@ -100,7 +101,7 @@ const inicioDoCiclo = (mes: string) => {
  * média nem o atestado, que eram o peso do cálculo.
  */
 export async function equipeCongelada(db: Db, competencia: string) {
-  const [{ data: fechados }, { data: pessoas }, { data: historico }, { data: cargos }, { data: comPontos }] = await Promise.all([
+  const [{ data: fechados }, { data: pessoas }, { data: historico }, { data: cargos }, { data: comPontos }] = await todas([
     db.from('fechamentos_cota').select('pessoa_id, resultado').eq('mes_competencia', competencia),
     db.from('pessoas').select('id, nome, admitido_em, desligado_em'),
     db.from('cargos_da_pessoa').select('pessoa_id, cargo_id, desde').lte('desde', competencia),

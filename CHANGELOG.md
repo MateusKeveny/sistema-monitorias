@@ -9,6 +9,24 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 5.5.1
+
+Correções da bateria de testes de 14/10/2026 (nenhuma muda número ou visual):
+
+- **Segurança: o login só volta para endereço do próprio site.** Um link do
+  painel com `?proximo=//outro-site` levava a pessoa, depois de digitar a
+  senha, para fora. A renovação da sessão tinha a mesma brecha com barra
+  invertida.
+- **Falha do banco não aparece mais como "vazio".** Nas telas de números
+  (Início, Extrato, Comparativo, Histórico), se o banco não responder, a tela
+  diz "Algo deu errado" em vez de mostrar lista vazia ou "Sem pontuação".
+- **"Tentar de novo"** na tela de erro busca os dados de novo no servidor.
+- **O login guarda os parâmetros do endereço**: o link do extrato de um mês e
+  de uma pessoa volta para ele depois de entrar.
+- Mês impossível na URL (`2026-13`) não mostra mais "Invalid Date"; a
+  exportação das monitorias responde "mês inválido" em vez de erro 500 e
+  aceita o mês como AAAA-MM.
+
 ## 5.5.0
 
 - **Gráficos semanais do Início com o mês anterior.** C-SAT, Volume e TME

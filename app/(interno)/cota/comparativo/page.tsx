@@ -7,6 +7,7 @@ import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { percentual } from '@/lib/formatar';
 import { resolverCompetencia } from '@/lib/competencia';
 import { fonteDoMes } from '@/lib/resumo';
+import { todas } from '@/lib/consultas';
 
 export const dynamic = 'force-dynamic';
 
@@ -81,7 +82,7 @@ export default async function Comparativo({
   const de = meses[0];
 
   const db = await criarClienteServidor();
-  const [pessoas, fechados, csat, volume, monitorias] = await Promise.all([
+  const [pessoas, fechados, csat, volume, monitorias] = await todas([
     db.from('pessoas').select('id, nome, exibir_no_painel, conta_nas_medias'),
     db.from('fechamentos_cota').select('pessoa_id, mes_competencia, resultado, meta')
       .gte('mes_competencia', de).lte('mes_competencia', fim),
@@ -101,7 +102,7 @@ export default async function Comparativo({
   const fontes = await Promise.all(abertos.map((m) => fonteDoMes(m)));
   const doResumo = abertos.filter((_, i) => fontes[i].resumo);
   const daView = abertos.filter((_, i) => !fontes[i].resumo);
-  const [{ data: resumidos }, { data: aoVivo }] = await Promise.all([
+  const [{ data: resumidos }, { data: aoVivo }] = await todas([
     doResumo.length
       ? db.from('resumo_cota_mensal').select('pessoa_id, mes_competencia, resultado, meta').in('mes_competencia', doResumo)
       : Promise.resolve({ data: [] }),

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
+import { destinoInterno } from '@/lib/destino';
 
 /**
  * Renova a sessão no navegador e volta para onde a pessoa ia (1.39.2).
@@ -9,14 +10,13 @@ import { criarClienteNavegador } from '@/lib/supabase/cliente';
  * O middleware manda para cá quem chega com o passe vencido ou quase. A troca
  * do passe acontece aqui, direto entre o navegador e o Supabase — sem passar
  * pelo Worker, onde o erro 1102 podia cortar a resposta e perder o passe novo.
- * O destino só vale dentro do próprio site (começa com uma única "/").
+ * O destino só vale dentro do próprio site (lib/destino.ts).
  */
 export default function RenovarSessao() {
   const [falhou, setFalhou] = useState(false);
 
   useEffect(() => {
-    const pedido = new URLSearchParams(window.location.search).get('proximo') ?? '/';
-    const proximo = pedido.startsWith('/') && !pedido.startsWith('//') ? pedido : '/';
+    const proximo = destinoInterno(new URLSearchParams(window.location.search).get('proximo'));
     (async () => {
       try {
         // getSession renova sozinho quando o passe venceu.

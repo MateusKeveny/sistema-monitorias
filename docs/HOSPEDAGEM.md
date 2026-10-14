@@ -13,8 +13,8 @@ sistema.
 
 | Sistema | Endereço atual | Versão | Para que serve |
 |---|---|---|---|
-| Monitorias de Qualidade | `painel-monitorias.expansao.workers.dev` | 5.5.0 | Monitorias de qualidade dos atendimentos: lançamento por sorteio de protocolo, painel, relatórios e consulta ao diário de bordo |
-| Painel de Performance | `painel-performance.expansao.workers.dev` | 1.41.0 | Cota de pontos por cargo: importação das avaliações (Hub) e dos chamados do Analista (painel ELO), lançamentos, extrato, fechamento, pagamento, exportação para o portal, atendentes, diário de bordo, consulta das monitorias, acessos e histórico de alteração de pesos |
+| Monitorias de Qualidade | `painel-monitorias.expansao.workers.dev` | 5.5.1 | Monitorias de qualidade dos atendimentos: lançamento por sorteio de protocolo, painel, relatórios e consulta ao diário de bordo |
+| Painel de Performance | `painel-performance.expansao.workers.dev` | 1.41.1 | Cota de pontos por cargo: importação das avaliações (Hub) e dos chamados do Analista (painel ELO), lançamentos, extrato, fechamento, pagamento, exportação para o portal, atendentes, diário de bordo, consulta das monitorias, acessos e histórico de alteração de pesos |
 
 Qual sistema cada publicação mostra é decidido em `lib/sistema.ts`:
 
@@ -254,7 +254,7 @@ O banco novo precisa oferecer, além do PostgreSQL e do login:
 `GET /api/saude` consulta o banco de verdade e responde:
 
 ```json
-{"estado":"ok","sistema":"cota","versao":"5.5.0","versoes":{"monitorias":"5.5.0","cota":"1.41.0"},"ms":95}
+{"estado":"ok","sistema":"cota","versao":"5.5.1","versoes":{"monitorias":"5.5.1","cota":"1.41.1"},"ms":95}
 ```
 
 - `200` com `"estado":"ok"`: aplicação e banco funcionando;

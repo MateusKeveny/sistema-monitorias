@@ -11,7 +11,7 @@ Escrito em 28/09/2026, atualizado em 08/10/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.41.0** · Monitorias **5.5.0** (deploy de 14/10/2026) |
+| Publicado | Performance **1.41.1** · Monitorias **5.5.1** (deploy de 14/10/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
 | Migrações no banco | 01 a 57, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
@@ -563,6 +563,24 @@ Três versões, cada uma publicada e conferida antes da próxima:
   em cinza, sem valores escritos (`<title>` no ponto) e legenda "Outubro /
   Setembro". Os dados do mês anterior já vinham (usados no "vs setembro"):
   nenhuma consulta nova.
+- **Performance 1.41.1 · Monitorias 5.5.1** (correções, sem migração), da
+  bateria de testes de 14/10: 24 endereços sem login no publicado; 97
+  variações de tela com o gestor (parâmetros válidos e inválidos); carga de 8
+  acessos simultâneos × 3 rodadas (tudo certo, com o resumo do mês). Achados e
+  correções: (1) redirecionamento aberto no login e em /auth/renovar →
+  `lib/destino.ts` (`destinoInterno`: interpreta como o navegador e só aceita
+  a mesma origem; testado contra //, /, \, /	/, javascript:); (2) 119
+  consultas liam só `data` — falha do banco virava "vazio" → `lib/consultas.ts`
+  (`todas` = Promise.all que confere, `conferida`, `dados`) nas telas de
+  números; permissão negada (42501) segue como antes, para não quebrar a tela
+  do atendente; o Extrato valida o id da pessoa antes de consultar
+  (`?pessoa=lixo` volta ao próprio extrato); (3) `app/error.tsx`: "Tentar de
+  novo" = `router.refresh()` + `reset()`; (4) middleware leva a query ao
+  `proximo` do login; (5) `mesValido` (`lib/formatar.ts`, 01–12, 2000–2099)
+  em competencia, mes-aberto, presencial, lançamentos, importar e exportação;
+  (6) `/api/exportar` responde 400 para mês inválido e aceita AAAA-MM.
+  Atenção para quem testar: a tela de erro é desenhada no navegador — no HTML
+  da resposta o sinal é o texto "O banco não respondeu" no payload.
 
 Visão de celular fica fora da revisão, por decisão do gestor. Os painéis são
 usados só no computador.

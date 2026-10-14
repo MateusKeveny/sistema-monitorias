@@ -5,6 +5,7 @@ import { mesRotulo, umaCasa } from '@/lib/formatar';
 import { ajustesDaMedia, aplicarNaMedia } from '@/lib/resultado-na-media';
 import { fonteDoMes } from '@/lib/resumo';
 import { REGRA_MEDIA, REGRA_MEDIA_REALIZADO, REGRA_META } from '@/lib/tipos';
+import { todas } from '@/lib/consultas';
 
 const num = (v: number, casas = 0) => Number(v).toLocaleString('pt-BR', { maximumFractionDigits: casas });
 const um = umaCasa;
@@ -39,7 +40,7 @@ export default async function PainelPleno({
   const db = await criarClienteServidor();
   // O mês aberto vem do resumo quando ele está em dia (migração 58).
   const fonte = await fonteDoMes(competencia);
-  const [cota, fechamento, extrato, pesos, regras, referencias, cargos, presenciais] = await Promise.all([
+  const [cota, fechamento, extrato, pesos, regras, referencias, cargos, presenciais] = await todas([
     db.from(fonte.mensal).select('resultado, meta').eq('pessoa_id', pessoaId).eq('mes_competencia', competencia).maybeSingle(),
     db.from('fechamentos_cota').select('id, resultado, meta').eq('pessoa_id', pessoaId).eq('mes_competencia', competencia).maybeSingle(),
     db.from(fonte.extrato).select('semana, regra, rotulo, quantidade, peso, cota')
@@ -62,7 +63,7 @@ export default async function PainelPleno({
   // O congelado, a equipe e o atestado saem juntos (1.39.4) — eram três
   // esperas seguidas. A equipe vem inteira e o filtro por cargo é feito aqui:
   // com `in('cargo', …)` a view levava ~6,5 s em vez de ~2 s (13/10/2026).
-  const [{ data: linhasFechadas }, { data: daEquipe }, ajustes] = await Promise.all([
+  const [{ data: linhasFechadas }, { data: daEquipe }, ajustes] = await todas([
     congelado
       ? db.from('fechamento_linhas').select('semana, regra, rotulo, quantidade, peso, cota').eq('fechamento_id', congelado.id)
       : Promise.resolve({ data: null }),

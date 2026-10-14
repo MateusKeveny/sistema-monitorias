@@ -1,6 +1,6 @@
 import { cache } from 'react';
 import { criarClienteServidor } from '@/lib/supabase/servidor';
-import { hojeNoBrasil, mesDeCompetencia } from '@/lib/formatar';
+import { hojeNoBrasil, mesDeCompetencia, mesValido } from '@/lib/formatar';
 
 export type Competencia = {
   /** A competência que a tela mostra, no formato '2026-09-01'. */
@@ -66,7 +66,7 @@ const competenciaPadrao = cache(async (): Promise<Competencia> => {
  * Pedido explícito vale sempre, mesmo que seja um mês vazio.
  */
 export async function resolverCompetencia(mes?: string): Promise<Competencia> {
-  if (/^\d{4}-\d{2}$/.test(mes ?? '')) {
+  if (mesValido(mes)) {
     return { competencia: `${mes}-01`, atual: mesDeCompetencia(hojeNoBrasil()), emAberto: false };
   }
   return competenciaPadrao();

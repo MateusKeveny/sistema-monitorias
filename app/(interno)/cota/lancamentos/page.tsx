@@ -5,7 +5,7 @@ import SeletorDeDetalhe, { type Destaque } from '@/componentes/SeletorDeDetalhe'
 import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
 import { Quadro, Tabela, Th, Td } from '@/componentes/ui';
 import Link from '@/componentes/Link';
-import { diaMes, hojeNoBrasil, mesDeCompetencia, periodoDaSemana } from '@/lib/formatar';
+import { diaMes, hojeNoBrasil, mesDeCompetencia, periodoDaSemana, mesValido } from '@/lib/formatar';
 import { mesAnterior } from '@/lib/competencia';
 import type {
   CargoDaPessoa, ConferenciaLancamento, Lancamento, PesoCargo, Pessoa, RegraCota,
@@ -35,7 +35,7 @@ export default async function LancamentosDeCota({
   const canal = canalPedido === 'diretores' ? 'diretores' : 'huggy';
 
   const atual = mesDeCompetencia(hojeNoBrasil());
-  const competencia = /^\d{4}-\d{2}$/.test(mes ?? '') ? `${mes}-01` : atual;
+  const competencia = mesValido(mes) ? `${mes}-01` : atual;
   const [inicio] = periodoDaSemana(competencia, 1);
   const [, fim] = periodoDaSemana(competencia, 4);
 
