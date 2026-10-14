@@ -11,13 +11,16 @@ const paraBytes = (b64: string) => {
   return Uint8Array.from(s, (c) => c.charCodeAt(0));
 };
 
-/** Nome curto do aparelho, para a lista: "Android · Chrome", "Windows · Edge". */
+/** O Brave se apresenta como Chrome no userAgent; quem o denuncia é `navigator.brave`. */
+const ehBrave = () => 'brave' in navigator;
+
+/** Nome curto do aparelho, para a lista: "Android · Chrome", "Windows · Brave". */
 function nomeDoAparelho(): string {
   const ua = navigator.userAgent;
   const so = /Android/.test(ua) ? 'Android' : /iPhone|iPad/.test(ua) ? 'iPhone' : /Windows/.test(ua) ? 'Windows'
     : /Mac OS/.test(ua) ? 'Mac' : /Linux/.test(ua) ? 'Linux' : 'Aparelho';
-  const nav = /Edg\//.test(ua) ? 'Edge' : /SamsungBrowser/.test(ua) ? 'Samsung Internet' : /Firefox/.test(ua) ? 'Firefox'
-    : /Chrome/.test(ua) ? 'Chrome' : /Safari/.test(ua) ? 'Safari' : 'navegador';
+  const nav = ehBrave() ? 'Brave' : /Edg\//.test(ua) ? 'Edge' : /SamsungBrowser/.test(ua) ? 'Samsung Internet'
+    : /Firefox/.test(ua) ? 'Firefox' : /Chrome/.test(ua) ? 'Chrome' : /Safari/.test(ua) ? 'Safari' : 'navegador';
   const app = matchMedia('(display-mode: standalone)').matches ? ' (app)' : '';
   return `${so} · ${nav}${app}`;
 }
@@ -71,7 +74,12 @@ export default function AtivarNotificacoes({ chavePublica }: { chavePublica: str
       setMensagem('Pronto: este aparelho vai receber os lembretes.');
       router.refresh();
     } catch (e) {
-      setMensagem(`Não foi possível ativar: ${e instanceof Error ? e.message : String(e)}`);
+      // O Brave vem com o serviço de push do Google desligado: a inscrição
+      // falha com "push service error" até a pessoa ligar nos ajustes dele.
+      setMensagem(ehBrave()
+        ? 'O Brave recusou a inscrição. Abra brave://settings/privacy, ligue "Usar os serviços do Google para '
+          + 'mensagens push", reinicie o Brave e tente de novo. Se continuar, use o Telegram.'
+        : `Não foi possível ativar: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setOcupado(false);
     }

@@ -35,6 +35,18 @@ para o Performance.
 
 ---
 
+## Agenda da Gestão 1.2.0
+
+Só Agenda (atualização). Não muda Monitorias nem Performance.
+
+- **Brave como aplicativo no Windows**: Ajustes → Instalar como aplicativo
+  ganha os passos do Brave, inclusive o ajuste que ele exige para
+  notificação (serviço de push do Google, que vem desligado) e o de rodar em
+  segundo plano.
+- Se o Brave recusar a ativação das notificações, a tela explica o ajuste em
+  vez de mostrar o erro técnico. A lista de aparelhos passa a mostrar
+  "Windows · Brave" (antes saía como Chrome).
+
 ## Agenda da Gestão 1.1.0
 
 Só Agenda (atualização). Não muda Monitorias nem Performance.

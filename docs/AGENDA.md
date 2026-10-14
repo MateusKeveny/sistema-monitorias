@@ -33,7 +33,7 @@ Projeto da AGENDA                              Projeto dos PAINÉIS
   (`supabase/59-ponte-da-agenda.sql`) com o `PONTE_SEGREDO`. Só textos e
   contagens vêm de lá; nada da agenda vai para lá.
 - Quem vê as pendências: `usuarios.ve_pendencias = true` no banco da agenda.
-- Login: o usuário `mateus` é `mateus@agenda.local` no Supabase
+- Login: o usuário `mateuskeveny` é `mateuskeveny@agenda.local` no Supabase
   (`lib/agenda/usuario.ts`). Rotas próprias: `/agenda/entrar` e
   `/agenda/renovar`; o middleware só aceita o cookie do projeto da agenda.
 - Lembrete com hora toca na hora. Sem hora, entra no resumo do dia (padrão
@@ -46,9 +46,9 @@ Projeto da AGENDA                              Projeto dos PAINÉIS
 2. **Banco da agenda** — colar `supabase/agenda/01-agenda.sql` no SQL Editor
    do projeto **da agenda**. A conferência no fim mostra 6 tabelas.
 3. **Usuário** — Authentication → Users → Add user → Create new user:
-   e-mail `mateus@agenda.local`, a senha, "Auto Confirm User" marcado. Depois,
+   e-mail `mateuskeveny@agenda.local`, a senha, "Auto Confirm User" marcado. Depois,
    no SQL Editor da agenda:
-   `update public.usuarios set nome = 'Mateus', ve_pendencias = true where usuario = 'mateus';`
+   `update public.usuarios set nome = 'Mateus', ve_pendencias = true where usuario = 'mateuskeveny';`
 4. **Ponte** — colar `supabase/59-ponte-da-agenda.sql` no SQL Editor do
    projeto **dos painéis**.
 5. **Chaves** — `node scripts/chaves-da-agenda.js gerar` (cria o que faltar;
@@ -60,6 +60,14 @@ Projeto da AGENDA                              Projeto dos PAINÉIS
    no dos painéis; apagar os dois arquivos.
 9. No celular: abrir o endereço no Chrome, entrar, ⋮ → Instalar app, abrir
    pelo ícone → Ajustes → Ativar notificações → Enviar teste.
+10. No computador, com o **Brave**: ícone de instalar à direita do endereço
+    (ou ☰ → Transmitir, salvar e compartilhar → Instalar página como app).
+    A Agenda vira programa no menu Iniciar. Para a notificação do navegador,
+    o Brave pede `brave://settings/privacy` → **Usar os serviços do Google
+    para mensagens push** ligado e o Brave reiniciado (vem desligado; sem
+    isso a inscrição falha com "push service error"). Para tocar com o Brave
+    fechado: `brave://settings/system` → continuar executando em segundo
+    plano. Se a empresa bloquear, o Telegram cobre.
 
 Trocar a chave VAPID derruba a inscrição de todos os aparelhos: cada um
 precisa ativar de novo.

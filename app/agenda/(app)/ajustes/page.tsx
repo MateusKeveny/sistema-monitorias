@@ -66,13 +66,20 @@ export default async function Ajustes() {
 
       <Painel>
         <Secao titulo="Instalar como aplicativo">
-          <div className="grid gap-4 text-sm text-slate-600 sm:grid-cols-2">
+          <div className="grid gap-4 text-sm text-slate-600 sm:grid-cols-2 lg:grid-cols-3">
             <div>
-              <p className="mb-1 font-medium text-slate-800">Android (Chrome)</p>
+              <p className="mb-1 font-medium text-slate-800">Windows (Brave)</p>
               <ol className="list-decimal space-y-0.5 pl-5">
-                <li>Toque nos três pontinhos ⋮ no canto de cima.</li>
-                <li>Escolha <b>Instalar app</b> (ou <b>Adicionar à tela inicial</b>).</li>
-                <li>Abra a Agenda pelo ícone e ative as notificações aqui.</li>
+                <li>
+                  Clique no ícone de instalar, à direita do endereço (ou ☰ → <b>Transmitir, salvar e
+                  compartilhar</b> → <b>Instalar página como app</b>).
+                </li>
+                <li>A Agenda vira um programa no menu Iniciar; dá para fixar na barra de tarefas.</li>
+                <li>
+                  Para receber notificação, o Brave precisa de um ajuste: abra <code
+                  className="rounded bg-slate-100 px-1">brave://settings/privacy</code>, ligue <b>Usar os serviços
+                  do Google para mensagens push</b> e reinicie o Brave. Depois, ative as notificações aqui.
+                </li>
               </ol>
             </div>
             <div>
@@ -83,10 +90,20 @@ export default async function Ajustes() {
                 <li>Ative as notificações aqui também — cada aparelho é separado.</li>
               </ol>
             </div>
+            <div>
+              <p className="mb-1 font-medium text-slate-800">Android (Chrome)</p>
+              <ol className="list-decimal space-y-0.5 pl-5">
+                <li>Toque nos três pontinhos ⋮ no canto de cima.</li>
+                <li>Escolha <b>Instalar app</b> (ou <b>Adicionar à tela inicial</b>).</li>
+                <li>Abra a Agenda pelo ícone e ative as notificações aqui.</li>
+              </ol>
+            </div>
           </div>
           <p className="mt-3 text-xs text-slate-500">
             No computador, as notificações chegam com o navegador fechado enquanto ele seguir rodando em segundo plano
-            (o padrão do Edge no Windows). No celular, basta o app instalado.
+            (o padrão do Edge no Windows; no Brave, <code className="rounded bg-slate-100 px-1">brave://settings/system</code>{' '}
+            → <b>Continuar executando apps em segundo plano quando o Brave estiver fechado</b>). No celular, basta o app
+            instalado. Se a empresa bloquear as notificações do navegador, use o Telegram, no topo desta tela.
           </p>
         </Secao>
       </Painel>
