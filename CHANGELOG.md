@@ -1,11 +1,37 @@
 # Histórico de versões
 
-Numeração em três partes: **crítico . atualização . correção**
+Numeração em três partes: **crítico . atualização . correção**. A regra vale
+igual para os dois sistemas — Monitorias (este arquivo) e Performance (a cota,
+`VERSAO_COTA` em `lib/versoes.ts`) — e é esta; `lib/versoes.ts` aponta para cá.
 
-- **1º número** — mudança crítica: falha de segurança corrigida, ou alteração que
-  reescreve dados já existentes e invalida o que foi reportado antes.
-- **2º número** — funcionalidade nova ou melhoria relevante.
-- **3º número** — correção pequena, sem mudança de comportamento.
+- **1º número — crítico**: falha de segurança que **expunha dados** a quem não
+  devia vê-los (ex.: 2.0.0, operador via monitorias de outro); ou mudança que
+  reescreve dados já existentes, ou regra de cálculo que altera competência já
+  calculada — o que foi reportado ou enviado antes deixa de valer.
+- **2º número — atualização**: funcionalidade nova ou mudança de comportamento
+  que quem usa percebe (tela, informação ou regra nova).
+- **3º número — correção**: conserto ou ajuste sem mudança de comportamento
+  esperado, incluindo brecha de segurança **sem vazamento de dados** (ex.:
+  5.5.1, redirecionamento para fora depois do login) e ganho de desempenho.
+
+**Suba só o sistema que mudou.** Os dois vivem no mesmo código e são
+publicados juntos, mas mudança só no Performance não muda a versão das
+Monitorias, e vice-versa. Mudança no que é dos dois (login, sessão, menu,
+diário, tela de erro) sobe os dois. Cada entrada abaixo diz de qual sistema é.
+
+**Commit e tag antes do deploy**: `vX.Y.Z` para as Monitorias, `cota-vX.Y.Z`
+para o Performance.
+
+> **Nota de 14/10/2026 — desvio de 5.3.6 a 5.5.0.** Entre 13 e 14/10 a versão
+> das Monitorias subiu junto com publicações que só mudaram o Performance
+> (5.3.6, 5.3.7, 5.3.8, 5.4.0 e 5.5.0): nessas versões **nada mudou nas
+> Monitorias**, e as entradas abaixo descrevem o Performance. Ficam como estão
+> — estão no ar, com tag e citadas na documentação da TI —, e a regra acima
+> passa a valer daqui em diante. Revisão do mesmo dia, também sem renumerar:
+> 5.3.2 (folha de feedback com falha crítica e observações) seria
+> atualização, não correção; 4.5.0 (queda pelo erro 1102) seria correção; e
+> 4.14.1, 4.14.2, 4.15.1 e 4.16.1 (comportamento do diário, que as Monitorias
+> também mostram) seriam atualização.
 
 ---
 

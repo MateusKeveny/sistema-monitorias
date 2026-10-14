@@ -8,15 +8,12 @@ import pacote from '@/package.json';
  * a versão que os operadores veem nas monitorias, e vice-versa.
  *
  * Ao publicar, suba só a versão do sistema que mudou:
- *   Monitorias — `npm version patch|minor --no-git-tag-version`
+ *   Monitorias — `npm version patch|minor|major --no-git-tag-version`
  *   Cota       — a constante abaixo
  *
- * O que cada número significa, nos dois sistemas:
- *
- *   MAJOR — muda regra de cálculo que altera pontuação de competência já
- *           calculada, ou qualquer coisa que obrigue a refazer um envio.
- *   MINOR — recurso novo.
- *   PATCH — correção, sem mudar número de ninguém.
+ * O que cada número significa está no topo do CHANGELOG.md — uma regra só,
+ * a mesma para os dois sistemas (unificada em 14/10/2026: antes este
+ * comentário e o CHANGELOG diziam coisas diferentes sobre o 1º número).
  *
  * E a regra de processo, aprendida errando: **commit e tag antes do deploy**.
  * Em setembro/2026 três versões da cota (0.12.0, 0.13.0 e 0.14.0) foram ao ar
