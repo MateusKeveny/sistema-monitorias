@@ -11,10 +11,10 @@ Escrito em 28/09/2026, atualizado em 08/10/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.42.0** · Monitorias **5.5.2** (deploy de 14/10/2026) |
-| Branch | `painel-performance` (a `main` segue intocada) |
-| Migrações no banco | 01 a 57, todas aplicadas |
-| Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
+| Publicado | Performance **1.42.0** · Monitorias **5.5.2** · Agenda **1.0.0** (14/10/2026) |
+| Branch | `painel-performance`, com os três sites (a `main` segue intocada) |
+| Migrações no banco | 01 a 59, todas aplicadas (a agenda tem banco próprio) |
+| Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` · `painel-agenda.expansao.workers.dev` |
 
 ### Revisão de design (28/09/2026)
 
@@ -597,6 +597,13 @@ Três versões, cada uma publicada e conferida antes da próxima:
   as telas do sistema da aba, com parâmetros válidos e inválidos, e lista
   FALHA-BANCO, ERRO-SERVIDOR, HTTP, TEXTO-SUSPEITO, 1102 e LENTA. Primeira
   rodada: 31 telas do Performance, nenhum sinal.
+- **Agenda da Gestão 1.0.0** (migração 59 no banco dos painéis; banco próprio
+  em `supabase/agenda/`): terceiro site, `painel-agenda.expansao.workers.dev`,
+  publicado em 14/10 a partir do worktree `sistema-monitorias-agenda` e
+  depois juntado a `painel-performance`. Tudo em [AGENDA.md](AGENDA.md).
+  Variáveis próprias no `.env.local`: `NEXT_PUBLIC_AGENDA_*`, `VAPID_*`,
+  `AGENDA_SEGREDO`, `PONTE_SEGREDO` — não gerar de novo. `cf:deploy` publica
+  os três sites; `cf:deploy:agenda` só a agenda.
 
 Visão de celular fica fora da revisão, por decisão do gestor. Os painéis são
 usados só no computador.

@@ -35,6 +35,25 @@ para o Performance.
 
 ---
 
+## Agenda da Gestão 1.0.0
+
+Terceiro site do mesmo código (`painel-agenda.expansao.workers.dev`,
+`VERSAO_AGENDA` em `lib/versoes.ts`), publicado em 14/10/2026. Não muda a
+versão das Monitorias nem do Performance. Detalhes em
+[docs/AGENDA.md](docs/AGENDA.md).
+
+- **Banco e login próprios:** projeto Supabase só da agenda
+  (`supabase/agenda/01-agenda.sql`), login por nome de usuário, perfil único.
+- **Meu dia** (entrada por frase e plano do dia), **Próximos**, **Feitos** e
+  **Ajustes**; instalável no celular, com notificações (Web Push) que tocam
+  na hora do lembrete ou no resumo do dia.
+- **Ponte só de leitura** com os painéis (migração 59): as pendências do
+  "Precisa de você" do Performance entram no plano do dia. Nada da agenda vai
+  para o banco dos painéis.
+- Assistente por regras, sem API de IA.
+- Publicação só da agenda: `npm run cf:deploy:agenda`. O `cf:deploy` completo
+  passa a publicar os três sites.
+
 ## 5.5.2 · Performance 1.42.0
 
 - **Monitorias e Performance:** falha do banco também deixa de virar "vazio"
