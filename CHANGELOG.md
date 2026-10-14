@@ -35,6 +35,14 @@ para o Performance.
 
 ---
 
+## Agenda da Gestão 1.2.1
+
+Só Agenda (correção).
+
+- As chaves liga/desliga de Ajustes → Resumo do dia mostravam a bolinha
+  fora do lugar: ligada, vazava para fora do trilho; desligada, ficava à
+  direita e parecia ligada.
+
 ## Agenda da Gestão 1.2.0
 
 Só Agenda (atualização). Não muda Monitorias nem Performance.
