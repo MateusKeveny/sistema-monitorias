@@ -11,9 +11,9 @@ Escrito em 28/09/2026, atualizado em 08/10/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.42.0** · Monitorias **5.5.2** · Agenda **1.2.2** (14/10/2026) |
+| Publicado | Performance **1.43.0** · Monitorias **5.5.2** · Agenda **1.3.0** (14/10/2026) |
 | Branch | `painel-performance`, com os três sites (a `main` segue intocada) |
-| Migrações no banco | 01 a 59, todas aplicadas (a agenda tem banco próprio) |
+| Migrações no banco | 01 a 60, todas aplicadas (a agenda tem banco próprio: 01 a 03) |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` · `painel-agenda.expansao.workers.dev` |
 
 ### Revisão de design (28/09/2026)
