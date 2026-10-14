@@ -5,6 +5,7 @@ import { Quadro, Tabela, Th, Td, Vazio, Indicador } from '@/componentes/ui';
 import { mesRotulo, percentual, nota } from '@/lib/formatar';
 import type { LinhaCriterio } from '@/lib/tipos';
 import { ateOMesAberto, mesAbertoDasMonitorias, mesCompleto } from '@/lib/mes-aberto';
+import { conferida } from '@/lib/consultas';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,10 +19,10 @@ export default async function RelatorioCriterios({
   const mesEscolhido = mesCompleto((await searchParams).mes);
   const db = await criarClienteServidor();
 
-  const { data } = await db
+  const { data } = await conferida(db
     .from('vw_criterios_reprovados')
     .select('*')
-    .order('mes_referencia', { ascending: false });
+    .order('mes_referencia', { ascending: false }));
 
   const todas = (data ?? []) as LinhaCriterio[];
   // Só até o mês aberto (migração 30): o seguinte libera com o fechamento da cota.

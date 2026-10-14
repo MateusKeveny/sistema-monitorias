@@ -5,6 +5,7 @@ import { Quadro, EtiquetaNota, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import { mesRotulo, mesCurto, nota, percentual } from '@/lib/formatar';
 import type { LinhaRanking } from '@/lib/tipos';
 import { ateOMesAberto, mesAbertoDasMonitorias, mesCompleto } from '@/lib/mes-aberto';
+import { conferida } from '@/lib/consultas';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,11 +19,11 @@ export default async function RelatorioRanking({
   const mesEscolhido = mesCompleto((await searchParams).mes);
   const db = await criarClienteServidor();
 
-  const { data: tudo } = await db
+  const { data: tudo } = await conferida(db
     .from('vw_ranking_mensal')
     .select('*')
     .order('mes_referencia', { ascending: false })
-    .order('nota_media', { ascending: false });
+    .order('nota_media', { ascending: false }));
 
   const linhas = (tudo ?? []) as LinhaRanking[];
   // Só até o mês aberto (migração 30): o seguinte libera com o fechamento da cota.

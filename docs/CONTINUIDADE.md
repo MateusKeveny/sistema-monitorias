@@ -11,7 +11,7 @@ Escrito em 28/09/2026, atualizado em 08/10/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.41.1** · Monitorias **5.5.1** (deploy de 14/10/2026) |
+| Publicado | Performance **1.42.0** · Monitorias **5.5.2** (deploy de 14/10/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
 | Migrações no banco | 01 a 57, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
@@ -581,6 +581,22 @@ Três versões, cada uma publicada e conferida antes da próxima:
   (6) `/api/exportar` responde 400 para mês inválido e aceita AAAA-MM.
   Atenção para quem testar: a tela de erro é desenhada no navegador — no HTML
   da resposta o sinal é o texto "O banco não respondeu" no payload.
+- **Performance 1.42.0 · Monitorias 5.5.2** (sem migração; primeira versão
+  pela regra unificada de 14/10, topo do CHANGELOG): Comparativo a partir de
+  `PRIMEIRO_MES = '2026-08-01'` (decisão do gestor) e só calcula ao vivo o mês
+  aberto fora do resumo que tem algum dado de origem (volume, C-SAT,
+  monitoria, lançamento, presencial, chamado); perfil ∥ competência ∥
+  situação do resumo. Conteúdo conferido igual ao anterior (3/6/12 meses)
+  antes do corte de agosto. `app/error.tsx` aponta o Reportar problema.
+  A proteção de `lib/consultas.ts` chegou ao Fechamento (`todas`) e aos
+  Relatórios das Monitorias (ranking, critérios e feedback, com `conferida`;
+  em critérios o import é só `conferida`, porque a tela tem uma variável
+  `todas`). Varredura: 31 telas do Performance e 24 das Monitorias, sem sinal.
+  **Varredura antes de publicar:** `scripts/varredura-navegador.js` — colar
+  no console de uma aba logada como gestor (local ou publicado); abre todas
+  as telas do sistema da aba, com parâmetros válidos e inválidos, e lista
+  FALHA-BANCO, ERRO-SERVIDOR, HTTP, TEXTO-SUSPEITO, 1102 e LENTA. Primeira
+  rodada: 31 telas do Performance, nenhum sinal.
 
 Visão de celular fica fora da revisão, por decisão do gestor. Os painéis são
 usados só no computador.

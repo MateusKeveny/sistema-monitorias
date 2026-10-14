@@ -35,6 +35,21 @@ para o Performance.
 
 ---
 
+## 5.5.2 · Performance 1.42.0
+
+- **Monitorias e Performance:** falha do banco também deixa de virar "vazio"
+  no **Fechamento** e nos **Relatórios** das Monitorias (ranking, critérios e
+  folha de feedback): a tela avisa em vez de mostrar lista vazia.
+- **Monitorias e Performance:** a tela de erro indica o botão **Reportar
+  problema**, no menu, em vez de "avise a Qualidade".
+- **Só Performance (atualização):** o **Comparativo começa em agosto/2026**,
+  o primeiro mês com dados do sistema — maio a julho apareciam como "sem
+  dado". A tela ficou mais rápida (~2,4 s → ~1 s no teste local): esses meses
+  e os sem nenhum dado de origem não vão mais ao cálculo ao vivo, e o perfil e
+  o mês saem juntos.
+- Ferramenta: `scripts/varredura-navegador.js`, a varredura de telas da
+  bateria de testes de 14/10, para rodar no console antes de publicar.
+
 ## 5.5.1
 
 Correções da bateria de testes de 14/10/2026 (nenhuma muda número ou visual):

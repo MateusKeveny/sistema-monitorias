@@ -11,6 +11,7 @@ import { Atingimento, Quadro, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import { dataHora, hojeNoBrasil, mesRotulo, semanaDoCiclo } from '@/lib/formatar';
 import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
 import { resolverCompetencia } from '@/lib/competencia';
+import { todas } from '@/lib/consultas';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,7 +48,7 @@ export default async function Fechamento({
 
   const db = await criarClienteServidor();
   const [abertos, fechados, semCargo, conferir, alteracoes, valor, pagamento, correcoes, volumes, monitorias, avaliados]
-    = await Promise.all([
+    = await todas([
     db.from('vw_cota_mensal').select('pessoa_id, pessoa, cargo, resultado, meta')
       .eq('mes_competencia', competencia).order('resultado', { ascending: false }),
     db.from('fechamentos_cota')

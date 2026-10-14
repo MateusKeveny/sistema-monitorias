@@ -5,6 +5,7 @@ import BotaoImprimir from '@/componentes/BotaoImprimir';
 import { mesRotulo, data as formatarData, nota, percentual } from '@/lib/formatar';
 import type { LinhaFeedback, Operador } from '@/lib/tipos';
 import { ateOMesAberto, mesAbertoDasMonitorias } from '@/lib/mes-aberto';
+import { todas, conferida } from '@/lib/consultas';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +18,7 @@ export default async function FolhaFeedback({
   const filtros = await searchParams;
   const db = await criarClienteServidor();
 
-  const [{ data: operadores }, { data: mesesBrutos }] = await Promise.all([
+  const [{ data: operadores }, { data: mesesBrutos }] = await todas([
     db.from('pessoas').select('id, nome').eq('avaliado', true).eq('ativo', true).order('nome'),
     db.from('vw_monitorias').select('mes_referencia').order('mes_referencia', { ascending: false }),
   ]);
@@ -66,13 +67,13 @@ export default async function FolhaFeedback({
     );
   }
 
-  const { data: bruto } = await db
+  const { data: bruto } = await conferida(db
     .from('vw_feedback_individual')
     .select('*')
     .eq('operador_id', operadorId)
     .eq('mes_referencia', mes)
     .order('data_atendimento')
-    .order('criterio_ordem');
+    .order('criterio_ordem'));
 
   const linhas = (bruto ?? []) as LinhaFeedback[];
 
@@ -88,7 +89,7 @@ export default async function FolhaFeedback({
   // zerada aparecia como "todos os critérios atendidos", sem explicar o 0%.
   const zeradas = monitorias.filter((m) => m.cabecalho.zerado).map((m) => m.cabecalho.monitoria_id);
   const { data: motivos } = zeradas.length
-    ? await db.from('monitorias').select('id, motivo_zeramento').in('id', zeradas)
+    ? await conferida(db.from('monitorias').select('id, motivo_zeramento').in('id', zeradas))
     : { data: [] };
   const motivoDe = new Map(((motivos ?? []) as { id: string; motivo_zeramento: string | null }[])
     .map((m) => [m.id, m.motivo_zeramento]));

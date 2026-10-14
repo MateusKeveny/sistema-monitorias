@@ -6,7 +6,7 @@ import { Painel, Secao, Vazio } from '@/componentes/ui';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { percentual } from '@/lib/formatar';
 import { resolverCompetencia } from '@/lib/competencia';
-import { fonteDoMes } from '@/lib/resumo';
+import { fonteDoMes, situacaoDoResumo } from '@/lib/resumo';
 import { todas } from '@/lib/consultas';
 
 export const dynamic = 'force-dynamic';
@@ -17,6 +17,8 @@ type Categoria = 'pts' | 'csat' | 'vol' | 'tme' | 'mon';
 type Serie = { id: string; nome: string; valores: (number | null)[] };
 
 const PERIODOS = [3, 6, 12];
+/** O Comparativo começa aqui: antes de agosto/2026 o sistema não tinha dados. */
+const PRIMEIRO_MES = '2026-08-01';
 const NOMES_MES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 const CANAIS: Canal[] = ['huggy', 'diretores'];
 
@@ -73,16 +75,19 @@ export default async function Comparativo({
 }: {
   searchParams: Promise<{ n?: string; cat?: string }>;
 }) {
-  const perfil = await exigirPerfil();
   const { n, cat } = await searchParams;
+  // O perfil, o mês padrão e a situação do resumo saem juntos (1.41.2).
+  const [perfil, { competencia: fim }] = await todas([exigirPerfil(), resolverCompetencia(), situacaoDoResumo()]);
   const periodo = PERIODOS.includes(Number(n)) ? Number(n) : 6;
   const veOTime = perfil.papel !== 'operador';
-  const { competencia: fim } = await resolverCompetencia();
-  const meses = mesesAte(fim, periodo);
+  // Só a partir de agosto/2026, o primeiro mês com dados do sistema (decisão
+  // do gestor, 14/10/2026): os meses antes disso apareciam como "sem dado" e
+  // custavam ~1 s de cálculo ao vivo.
+  const meses = mesesAte(fim, periodo).filter((m) => m >= PRIMEIRO_MES);
   const de = meses[0];
 
   const db = await criarClienteServidor();
-  const [pessoas, fechados, csat, volume, monitorias] = await todas([
+  const [pessoas, fechados, csat, volume, monitorias, lancados, presenciais, chamados] = await todas([
     db.from('pessoas').select('id, nome, exibir_no_painel, conta_nas_medias'),
     db.from('fechamentos_cota').select('pessoa_id, mes_competencia, resultado, meta')
       .gte('mes_competencia', de).lte('mes_competencia', fim),
@@ -92,16 +97,30 @@ export default async function Comparativo({
       .gte('mes_competencia', de).lte('mes_competencia', fim),
     db.from('vw_monitorias').select('operador_id, mes_referencia, nota_final')
       .gte('mes_referencia', de).lte('mes_referencia', fim),
+    // Só os meses com lançamento, presencial e chamado: com volume, C-SAT e
+    // monitorias, dizem quais meses têm algo para calcular (1.41.2).
+    db.from('lancamentos').select('mes_competencia').gte('mes_competencia', de).lte('mes_competencia', fim),
+    db.from('vw_presenciais').select('mes_competencia').gte('mes_competencia', de).lte('mes_competencia', fim),
+    db.from('chamados_elo').select('mes_competencia').gte('mes_competencia', de).lte('mes_competencia', fim),
   ]);
 
   // Meses sem fechamento nenhum: a pontuação vem do cálculo ao vivo.
   type Ponto = { pessoa_id: string; mes_competencia: string; resultado: number; meta: number | null };
   const doFechamento = (fechados.data ?? []) as Ponto[];
   const abertos = meses.filter((m) => !doFechamento.some((f) => f.mes_competencia === m));
-  // Os que estão no resumo do mês (migração 58) saem dele; os demais, da view.
+  // Os que estão no resumo do mês (migração 58) saem dele; os demais, da view
+  // — mas só se o mês tem algum dado de origem. Maio a julho/2026, antes do
+  // sistema, iam ao cálculo ao vivo (~1 s) para voltar vazios (1.41.2).
+  const comDado = new Set([
+    ...((csat.data ?? []) as { mes_competencia: string }[]).map((x) => x.mes_competencia),
+    ...((volume.data ?? []) as { mes_competencia: string }[]).map((x) => x.mes_competencia),
+    ...((monitorias.data ?? []) as { mes_referencia: string }[]).map((x) => x.mes_referencia),
+    ...[lancados, presenciais, chamados].flatMap((r) => ((r.data ?? []) as { mes_competencia: string }[])
+      .map((x) => x.mes_competencia)),
+  ]);
   const fontes = await Promise.all(abertos.map((m) => fonteDoMes(m)));
   const doResumo = abertos.filter((_, i) => fontes[i].resumo);
-  const daView = abertos.filter((_, i) => !fontes[i].resumo);
+  const daView = abertos.filter((m, i) => !fontes[i].resumo && comDado.has(m));
   const [{ data: resumidos }, { data: aoVivo }] = await todas([
     doResumo.length
       ? db.from('resumo_cota_mensal').select('pessoa_id, mes_competencia, resultado, meta').in('mes_competencia', doResumo)

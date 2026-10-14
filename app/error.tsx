@@ -18,8 +18,8 @@ export default function Erro({ reset }: { error: Error; reset: () => void }) {
       <div className="max-w-md rounded-2xl border border-slate-200 bg-superficie p-8 text-center shadow-xl">
         <h1 className="text-xl font-semibold text-slate-900">Algo deu errado</h1>
         <p className="mt-2 text-sm leading-relaxed text-slate-600">
-          Não conseguimos carregar esta página. Se o problema continuar, avise a
-          Qualidade informando o que você estava fazendo.
+          Não conseguimos carregar esta página. Se o problema continuar, use o
+          botão Reportar problema, no menu, contando o que você estava fazendo.
         </p>
         <div className="mt-6 flex justify-center gap-2">
           <button
