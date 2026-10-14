@@ -13,8 +13,8 @@ sistema.
 
 | Sistema | Endereço atual | Versão | Para que serve |
 |---|---|---|---|
-| Monitorias de Qualidade | `painel-monitorias.expansao.workers.dev` | 5.3.1 | Monitorias de qualidade dos atendimentos: lançamento por sorteio de protocolo, painel, relatórios e consulta ao diário de bordo |
-| Painel de Performance | `painel-performance.expansao.workers.dev` | 1.38.2 | Cota de pontos por cargo: importação das avaliações (Hub) e dos chamados do Analista (painel ELO), lançamentos, extrato, fechamento, pagamento, exportação para o portal, atendentes, diário de bordo, consulta das monitorias e acessos |
+| Monitorias de Qualidade | `painel-monitorias.expansao.workers.dev` | 5.5.0 | Monitorias de qualidade dos atendimentos: lançamento por sorteio de protocolo, painel, relatórios e consulta ao diário de bordo |
+| Painel de Performance | `painel-performance.expansao.workers.dev` | 1.41.0 | Cota de pontos por cargo: importação das avaliações (Hub) e dos chamados do Analista (painel ELO), lançamentos, extrato, fechamento, pagamento, exportação para o portal, atendentes, diário de bordo, consulta das monitorias, acessos e histórico de alteração de pesos |
 
 Qual sistema cada publicação mostra é decidido em `lib/sistema.ts`:
 
@@ -51,6 +51,7 @@ Navegador ──HTTPS──► Cloudflare Workers (2 Workers, plano gratuito)
 Better Stack ──► /api/saude  (monitoramento de queda, nos dois sites)
 
 Supabase ──HTTPS──► Microsoft Teams (avisos automáticos, pg_net + pg_cron)
+Supabase ──pg_cron──► resumo do mês aberto, recalculado a cada minuto se algo mudou
 ```
 
 | Camada | Serviço | Plano | Observação |
@@ -59,6 +60,7 @@ Supabase ──HTTPS──► Microsoft Teams (avisos automáticos, pg_net + pg_
 | Banco de dados | Supabase (PostgreSQL 15+) | Verificar no painel do Supabase | Também faz o **login** dos usuários |
 | Monitoramento | Better Stack | Gratuito | Vigia `/api/saude` dos dois sites |
 | Avisos | Microsoft Teams (Workflows) | — | O **banco** posta os cartões: semana encerrada, mês fechado, lembrete de fechamento, novidades do diário, report novo |
+| Tarefas agendadas | pg_cron, dentro do banco | — | `avisos-das-oito` (todo dia às 8h) e `resumo-do-mes` (a cada minuto: mantém pronto o cálculo do mês aberto) |
 
 ### Por que migrar
 
@@ -74,6 +76,12 @@ telas foram otimizadas para caber nisso, mas é um teto baixo:
   **está confirmado** e o sistema já opera no teto;
 - a alternativa sem migrar é o plano pago dos Workers (US$ 5/mês, 30 s de
   processamento por acesso). Decisão do gestor: aguardar a migração;
+- em 13/10/2026 o impacto foi reduzido: a renovação do login passou para o
+  navegador (1.39.2 — um 1102 não derruba mais a sessão) e as telas ficaram
+  mais leves (1.39.3 a 1.40.0 — consultas em paralelo, mês fechado lido do
+  congelado e o mês aberto guardado pronto no banco). O Extrato do gestor
+  caiu de ~3,2 s para ~0,6 s. O teto de 10 ms continua; o erro pode voltar a
+  aparecer numa tela, e o F5 resolve;
 - a leitura de planilhas teve de ser feita no navegador do usuário, e não no
   servidor, para não estourar o limite;
 - recursos futuros ficam limitados por esse teto.
@@ -182,8 +190,10 @@ infraestrutura da IGreen e não tem nenhum dos limites atuais.
    chega ao novo. Combinar a virada para um momento sem lançamentos, de
    preferência logo depois de um fechamento de ciclo.
 5. **Conferir.** `/api/saude` das duas instâncias respondendo `"estado":"ok"`,
-   login de um usuário de cada papel e o extrato de um mês já fechado igual ao
-   de antes.
+   login de um usuário de cada papel, o extrato de um mês já fechado igual ao
+   de antes, as tarefas agendadas recriadas (`cron.job`) e o Extrato do mês
+   aberto mostrando "Atualizado às" com horário recente. `select * from
+   public.conferir_resumo();` deve dar zero em todas as linhas.
 
 Os dois sistemas usam **o mesmo banco** e precisam continuar juntos: a
 migração leva os dois de uma vez.
@@ -191,7 +201,7 @@ migração leva os dois de uma vez.
 ### Estrutura
 
 As migrações estão em `supabase/`, numeradas na ordem em que foram aplicadas
-(01 a 55). O banco de produção já está com **todas aplicadas**.
+(01 a 58). O banco de produção já está com **todas aplicadas**.
 
 - `00-instalar-tudo.sql` é um atalho antigo que junta as primeiras migrações;
   não usar junto com elas.
@@ -208,6 +218,16 @@ O banco novo precisa oferecer, além do PostgreSQL e do login:
   Teams e roda a rotina diária das 8h (horário de Brasília). Sem essas
   extensões, os avisos param; o resto do sistema segue funcionando. Os
   endereços dos Workflows ficam na tabela `avisos_teams` e vão junto na cópia.
+- **pg_cron também mantém o resumo do mês aberto** (migração 58, tarefa
+  `resumo-do-mes`, a cada minuto). As telas do Performance leem o cálculo do
+  mês aberto já pronto, em tabelas de resumo; gatilhos marcam quando algum
+  dado muda e a tarefa recalcula. **Sem a tarefa, nada quebra e nenhum número
+  fica errado**: passados 40 minutos sem atualização, as telas voltam sozinhas
+  ao cálculo ao vivo — só ficam mais lentas (~3 s no Extrato).
+- **As tarefas agendadas não vão na cópia.** Elas ficam no esquema `cron`,
+  fora do `public`. Depois de restaurar o banco, recriar as duas rodando de
+  novo o bloco final `do $ … cron.schedule …` das migrações 40 e 58, e
+  conferir com `select jobname, schedule, active from cron.job;`.
 - **Storage** (migração 44). O bucket privado `reportes` guarda os prints
   anexados em "Reportar problema". A cópia do banco **não** leva os arquivos:
   eles precisam ser copiados à parte, ou os reports antigos ficam sem imagem.
@@ -234,7 +254,7 @@ O banco novo precisa oferecer, além do PostgreSQL e do login:
 `GET /api/saude` consulta o banco de verdade e responde:
 
 ```json
-{"estado":"ok","sistema":"cota","versao":"1.38.2","versoes":{"monitorias":"5.3.1","cota":"1.38.2"},"ms":95}
+{"estado":"ok","sistema":"cota","versao":"5.5.0","versoes":{"monitorias":"5.5.0","cota":"1.41.0"},"ms":95}
 ```
 
 - `200` com `"estado":"ok"`: aplicação e banco funcionando;

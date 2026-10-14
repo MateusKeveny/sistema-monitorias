@@ -9,6 +9,18 @@ Numeração em três partes: **crítico . atualização . correção**
 
 ---
 
+## 5.5.0
+
+- **Gráficos semanais do Início com o mês anterior.** C-SAT, Volume e TME
+  por semana mostram, atrás da linha do mês, o mês anterior em cinza, semana a
+  semana, só para comparar (o valor aparece ao passar o mouse). Vale para o
+  Início do gestor e para o do atendente, com os números dele.
+- **Tela Presencial mais leve.** O peso do presencial no cargo de quem está
+  olhando vinha de uma linha qualquer do extrato ao vivo, de todos os meses;
+  agora o cargo vem do cadastro na competência.
+- Documentação da hospedagem e da apresentação para a TI atualizadas: versões,
+  migrações até a 58 e a dependência do pg_cron para o resumo do mês.
+
 ## 5.4.0
 
 - **Resumo do mês aberto (migração 58).** O resultado do mês aberto fica

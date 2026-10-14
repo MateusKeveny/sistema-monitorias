@@ -28,26 +28,27 @@ export default async function AtendimentoPresencial({
 
   const db = await criarClienteServidor();
 
-  const [{ data: registros }, { data: linhas }] = await Promise.all([
+  const [{ data: registros }, { data: cargos }, { data: pesos }] = await Promise.all([
     db.from('vw_presenciais').select('*')
       .eq('mes_competencia', competencia).order('data', { ascending: false }),
-    // O peso do presencial no cargo de quem está olhando, só para informar.
-    db.from('vw_extrato_cota').select('cargo_id')
-      .eq('pessoa_id', perfil.id).limit(1),
+    // O peso do presencial no cargo de quem está olhando, só para informar. O
+    // cargo vem do cadastro na competência (1.40.1) — antes saía de uma linha
+    // qualquer do extrato ao vivo, de todos os meses, a consulta mais pesada
+    // do sistema para descobrir um número.
+    veOTime
+      ? Promise.resolve({ data: [] as { cargo_id: number }[] })
+      : db.from('cargos_da_pessoa').select('cargo_id')
+        .eq('pessoa_id', perfil.id).lte('desde', competencia).order('desde', { ascending: false }).limit(1),
+    db.from('pesos_por_cargo').select('cargo_id, peso').eq('regra', 'presencial').eq('ativo', true),
   ]);
 
-  const cargoId = (linhas ?? [])[0]?.cargo_id as number | undefined;
   // Quem vê a equipe nem sempre pontua por presencial no próprio cargo (o
   // gestor não pontua): aí vale o peso de quem atende.
-  const { data: pesos } = veOTime
-    ? await db.from('pesos_por_cargo').select('peso').eq('regra', 'presencial').eq('ativo', true)
-    : cargoId
-      ? await db.from('pesos_por_cargo').select('peso')
-        .eq('cargo_id', cargoId).eq('regra', 'presencial').eq('ativo', true)
-      : { data: [] };
+  const cargoId = (cargos ?? [])[0]?.cargo_id as number | undefined;
+  const doCargo = veOTime ? (pesos ?? []) : (pesos ?? []).filter((p) => p.cargo_id === cargoId);
 
   const lista = (registros ?? []) as Presencial[];
-  const valores = (pesos ?? []).map((p) => Number(p.peso)).filter((v) => v > 0);
+  const valores = doCargo.map((p) => Number(p.peso)).filter((v) => v > 0);
   const pontos = valores.length ? Math.max(...valores) : null;
   const pessoasNoMes = new Set(lista.map((r) => r.pessoa_id)).size;
 

@@ -8,6 +8,11 @@
  * valor escrito em cima. A linha se desenha uma vez ao aparecer (desenhar-linha,
  * em globals.css); quem desativa animações vê pronta.
  *
+ * Com `comparacao` (1.41.0), o mês anterior aparece atrás, semana a semana:
+ * linha cinza fina, sem valores escritos (o número aparece ao passar o
+ * mouse), e uma legenda pequena em cima. Só para comparar — a cor e os
+ * valores continuam sendo os do mês da tela.
+ *
  * SVG montado no servidor, sem biblioteca de gráfico no navegador.
  */
 export type PontoDaLinha = { valor: number; tom?: 'bom' | 'atencao' | 'ruim' } | null;
@@ -15,9 +20,11 @@ export type PontoDaLinha = { valor: number; tom?: 'bom' | 'atencao' | 'ruim' } |
 const COR = { bom: 'var(--color-marca-600)', atencao: 'var(--color-amber-500)', ruim: 'var(--color-rose-500)' };
 
 export default function GraficoDeLinha({
-  pontos, formatar, referencia, min = 0, max, rotulos, largura = 640,
+  pontos, formatar, referencia, min = 0, max, rotulos, largura = 640, comparacao,
 }: {
   pontos: PontoDaLinha[];
+  /** O mês anterior, semana a semana, para comparar; os rótulos são os nomes dos meses na legenda. */
+  comparacao?: { pontos: (number | null)[]; rotulo: string; rotuloAtual: string };
   formatar: (v: number) => string;
   /** Linha tracejada: a meta (C-SAT) ou a média (volume, TME). */
   referencia?: { valor: number; rotulo: string };
@@ -30,7 +37,10 @@ export default function GraficoDeLinha({
   largura?: number;
 }) {
   const L = largura, A = 220, esq = 18, dir = 18, topo = 36, base = 30;
-  const valores = pontos.filter((p): p is NonNullable<PontoDaLinha> => p != null).map((p) => p.valor);
+  const valores = [
+    ...pontos.filter((p): p is NonNullable<PontoDaLinha> => p != null).map((p) => p.valor),
+    ...(comparacao?.pontos ?? []).filter((v): v is number => v != null),
+  ];
   const teto = max ?? Math.max(1, ...valores, referencia?.valor ?? 0) * 1.15;
   const x = (i: number) => esq + (i * (L - esq - dir)) / Math.max(1, pontos.length - 1);
   const y = (v: number) => topo + (1 - Math.max(0, Math.min(1, (v - min) / (teto - min)))) * (A - topo - base);
@@ -41,10 +51,36 @@ export default function GraficoDeLinha({
   const area = comDado.length > 1
     ? `${trilha} L${x(comDado.at(-1)!.i)},${A - base} L${x(comDado[0].i)},${A - base} Z` : '';
 
+  // O mês anterior: só as semanas com dado, ligadas na ordem.
+  const antes = (comparacao?.pontos ?? []).map((v, i) => (v != null ? { v, i } : null))
+    .filter((p): p is { v: number; i: number } => p != null);
+  const trilhaAntes = antes.map((p, n) => `${n ? 'L' : 'M'}${x(p.i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ');
+
   return (
+    <>
+    {comparacao && antes.length > 0 && (
+      <p className="mb-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+        <span className="inline-flex items-center gap-1.5">
+          <span aria-hidden className="inline-block w-4 border-t-[2.5px] border-marca-600" />{comparacao.rotuloAtual}
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span aria-hidden className="inline-block w-4 border-t-2 border-slate-400" />{comparacao.rotulo}
+        </span>
+      </p>
+    )}
     <svg viewBox={`0 0 ${L} ${A}`} role="img" aria-label={rotulos ? 'Evolução por mês' : 'Evolução por semana'}
          className="block h-auto w-full overflow-visible tabular-nums">
       {area && <path d={area} fill="var(--color-marca-600)" opacity={0.08} />}
+      {antes.length > 1 && (
+        <path d={trilhaAntes} fill="none" stroke="var(--color-slate-400)" strokeWidth={2}
+              strokeLinejoin="round" strokeLinecap="round" opacity={0.75} />
+      )}
+      {antes.map((p) => (
+        <circle key={`a${p.i}`} cx={x(p.i)} cy={y(p.v)} r={3.5} fill="var(--color-superficie)"
+                stroke="var(--color-slate-400)" strokeWidth={2}>
+          <title>{`${comparacao!.rotulo}, ${p.i + 1}ª semana: ${formatar(p.v)}`}</title>
+        </circle>
+      ))}
       {referencia && (
         <>
           <line x1={esq} x2={L - dir} y1={y(referencia.valor)} y2={y(referencia.valor)}
@@ -74,5 +110,6 @@ export default function GraficoDeLinha({
         </g>
       ))}
     </svg>
+    </>
   );
 }

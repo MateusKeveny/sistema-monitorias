@@ -237,6 +237,19 @@ export default async function PainelAtendente({
       return t != null && t > 0 ? Number(t) : null;
     };
     const tmeEquipeMes = media([1, 2, 3, 4].map(tmeEquipeSemana).filter((t): t is number => t != null));
+
+    // O mês anterior, semana a semana, atrás das linhas (1.41.0): o atendente
+    // compara o próprio resultado com o do mês de antes.
+    const nomes = { rotuloAtual: nomeDoMesMaiusculo(competencia), rotulo: nomeDoMesMaiusculo(anterior) };
+    const csatSemanasAntes = [1, 2, 3, 4].map((s) => {
+      const l = deste(anterior).find((x) => x.semana === s);
+      return l && l.avaliacoes ? l.positivas / l.avaliacoes : null;
+    });
+    const volSemanasAntes = [1, 2, 3, 4].map((s) => vol(anterior).find((v) => v.semana === s)?.finalizados ?? null);
+    const tmeSemanasAntes = [1, 2, 3, 4].map((s) => {
+      const v = vol(anterior).find((x) => x.semana === s);
+      return v && (v.tme_seg ?? 0) > 0 ? v.tme_seg! : null;
+    });
     const faixasTme = todasRegras.filter((r) => r.grupo === (c === 'huggy' ? 'tme' : 'tme_diretores'));
 
     const dCsat = csatMes != null && csatAntes != null ? (csatMes - csatAntes) * 100 : null;
@@ -266,6 +279,7 @@ export default async function PainelAtendente({
               {csatMes == null ? <Vazio>Sem avaliações neste canal.</Vazio> : (
                 <GraficoDeLinha min={0.75} max={1} formatar={percentual}
                                 referencia={{ valor: META_CSAT, rotulo: 'meta 95%' }}
+                                comparacao={{ pontos: csatSemanasAntes, ...nomes }}
                                 pontos={csatSemanas.map((s): PontoDaLinha => s && { valor: s.valor, tom: tomDoCsat(s.valor) })} />
               )}
             </Secao>
@@ -303,6 +317,7 @@ export default async function PainelAtendente({
               {!volTotal ? <Vazio>Nenhum volume lançado neste canal.</Vazio> : (
                 <GraficoDeLinha formatar={(v) => num(v)}
                                 referencia={volMediaSemanal != null ? { valor: volMediaSemanal, rotulo: `sua média ${num(volMediaSemanal)}` } : undefined}
+                                comparacao={{ pontos: volSemanasAntes, ...nomes }}
                                 pontos={volSemanas.map((v): PontoDaLinha => v == null ? null : { valor: v })} />
               )}
             </Secao>
@@ -334,6 +349,7 @@ export default async function PainelAtendente({
               {tmeMes == null ? <Vazio>Nenhum tempo lançado neste canal.</Vazio> : (
                 <GraficoDeLinha formatar={tempo}
                                 referencia={tmeEquipeMes != null ? { valor: tmeEquipeMes, rotulo: `média da equipe ${tempo(tmeEquipeMes)}` } : undefined}
+                                comparacao={{ pontos: tmeSemanasAntes, ...nomes }}
                                 pontos={tmeSemanas.map((v, i): PontoDaLinha => v == null ? null
                                   : { valor: v, tom: (tmeEquipeSemana(i + 1) ?? Infinity) < v ? 'atencao' : 'bom' })} />
               )}

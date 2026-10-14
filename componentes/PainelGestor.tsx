@@ -39,6 +39,7 @@ function tempo(seg: number) {
 /** '2026-08-01' → 'agosto'. */
 const nomeDoMes = (c: string) =>
   new Date(`${c}T12:00:00Z`).toLocaleDateString('pt-BR', { month: 'long', timeZone: 'UTC' });
+const maiusculo = (t: string) => t.replace(/^./, (l) => l.toUpperCase());
 
 /** Escala única do painel para a nota de monitoria: 85% é o piso para pontuar. */
 const tomDaNota = (v: number): 'bom' | 'atencao' | 'ruim' => (v >= 0.85 ? 'bom' : v >= 0.70 ? 'atencao' : 'ruim');
@@ -295,6 +296,8 @@ export default async function PainelGestor({
   const porCanal = Object.fromEntries(CANAIS.map((c) => {
     const agora = canal(c, competencia);
     const antes = canal(c, anterior);
+    // Nomes da legenda dos gráficos semanais (1.41.0): o mês da tela e o anterior.
+    const nomes = { rotuloAtual: maiusculo(nomeDoMes(competencia)), rotulo: maiusculo(nomeDoMes(anterior)) };
 
     const dCsat = agora.csatMes != null && antes.csatMes != null ? (agora.csatMes - antes.csatMes) * 100 : null;
     const dVol = agora.volTotal && antes.volTotal ? (agora.volTotal - antes.volTotal) / antes.volTotal : null;
@@ -354,6 +357,7 @@ export default async function PainelGestor({
                 <>
                   <GraficoDeLinha min={0.75} max={1} formatar={percentual}
                                   referencia={{ valor: META_CSAT, rotulo: 'meta 95%' }}
+                                  comparacao={{ pontos: antes.csatSemanas.map((s) => s?.valor ?? null), ...nomes }}
                                   pontos={agora.csatSemanas.map((s): PontoDaLinha => s && { valor: s.valor, tom: tomDoCsat(s.valor) })} />
                   {/* O tamanho da amostra: 100% de duas avaliações não é 100% de duzentas. */}
                   <p className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-500">
@@ -413,6 +417,7 @@ export default async function PainelGestor({
               {!agora.volTotal ? <Vazio>Nenhum volume lançado neste canal.</Vazio> : (
                 <GraficoDeLinha formatar={inteiro}
                                 referencia={mediaVolSemanal != null ? { valor: mediaVolSemanal, rotulo: `média ${inteiro(mediaVolSemanal)}` } : undefined}
+                                comparacao={{ pontos: antes.volSemanas, ...nomes }}
                                 pontos={agora.volSemanas.map((v): PontoDaLinha => v == null ? null : { valor: v })} />
               )}
             </Secao>
@@ -459,6 +464,7 @@ export default async function PainelGestor({
               {agora.tmeEquipe == null ? <Vazio>Nenhum TME lançado neste canal.</Vazio> : (
                 <GraficoDeLinha formatar={tempo}
                                 referencia={{ valor: agora.tmeEquipe, rotulo: `média ${tempo(agora.tmeEquipe)}` }}
+                                comparacao={{ pontos: antes.tmeSemanas, ...nomes }}
                                 pontos={agora.tmeSemanas.map((v): PontoDaLinha => v == null ? null
                                   : { valor: v, tom: v > agora.tmeEquipe! ? 'atencao' : 'bom' })} />
               )}

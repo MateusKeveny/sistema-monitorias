@@ -11,7 +11,7 @@ Escrito em 28/09/2026, atualizado em 08/10/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.40.0** · Monitorias **5.4.0** (deploy de 13/10/2026) |
+| Publicado | Performance **1.41.0** · Monitorias **5.5.0** (deploy de 14/10/2026) |
 | Branch | `painel-performance` (a `main` segue intocada) |
 | Migrações no banco | 01 a 57, todas aplicadas |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` |
@@ -552,6 +552,17 @@ Três versões, cada uma publicada e conferida antes da próxima:
   `vw_cota_mensal` ou `vw_sem_cargo`, recrie a tabela de resumo
   correspondente (o `insert … select *` depende das mesmas colunas), e se o
   cálculo passar a ler uma tabela nova, ponha nela o gatilho `resumo_mudou`.
+- **Performance 1.41.0 · Monitorias 5.5.0** (sem migração): tela Presencial
+  pega o cargo em `cargos_da_pessoa` (na competência) e os pesos do
+  presencial numa consulta só — antes lia `vw_extrato_cota` sem filtro de mês.
+  HOSPEDAGEM e o documento da TI (Claude Docs) atualizados: versões,
+  migrações 01–58, pg_cron também para o resumo e o passo de recriar as
+  tarefas agendadas depois da cópia do banco (o esquema `cron` não vai junto).
+  E os gráficos semanais do Início (C-SAT, Volume, TME; PainelGestor e
+  PainelAtendente) ganham `comparacao` no `GraficoDeLinha`: o mês anterior
+  em cinza, sem valores escritos (`<title>` no ponto) e legenda "Outubro /
+  Setembro". Os dados do mês anterior já vinham (usados no "vs setembro"):
+  nenhuma consulta nova.
 
 Visão de celular fica fora da revisão, por decisão do gestor. Os painéis são
 usados só no computador.
