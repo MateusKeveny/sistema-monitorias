@@ -1,4 +1,5 @@
 import AtivarNotificacoes from '@/componentes/agenda/AtivarNotificacoes';
+import ConectarTelegram from '@/componentes/agenda/ConectarTelegram';
 import PreferenciasDoResumo from '@/componentes/agenda/PreferenciasDoResumo';
 import BotaoSair from '@/componentes/agenda/BotaoSair';
 import BotaoTema from '@/componentes/BotaoTema';
@@ -6,21 +7,26 @@ import { Painel, Secao } from '@/componentes/ui';
 import TrocarSenha from '@/componentes/agenda/TrocarSenha';
 import { criarServidorDaAgenda, exigirUsuario } from '@/lib/agenda/db-servidor';
 import { chavesVapid } from '@/lib/agenda/envio';
+import { nomeDoBot } from '@/lib/agenda/telegram';
 import { dataHora } from '@/lib/formatar';
 import { PREFERENCIAS_PADRAO, type Preferencias } from '@/lib/agenda/tipos';
 import { VERSAO_AGENDA } from '@/lib/versoes';
 
 export const dynamic = 'force-dynamic';
 
-/** Notificações deste aparelho, resumo do dia, aparelhos inscritos e a conta. */
+/** Telegram, notificações deste aparelho, resumo do dia, aparelhos inscritos e a conta. */
 export default async function Ajustes() {
   const usuario = await exigirUsuario();
   const db = await criarServidorDaAgenda();
-  const [preferencias, aparelhos] = await Promise.all([
+  const [preferencias, aparelhos, telegram, bot] = await Promise.all([
     db.from('agenda_preferencias').select('resumo_ativo, resumo_hora, resumo_fim_semana, pendencias').maybeSingle()
       .then((r) => (r.data as Preferencias | null) ?? PREFERENCIAS_PADRAO),
     db.from('agenda_inscricoes').select('endpoint, aparelho, criado_em').order('criado_em', { ascending: false })
       .then((r) => (r.data ?? []) as { endpoint: string; aparelho: string | null; criado_em: string }[]),
+    // Antes do 02-telegram.sql a tabela não existe: a consulta falha e a seção mostra "não conectado".
+    db.from('agenda_telegram').select('nome, criado_em').maybeSingle()
+      .then((r) => (r.data as { nome: string | null; criado_em: string } | null) ?? null),
+    nomeDoBot(),
   ]);
 
   return (
@@ -30,6 +36,11 @@ export default async function Ajustes() {
       </header>
 
       <Painel>
+        <Secao titulo="Avisos pelo Telegram"
+               subtitulo="Para quando o aparelho não aceita notificação do navegador: os lembretes chegam como mensagem.">
+          <ConectarTelegram bot={bot} ligado={telegram} />
+        </Secao>
+
         <Secao titulo="Notificações neste aparelho"
                subtitulo="Ative em cada aparelho onde quer ser lembrado: no celular e no computador.">
           <AtivarNotificacoes chavePublica={chavesVapid()?.publica ?? null} />

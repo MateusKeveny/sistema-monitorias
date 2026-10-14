@@ -604,6 +604,14 @@ Três versões, cada uma publicada e conferida antes da próxima:
   Variáveis próprias no `.env.local`: `NEXT_PUBLIC_AGENDA_*`, `VAPID_*`,
   `AGENDA_SEGREDO`, `PONTE_SEGREDO` — não gerar de novo. `cf:deploy` publica
   os três sites; `cf:deploy:agenda` só a agenda.
+- **Agenda 1.1.0 — avisos pelo Telegram** (ainda não publicada;
+  `supabase/agenda/02-telegram.sql`): o aparelho do gestor bloqueia
+  notificação do navegador, então os avisos também saem por um bot.
+  `agenda_destinos` junta aparelhos e conversa; `agenda_disparar` e
+  `agenda_testar` foram redefinidas no 02 para usar isso. Webhook em
+  `/api/agenda/telegram` (fora do middleware), com a senha
+  `seloDoItem('telegram', AGENDA_SEGREDO)`. Segredo novo só o
+  `TELEGRAM_TOKEN`. Passos em [AGENDA.md](AGENDA.md#avisos-pelo-telegram-110).
 
 Visão de celular fica fora da revisão, por decisão do gestor. Os painéis são
 usados só no computador.

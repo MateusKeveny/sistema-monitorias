@@ -86,7 +86,8 @@ export const config = {
   // texto literal. Quebrar a linha com `+` faz a regra inteira ser ignorada.
   // Da agenda (migração 59) também ficam de fora o service worker e o
   // manifesto, que o navegador busca sem sessão, e as duas rotas chamadas
-  // pelo banco e pela notificação — essas conferem o segredo por conta própria.
+  // pelo banco e pela notificação, e o webhook do Telegram — essas conferem o
+  // segredo por conta própria.
   // eslint-disable-next-line max-len
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/saude|api/agenda/enviar|api/agenda/acao|agenda-sw.js|agenda.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/saude|api/agenda/enviar|api/agenda/acao|api/agenda/telegram|agenda-sw.js|agenda.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 };

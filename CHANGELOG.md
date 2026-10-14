@@ -35,6 +35,18 @@ para o Performance.
 
 ---
 
+## Agenda da Gestão 1.1.0
+
+Só Agenda (atualização). Não muda Monitorias nem Performance.
+
+- **Avisos pelo Telegram**, para aparelho que não aceita notificação do
+  navegador: os lembretes e o resumo do dia chegam como mensagem de um bot,
+  com os botões **Concluir**, **Adiar 15 min** e **Abrir a agenda**. Em
+  Ajustes, **Conectar Telegram** liga a conta com um toque, sem digitar
+  número nenhum. Os dois canais podem ficar ligados juntos.
+- Banco da agenda: `supabase/agenda/02-telegram.sql`. Ligar o bot:
+  [docs/AGENDA.md](docs/AGENDA.md#avisos-pelo-telegram-110).
+
 ## Agenda da Gestão 1.0.0
 
 Terceiro site do mesmo código (`painel-agenda.expansao.workers.dev`,

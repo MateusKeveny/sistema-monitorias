@@ -63,3 +63,32 @@ Projeto da AGENDA                              Projeto dos PAINÉIS
 
 Trocar a chave VAPID derruba a inscrição de todos os aparelhos: cada um
 precisa ativar de novo.
+
+## Avisos pelo Telegram (1.1.0)
+
+Para aparelho que não aceita notificação do navegador (bloqueada pela
+empresa, por exemplo). Os mesmos lembretes e o resumo do dia chegam como
+mensagem de um bot, com os botões **Concluir**, **Adiar 15 min** e **Abrir a
+agenda**. Os dois canais podem ficar ligados juntos.
+
+Como funciona: `agenda_disparar` manda cada aviso para todos os destinos do
+usuário (`agenda_destinos`: aparelhos e conversa do Telegram). O site envia
+pela API de bots com o `TELEGRAM_TOKEN`. O bot chama `/api/agenda/telegram`
+(webhook) quando alguém fala com ele ou toca num botão. A senha do webhook
+sai do `AGENDA_SEGREDO`, então não é mais um segredo para guardar.
+
+Ligar (uma vez):
+
+1. **Criar o bot** — no Telegram, conversa com **@BotFather** → `/newbot` →
+   um nome ("Agenda da Gestão") e um usuário terminado em `bot`. Ele responde
+   com o **token**. O token é senha: não mande em conversa nenhuma.
+2. **Token no `.env.local`** — acrescentar a linha `TELEGRAM_TOKEN=<token>`.
+3. **Banco** — colar `supabase/agenda/02-telegram.sql` no SQL Editor do
+   projeto **da agenda**. A conferência no fim mostra `tabelas_telegram = 2`.
+4. **Publicar** — `npm run cf:deploy:agenda` (ou o `cf:deploy` completo).
+5. **Token no Worker e webhook** — `node scripts/chaves-da-agenda.js telegram`.
+6. **Conectar** — na agenda, Ajustes → **Conectar Telegram** → no Telegram,
+   **Iniciar**. De volta à agenda, **Já conectei** e **Enviar teste**.
+
+Bot bloqueado ou conversa apagada: o primeiro aviso recusado (403) desliga a
+conversa sozinho. Para ligar de novo, repita o passo 6.

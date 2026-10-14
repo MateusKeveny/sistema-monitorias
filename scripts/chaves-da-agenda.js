@@ -19,6 +19,12 @@
  *       agenda-config.sql — para o SQL Editor do projeto da AGENDA;
  *       ponte-config.sql  — para o SQL Editor do projeto dos PAINÉIS.
  *
+ *   node scripts/chaves-da-agenda.js telegram
+ *     Avisos pelo Telegram (supabase/agenda/02-telegram.sql). Precisa da linha
+ *     TELEGRAM_TOKEN=<token do @BotFather> no .env.local. Grava o token como
+ *     segredo do Worker e registra o webhook do bot, com a senha que sai do
+ *     AGENDA_SEGREDO (a mesma conta de lib/agenda/telegram.ts).
+ *
  * Os segredos não aparecem na tela.
  */
 const fs = require('node:fs');
@@ -112,6 +118,30 @@ insert into public.agenda_ponte (chave, valor) values ('segredo', '${valores.PON
 on conflict (chave) do update set valor = excluded.valor;
 `);
   console.log('Escritos dados/agenda-config.sql (projeto da agenda) e dados/ponte-config.sql (projeto dos painéis).');
+} else if (passo === 'telegram') {
+  const { valores } = ler();
+  faltando(valores, ['AGENDA_SEGREDO']);
+  if (!/^\d+:[A-Za-z0-9_-]{30,}$/.test(valores.TELEGRAM_TOKEN ?? '')) {
+    console.error('Falta no .env.local a linha TELEGRAM_TOKEN=<token que o @BotFather entregou>.');
+    process.exit(1);
+  }
+  console.log('Gravando TELEGRAM_TOKEN no Worker painel-agenda…');
+  const r = spawnSync('npx', ['wrangler', 'secret', 'put', 'TELEGRAM_TOKEN', '--env', 'agenda'],
+    { cwd: raiz, input: valores.TELEGRAM_TOKEN, stdio: ['pipe', 'inherit', 'inherit'], shell: true });
+  if (r.status !== 0) process.exit(r.status ?? 1);
+  // Igual a seloDoWebhook(AGENDA_SEGREDO) em lib/agenda/telegram.ts.
+  const senha = crypto.createHmac('sha256', valores.AGENDA_SEGREDO).update('agenda:telegram').digest('base64url');
+  fetch(`https://api.telegram.org/bot${valores.TELEGRAM_TOKEN}/setWebhook`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      url: `${ENDERECO}/api/agenda/telegram`, secret_token: senha,
+      allowed_updates: ['message', 'callback_query'], drop_pending_updates: true,
+    }),
+  }).then((res) => res.json()).then((j) => {
+    if (!j.ok) { console.error(`O Telegram recusou o webhook: ${j.description}`); process.exit(1); }
+    console.log('Webhook do bot registrado.');
+  }).catch((e) => { console.error(`Sem resposta do Telegram: ${e.message}`); process.exit(1); });
 } else {
-  console.log('Uso: node scripts/chaves-da-agenda.js projeto <url> <anon> | gerar | worker | sql');
+  console.log('Uso: node scripts/chaves-da-agenda.js projeto <url> <anon> | gerar | worker | sql | telegram');
 }

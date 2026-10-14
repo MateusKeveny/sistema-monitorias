@@ -97,7 +97,7 @@ export default function AtivarNotificacoes({ chavePublica }: { chavePublica: str
     const { data, error } = await criarClienteDaAgenda().rpc('agenda_testar');
     setOcupado(false);
     setMensagem(error ? `Falhou: ${error.message}`
-      : `Enviado para ${data} aparelho${Number(data) === 1 ? '' : 's'}. Deve chegar em alguns segundos.`);
+      : `Enviado para ${data} destino${Number(data) === 1 ? '' : 's'}. Deve chegar em alguns segundos.`);
   }
 
   const botao = 'rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60';
