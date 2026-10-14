@@ -6,7 +6,7 @@ import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import BotaoTema from '@/componentes/BotaoTema';
 import BotaoReportar from '@/componentes/BotaoReportar';
 import { ITENS, type Item } from '@/componentes/Navegacao';
-import { NOME_SISTEMA, type Sistema } from '@/lib/sistema';
+import { NOME_SISTEMA, type SistemaDoPainel as Sistema } from '@/lib/sistema';
 import { NOMES_PAPEL, type Perfil } from '@/lib/tipos';
 
 /** Ícones de traço, desenhados para 20×20, por endereço, nos dois sistemas. */

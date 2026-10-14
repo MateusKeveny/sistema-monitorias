@@ -13,7 +13,10 @@
     "exportar": "node --env-file=.env.local scripts/gerar-exportacao.js",
     "cf:build": "opennextjs-cloudflare build",
     "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy && opennextjs-cloudflare deploy --env performance",
+    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy && opennextjs-cloudflare deploy --env performance && opennextjs-cloudflare deploy --env agenda",
+    "cf:deploy:agenda": "opennextjs-cloudflare build && opennextjs-cloudflare deploy --env agenda",
+    "agenda:chaves": "node scripts/chaves-da-agenda.js gerar",
+    "agenda:icones": "node scripts/icones-da-agenda.js",
     "papel": "node --env-file=.env.local scripts/definir-papel.js",
     "vincular": "node --env-file=.env.local scripts/vincular-contas.js",
     "acesso": "node --env-file=.env.local scripts/criar-acesso.js"

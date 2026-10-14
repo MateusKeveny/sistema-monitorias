@@ -15,15 +15,18 @@
  */
 type Cookie = { name: string; value: string };
 
-const ehDaSessao = (nome: string) => nome.startsWith('sb-') && /-auth-token(\.\d+)?$/.test(nome);
+// `projeto` restringe ao cookie de um projeto Supabase só — a agenda tem o
+// dela (supabase/agenda/), e o de um painel não pode valer como sessão lá.
+const ehDaSessao = (nome: string, projeto?: string) =>
+  nome.startsWith(projeto ? `sb-${projeto}-` : 'sb-') && /-auth-token(\.\d+)?$/.test(nome);
 
-export function temCookieDeSessao(cookies: Cookie[]): boolean {
-  return cookies.some((c) => ehDaSessao(c.name));
+export function temCookieDeSessao(cookies: Cookie[], projeto?: string): boolean {
+  return cookies.some((c) => ehDaSessao(c.name, projeto));
 }
 
 /** Validade da sessão em segundos (época Unix), ou null se não der para ler. */
-export function validadeDaSessao(cookies: Cookie[]): number | null {
-  const partes = cookies.filter((c) => ehDaSessao(c.name));
+export function validadeDaSessao(cookies: Cookie[], projeto?: string): number | null {
+  const partes = cookies.filter((c) => ehDaSessao(c.name, projeto));
   if (!partes.length) return null;
   // Inteiro, ou os pedaços .0, .1… na ordem.
   const inteiro = partes.find((c) => !/\.\d+$/.test(c.name));

@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { INICIO_COTA, caminhoForaDoSistema, sistemaDoHost } from '@/lib/sistema';
+import { INICIO, caminhoForaDoSistema, sistemaDoHost } from '@/lib/sistema';
 import { temCookieDeSessao, validadeDaSessao } from '@/lib/sessao-cookie';
 
 /**
@@ -14,20 +14,28 @@ export async function middleware(requisicao: NextRequest) {
   const sistema = sistemaDoHost(requisicao.headers.get('host'));
   if (caminhoForaDoSistema(sistema, caminho)) {
     const destino = requisicao.nextUrl.clone();
-    destino.pathname = sistema === 'cota' ? INICIO_COTA : '/';
+    destino.pathname = INICIO[sistema];
     destino.search = '';
     return NextResponse.redirect(destino);
   }
 
-  const publica = caminho.startsWith('/login') || caminho.startsWith('/auth');
+  // A agenda tem banco e login próprios (supabase/agenda/): outra porta de
+  // entrada, outra renovação e só o cookie do projeto dela.
+  const agenda = sistema === 'agenda';
+  const entrar = agenda ? '/agenda/entrar' : '/login';
+  const renovar = agenda ? '/agenda/renovar' : '/auth/renovar';
+  const publica = agenda
+    ? caminho === entrar || caminho === renovar
+    : caminho.startsWith('/login') || caminho.startsWith('/auth');
+  const projeto = agenda ? projetoDaAgenda() : undefined;
   const cookies = requisicao.cookies.getAll();
 
   // Sem cookie de sessão não há ninguém logado: vai ao login (1.35.4).
-  if (!temCookieDeSessao(cookies)) {
+  if (!temCookieDeSessao(cookies, projeto)) {
     if (publica) return NextResponse.next();
     // Com os parâmetros (1.41.1): o link do extrato de setembro de uma pessoa
     // voltava, depois do login, no mês e na pessoa padrão.
-    return irPara(requisicao, '/login', caminho + requisicao.nextUrl.search);
+    return irPara(requisicao, entrar, caminho + requisicao.nextUrl.search);
   }
 
   // Com cookie, só a validade é lida — sem ir ao Supabase e sem renovar aqui
@@ -41,11 +49,20 @@ export async function middleware(requisicao: NextRequest) {
   // não dá para saber se a sessão ainda vale no Supabase (encerrada pelo
   // gestor, por exemplo), e a tela mandaria de volta ao login — um laço.
   if (publica) return NextResponse.next();
-  const validade = validadeDaSessao(cookies);
+  const validade = validadeDaSessao(cookies, projeto);
   if (validade == null || validade <= Date.now() / 1000 + MARGEM_SEG) {
-    return irPara(requisicao, '/auth/renovar', caminho + requisicao.nextUrl.search);
+    return irPara(requisicao, renovar, caminho + requisicao.nextUrl.search);
   }
   return NextResponse.next();
+}
+
+/** "https://abcd.supabase.co" → "abcd", o miolo do nome do cookie `sb-abcd-auth-token`. */
+function projetoDaAgenda(): string | undefined {
+  try {
+    return new URL(process.env.NEXT_PUBLIC_AGENDA_SUPABASE_URL ?? '').hostname.split('.')[0] || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** Renova um pouco antes de vencer, para a tela não pegar o passe no limite. */
@@ -67,6 +84,9 @@ export const config = {
   // uma ida ao Supabase para conferir sessão a cada verificação.
   // O Next lê este valor no build, sem executar o arquivo: precisa ser um
   // texto literal. Quebrar a linha com `+` faz a regra inteira ser ignorada.
+  // Da agenda (migração 59) também ficam de fora o service worker e o
+  // manifesto, que o navegador busca sem sessão, e as duas rotas chamadas
+  // pelo banco e pela notificação — essas conferem o segredo por conta própria.
   // eslint-disable-next-line max-len
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/saude|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/saude|api/agenda/enviar|api/agenda/acao|agenda-sw.js|agenda.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 };

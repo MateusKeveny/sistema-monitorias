@@ -1,9 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
-import { VERSAO_COTA, VERSAO_MONITORIAS } from '@/lib/versoes';
+import { VERSAO_AGENDA, VERSAO_COTA, VERSAO_MONITORIAS } from '@/lib/versoes';
 import { sistemaDoHost } from '@/lib/sistema';
 
 // `versao` continua sendo a das monitorias, que é o que o monitoramento já lê.
-const versoes = { versao: VERSAO_MONITORIAS, versoes: { monitorias: VERSAO_MONITORIAS, cota: VERSAO_COTA } };
+const versoes = {
+  versao: VERSAO_MONITORIAS,
+  versoes: { monitorias: VERSAO_MONITORIAS, cota: VERSAO_COTA, agenda: VERSAO_AGENDA },
+};
 
 export const dynamic = 'force-dynamic';
 

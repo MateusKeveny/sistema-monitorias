@@ -7,7 +7,7 @@ import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import BotaoTema from '@/componentes/BotaoTema';
 import BotaoReportar from '@/componentes/BotaoReportar';
 import { NOMES_PAPEL, type Perfil } from '@/lib/tipos';
-import { NOME_SISTEMA, type Sistema } from '@/lib/sistema';
+import { NOME_SISTEMA, type SistemaDoPainel as Sistema } from '@/lib/sistema';
 
 /**
  * `grupo` junta itens num menu que abre ao clicar. Nove links soltos quebravam

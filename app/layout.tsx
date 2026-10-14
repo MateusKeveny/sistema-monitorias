@@ -1,16 +1,30 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { NOME_SISTEMA } from '@/lib/sistema';
 import { sistemaAtual } from '@/lib/sistema-servidor';
 import './globals.css';
 
 export async function generateMetadata(): Promise<Metadata> {
   const sistema = await sistemaAtual();
+  // A agenda se instala como aplicativo (migração 59): manifesto e ícones só nela.
+  if (sistema === 'agenda') {
+    return {
+      title: 'Agenda da Gestão — IGreen',
+      description: 'Lembretes, pendências e o plano do dia da gestão',
+      manifest: '/agenda.webmanifest',
+      icons: { icon: '/agenda-192.png', apple: '/agenda-192.png' },
+      appleWebApp: { capable: true, title: 'Agenda', statusBarStyle: 'default' },
+    };
+  }
   return {
     title: `${NOME_SISTEMA[sistema]} — IGreen`,
     description: sistema === 'cota'
       ? 'Acompanhamento de cota por cargo'
       : 'Sistema de monitorias de qualidade de atendimento (C-SAT)',
   };
+}
+
+export async function generateViewport(): Promise<Viewport> {
+  return (await sistemaAtual()) === 'agenda' ? { themeColor: '#005d0c' } : {};
 }
 
 /**

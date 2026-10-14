@@ -1,8 +1,8 @@
 /**
  * Qual sistema este endereço serve.
  *
- * O mesmo código é publicado em dois Workers — `painel-monitorias` e
- * `painel-performance` — e cada um mostra só o seu sistema. A escolha é pelo
+ * O mesmo código é publicado em três Workers — `painel-monitorias`,
+ * `painel-performance` e `painel-agenda` — e cada um mostra só o seu sistema. A escolha é pelo
  * endereço, e não por variável de ambiente, porque o middleware do Next pode
  * ter o `process.env` congelado no build: com o endereço não há como os dois
  * sites saírem iguais por engano.
@@ -13,18 +13,31 @@
  * Arquivo puro (sem `next/headers`): é usado também no middleware e no
  * navegador.
  */
-export type Sistema = 'monitorias' | 'cota';
+export type Sistema = 'monitorias' | 'cota' | 'agenda';
+
+/** Os dois painéis — a agenda tem moldura, menu e login próprios. */
+export type SistemaDoPainel = Exclude<Sistema, 'agenda'>;
 
 export const NOME_SISTEMA: Record<Sistema, string> = {
   monitorias: 'Monitorias de Qualidade',
   cota: 'Painel de Performance',
+  agenda: 'Agenda da Gestão',
 };
 
 /** Links do Performance para uma monitoria abrem no site das monitorias. */
 export const ENDERECO_MONITORIAS = 'https://painel-monitorias.expansao.workers.dev';
 
+/** As pendências da agenda levam às telas do Performance. */
+export const ENDERECO_PERFORMANCE = 'https://painel-performance.expansao.workers.dev';
+
 /** Página inicial do site de cota. */
 export const INICIO_COTA = '/cota';
+
+/** Página inicial da agenda. */
+export const INICIO_AGENDA = '/agenda';
+
+/** Página inicial de cada sistema: para onde vai quem cai num caminho de outro. */
+export const INICIO: Record<Sistema, string> = { monitorias: '/', cota: INICIO_COTA, agenda: INICIO_AGENDA };
 
 /**
  * Caminhos que só existem no site de cota: as telas e as rotas de API delas.
@@ -42,10 +55,20 @@ const EXCLUSIVOS_DA_COTA = ['/cota', '/api/cota'];
  */
 const CAMINHOS_COTA = [...EXCLUSIVOS_DA_COTA, '/login', '/auth', '/definir-senha', '/reportes'];
 
+/**
+ * A agenda (terceiro site) tem banco e login próprios (supabase/agenda/):
+ * tudo dela mora em /agenda — inclusive /agenda/entrar e /agenda/renovar —
+ * e o /login dos painéis não existe lá.
+ */
+const EXCLUSIVOS_DA_AGENDA = ['/agenda', '/api/agenda'];
+const CAMINHOS_AGENDA = EXCLUSIVOS_DA_AGENDA;
+
 export function sistemaDoHost(host: string | null | undefined): Sistema {
-  if (host?.toLowerCase().startsWith('painel-performance.')) return 'cota';
+  const h = host?.toLowerCase();
+  if (h?.startsWith('painel-performance.')) return 'cota';
+  if (h?.startsWith('painel-agenda.')) return 'agenda';
   // Só para desenvolvimento local, onde o endereço é localhost.
-  return process.env.SISTEMA === 'cota' ? 'cota' : 'monitorias';
+  return process.env.SISTEMA === 'cota' ? 'cota' : process.env.SISTEMA === 'agenda' ? 'agenda' : 'monitorias';
 }
 
 const dentro = (caminho: string, base: string) =>
@@ -53,7 +76,7 @@ const dentro = (caminho: string, base: string) =>
 
 /** O caminho pertence a outro sistema e deve ser redirecionado. */
 export function caminhoForaDoSistema(sistema: Sistema, caminho: string): boolean {
-  return sistema === 'cota'
-    ? !CAMINHOS_COTA.some((base) => dentro(caminho, base))
-    : EXCLUSIVOS_DA_COTA.some((base) => dentro(caminho, base));
+  if (sistema === 'cota') return !CAMINHOS_COTA.some((base) => dentro(caminho, base));
+  if (sistema === 'agenda') return !CAMINHOS_AGENDA.some((base) => dentro(caminho, base));
+  return [...EXCLUSIVOS_DA_COTA, ...EXCLUSIVOS_DA_AGENDA].some((base) => dentro(caminho, base));
 }

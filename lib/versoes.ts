@@ -28,3 +28,6 @@ export const VERSAO_MONITORIAS: string = pacote.version;
  * estreia em produção (1.0.0, em 18/09/2026), a cota está em 1.4.0.
  */
 export const VERSAO_COTA = '1.41.1';
+
+/** Agenda da Gestão (migração 59), terceiro site do mesmo código. */
+export const VERSAO_AGENDA = '1.0.0';

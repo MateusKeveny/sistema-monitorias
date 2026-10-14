@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation';
 import Navegacao from '@/componentes/Navegacao';
 import MenuLateral from '@/componentes/MenuLateral';
 import { VERSAO_COTA, VERSAO_MONITORIAS } from '@/lib/versoes';
@@ -10,7 +11,12 @@ import { hojeNoBrasil } from '@/lib/formatar';
 import type { LeituraDiario, RegistroDiario } from '@/lib/diario';
 
 export default async function LayoutInterno({ children }: { children: React.ReactNode }) {
-  const [perfil, sistema] = await Promise.all([exigirPerfil(), sistemaAtual()]);
+  // A agenda tem moldura e login próprios (app/agenda); o middleware já a
+  // mantém fora daqui, e isto só garante.
+  // Ler o sistema é só ler o endereço: não atrasa a ida ao banco.
+  const sistema = await sistemaAtual();
+  if (sistema === 'agenda') redirect('/agenda');
+  const perfil = await exigirPerfil();
 
   // As consultas do layout saem juntas (1.39.3): rodam a cada clique, e uma
   // atrás da outra somavam as esperas pelo banco.
