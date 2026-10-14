@@ -35,6 +35,15 @@ para o Performance.
 
 ---
 
+## Agenda da Gestão 1.2.2
+
+Só Agenda (correção).
+
+- **Conectar Telegram funcionava só na primeira conversa com o bot.** Com a
+  conversa já aberta, o Telegram não manda o código do link, e o bot
+  respondia "Eu só entrego os avisos…". Agora Ajustes mostra o código com
+  **Copiar**, e o bot aceita o código enviado como mensagem.
+
 ## Agenda da Gestão 1.2.1
 
 Só Agenda (correção).

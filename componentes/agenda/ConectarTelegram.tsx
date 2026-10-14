@@ -16,7 +16,9 @@ export default function ConectarTelegram({ bot, ligado }: {
   ligado: { nome: string | null; criado_em: string } | null;
 }) {
   const router = useRouter();
-  const [aguardando, setAguardando] = useState(false);
+  /** Código gerado no último "Conectar"; mostrado para colar no bot. */
+  const [codigo, setCodigo] = useState<string | null>(null);
+  const [copiado, setCopiado] = useState(false);
   const [mensagem, setMensagem] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const db = criarClienteDaAgenda();
@@ -33,7 +35,18 @@ export default function ConectarTelegram({ bot, ligado }: {
     if (error || !data) { aba?.close(); setMensagem(`Não foi possível gerar o código: ${error?.message ?? 'sem resposta'}`); return; }
     const link = `https://t.me/${bot}?start=${data}`;
     if (aba) aba.location.href = link; else window.location.href = link;
-    setAguardando(true);
+    setCodigo(String(data));
+    setCopiado(false);
+  }
+
+  async function copiar() {
+    if (!codigo) return;
+    try {
+      await navigator.clipboard.writeText(codigo);
+      setCopiado(true);
+    } catch {
+      setMensagem('Não deu para copiar sozinho: selecione o código e copie com Ctrl+C.');
+    }
   }
 
   async function desconectar() {
@@ -80,17 +93,30 @@ export default function ConectarTelegram({ bot, ligado }: {
             <button onClick={conectar} disabled={ocupado} className={`${botao} bg-marca-600 text-white hover:bg-marca-700`}>
               {ocupado ? 'Abrindo…' : 'Conectar Telegram'}
             </button>
-            {aguardando && (
+            {codigo && (
               <button onClick={() => router.refresh()} className={`${botao} border border-slate-300 text-slate-700 hover:bg-slate-50`}>
                 Já conectei
               </button>
             )}
           </div>
-          <p className="text-xs text-slate-500">
-            {aguardando
-              ? 'No Telegram, toque em Iniciar. O código vale por 15 minutos.'
-              : `Abre a conversa com @${bot} no Telegram. Depois de tocar em Iniciar, os lembretes chegam lá.`}
-          </p>
+          {codigo ? (
+            <div className="space-y-2 text-xs text-slate-500">
+              <p>
+                No Telegram, toque em <b>Iniciar</b>. Se o bot não responder &quot;Pronto&quot;, copie este código e
+                envie como mensagem para @{bot}. Vale por 15 minutos.
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <code className="select-all rounded bg-slate-100 px-2 py-1 font-mono text-sm text-slate-800">{codigo}</code>
+                <button onClick={copiar} className={`${botao} border border-slate-300 text-slate-700 hover:bg-slate-50`}>
+                  {copiado ? 'Copiado' : 'Copiar'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-slate-500">
+              Abre a conversa com @{bot} no Telegram. Depois de tocar em Iniciar, os lembretes chegam lá.
+            </p>
+          )}
         </div>
       )}
       {mensagem && <p role="status" className="text-sm text-slate-600">{mensagem}</p>}

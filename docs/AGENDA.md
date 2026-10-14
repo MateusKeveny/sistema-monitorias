@@ -96,7 +96,10 @@ Ligar (uma vez):
 4. **Publicar** — `npm run cf:deploy:agenda` (ou o `cf:deploy` completo).
 5. **Token no Worker e webhook** — `node scripts/chaves-da-agenda.js telegram`.
 6. **Conectar** — na agenda, Ajustes → **Conectar Telegram** → no Telegram,
-   **Iniciar**. De volta à agenda, **Já conectei** e **Enviar teste**.
+   **Iniciar**. De volta à agenda, **Já conectei** e **Enviar teste**. Se o
+   bot responder "Eu só entrego os avisos…" (conversa que já existia: o
+   Telegram não manda o código), copie o código que aparece em Ajustes e
+   envie como mensagem para o bot.
 
 Bot bloqueado ou conversa apagada: o primeiro aviso recusado (403) desliga a
 conversa sozinho. Para ligar de novo, repita o passo 6.

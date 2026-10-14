@@ -23,7 +23,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
  * por `node scripts/chaves-da-agenda.js telegram`. Responde sempre 200 depois
  * de conferida — com erro, o Telegram repete a mesma atualização por horas.
  *
- *   "/start <código>"  liga a conversa ao usuário que pediu em Ajustes.
+ *   "/start <código>" ou o código sozinho  liga a conversa ao usuário que pediu em Ajustes.
  *   "c:<item>"         botão Concluir; "a:<item>" botão Adiar 15 min.
  */
 export async function POST(requisicao: Request) {
@@ -67,7 +67,9 @@ export async function POST(requisicao: Request) {
       chat_id: m.chat.id, text: texto, parse_mode: 'HTML', link_preview_options: { is_disabled: true },
     });
 
-    const codigo = /^\/start\s+([0-9a-f]{32})$/.exec(m.text?.trim() ?? '')?.[1];
+    // "/start <código>" vem do link; o código sozinho, de quem copiou dos
+    // Ajustes — o Telegram não manda o código quando a conversa já existe.
+    const codigo = /^(?:\/start\s+)?([0-9a-f]{32})$/i.exec(m.text?.trim() ?? '')?.[1]?.toLowerCase();
     if (codigo) {
       const { data: nome } = await db.rpc('agenda_telegram_vincular', {
         p_segredo: segredo, p_codigo: codigo, p_chat: m.chat.id, p_nome: m.from?.first_name ?? null,
@@ -79,7 +81,8 @@ export async function POST(requisicao: Request) {
     }
 
     await responder('Eu só entrego os avisos da Agenda da Gestão. Para criar ou mudar lembretes, use a agenda:\n'
-      + `${ENDERECO_AGENDA}/agenda`);
+      + `${ENDERECO_AGENDA}/agenda\n\n`
+      + 'Para ligar esta conversa, toque em <b>Conectar Telegram</b> em Ajustes e cole aqui o código que aparecer.');
   } catch (erro) {
     console.warn('agenda: falha no webhook do telegram', String(erro));
   }
