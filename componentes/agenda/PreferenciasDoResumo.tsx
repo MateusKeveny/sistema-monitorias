@@ -47,7 +47,7 @@ export default function PreferenciasDoResumo({ inicial, gestor, usuarioId }: { i
         <label className={linha}>
           <span>
             <span className="block text-sm font-medium text-slate-800">Pendências do Performance</span>
-            <span className="block text-xs text-slate-500">Semanas sem volume, fechamento, diário, reports e chamados no plano do dia</span>
+            <span className="block text-xs text-slate-500">Semanas sem volume ou sem chamados, fechamento, diário, reports e chamados no plano do dia, e o lembrete dos relatórios do ciclo</span>
           </span>
           <Chave ligada={p.pendencias} aoMudar={(v) => mudar({ pendencias: v })} />
         </label>

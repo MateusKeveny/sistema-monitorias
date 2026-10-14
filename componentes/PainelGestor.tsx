@@ -176,6 +176,20 @@ export default async function PainelGestor({
       acao: 'Importar', href: '/cota/importar',
     });
   }
+  // Semanas sem chamados importados (migração 60). Fora do `todas`: antes da
+  // migração a função não existe, e a tela segue sem esta pendência.
+  const { data: semanasDeChamados } = comPendencias
+    ? await db.rpc('chamados_por_semana', { p_mes: competencia })
+    : { data: null };
+  const semChamados = ((semanasDeChamados ?? []) as { semana: number; quantidade: number; encerrada: boolean; marcada: boolean }[])
+    .filter((s) => s.encerrada && s.quantidade === 0 && !s.marcada).map((s) => s.semana);
+  if (semChamados.length) {
+    pendencias.push({
+      texto: semChamados.length === 1 ? `Semana ${semChamados[0]} sem chamados importados`
+        : `Semanas ${semChamados.join(', ').replace(/, (\d)$/, ' e $1')} sem chamados importados`,
+      acao: 'Importar', href: '/cota/importar?aba=chamados',
+    });
+  }
   if (competencia < atual && !fechadoEm(competencia)) {
     pendencias.push({
       texto: `${nomeDoMes(competencia).replace(/^./, (l) => l.toUpperCase())} aguardando fechamento`,

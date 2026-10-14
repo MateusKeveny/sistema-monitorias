@@ -56,9 +56,12 @@ export const botoesDoItem = (item: string): Botao[][] => [[
 export function mensagemDoAviso(aviso: { titulo: string; corpo: string; url: string; item?: string | null }) {
   const texto = [`<b>${escaparHtml(aviso.titulo)}</b>`, aviso.corpo ? escaparHtml(aviso.corpo) : null]
     .filter(Boolean).join('\n');
+  // Endereço completo leva a outro site (o lembrete do ciclo abre o Importar do Performance).
+  const externo = aviso.url.startsWith('https://');
   const teclado: Botao[][] = [
     ...(aviso.item ? botoesDoItem(aviso.item) : []),
-    [{ text: 'Abrir a agenda', url: `${ENDERECO_AGENDA}${aviso.url.startsWith('/') ? aviso.url : '/agenda'}` }],
+    [externo ? { text: 'Abrir no Performance', url: aviso.url }
+      : { text: 'Abrir a agenda', url: `${ENDERECO_AGENDA}${aviso.url.startsWith('/') ? aviso.url : '/agenda'}` }],
   ];
   return { text: texto, parse_mode: 'HTML', reply_markup: { inline_keyboard: teclado } };
 }

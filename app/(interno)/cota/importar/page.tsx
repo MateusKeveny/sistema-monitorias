@@ -3,9 +3,11 @@ import ImportadorAvaliacoes from '@/componentes/ImportadorAvaliacoes';
 import ImportadorChamados from '@/componentes/ImportadorChamados';
 import FilaDeAtrasos, { type ChamadoAtrasado } from '@/componentes/FilaDeAtrasos';
 import NotasGuardadas, { type NotaGuardada } from '@/componentes/NotasGuardadas';
+import SemanasDeChamados, { type SemanaDeChamados } from '@/componentes/SemanasDeChamados';
 import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
 import { Quadro } from '@/componentes/ui';
-import { dataHora, diaMes, hojeNoBrasil, mesDeCompetencia, periodoDaSemana, mesValido } from '@/lib/formatar';
+import { mesAnterior } from '@/lib/competencia';
+import { dataHora, diaMes, hojeNoBrasil, mesDeCompetencia, mesRotulo, periodoDaSemana, mesValido } from '@/lib/formatar';
 import type { Pessoa } from '@/lib/tipos';
 
 export const dynamic = 'force-dynamic';
@@ -53,12 +55,22 @@ export default async function ImportarAvaliacoes({
 
   if (aba === 'chamados') {
     const campos = 'protocolo, titulo, responsavel, aberto_em, concluido_em, tempo_util, tempo_interno, tempo_ti, motivo_atraso, observacao, justificativa, justificado_por_nome, justificado_em, decisao, decidido_por_nome, decidido_em';
-    const [{ data: pendentes }, { data: decididos }] = await Promise.all([
+    // Semanas sem chamados (migração 60): o mês corrente e, enquanto não
+    // fechado, o anterior — os mesmos que a pendência olha.
+    const anterior = mesAnterior(atual);
+    const [{ data: pendentes }, { data: decididos }, { count: anteriorFechado }, semanasAtual, semanasAnterior] = await Promise.all([
       db.from('chamados_elo').select(campos).gte('tempo_util', 3).not('concluido_em', 'is', null)
         .neq('status', 'Cancelado').not('pessoa_id', 'is', null).is('decisao', null).order('aberto_em'),
       db.from('chamados_elo').select(campos).not('decisao', 'is', null).eq('mes_competencia', atual)
         .order('decidido_em', { ascending: false }),
+      db.from('fechamentos_cota').select('pessoa_id', { count: 'exact', head: true }).eq('mes_competencia', anterior),
+      db.rpc('chamados_por_semana', { p_mes: atual }),
+      db.rpc('chamados_por_semana', { p_mes: anterior }),
     ]);
+    const meses = [
+      ...(anteriorFechado ? [] : [{ competencia: anterior, rotulo: mesRotulo(anterior), semanas: semanasAnterior.data }]),
+      { competencia: atual, rotulo: mesRotulo(atual), semanas: semanasAtual.data },
+    ].filter((m) => (m.semanas ?? []).length) as { competencia: string; rotulo: string; semanas: SemanaDeChamados[] }[];
     return (
       <div className="space-y-6">
         <div>
@@ -67,6 +79,7 @@ export default async function ImportarAvaliacoes({
           <div className="mt-3">{abas}</div>
         </div>
         <ImportadorChamados />
+        {meses.length > 0 && <SemanasDeChamados meses={meses} />}
         <FilaDeAtrasos pendentes={(pendentes ?? []) as ChamadoAtrasado[]} decididos={(decididos ?? []) as ChamadoAtrasado[]} />
       </div>
     );

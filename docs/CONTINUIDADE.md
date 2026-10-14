@@ -11,7 +11,7 @@ Escrito em 28/09/2026, atualizado em 08/10/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.42.0** · Monitorias **5.5.2** · Agenda **1.0.0** (14/10/2026) |
+| Publicado | Performance **1.42.0** · Monitorias **5.5.2** · Agenda **1.2.2** (14/10/2026) |
 | Branch | `painel-performance`, com os três sites (a `main` segue intocada) |
 | Migrações no banco | 01 a 59, todas aplicadas (a agenda tem banco próprio) |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` · `painel-agenda.expansao.workers.dev` |
@@ -612,6 +612,17 @@ Três versões, cada uma publicada e conferida antes da próxima:
   `/api/agenda/telegram` (fora do middleware), com a senha
   `seloDoItem('telegram', AGENDA_SEGREDO)`. Segredo novo só o
   `TELEGRAM_TOKEN`. Passos em [AGENDA.md](AGENDA.md#avisos-pelo-telegram-110).
+  Publicada em 14/10 com 1.2.0 (Brave no Windows: push do Google desligado
+  por padrão), 1.2.1 (chaves) e 1.2.2 (código do Telegram para colar no bot).
+- **Performance 1.43.0 · Agenda 1.3.0** (migração 60 nos painéis;
+  `supabase/agenda/03-lembrete-do-ciclo.sql` na agenda): semana encerrada sem
+  chamados importados vira pendência (`chamados_por_semana_interno`, mesma
+  regra de "encerrada" das semanas sem volume) — no Precisa de você, fora do
+  `todas` para não quebrar a tela antes da migração — e Importar → Chamados
+  ganha o quadro "Chamados por semana" com **Sem chamados**
+  (`semanas_sem_chamados`). Na agenda, `agenda_disparar_ciclo` chama o site
+  na hora do resumo; o site manda "Relatórios do ciclo para subir" só se a
+  ponte tiver `sem_volume:` ou `sem_chamados:`.
 
 Visão de celular fica fora da revisão, por decisão do gestor. Os painéis são
 usados só no computador.

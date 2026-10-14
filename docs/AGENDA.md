@@ -103,3 +103,24 @@ Ligar (uma vez):
 
 Bot bloqueado ou conversa apagada: o primeiro aviso recusado (403) desliga a
 conversa sozinho. Para ligar de novo, repita o passo 6.
+
+## Lembrete dos relatórios do ciclo (1.3.0)
+
+Cada semana do ciclo (26–2, 3–10, 11–18, 19–25) termina com dois relatórios
+para subir no Performance: atendimentos e chamados. No horário do resumo, a
+agenda manda "Relatórios do ciclo para subir" com as semanas que faltam, a
+partir do dia seguinte ao fim da semana, todo dia, até o relatório subir.
+
+- Quem decide o que falta é a ponte: `sem_volume:<mês>` (atendimentos) e
+  `sem_chamados:<mês>` (migração 60 dos painéis). Sem nada faltando, o site
+  não envia nada.
+- Semana sem nenhum chamado de verdade: Importar → Chamados (ELO) → **Sem
+  chamados** na semana. A pendência some; **Desfazer** volta a cobrar.
+- `agenda_disparar_ciclo` (cron `agenda-ciclo`, a cada minuto) chama o site
+  uma vez por dia e por usuário, na hora do resumo e nos mesmos dias. Não
+  depende de o resumo estar ligado: quem desliga é **Pendências do
+  Performance**.
+
+Ligar (uma vez): `supabase/60-semanas-sem-chamados.sql` no projeto dos
+**painéis**, `supabase/agenda/03-lembrete-do-ciclo.sql` no projeto da
+**agenda**, e publicar o Performance e a agenda.

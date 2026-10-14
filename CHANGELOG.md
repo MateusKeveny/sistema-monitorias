@@ -35,6 +35,23 @@ para o Performance.
 
 ---
 
+## Performance 1.43.0 · Agenda da Gestão 1.3.0
+
+Migração 60 (banco dos painéis) e `supabase/agenda/03-lembrete-do-ciclo.sql`
+(banco da agenda). Não muda as Monitorias.
+
+- **Performance (atualização): semanas sem chamados.** Importar → Chamados
+  (ELO) mostra os chamados de cada semana do ciclo. Semana encerrada sem
+  nenhum chamado importado vira pendência no **Precisa de você**, como as
+  semanas sem volume. Se a semana não teve chamado, **Sem chamados** tira a
+  pendência; **Desfazer** volta a cobrar.
+- **Agenda (atualização): lembrete dos relatórios do ciclo.** No horário do
+  resumo, chega "Relatórios do ciclo para subir" com as semanas sem
+  atendimentos ou sem chamados, e o botão para o Importar do Performance. O
+  primeiro aviso é no dia seguinte ao fim da semana (3, 11, 19 e 26), e ele
+  se repete a cada dia até o relatório subir. Segue a chave **Pendências do
+  Performance** dos Ajustes.
+
 ## Agenda da Gestão 1.2.2
 
 Só Agenda (correção).

@@ -2,7 +2,7 @@ import { chavesVapid, dbSemSessao, segredoDaAgenda } from '@/lib/agenda/envio';
 import { pendenciasDoPerformance } from '@/lib/agenda/ponte';
 import { chamarTelegram, mensagemDoAviso, tokenDoTelegram } from '@/lib/agenda/telegram';
 import { enviarPush, iguais, seloDoItem } from '@/lib/agenda/webpush';
-import { sistemaDoHost } from '@/lib/sistema';
+import { ENDERECO_PERFORMANCE, sistemaDoHost } from '@/lib/sistema';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +18,8 @@ type Envio = {
 
 /**
  * Entrega as notificações que o banco da agenda juntou (agenda_disparar,
- * supabase/agenda/01-agenda.sql e 02-telegram.sql).
+ * supabase/agenda/01-agenda.sql e 02-telegram.sql) e o lembrete dos
+ * relatórios do ciclo (agenda_disparar_ciclo, 03-lembrete-do-ciclo.sql).
  *
  * Quem chama é o pg_net, a cada minuto em que há algo vencendo, com o segredo
  * no cabeçalho. Sem sessão: por isso fica fora do middleware.
@@ -46,9 +47,14 @@ export async function POST(requisicao: Request) {
   const conversasMortas: number[] = [];
   let entregues = 0;
 
-  // Resumo do dia: o banco da agenda não conhece as pendências do Performance,
-  // então a conta entra aqui, pela ponte — uma consulta só para o lote todo.
-  const pendencias = envios.some((e) => e.pendencias) ? (await pendenciasDoPerformance()).lista.length : 0;
+  // Resumo do dia e lembrete do ciclo: o banco da agenda não conhece as
+  // pendências do Performance, então elas entram aqui, pela ponte — uma
+  // consulta só para o lote todo.
+  const lista = envios.some((e) => e.pendencias) ? (await pendenciasDoPerformance()).lista : [];
+  const pendencias = lista.length;
+  // Relatórios do ciclo (supabase/agenda/03-lembrete-do-ciclo.sql): semanas
+  // sem atendimentos (sem volume) ou sem chamados importados.
+  const relatorios = lista.filter((p) => /^sem_(volume|chamados):/.test(p.chave));
   const corpoDe = (e: Envio) => {
     if (!e.tag?.startsWith('resumo-')) return e.corpo;
     const partes = [e.corpo || null,
@@ -57,6 +63,16 @@ export async function POST(requisicao: Request) {
   };
 
   await Promise.all(envios.slice(0, 200).map(async (e) => {
+    // Lembrete do ciclo: com tudo em dia, não há o que avisar.
+    if (e.tag?.startsWith('ciclo-')) {
+      if (!relatorios.length) return;
+      e = {
+        ...e,
+        titulo: 'Relatórios do ciclo para subir',
+        corpo: relatorios.map((p) => p.texto).join('\n'),
+        url: `${ENDERECO_PERFORMANCE}${relatorios.every((p) => p.href === relatorios[0].href) ? relatorios[0].href : '/cota/importar'}`,
+      };
+    }
     try {
       if (e.telegram != null) {
         if (!token) return;
