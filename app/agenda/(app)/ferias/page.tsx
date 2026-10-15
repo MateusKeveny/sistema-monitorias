@@ -68,9 +68,9 @@ export default async function FeriasDaAgenda() {
             Cadastrar a equipe ↗
           </a>) : undefined}>
           <div className="space-y-6">
-            <CalendarioDeFerias periodos={todos} mes={mes} hoje={hoje} />
-            <CalendarioDeFerias periodos={todos} mes={mesMais(mes, 1)} hoje={hoje} />
-            <CalendarioDeFerias periodos={todos} mes={mesMais(mes, 2)} hoje={hoje} />
+            <CalendarioDeFerias periodos={todos} mes={mes} hoje={hoje} prazos={equipe?.prazos ?? []} />
+            <CalendarioDeFerias periodos={todos} mes={mesMais(mes, 1)} hoje={hoje} prazos={equipe?.prazos ?? []} />
+            <CalendarioDeFerias periodos={todos} mes={mesMais(mes, 2)} hoje={hoje} prazos={equipe?.prazos ?? []} />
           </div>
           {equipe && !equipe.ok && <p className="mt-3 text-xs text-amber-700">Não deu para ler as férias da equipe agora; mostrando só as suas.</p>}
         </Secao>
@@ -86,7 +86,7 @@ export default async function FeriasDaAgenda() {
                 <li key={z.pessoa} className="flex flex-wrap items-center justify-between gap-2 py-2">
                   <span className="font-medium text-slate-800">{z.pessoa}</span>
                   <span className={z.dias < 0 || z.dias <= 30 ? 'font-semibold text-rose-700' : z.dias <= 90 ? 'font-semibold text-amber-700' : 'text-slate-600'}>
-                    {z.dias < 0 ? `vencidas desde ${ddmm(z.limite)}` : `sair até ${ddmm(z.limite)} · ${z.dias} dias`} · {z.saldo} dias a tirar
+                    {z.dias < 0 ? `prazo de saída passou em ${ddmm(z.limite)}` : `sair até ${ddmm(z.limite)} · em ${z.dias} dias`} · {z.saldo} dias a tirar
                   </span>
                 </li>
               ))}

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteDaAgenda } from '@/lib/agenda/db-cliente';
-import { ddmm, duracao, sobreposicoes, type PeriodoDeFerias } from '@/lib/ferias';
+import { ddmm, duracao, sobreposicoes, somar, type PeriodoDeFerias } from '@/lib/ferias';
 
 type Minha = { id: string; inicio: string; fim: string; observacao: string | null };
 
@@ -14,12 +14,14 @@ type Minha = { id: string; inicio: string; fim: string; observacao: string | nul
 export default function MinhasFerias({ minhas, equipe, hoje }: { minhas: Minha[]; equipe: PeriodoDeFerias[]; hoje: string }) {
   const router = useRouter();
   const [inicio, setInicio] = useState('');
-  const [fim, setFim] = useState('');
+  const [dias, setDias] = useState(30);
   const [obs, setObs] = useState('');
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
 
-  const valido = inicio && fim && fim >= inicio;
+  // Saída e quantidade de dias; o último dia sai da conta.
+  const fim = inicio && dias > 0 ? somar(inicio, dias - 1) : '';
+  const valido = !!(inicio && dias >= 1 && dias <= 60);
   const junto = valido
     ? sobreposicoes([...equipe, { id: 'nova', pessoa: 'você', inicio, fim, minha: true }], '0000-01-01')
         .filter((s) => s.a.id === 'nova' || s.b.id === 'nova')
@@ -28,13 +30,12 @@ export default function MinhasFerias({ minhas, equipe, hoje }: { minhas: Minha[]
 
   async function salvar(e: React.FormEvent) {
     e.preventDefault();
-    if (!valido) { setErro('Preencha a saída e o último dia.'); return; }
-    if (duracao({ inicio, fim }) > 60) { setErro('Período maior que 60 dias: confira as datas.'); return; }
+    if (!valido) { setErro('Preencha a saída e de 1 a 60 dias.'); return; }
     setOcupado(true); setErro(null);
     const { error } = await criarClienteDaAgenda().from('minhas_ferias').insert({ inicio, fim, observacao: obs.trim() || null });
     setOcupado(false);
     if (error) { setErro(`Não foi possível salvar: ${error.message}`); return; }
-    setInicio(''); setFim(''); setObs('');
+    setInicio(''); setDias(30); setObs('');
     router.refresh();
   }
 
@@ -65,14 +66,15 @@ export default function MinhasFerias({ minhas, equipe, hoje }: { minhas: Minha[]
           ))}
         </ul>
       )}
-      <form onSubmit={salvar} className="grid gap-3 sm:grid-cols-[1fr_1fr_2fr_auto] sm:items-end">
+      <form onSubmit={salvar} className="grid gap-3 sm:grid-cols-[1fr_6rem_2fr_auto] sm:items-end">
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-slate-600">Saída</span>
           <input type="date" className={campo} value={inicio} onChange={(e) => setInicio(e.target.value)} />
         </label>
         <label className="block">
-          <span className="mb-1 block text-xs font-medium text-slate-600">Último dia</span>
-          <input type="date" className={campo} value={fim} min={inicio || undefined} onChange={(e) => setFim(e.target.value)} />
+          <span className="mb-1 block text-xs font-medium text-slate-600">Dias</span>
+          <input type="number" min={1} max={60} className={campo} value={dias || ''}
+                 onChange={(e) => setDias(Math.min(60, Math.max(0, Number(e.target.value) || 0)))} />
         </label>
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-slate-600">Observação <span className="font-normal text-slate-400">(opcional)</span></span>
@@ -83,6 +85,7 @@ export default function MinhasFerias({ minhas, equipe, hoje }: { minhas: Minha[]
           {ocupado ? 'Salvando…' : 'Adicionar'}
         </button>
       </form>
+      {fim && <p className="-mt-2 text-xs text-slate-500">Até {ddmm(fim)} · volta em {ddmm(somar(fim, 1))}</p>}
       {junto.length > 0 && (
         <div role="alert" className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900 ring-1 ring-amber-300">
           <p className="font-semibold">Gente da equipe fora no mesmo período</p>

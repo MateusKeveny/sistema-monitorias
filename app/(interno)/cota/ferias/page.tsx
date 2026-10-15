@@ -1,6 +1,7 @@
 import Link from '@/componentes/Link';
 import CalendarioDeFerias from '@/componentes/CalendarioDeFerias';
 import QuadroDoAno from '@/componentes/QuadroDoAno';
+import PeriodoForaDoSistema from '@/componentes/PeriodoForaDoSistema';
 import GestaoDeFerias, { type FeriasCadastrada } from '@/componentes/GestaoDeFerias';
 import { Painel, Secao } from '@/componentes/ui';
 import { redirect } from 'next/navigation';
@@ -40,7 +41,7 @@ export default async function Ferias({ searchParams }: { searchParams: Promise<{
   // Os nomes vêm de nomes_das_pessoas: Pleno e Analista não leem o cadastro.
   const [{ data: pessoas }, { data: ferias }, { data: prazos }, { data: nomes }] = await Promise.all([
     gestor
-      ? db.from('pessoas').select('id, nome').eq('ativo', true).is('desligado_em', null).order('nome')
+      ? db.from('pessoas').select('id, nome, ferias_dias_fora').eq('ativo', true).is('desligado_em', null).order('nome')
       : Promise.resolve({ data: [] }),
     db.from('ferias').select('id, pessoa_id, inicio, fim, situacao, observacao')
       .gte('fim', somar(hoje, -400)).order('inicio'),
@@ -64,6 +65,10 @@ export default async function Ferias({ searchParams }: { searchParams: Promise<{
     .map((z) => ({ pessoa: z.nome, limite: z.limite!, saldo: z.saldo!, dias: z.dias_ate_limite!, completo: !!z.completo }));
   const avisos = avisosDeFerias(lista, prazosDoAviso, hoje);
   const foraHoje = foraNoDia(lista, hoje);
+  // O último dia para sair, marcado no calendário e no quadro do ano (64).
+  const prazosNoCalendario = prazosDoAviso.filter((z) => z.saldo > 0).map((z) => ({ pessoa: z.pessoa, limite: z.limite }));
+  const diasFora = new Map(((pessoas ?? []) as { id: string; ferias_dias_fora: number | null }[])
+    .map((p) => [p.id, p.ferias_dias_fora ?? 0]));
 
   const tom = (z: Prazo) => z.saldo == null || !umAno(z) ? 'text-slate-400'
     : z.saldo === 0 ? 'text-slate-500'
@@ -105,10 +110,10 @@ export default async function Ferias({ searchParams }: { searchParams: Promise<{
           {/* O mês (e o seguinte) e, ao lado, o ano inteiro com a mesma sinalização. */}
           <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_20rem]">
             <div className="min-w-0 space-y-6">
-              <CalendarioDeFerias periodos={lista} mes={mesAtual} hoje={hoje} />
-              <CalendarioDeFerias periodos={lista} mes={mesSeguinte(mesAtual, 1)} hoje={hoje} />
+              <CalendarioDeFerias periodos={lista} mes={mesAtual} hoje={hoje} prazos={prazosNoCalendario} />
+              <CalendarioDeFerias periodos={lista} mes={mesSeguinte(mesAtual, 1)} hoje={hoje} prazos={prazosNoCalendario} />
             </div>
-            <QuadroDoAno periodos={lista} ano={Number(mesAtual.slice(0, 4))} hoje={hoje}
+            <QuadroDoAno periodos={lista} prazos={prazosNoCalendario} ano={Number(mesAtual.slice(0, 4))} hoje={hoje}
                          mesAberto={mesAtual.slice(0, 7)} linkDoMes={(m) => `/cota/ferias?mes=${m}`} />
           </div>
         </Secao>
@@ -122,7 +127,7 @@ export default async function Ferias({ searchParams }: { searchParams: Promise<{
       {gestor && (
       <Painel>
         <Secao titulo="Prazo de cada pessoa (CLT)"
-               subtitulo="30 dias por ano trabalhado, a tirar nos 12 meses seguintes; depois disso, pagamento em dobro. Conta da admissão na empresa (ou, sem ela, da entrada na equipe) e das férias cadastradas aqui. Só sinaliza quem completa 1 ano de casa até o fim do ano.">
+               subtitulo="30 dias por ano trabalhado, a tirar nos 12 meses seguintes; as férias têm de terminar dentro deles, então a saída é até 30 dias antes do fim (ou menos, se já tirou parte). Dias depois do fim saem em dobro. Conta da admissão na empresa (ou, sem ela, da entrada na equipe) e das férias cadastradas aqui. Só sinaliza quem completa 1 ano de casa até o fim do ano.">
           <div className="-mx-6 overflow-x-auto sm:-mx-7">
             <table className="w-full min-w-[640px] text-sm">
               <thead>
@@ -130,7 +135,7 @@ export default async function Ferias({ searchParams }: { searchParams: Promise<{
                   <th className="px-6 py-2 font-medium sm:px-7">Pessoa</th>
                   <th className="py-2 font-medium">Admissão</th>
                   <th className="py-2 font-medium">Período aquisitivo</th>
-                  <th className="py-2 font-medium">Sair até</th>
+                  <th className="py-2 font-medium">Sair até (último dia)</th>
                   <th className="py-2 pr-6 text-right font-medium sm:pr-7">Situação</th>
                 </tr>
               </thead>
@@ -148,8 +153,12 @@ export default async function Ferias({ searchParams }: { searchParams: Promise<{
                       {z.saldo == null ? <Link href="/cota/atendentes" className="underline-offset-2 hover:underline">sem data de entrada</Link>
                         : !umAno(z) ? `menos de 1 ano em ${hoje.slice(0, 4)}`
                         : z.saldo === 0 ? 'em dia'
-                        : z.dias_ate_limite! < 0 ? `vencidas · ${z.saldo} dias`
-                        : `${z.saldo} dias · ${z.dias_ate_limite} dias de prazo`}
+                        : z.dias_ate_limite! < 0 ? `prazo de saída passou · ${z.saldo} dias`
+                        : `${z.saldo} dias · ${z.dias_ate_limite} dias para sair`}
+                      {z.saldo != null && (
+                        <PeriodoForaDoSistema pessoaId={z.pessoa_id} nome={z.nome} diasFora={diasFora.get(z.pessoa_id) ?? 0}
+                                              mostrarBotao={!!z.completo && z.saldo > 0} />
+                      )}
                     </td>
                   </tr>
                 ))}

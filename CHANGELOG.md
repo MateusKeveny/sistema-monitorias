@@ -35,6 +35,24 @@ para o Performance.
 
 ---
 
+## Performance 1.47.0 · Agenda da Gestão 1.5.0
+
+Migração 64 (banco dos painéis). Não muda as Monitorias.
+
+- **Performance e Agenda (atualização): prazo de saída.** Pela CLT as férias
+  têm de terminar dentro do período concessivo; o "sair até" passa a ser o
+  fim dele menos os dias a tirar (30 dias antes, para quem não tirou nada). O
+  último dia para sair aparece marcado no calendário (contorno vermelho) e no
+  quadro do ano (vermelho cheio), e os avisos falam em prazo de saída.
+- **Performance (atualização): período tirado fora do sistema.** Quem tirou
+  férias antes do cadastro aparecia com período vencido. Na tabela de prazos,
+  **Período tirado fora do sistema** credita 30 dias (e dá para desfazer).
+- **Performance e Agenda (atualização): dias em vez do último dia.** No
+  cadastro escolhe-se a saída e a quantidade de dias (atalhos de 5 a 30); o
+  último dia e o retorno aparecem calculados.
+- **Performance (atualização): aprovar planejadas.** Férias planejadas ganham
+  o botão **Aprovar** na lista.
+
 ## Performance 1.46.0 · Agenda da Gestão 1.4.1
 
 Migração 63 (banco dos painéis). Não muda as Monitorias.

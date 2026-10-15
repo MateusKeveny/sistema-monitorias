@@ -113,8 +113,8 @@ export function avisosDeFerias(lista: PeriodoDeFerias[], prazos: PrazoDeFerias[]
     avisos.push({
       chave: `prazo:${z.pessoa}`, dia: z.limite, grave: z.dias <= 30,
       texto: z.dias < 0
-        ? `Férias vencidas: ${nome}, ${z.saldo} dias desde ${ddmm(z.limite)} (pagamento em dobro)`
-        : `Prazo de férias: ${nome} precisa sair até ${ddmm(z.limite)} (${z.dias} dias) · ${z.saldo} dias a tirar`,
+        ? `Prazo de saída passou: ${nome} devia ter saído até ${ddmm(z.limite)} · ${z.saldo} dias (os que passarem do período saem em dobro)`
+        : `Prazo de férias: ${nome} precisa sair até ${ddmm(z.limite)} (${z.dias === 0 ? 'hoje' : `em ${z.dias} dias`}) · ${z.saldo} dias a tirar`,
     });
   }
 

@@ -7,10 +7,13 @@ const LETRAS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 /**
  * O ano inteiro de férias, ao lado do calendário do mês: doze mini-meses com
  * a mesma sinalização — verde aprovada, amarelo só planejada, contorno rosa
- * com duas ou mais pessoas fora. Cada mês leva ao calendário dele.
+ * com duas ou mais pessoas fora e vermelho cheio no último dia para sair de
+ * férias de alguém (prazo da CLT). Cada mês leva ao calendário dele.
  */
-export default function QuadroDoAno({ periodos, ano, hoje, mesAberto, linkDoMes }: {
+export default function QuadroDoAno({ periodos, ano, hoje, mesAberto, linkDoMes, prazos = [] }: {
   periodos: PeriodoDeFerias[];
+  /** Último dia para sair de cada pessoa (migração 64). */
+  prazos?: { pessoa: string; limite: string }[];
   ano: number;
   hoje: string;
   /** 'AAAA-MM' do mês aberto no calendário, para destacar. */
@@ -38,10 +41,14 @@ export default function QuadroDoAno({ periodos, ano, hoje, mesAberto, linkDoMes 
                 {dias.map((d) => {
                   const fora = foraNoDia(periodos, d);
                   const aprovada = fora.some((p) => p.minha || p.situacao !== 'planejada');
-                  const cor = !fora.length ? (d === hoje ? 'bg-slate-300' : 'bg-slate-100')
+                  const prazo = prazos.filter((z) => z.limite === d);
+                  const cor = prazo.length && !fora.length ? 'bg-rose-600'
+                    : !fora.length ? (d === hoje ? 'bg-slate-300' : 'bg-slate-100')
                     : aprovada ? 'bg-marca-600' : 'bg-amber-400';
                   return (
-                    <span key={d} title={fora.length ? `${d.slice(8)}/${d.slice(5, 7)}: ${fora.map((p) => p.pessoa.split(/\s+/)[0]).join(', ')}` : undefined}
+                    <span key={d} title={[fora.length ? `${d.slice(8)}/${d.slice(5, 7)}: ${fora.map((p) => p.pessoa.split(/\s+/)[0]).join(', ')}` : null,
+                      ...prazo.map((z) => `${z.pessoa.split(/\s+/)[0]}: último dia para sair (${d.slice(8)}/${d.slice(5, 7)})`)]
+                      .filter(Boolean).join(' · ') || undefined}
                           className={`block aspect-square rounded-[2px] ${cor} ${fora.length > 1 ? 'ring-1 ring-rose-500' : ''}`} />
                   );
                 })}
