@@ -14,6 +14,8 @@ export const dynamic = 'force-dynamic';
 type Prazo = {
   pessoa_id: string; nome: string; admitido_em: string | null; aquisitivo_inicio: string | null;
   aquisitivo_fim: string | null; limite: string | null; saldo: number | null; dias_ate_limite: number | null; completo: boolean | null;
+  /** Períodos já quitados antes do mostrado, e as datas do último (migração 65). */
+  concluidos: number | null; concluido_inicio: string | null; concluido_fim: string | null;
 };
 
 const mesSeguinte = (m: string, n: number) => {
@@ -127,7 +129,7 @@ export default async function Ferias({ searchParams }: { searchParams: Promise<{
       {gestor && (
       <Painel>
         <Secao titulo="Prazo de cada pessoa (CLT)"
-               subtitulo="30 dias por ano trabalhado, a tirar nos 12 meses seguintes; as férias têm de terminar dentro deles, então a saída é até 30 dias antes do fim (ou menos, se já tirou parte). Dias depois do fim saem em dobro. Conta da admissão na empresa (ou, sem ela, da entrada na equipe) e das férias cadastradas aqui. Só sinaliza quem completa 1 ano de casa até o fim do ano.">
+               subtitulo="30 dias por ano trabalhado, a tirar nos 12 meses seguintes; as férias têm de terminar dentro deles, então a saída é até 30 dias antes do fim, sempre. Dias depois do fim saem em dobro. Conta da admissão na empresa (ou, sem ela, da entrada na equipe) e das férias cadastradas aqui. Só sinaliza quem completa 1 ano de casa até o fim do ano.">
           <div className="-mx-6 overflow-x-auto sm:-mx-7">
             <table className="w-full min-w-[640px] text-sm">
               <thead>
@@ -147,6 +149,13 @@ export default async function Ferias({ searchParams }: { searchParams: Promise<{
                     <td className="py-2 tabular-nums text-slate-600">
                       {z.aquisitivo_inicio ? `${ddmm(z.aquisitivo_inicio)}/${z.aquisitivo_inicio.slice(2, 4)} a ${ddmm(z.aquisitivo_fim!)}/${z.aquisitivo_fim!.slice(2, 4)}` : '—'}
                       {z.completo === false && <span className="ml-1 text-xs text-slate-400">(correndo)</span>}
+                      {/* O período anterior quitado — a tabela pula para o próximo, então diz. */}
+                      {!!z.concluidos && z.concluido_inicio && z.concluido_fim && (
+                        <span className="block text-xs text-emerald-700">
+                          ✓ {ddmm(z.concluido_inicio)}/{z.concluido_inicio.slice(2, 4)} a {ddmm(z.concluido_fim)}/{z.concluido_fim.slice(2, 4)} concluído
+                          {z.concluidos > 1 && <span className="text-slate-500"> (e {z.concluidos - 1} anterior{z.concluidos > 2 ? 'es' : ''})</span>}
+                        </span>
+                      )}
                     </td>
                     <td className="py-2 tabular-nums text-slate-600">{z.limite ? `${ddmm(z.limite)}/${z.limite.slice(2, 4)}` : '—'}</td>
                     <td className={`py-2 pr-6 text-right sm:pr-7 ${tom(z)}`}>

@@ -35,6 +35,17 @@ para o Performance.
 
 ---
 
+## Performance 1.48.1
+
+Migração 65 (banco dos painéis). Não muda as Monitorias nem a Agenda.
+
+- **Performance e Agenda (correção): prazo de saída fixo.** Na 1.47.0 o "sair
+  até" andava com os dias já tirados. Agora é sempre 30 dias antes do fim do
+  período concessivo.
+- **Performance (correção): período concluído à vista.** Quando um período
+  anterior está quitado, a tabela de prazos mostra "✓ … concluído" embaixo do
+  período aquisitivo, em vez de pular para o próximo em silêncio.
+
 ## Performance 1.48.0
 
 Sem migração. Não muda as Monitorias nem a Agenda.
