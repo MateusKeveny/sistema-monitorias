@@ -1,5 +1,7 @@
 import { chavesVapid, dbSemSessao, segredoDaAgenda } from '@/lib/agenda/envio';
-import { pendenciasDoPerformance } from '@/lib/agenda/ponte';
+import { feriasDoPerformance, pendenciasDoPerformance } from '@/lib/agenda/ponte';
+import { hoje as hojeNoBrasil } from '@/lib/agenda/tempo';
+import { avisosDeFerias, type PeriodoDeFerias } from '@/lib/ferias';
 import { chamarTelegram, mensagemDoAviso, tokenDoTelegram } from '@/lib/agenda/telegram';
 import { enviarPush, iguais, seloDoItem } from '@/lib/agenda/webpush';
 import { ENDERECO_PERFORMANCE, sistemaDoHost } from '@/lib/sistema';
@@ -12,6 +14,7 @@ type Envio = {
   /** …ou conversa do Telegram (supabase/agenda/02-telegram.sql). */
   telegram?: number;
   titulo: string; corpo: string; url: string; tag: string; item_id?: string;
+  usuario_id?: string;
   /** Resumo de quem vê as pendências do Performance. */
   pendencias?: boolean;
 };
@@ -55,11 +58,31 @@ export async function POST(requisicao: Request) {
   // Relatórios do ciclo (supabase/agenda/03-lembrete-do-ciclo.sql): semanas
   // sem atendimentos (sem volume) ou sem chamados importados.
   const relatorios = lista.filter((p) => /^sem_(volume|chamados):/.test(p.chave));
+  // Férias no resumo (61 e agenda/04): as da equipe pela ponte, para quem vê
+  // as pendências; as de cada usuário, do banco da agenda.
+  const resumos = envios.filter((e) => e.tag?.startsWith('resumo-'));
+  const hoje = hojeNoBrasil();
+  const [equipe, minhas] = resumos.length ? await Promise.all([
+    resumos.some((e) => e.pendencias) ? feriasDoPerformance() : Promise.resolve(null),
+    dbSemSessao().rpc('agenda_minhas_ferias_resumo', {
+      p_segredo: segredo,
+      p_usuarios: [...new Set(resumos.map((e) => e.usuario_id).filter(Boolean))],
+    }).then((r) => (r.data ?? []) as { usuario_id: string; inicio: string; fim: string }[]),
+  ]) : [null, []];
+  const feriasDe = (e: Envio) => {
+    const meus: PeriodoDeFerias[] = minhas.filter((m) => m.usuario_id === e.usuario_id)
+      .map((m, i) => ({ id: `minha-${i}`, pessoa: 'você', inicio: m.inicio, fim: m.fim, minha: true }));
+    const daEquipe = e.pendencias && equipe ? equipe : null;
+    return avisosDeFerias([...meus, ...(daEquipe?.ferias ?? [])], daEquipe?.prazos ?? [], hoje, 'resumo').map((a) => a.texto);
+  };
+
   const corpoDe = (e: Envio) => {
     if (!e.tag?.startsWith('resumo-')) return e.corpo;
     const partes = [e.corpo || null,
       e.pendencias && pendencias ? `${pendencias} pendência${pendencias > 1 ? 's' : ''} do sistema` : null].filter(Boolean);
-    return partes.length ? partes.join(' · ') : 'Nada marcado para hoje. Bom trabalho!';
+    const ferias = feriasDe(e);
+    const linha = partes.length ? partes.join(' · ') : ferias.length ? null : 'Nada marcado para hoje. Bom trabalho!';
+    return [linha, ...ferias.map((t) => `🏖 ${t}`)].filter(Boolean).join('\n');
   };
 
   await Promise.all(envios.slice(0, 200).map(async (e) => {

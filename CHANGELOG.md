@@ -35,6 +35,23 @@ para o Performance.
 
 ---
 
+## Performance 1.44.0 · Agenda da Gestão 1.4.0
+
+Migração 61 (banco dos painéis) e `supabase/agenda/04-minhas-ferias.sql`
+(banco da agenda). Não muda as Monitorias.
+
+- **Performance (atualização): Férias.** Nova tela em Administrar → Férias, só
+  do gestor: calendário do mês, cadastro dos períodos de cada pessoa
+  (aprovada ou planejada) com aviso na hora quando outra pessoa está fora no
+  mesmo período, e o **prazo da CLT** de cada um — 30 dias por ano trabalhado,
+  a tirar nos 12 meses seguintes, contado pela data de entrada e pelas férias
+  cadastradas. Sem data de entrada não há prazo.
+- **Agenda (atualização): Férias.** Tela nova com o calendário da equipe
+  (pela ponte, só leitura) e as suas férias, que ficam só no banco da agenda.
+  O plano do dia e o resumo das 8h (no celular e no Telegram) avisam: saída em
+  até 7 dias, retorno, duas pessoas fora ao mesmo tempo e prazo da CLT (aos
+  90 e 60 dias e, de 30 dias para baixo, todo dia).
+
 ## Performance 1.43.0 · Agenda da Gestão 1.3.0
 
 Migração 60 (banco dos painéis) e `supabase/agenda/03-lembrete-do-ciclo.sql`

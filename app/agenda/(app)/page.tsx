@@ -3,10 +3,11 @@ import EntradaRapida from '@/componentes/agenda/EntradaRapida';
 import ListaDaAgenda, { type Grupo } from '@/componentes/agenda/ListaDaAgenda';
 import { Painel } from '@/componentes/ui';
 import { criarServidorDaAgenda, exigirUsuario } from '@/lib/agenda/db-servidor';
-import { pendenciasDoPerformance } from '@/lib/agenda/ponte';
+import { feriasDoPerformance, pendenciasDoPerformance } from '@/lib/agenda/ponte';
+import { avisosDeFerias } from '@/lib/ferias';
 import { mesDeCompetencia, periodoDaSemana, semanaDoCiclo, diaMes } from '@/lib/formatar';
 import { agoraNoBrasil, atrasado, diaDoItem, linhaDoTempo, planoDoDia } from '@/lib/agenda/plano';
-import { dataPorExtenso, diasEntre, nomeDoMes, rotuloDoDia } from '@/lib/agenda/tempo';
+import { dataPorExtenso, diasEntre, nomeDoMes, rotuloDoDia, somarDias } from '@/lib/agenda/tempo';
 import { COLUNAS_ITEM, type ItemAgenda, type Pendencia } from '@/lib/agenda/tipos';
 
 export const dynamic = 'force-dynamic';
@@ -22,18 +23,27 @@ export default async function MeuDia({ searchParams }: { searchParams: Promise<{
   // As pendências vêm do banco dos painéis, pela ponte (lib/agenda/ponte.ts).
   const vePendencias = usuario.ve_pendencias;
 
-  const [itens, pendencias, preferencias, aparelhos] = await Promise.all([
+  const [itens, pendencias, preferencias, aparelhos, equipe, minhas] = await Promise.all([
     db.from('agenda_itens').select(COLUNAS_ITEM).is('concluido_em', null)
       .order('lembrar_em', { ascending: true, nullsFirst: false }).limit(500)
       .then((r) => (r.data ?? []) as ItemAgenda[]),
     vePendencias ? pendenciasDoPerformance().then((r) => r.lista) : Promise.resolve([] as Pendencia[]),
     db.from('agenda_preferencias').select('pendencias').maybeSingle().then((r) => r.data),
     db.from('agenda_inscricoes').select('endpoint', { count: 'exact', head: true }).then((r) => r.count ?? 0),
+    // Férias (61 e agenda/04): da equipe pela ponte; as suas, daqui.
+    vePendencias ? feriasDoPerformance() : Promise.resolve(null),
+    db.from('minhas_ferias').select('id, inicio, fim').gte('fim', somarDias(agoraNoBrasil().dia, -7))
+      .then((r) => (r.data ?? []) as { id: string; inicio: string; fim: string }[]),
   ]);
 
   const agora = agoraNoBrasil();
   const comPendencias = vePendencias && preferencias?.pendencias !== false;
-  const plano = planoDoDia(itens, comPendencias ? pendencias : [], agora);
+  // No plano do dia só o que está perto (janela do resumo); o resto fica na tela Férias.
+  const avisosFerias: Pendencia[] = avisosDeFerias(
+    [...minhas.map((m) => ({ ...m, pessoa: usuario.nome, minha: true })), ...(equipe?.ferias ?? [])],
+    equipe?.prazos ?? [], agora.dia, 'resumo',
+  ).map((a) => ({ chave: `ferias:${a.chave}`, texto: a.texto, acao: 'Férias', href: '/agenda/ferias', grave: a.grave, quantidade: 1 }));
+  const plano = planoDoDia(itens, [...(comPendencias ? pendencias : []), ...avisosFerias], agora);
   const proximos = linhaDoTempo(itens, agora, 7);
   const semData = itens.filter((i) => !i.lembrar_em);
 

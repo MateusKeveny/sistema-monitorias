@@ -1,10 +1,12 @@
 /** Itens e ícones do menu da agenda — a barra de baixo e o menu lateral. */
 export const MENU_DA_AGENDA: { href: string; rotulo: string; icone: React.ReactNode }[] = [
-  // O sol do dia, o calendário, o visto, a engrenagem. Traço para 20×20.
+  // O sol do dia, o calendário, o sol no horizonte (férias), o visto, a engrenagem. Traço para 20×20.
   { href: '/agenda', rotulo: 'Meu dia',
     icone: <><circle cx="10" cy="10" r="3.2" /><path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M4.7 15.3l1.4-1.4M13.9 6.1l1.4-1.4" /></> },
   { href: '/agenda/proximos', rotulo: 'Próximos',
     icone: <><rect x="3.5" y="4.5" width="13" height="12" rx="1.5" /><path d="M3.5 8.5h13M7 3v3M13 3v3" /></> },
+  { href: '/agenda/ferias', rotulo: 'Férias',
+    icone: <path d="M3 15h14M5.5 15a4.5 4.5 0 0 1 9 0M10 5v2M4.6 7.6l1.4 1.4M15.4 7.6 14 9" /> },
   { href: '/agenda/feitos', rotulo: 'Feitos',
     icone: <><circle cx="10" cy="10" r="7" /><path d="m6.8 10.2 2.2 2.2 4.2-4.6" /></> },
   { href: '/agenda/ajustes', rotulo: 'Ajustes',

@@ -126,9 +126,10 @@ function LinhaPendencia({ linha }: { linha: Extract<Linha, { tipo: 'pendencia' }
         <p className="text-sm text-slate-800">{p.texto}</p>
         <p className={`text-xs ${TOM[linha.tom ?? 'normal']}`}>{linha.motivo}</p>
       </div>
-      <a href={`${ENDERECO_PERFORMANCE}${p.href}`} target="_blank" rel="noopener"
+      <a href={p.href.startsWith('/agenda') ? p.href : `${ENDERECO_PERFORMANCE}${p.href}`}
+         {...(p.href.startsWith('/agenda') ? {} : { target: '_blank', rel: 'noopener' })}
          className="shrink-0 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50">
-        {p.acao} ↗
+        {p.acao}{p.href.startsWith('/agenda') ? '' : ' ↗'}
       </a>
     </li>
   );
