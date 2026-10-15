@@ -156,7 +156,7 @@ export default async function Ferias({ searchParams }: { searchParams: Promise<{
                         : z.dias_ate_limite! < 0 ? `prazo de saída passou · ${z.saldo} dias`
                         : `${z.saldo} dias · ${z.dias_ate_limite} dias para sair`}
                       {z.saldo != null && (
-                        <PeriodoForaDoSistema pessoaId={z.pessoa_id} nome={z.nome} diasFora={diasFora.get(z.pessoa_id) ?? 0}
+                        <PeriodoForaDoSistema pessoaId={z.pessoa_id} nome={z.nome} diasFora={diasFora.get(z.pessoa_id) ?? 0} saldo={z.saldo}
                                               mostrarBotao={!!z.completo && z.saldo > 0} />
                       )}
                     </td>

@@ -35,6 +35,14 @@ para o Performance.
 
 ---
 
+## Performance 1.48.0
+
+Sem migração. Não muda as Monitorias nem a Agenda.
+
+- **Performance (atualização): dias tirados fora do sistema.** O botão
+  **Período tirado fora do sistema** abre um campo para informar quantos dias
+  foram tirados (sugere o que falta no período), em vez de creditar 30 direto.
+
 ## Performance 1.47.0 · Agenda da Gestão 1.5.0
 
 Migração 64 (banco dos painéis). Não muda as Monitorias.
