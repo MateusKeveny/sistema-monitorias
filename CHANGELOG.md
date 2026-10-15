@@ -35,6 +35,17 @@ para o Performance.
 
 ---
 
+## Performance 1.45.0
+
+Migração 62 (banco dos painéis). Não muda as Monitorias nem a Agenda.
+
+- **Performance (atualização): Férias para os pares.** A tela Férias passa a
+  ser vista por Gestor, Qualidade e quem tem cargo **Atendente Pleno** ou
+  **Analista** no mês: calendário, quem está fora e períodos que coincidem.
+  Cadastrar, editar e o prazo da CLT continuam só do gestor. Os gestores
+  agora entram no cadastro e no prazo, como qualquer pessoa — assim as férias
+  do gestor aparecem para os pares.
+
 ## Performance 1.44.0 · Agenda da Gestão 1.4.0
 
 Migração 61 (banco dos painéis) e `supabase/agenda/04-minhas-ferias.sql`

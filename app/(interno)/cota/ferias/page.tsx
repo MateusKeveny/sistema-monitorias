@@ -2,7 +2,8 @@ import Link from '@/componentes/Link';
 import CalendarioDeFerias from '@/componentes/CalendarioDeFerias';
 import GestaoDeFerias, { type FeriasCadastrada } from '@/componentes/GestaoDeFerias';
 import { Painel, Secao } from '@/componentes/ui';
-import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
+import { redirect } from 'next/navigation';
+import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { hojeNoBrasil, mesValido } from '@/lib/formatar';
 import { avisosDeFerias, ddmm, foraNoDia, somar, type PrazoDeFerias } from '@/lib/ferias';
 
@@ -20,26 +21,36 @@ const mesSeguinte = (m: string, n: number) => {
 };
 
 /**
- * Férias da equipe (migração 61): calendário do mês, cadastro e o prazo de
- * cada pessoa pela CLT. A Agenda da Gestão lê daqui e avisa.
+ * Férias da equipe (migrações 61 e 62): calendário do mês, cadastro e o
+ * prazo de cada pessoa pela CLT. A Agenda da Gestão lê daqui e avisa.
+ *
+ * Veem o calendário e os avisos: gestor, Qualidade, Pleno e Analista
+ * (ve_ferias). Cadastro e prazo da CLT: só o gestor.
  */
 export default async function Ferias({ searchParams }: { searchParams: Promise<{ mes?: string }> }) {
-  await exigirGestor();
+  const perfil = await exigirPerfil();
+  const db = await criarClienteServidor();
+  const gestor = perfil.papel === 'gestor';
+  if (!gestor && !(await db.rpc('ve_ferias')).data) redirect('/cota');
   const { mes } = await searchParams;
   const hoje = hojeNoBrasil();
   const mesAtual = mesValido(mes) ? `${mes}-01` : `${hoje.slice(0, 7)}-01`;
-  const db = await criarClienteServidor();
 
-  const [{ data: pessoas }, { data: ferias }, { data: prazos }] = await Promise.all([
-    db.from('pessoas').select('id, nome').eq('ativo', true).is('desligado_em', null).neq('papel', 'gestor').order('nome'),
-    db.from('ferias').select('id, pessoa_id, inicio, fim, situacao, observacao, pessoas!ferias_pessoa_id_fkey(nome)')
+  // Os nomes vêm de nomes_das_pessoas: Pleno e Analista não leem o cadastro.
+  const [{ data: pessoas }, { data: ferias }, { data: prazos }, { data: nomes }] = await Promise.all([
+    gestor
+      ? db.from('pessoas').select('id, nome').eq('ativo', true).is('desligado_em', null).order('nome')
+      : Promise.resolve({ data: [] }),
+    db.from('ferias').select('id, pessoa_id, inicio, fim, situacao, observacao')
       .gte('fim', somar(hoje, -400)).order('inicio'),
-    db.rpc('ferias_prazos'),
+    gestor ? db.rpc('ferias_prazos') : Promise.resolve({ data: [] }),
+    db.rpc('nomes_das_pessoas'),
   ]);
+  const nome = new Map(((nomes ?? []) as { id: string; nome: string }[]).map((p) => [p.id, p.nome]));
 
   const lista: FeriasCadastrada[] = (ferias ?? []).map((f) => ({
     id: f.id as string, pessoa_id: f.pessoa_id as string,
-    pessoa: ((f.pessoas as unknown as { nome: string } | null)?.nome) ?? '—',
+    pessoa: nome.get(f.pessoa_id as string) ?? '—',
     inicio: f.inicio as string, fim: f.fim as string,
     situacao: f.situacao as 'planejada' | 'aprovada', observacao: f.observacao as string | null,
   }));
@@ -60,7 +71,7 @@ export default async function Ferias({ searchParams }: { searchParams: Promise<{
         <h1 className="text-2xl font-bold tracking-tight">Férias</h1>
         <p className="text-sm text-sobre-fundo-suave">
           {foraHoje.length ? `De férias hoje: ${foraHoje.map((f) => f.pessoa.split(/\s+/)[0]).join(', ')}` : 'Ninguém de férias hoje'}
-          {' · '}os avisos chegam na Agenda da Gestão
+          {gestor && ' · os avisos chegam na Agenda da Gestão'}
         </p>
       </header>
 
@@ -91,11 +102,14 @@ export default async function Ferias({ searchParams }: { searchParams: Promise<{
             <CalendarioDeFerias periodos={lista} mes={mesSeguinte(mesAtual, 1)} hoje={hoje} />
           </div>
         </Secao>
-        <Secao titulo="Cadastro">
-          <GestaoDeFerias pessoas={(pessoas ?? []) as { id: string; nome: string }[]} ferias={lista} hoje={hoje} />
-        </Secao>
+        {gestor && (
+          <Secao titulo="Cadastro">
+            <GestaoDeFerias pessoas={(pessoas ?? []) as { id: string; nome: string }[]} ferias={lista} hoje={hoje} />
+          </Secao>
+        )}
       </Painel>
 
+      {gestor && (
       <Painel>
         <Secao titulo="Prazo de cada pessoa (CLT)"
                subtitulo="30 dias por ano trabalhado, a tirar nos 12 meses seguintes; depois disso, pagamento em dobro. Conta pela data de entrada e pelas férias cadastradas aqui.">
@@ -133,6 +147,7 @@ export default async function Ferias({ searchParams }: { searchParams: Promise<{
           </div>
         </Secao>
       </Painel>
+      )}
     </div>
   );
 }

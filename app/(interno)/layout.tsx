@@ -22,7 +22,7 @@ export default async function LayoutInterno({ children }: { children: React.Reac
   // atrás da outra somavam as esperas pelo banco.
   const db = await criarClienteServidor();
   const leDiario = sistema === 'cota' && perfil.papel !== 'gestor';
-  const [pendentes, avisosReporte, leituras] = await Promise.all([
+  const [pendentes, avisosReporte, leituras, veFerias] = await Promise.all([
     // Exclusões esperando decisão aparecem no Painel, mas o quadro só existe
     // quando há alguma — o gestor não teria como saber que chegou pedido sem
     // abrir a tela por acaso. O contador no menu resolve isso: ele aparece em
@@ -42,6 +42,11 @@ export default async function LayoutInterno({ children }: { children: React.Reac
     leDiario
       ? db.rpc('leituras_do_diario').then((r) => (r.data ?? []) as LeituraDiario[])
       : Promise.resolve([] as LeituraDiario[]),
+    // Férias (62): gestor e Qualidade sempre; operador só com cargo Pleno ou
+    // Analista no mês — e isso só o banco sabe, daí a pergunta só para ele.
+    sistema !== 'cota' ? Promise.resolve(false)
+      : perfil.papel !== 'operador' ? Promise.resolve(true)
+      : db.rpc('ve_ferias').then((r) => r.data === true),
   ]);
 
   // Menu lateral em tela larga e conteúdo na largura toda — limitado a 7xl,
@@ -83,11 +88,11 @@ export default async function LayoutInterno({ children }: { children: React.Reac
         {/* Uma abertura do painel por carregamento (migração 52, tela Acessos). */}
         <RegistrarAcesso sistema={sistema} />
         <ManterSessao />
-        <MenuLateral perfil={perfil} versao={versao} sistema={sistema}
+        <MenuLateral perfil={perfil} versao={versao} sistema={sistema} veFerias={veFerias}
                      avisosReporte={avisosReporte} pendentes={pendentes} />
         <div className="min-w-0">
           <div className="lg:hidden">
-            <Navegacao perfil={perfil} pendentes={pendentes} sistema={sistema} versao={versao} avisosReporte={avisosReporte} />
+            <Navegacao perfil={perfil} pendentes={pendentes} sistema={sistema} versao={versao} avisosReporte={avisosReporte} veFerias={veFerias} />
           </div>
           <main className="max-w-[1680px] px-6 py-8 lg:px-9">{children}</main>
         </div>

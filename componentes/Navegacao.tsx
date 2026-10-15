@@ -42,7 +42,8 @@ export const ITENS: Record<Sistema, Item[]> = {
     { href: '/cota/importar', rotulo: 'Importar', papeis: ['gestor'], grupo: 'Registrar' },
     { href: '/cota/fechamento', rotulo: 'Fechamento', papeis: ['gestor'] },
     { href: '/cota/atendentes', rotulo: 'Atendentes', papeis: ['gestor'], grupo: 'Administrar' },
-    { href: '/cota/ferias', rotulo: 'Férias', papeis: ['gestor'], grupo: 'Administrar' },
+    // Férias: quem vê é decidido por ve_ferias (cargo Pleno ou Analista conta), não só pelo papel.
+    { href: '/cota/ferias', rotulo: 'Férias', papeis: ['gestor', 'qualidade', 'operador'], grupo: 'Administrar' },
     { href: '/cota/acessos', rotulo: 'Acessos', papeis: ['gestor'], grupo: 'Administrar' },
     { href: '/cota/configuracao', rotulo: 'Configuração', papeis: ['gestor'], grupo: 'Administrar' },
     { href: '/reportes', rotulo: 'Reports de problemas', papeis: ['gestor'], grupo: 'Administrar' },
@@ -50,8 +51,10 @@ export const ITENS: Record<Sistema, Item[]> = {
 };
 
 export default function Navegacao({
-  perfil, pendentes = 0, sistema, versao, avisosReporte = 0,
+  perfil, pendentes = 0, sistema, versao, avisosReporte = 0, veFerias = false,
 }: {
+  /** Vê a tela de Férias (ve_ferias, migração 62): papel ou cargo Pleno/Analista. */
+  veFerias?: boolean;
   /** Respostas novas (autor) ou reports novos (gestor), no botão de reportar. */
   avisosReporte?: number;
   perfil: Perfil;
@@ -111,7 +114,7 @@ export default function Navegacao({
   }, [caminho, deslizante]);
 
   // Na ordem da lista: cada grupo entra onde aparece o primeiro item dele.
-  const visiveis = ITENS[sistema].filter((i) => i.papeis.includes(perfil.papel));
+  const visiveis = ITENS[sistema].filter((i) => (i.href === '/cota/ferias' ? veFerias : i.papeis.includes(perfil.papel)));
   const entradas: (Item | { grupo: string; itens: Item[] })[] = [];
   for (const item of visiveis) {
     const doGrupo = item.grupo ? visiveis.filter((i) => i.grupo === item.grupo) : [];

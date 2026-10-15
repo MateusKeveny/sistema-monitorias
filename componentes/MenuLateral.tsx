@@ -51,7 +51,9 @@ const ICONES: Record<string, React.ReactNode> = {
  * Fechamento e Relatórios não têm grupo no menu do topo — cabem sozinhos —,
  * mas aqui ganham o seu: um é etapa do mês, o outro é consulta.
  */
-export default function MenuLateral({ perfil, versao, sistema, avisosReporte = 0, pendentes = 0 }: {
+export default function MenuLateral({ perfil, versao, sistema, avisosReporte = 0, pendentes = 0, veFerias = false }: {
+  /** Vê a tela de Férias (ve_ferias, migração 62). */
+  veFerias?: boolean;
   perfil: Perfil;
   versao: string;
   sistema: Sistema;
@@ -68,7 +70,7 @@ export default function MenuLateral({ perfil, versao, sistema, avisosReporte = 0
     router.refresh();
   }
 
-  const visiveis = ITENS[sistema].filter((i) => i.papeis.includes(perfil.papel));
+  const visiveis = ITENS[sistema].filter((i) => (i.href === '/cota/ferias' ? veFerias : i.papeis.includes(perfil.papel)));
 
   // Vence o endereço mais específico que casa com a página. Sem isso,
   // "/monitorias" e "/monitorias/nova" acendiam juntos — duas linhas acesas no
