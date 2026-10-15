@@ -344,6 +344,19 @@ function Ficha({
       {aviso && <p className="my-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-emerald-600/20">{aviso}</p>}
 
       <Secao titulo="Entrada">
+        {/* Duas datas (migração 63): a da empresa só vale para as férias (CLT);
+            a da equipe é a da cota. Transferido de outra equipe tem as duas. */}
+        <label className="flex items-center justify-between gap-3 text-sm text-slate-600">
+          Na empresa desde
+          <input type="date" defaultValue={pessoa.admitido_na_empresa ?? ''} disabled={ocupado} className={entrada}
+                 aria-label={`Admissão na empresa de ${pessoa.nome}`}
+                 onBlur={(e) => {
+                   if ((e.target.value || null) !== (pessoa.admitido_na_empresa ?? null)) {
+                     executar(() => db().from('pessoas').update({ admitido_na_empresa: e.target.value || null }).eq('id', pessoa.id));
+                   }
+                 }} />
+        </label>
+        <p className="mb-3 mt-1 text-xs text-slate-500">Para as férias (prazo da CLT). Em branco: conta da entrada na equipe.</p>
         <label className="flex items-center justify-between gap-3 text-sm text-slate-600">
           Na equipe desde
           <input type="date" defaultValue={pessoa.admitido_em ?? ''} disabled={ocupado} className={entrada}
@@ -354,7 +367,7 @@ function Ficha({
                    }
                  }} />
         </label>
-        <p className="mt-1 text-xs text-slate-500">Em branco: já estava antes do painel e conta em todos os meses.</p>
+        <p className="mt-1 text-xs text-slate-500">Para a cota. Em branco: já estava antes do painel e conta em todos os meses.</p>
       </Secao>
 
       <Secao titulo="Cargo">
@@ -621,7 +634,7 @@ function Registro({ saida }: { saida: Saida }) {
       <dl className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
         <div><dt className="inline text-slate-500">E-mail: </dt><dd className="inline text-slate-800">{ficha.email ?? '—'}</dd></div>
         <div><dt className="inline text-slate-500">Papel: </dt><dd className="inline text-slate-800">{ficha.papel ?? '—'}</dd></div>
-        <div><dt className="inline text-slate-500">Entrada: </dt><dd className="inline text-slate-800">{data(ficha.admitido_em)}</dd></div>
+        <div><dt className="inline text-slate-500">Entrada na equipe: </dt><dd className="inline text-slate-800">{data(ficha.admitido_em)}</dd></div>
         <div><dt className="inline text-slate-500">Nome no Hub: </dt><dd className="inline text-slate-800">{ficha.nome_hub ?? ficha.nome_huggy ?? '—'}</dd></div>
         <div className="sm:col-span-2"><dt className="inline text-slate-500">Cargos: </dt>
           <dd className="inline text-slate-800">

@@ -28,6 +28,8 @@ export type Pessoa = {
   senha_definida: boolean;
   /** Entrada na operação. Nulo = já estava antes do painel existir. */
   admitido_em?: string | null;
+  /** Admissão na empresa, só para as férias (migração 63). Nulo = usa admitido_em. */
+  admitido_na_empresa?: string | null;
   /** Saída da operação. Nulo = continua na equipe. */
   desligado_em?: string | null;
   /** Aparece nas listas da tela inicial do gestor. Não afeta cálculo. */

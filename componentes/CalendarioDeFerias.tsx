@@ -8,7 +8,7 @@ const nomeCurto = (p: PeriodoDeFerias) => (p.minha ? 'Você' : p.pessoa.trim().s
 
 /**
  * Calendário de férias de um mês: uma linha por pessoa, um quadradinho por
- * dia. Dia com duas ou mais pessoas fora fica marcado no topo (âmbar), para a
+ * dia. Dia com duas ou mais pessoas fora fica marcado no topo (rosa; planejadas ficam em amarelo), para a
  * falta de cobertura saltar aos olhos. Servidor puro, sem script; no celular
  * a grade rola de lado.
  *
@@ -52,7 +52,7 @@ export default function CalendarioDeFerias({ periodos, mes, hoje }: {
                         className={`w-6 min-w-6 px-0 pb-1 text-center font-normal tabular-nums ${
                           d === hoje ? 'text-marca-700 dark:text-marca-400 font-bold' : dow === 0 || dow === 6 ? 'text-slate-400' : 'text-slate-500'}`}>
                       <span className="block text-[9px]">{LETRAS[dow]}</span>
-                      <span className={`mx-auto block w-5 rounded ${fora > 1 ? 'bg-amber-100 text-amber-800 font-semibold' : ''}`}>
+                      <span className={`mx-auto block w-5 rounded ${fora > 1 ? 'bg-rose-100 text-rose-800 font-semibold' : ''}`}>
                         {Number(d.slice(8))}
                       </span>
                     </th>
@@ -69,7 +69,7 @@ export default function CalendarioDeFerias({ periodos, mes, hoje }: {
                   {dias.map((d) => {
                     const p = ps.find((q) => q.inicio <= d && q.fim >= d);
                     const cor = !p ? '' : p.minha ? 'bg-sky-500' : p.situacao === 'planejada'
-                      ? 'bg-marca-500/40 ring-1 ring-inset ring-marca-600/50' : 'bg-marca-600';
+                      ? 'bg-amber-400' : 'bg-marca-600';
                     return (
                       <td key={d} className="px-[1px] py-0.5">
                         <span title={p ? `${nomeCurto(p)}: ${ddmm(p.inicio)} a ${ddmm(p.fim)}` : undefined}
@@ -85,9 +85,9 @@ export default function CalendarioDeFerias({ periodos, mes, hoje }: {
       )}
       <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500">
         <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-marca-600" /> aprovadas</span>
-        <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-marca-500/40 ring-1 ring-inset ring-marca-600/50" /> planejadas</span>
+        <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-amber-400" /> planejadas</span>
         {periodos.some((p) => p.minha) && <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-sky-500" /> você</span>}
-        <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-amber-100 ring-1 ring-amber-300" /> 2+ pessoas fora</span>
+        <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-rose-100 ring-1 ring-rose-300" /> 2+ pessoas fora</span>
       </p>
     </div>
   );

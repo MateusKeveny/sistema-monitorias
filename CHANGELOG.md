@@ -35,6 +35,23 @@ para o Performance.
 
 ---
 
+## Performance 1.46.0 · Agenda da Gestão 1.4.1
+
+Migração 63 (banco dos painéis). Não muda as Monitorias.
+
+- **Performance (atualização): admissão na empresa.** A ficha em Atendentes
+  ganha **Na empresa desde**, ao lado de **Na equipe desde**. A da empresa só
+  vale para as férias: quem veio transferido conta o período aquisitivo de lá.
+  A da equipe segue sendo a da cota, sem mudança. Sem a da empresa, as férias
+  usam a da equipe.
+- **Performance (atualização): o ano inteiro.** Ao lado do calendário de
+  Férias, os 12 meses com a mesma sinalização; cada mês abre o calendário dele.
+- **Performance e Agenda (atualização): planejadas em amarelo.** Dia com duas
+  ou mais pessoas fora passa a ser marcado em rosa, para não confundir.
+- **Performance e Agenda (atualização): atenção ao prazo da CLT** só para quem
+  completa 1 ano de casa até o fim do ano; os demais aparecem como "menos de
+  1 ano".
+
 ## Performance 1.45.0
 
 Migração 62 (banco dos painéis). Não muda as Monitorias nem a Agenda.

@@ -1,5 +1,6 @@
 import Link from '@/componentes/Link';
 import CalendarioDeFerias from '@/componentes/CalendarioDeFerias';
+import QuadroDoAno from '@/componentes/QuadroDoAno';
 import GestaoDeFerias, { type FeriasCadastrada } from '@/componentes/GestaoDeFerias';
 import { Painel, Secao } from '@/componentes/ui';
 import { redirect } from 'next/navigation';
@@ -55,12 +56,16 @@ export default async function Ferias({ searchParams }: { searchParams: Promise<{
     situacao: f.situacao as 'planejada' | 'aprovada', observacao: f.observacao as string | null,
   }));
   const todosPrazos = (prazos ?? []) as Prazo[];
-  const prazosDoAviso: PrazoDeFerias[] = todosPrazos.filter((z) => z.saldo != null && z.limite)
+  // Atenção só para quem completa 1 ano de casa até o fim deste ano (63).
+  const fimDoAno = `${hoje.slice(0, 4)}-12-31`;
+  const umAno = (z: Prazo) => !!z.admitido_em
+    && `${Number(z.admitido_em.slice(0, 4)) + 1}${z.admitido_em.slice(4)}` <= fimDoAno;
+  const prazosDoAviso: PrazoDeFerias[] = todosPrazos.filter((z) => z.saldo != null && z.limite && umAno(z))
     .map((z) => ({ pessoa: z.nome, limite: z.limite!, saldo: z.saldo!, dias: z.dias_ate_limite!, completo: !!z.completo }));
   const avisos = avisosDeFerias(lista, prazosDoAviso, hoje);
   const foraHoje = foraNoDia(lista, hoje);
 
-  const tom = (z: Prazo) => z.saldo == null ? 'text-slate-400'
+  const tom = (z: Prazo) => z.saldo == null || !umAno(z) ? 'text-slate-400'
     : z.saldo === 0 ? 'text-slate-500'
     : z.dias_ate_limite! < 0 || z.dias_ate_limite! <= 30 ? 'text-rose-700 font-semibold'
     : z.dias_ate_limite! <= 90 ? 'text-amber-700 font-semibold' : 'text-emerald-700';
@@ -97,9 +102,14 @@ export default async function Ferias({ searchParams }: { searchParams: Promise<{
             <Link href="/cota/ferias" className="rounded-lg px-2 py-1 text-xs text-slate-500 hover:bg-slate-100">hoje</Link>
             <Link href={`/cota/ferias?mes=${mesSeguinte(mesAtual, 1).slice(0, 7)}`} className="rounded-lg px-2 py-1 text-slate-600 hover:bg-slate-100" aria-label="Próximo mês">›</Link>
           </div>}>
-          <div className="space-y-6">
-            <CalendarioDeFerias periodos={lista} mes={mesAtual} hoje={hoje} />
-            <CalendarioDeFerias periodos={lista} mes={mesSeguinte(mesAtual, 1)} hoje={hoje} />
+          {/* O mês (e o seguinte) e, ao lado, o ano inteiro com a mesma sinalização. */}
+          <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_20rem]">
+            <div className="min-w-0 space-y-6">
+              <CalendarioDeFerias periodos={lista} mes={mesAtual} hoje={hoje} />
+              <CalendarioDeFerias periodos={lista} mes={mesSeguinte(mesAtual, 1)} hoje={hoje} />
+            </div>
+            <QuadroDoAno periodos={lista} ano={Number(mesAtual.slice(0, 4))} hoje={hoje}
+                         mesAberto={mesAtual.slice(0, 7)} linkDoMes={(m) => `/cota/ferias?mes=${m}`} />
           </div>
         </Secao>
         {gestor && (
@@ -112,13 +122,13 @@ export default async function Ferias({ searchParams }: { searchParams: Promise<{
       {gestor && (
       <Painel>
         <Secao titulo="Prazo de cada pessoa (CLT)"
-               subtitulo="30 dias por ano trabalhado, a tirar nos 12 meses seguintes; depois disso, pagamento em dobro. Conta pela data de entrada e pelas férias cadastradas aqui.">
+               subtitulo="30 dias por ano trabalhado, a tirar nos 12 meses seguintes; depois disso, pagamento em dobro. Conta da admissão na empresa (ou, sem ela, da entrada na equipe) e das férias cadastradas aqui. Só sinaliza quem completa 1 ano de casa até o fim do ano.">
           <div className="-mx-6 overflow-x-auto sm:-mx-7">
             <table className="w-full min-w-[640px] text-sm">
               <thead>
                 <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
                   <th className="px-6 py-2 font-medium sm:px-7">Pessoa</th>
-                  <th className="py-2 font-medium">Entrada</th>
+                  <th className="py-2 font-medium">Admissão</th>
                   <th className="py-2 font-medium">Período aquisitivo</th>
                   <th className="py-2 font-medium">Sair até</th>
                   <th className="py-2 pr-6 text-right font-medium sm:pr-7">Situação</th>
@@ -136,6 +146,7 @@ export default async function Ferias({ searchParams }: { searchParams: Promise<{
                     <td className="py-2 tabular-nums text-slate-600">{z.limite ? `${ddmm(z.limite)}/${z.limite.slice(2, 4)}` : '—'}</td>
                     <td className={`py-2 pr-6 text-right sm:pr-7 ${tom(z)}`}>
                       {z.saldo == null ? <Link href="/cota/atendentes" className="underline-offset-2 hover:underline">sem data de entrada</Link>
+                        : !umAno(z) ? `menos de 1 ano em ${hoje.slice(0, 4)}`
                         : z.saldo === 0 ? 'em dia'
                         : z.dias_ate_limite! < 0 ? `vencidas · ${z.saldo} dias`
                         : `${z.saldo} dias · ${z.dias_ate_limite} dias de prazo`}
