@@ -35,6 +35,22 @@ para o Performance.
 
 ---
 
+## Performance 1.51.0 · Monitorias 5.6.1
+
+Migração 68 (banco dos painéis). Não muda a Agenda.
+
+- **Performance (atualização): criar acesso pela tela.** Na ficha do atendente,
+  quem ainda não entra no painel ganha a seção "Acesso" com e-mail, papel e o
+  botão **Criar acesso**: gera a senha temporária (mostrada uma vez; a pessoa
+  troca no primeiro acesso) ou, se já existir conta com o e-mail, só vincula.
+  Substitui os comandos `npm run acesso` e `npm run vincular`. A lista avisa
+  "sem acesso ao painel".
+- **Performance (atualização): Nome no ELO na ficha**, como o Nome no Hub.
+  Salvar também passa para a pessoa os chamados dos meses abertos que tinham
+  ficado sem dono com esse nome.
+- **Monitorias (correção):** o aviso do cadastro de pessoas aponta para o
+  "Criar acesso" do Performance.
+
 ## Performance 1.50.0 · Monitorias 5.6.0
 
 Migração 67 (banco dos painéis). Não muda a Agenda.

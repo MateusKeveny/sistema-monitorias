@@ -11,7 +11,7 @@ Escrito em 28/09/2026, atualizado em 08/10/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.50.0** · Monitorias **5.6.0** · Agenda **1.5.0** (16/10/2026) |
+| Publicado | Performance **1.51.0** · Monitorias **5.6.1** · Agenda **1.5.0** (16/10/2026) |
 | Branch | `painel-performance`, com os três sites (a `main` segue intocada) |
 | Migrações no banco | 01 a 60, todas aplicadas (a agenda tem banco próprio: 01 a 03) |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` · `painel-agenda.expansao.workers.dev` |
@@ -651,6 +651,22 @@ Três versões, cada uma publicada e conferida antes da próxima:
   Configuração; `DiarioDeBordo` recebe `tiposDaEquipe` para os filtros.
   Conferido: configuração inicial e contagem por tipo (6 processos, 3
   autorizações, 3 exceções, 2 problemas); telas do gestor sem falha.
+- **Performance 1.51.0 · Monitorias 5.6.1** (**migração 68**):
+  `criar_acesso(pessoa, email, papel)` — security definer, só gestor, no
+  modelo de `redefinir_senha` (32): grava e-mail e papel na pessoa, insere em
+  `auth.users` + `auth.identities` com senha temporária (alfabeto sem
+  0/O/1/l/I) ou, havendo conta com o e-mail, só vincula e troca a senha;
+  `senha_definida = false`; registro em `acessos_criados`. O gatilho
+  `tratar_novo_usuario` (11) também liga pelo e-mail. `salvar_nome_elo`
+  grava `nome_elo` (índice único) e passa para a pessoa os chamados de mês
+  aberto sem dono com esse responsável. Ficha (`PainelAtendentes`): seções
+  "Nome no ELO" e "Acesso" (sem login), pendência "sem acesso ao painel".
+  **Teste de 16/10**: pessoa de teste criada pelo gestor, acesso criado pelo
+  botão, login com a senha temporária pediu a troca; depois apagadas pessoa e
+  conta. Os scripts `acesso`/`vincular` continuam no repositório, mas não
+  são mais o caminho. Observação: o navegador embutido do Claude não mostra
+  `confirm()` (responde "cancelar"); botões com confirmação se testam no
+  navegador normal.
 
 Visão de celular fica fora da revisão, por decisão do gestor. Os painéis são
 usados só no computador.

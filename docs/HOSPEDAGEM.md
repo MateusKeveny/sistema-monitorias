@@ -273,7 +273,7 @@ ferramenta de monitoramento da TI.
 | `componentes/` | Componentes de tela |
 | `lib/` | Regras compartilhadas, acesso ao banco, versões, seleção de sistema |
 | `supabase/` | Migrações do banco, em ordem |
-| `scripts/` | Scripts de manutenção (importação, criação de acesso) — uso manual |
+| `scripts/` | Scripts de manutenção (importação; criação de acesso, hoje substituída pelo botão "Criar acesso" na ficha do atendente) — uso manual |
 | `docs/` | Documentação, incluindo este arquivo e o modelo da cota |
 | `middleware.ts` | Controle de sessão e separação entre os dois sistemas |
 | `package.json` / `package-lock.json` | Dependências com versões exatas |

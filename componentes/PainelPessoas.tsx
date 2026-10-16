@@ -277,8 +277,8 @@ export default function PainelPessoas({ pessoas }: { pessoas: Pessoa[] }) {
       </form>
 
       <p className="mt-3 text-xs leading-relaxed text-slate-500">
-        Cadastrar aqui não cria login. Quando a conta for criada no Supabase com o mesmo
-        e-mail, o vínculo acontece sozinho — e o papel passa a valer. Renomear é seguro: as
+        Cadastrar aqui não cria login: o acesso se cria no Performance, em Atendentes › ficha da
+        pessoa › Criar acesso, que gera a senha temporária. Renomear é seguro: as
         monitorias apontam para o registro, não para o texto, então o histórico inteiro
         acompanha.
       </p>

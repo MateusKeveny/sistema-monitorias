@@ -21,6 +21,8 @@ export type Pessoa = {
   nome_hub?: string | null;
   /** Outras grafias do mesmo nome no Hub (migração 45). */
   nomes_hub_extras?: string[];
+  /** Como a pessoa aparece no relatório do painel ELO (migração 53). */
+  nome_elo?: string | null;
   papel: PapelUsuario;
   avaliado: boolean;
   ativo: boolean;

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { mesRotulo } from '@/lib/formatar';
-import { NOMES_PAPEL, type Cargo, type CargoDaPessoa, type Pessoa, type Saida } from '@/lib/tipos';
+import { NOMES_PAPEL, type Cargo, type CargoDaPessoa, type PapelUsuario, type Pessoa, type Saida } from '@/lib/tipos';
 import { ROTULO_TIPO, type AnotacaoGestor, type LeituraDaPessoa } from '@/lib/diario';
 
 const entrada = `rounded-lg border border-slate-300 bg-superficie px-2.5 py-1.5 text-sm outline-none
@@ -70,6 +70,7 @@ export default function PainelAtendentes({
     if (!cargo) l.push('sem cargo — não recebe cota');
     const linhas = linhasDe(p.id);
     if (linhas.some((h, i) => i > 0 && h.cargo_id === linhas[i - 1].cargo_id)) l.push('mesmo cargo repetido no histórico');
+    if (!p.auth_id) l.push('sem acesso ao painel — crie o acesso na ficha');
     if (p.papel === 'operador' && cargo && nomeCargo.get(cargo.cargo_id)?.startsWith('Atendente') && !p.nome_hub) {
       l.push('sem Nome no Hub — a importação não acha as avaliações');
     }
@@ -305,6 +306,9 @@ function Ficha({
   const [aviso, setAviso] = useState<string | null>(null);
   const [novoCargo, setNovoCargo] = useState({ cargo: '', mes: competencia.slice(0, 7) });
   const [hub, setHub] = useState(pessoa.nome_hub ?? '');
+  const [elo, setElo] = useState(pessoa.nome_elo ?? '');
+  // Criar acesso (migração 68): o e-mail do cadastro e o papel, editáveis.
+  const [novoAcesso, setNovoAcesso] = useState({ email: pessoa.email ?? '', papel: pessoa.papel ?? 'operador' });
   const [saidaDia, setSaidaDia] = useState('');
   const [motivo, setMotivo] = useState('');
   const [verRegistro, setVerRegistro] = useState(false);
@@ -446,6 +450,32 @@ function Ficha({
         )}
       </Secao>
 
+      <Secao titulo="Nome no ELO">
+        <div className="flex gap-2">
+          <input value={elo} disabled={ocupado} onChange={(e) => setElo(e.target.value)}
+                 placeholder="Como aparece no relatório do painel ELO" aria-label={`Nome de ${pessoa.nome} no ELO`}
+                 className={`${entrada} min-w-0 flex-1`} />
+          <button type="button" disabled={ocupado || elo.trim() === (pessoa.nome_elo ?? '')} className={botaoSecundario}
+                  onClick={async () => {
+                    setOcupado(true); setErro(null); setAviso(null);
+                    // Pela função (migração 68): grava o nome e passa para a pessoa os
+                    // chamados dos meses abertos que tinham ficado sem dono com ele.
+                    const { data: n, error } = await db().rpc('salvar_nome_elo', { p_pessoa: pessoa.id, p_nome: elo.trim() });
+                    setOcupado(false);
+                    if (error) { setErro(/duplicate|unique/i.test(error.message) ? 'Esse nome já é de outra pessoa.' : error.message); return; }
+                    const q = Number(n ?? 0);
+                    setAviso(q ? `Nome salvo. ${q} chamado${q > 1 ? 's' : ''} sem dono com esse nome passa${q > 1 ? 'ram' : 'ou'} para ${pessoa.nome.split(' ')[0]}.` : 'Nome salvo.');
+                    router.refresh();
+                  }}>
+            Salvar
+          </button>
+        </div>
+        <p className="mt-1 text-xs text-slate-500">
+          É por ele que a importação dos chamados acha a pessoa (ex.: &ldquo;Matheus Scariot&rdquo; é o Matheus Camargo).
+          Só precisa para quem trata chamados. Sem ele, vale o nome do cadastro.
+        </p>
+      </Secao>
+
       <Secao titulo="Tela inicial">
         {([
           ['exibir_no_painel', 'Aparece nas listas', pessoa.exibir_no_painel ?? true],
@@ -571,6 +601,48 @@ function Ficha({
               </p>
             </>
           )}
+        </Secao>
+      )}
+
+      {!pessoa.auth_id && pessoa.ativo && !pessoa.desligado_em && (
+        <Secao titulo="Acesso">
+          <p className="mb-2 text-sm text-slate-600">Ainda não entra no painel.</p>
+          <div className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2 text-sm text-slate-600">
+            <label htmlFor="novo-acesso-email">E-mail</label>
+            <input id="novo-acesso-email" type="email" value={novoAcesso.email} disabled={ocupado}
+                   onChange={(e) => setNovoAcesso((s) => ({ ...s, email: e.target.value }))}
+                   placeholder="nome@igreenenergy.com.br" className={entrada} />
+            <label htmlFor="novo-acesso-papel">Papel</label>
+            <select id="novo-acesso-papel" value={novoAcesso.papel} disabled={ocupado}
+                    onChange={(e) => setNovoAcesso((s) => ({ ...s, papel: e.target.value as PapelUsuario }))}
+                    className={entrada}>
+              <option value="operador">Operador (atendente)</option>
+              <option value="qualidade">Qualidade</option>
+              <option value="gestor">Gestor</option>
+            </select>
+          </div>
+          <div className="mt-3 flex justify-end">
+            <button type="button" disabled={ocupado || !novoAcesso.email.trim()} className={botaoPrimario}
+                    onClick={async () => {
+                      if (!confirm(`Criar o acesso de ${pessoa.nome} (${novoAcesso.email.trim()})? Uma senha temporária será gerada para você repassar.`)) return;
+                      setOcupado(true); setErro(null); setAviso(null);
+                      // Pela função (migração 68), como o Redefinir senha: no banco, só gestor.
+                      const { data, error } = await db().rpc('criar_acesso',
+                        { p_pessoa: pessoa.id, p_email: novoAcesso.email.trim(), p_papel: novoAcesso.papel });
+                      setOcupado(false);
+                      if (error) { setErro(error.message); return; }
+                      // A senha aparece na seção Acesso de quem já entra, que esta vira
+                      // depois do refresh — o estado da ficha continua o mesmo.
+                      setSenhaTemporaria(String(data)); setCopiada(null);
+                      router.refresh();
+                    }}>
+              Criar acesso
+            </button>
+          </div>
+          <p className="mt-1 text-xs text-slate-500">
+            Cria o login com uma senha temporária, mostrada só para você; a pessoa troca no primeiro acesso. Se já
+            existir uma conta com esse e-mail, ela é só vinculada.
+          </p>
         </Secao>
       )}
 

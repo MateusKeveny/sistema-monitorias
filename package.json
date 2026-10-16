@@ -1,6 +1,6 @@
 {
   "name": "sistema-monitorias",
-  "version": "5.6.0",
+  "version": "5.6.1",
   "private": true,
   "description": "Sistema de Monitorias de Qualidade (C-SAT) — IGreen Energia",
   "scripts": {
