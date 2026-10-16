@@ -8,6 +8,7 @@ import {
   REGRA_MEDIA, REGRA_META,
   type Cargo, type PesoCargo, type ReferenciaCargo, type RegraCota,
 } from '@/lib/tipos';
+import { mensagemDoErro } from '@/lib/erro-amigavel';
 
 /**
  * O cargo de base é avaliado em todas as regras e serve de referência para os
@@ -145,7 +146,7 @@ export default function MatrizDePesos({
     const { error } = await criarClienteNavegador().from('pesos_por_cargo')
       .upsert(linhas, { onConflict: 'cargo_id,regra' });
     setOcupado(false);
-    if (error) { setErro(error.message); return; }
+    if (error) { setErro(await mensagemDoErro(error)); return; }
     setAviso(`${linhas.length} ${linhas.length === 1 ? 'peso salvo' : 'pesos salvos'}. Meses já fechados não mudam.`);
     setMotivo('');
     router.refresh();
@@ -499,7 +500,7 @@ function EditorDoCargo({
       });
     }
     const { error } = await db.from('pesos_por_cargo').upsert(linhas, { onConflict: 'cargo_id,regra' });
-    if (error) { setOcupado(false); setErro(error.message); return; }
+    if (error) { setOcupado(false); setErro(await mensagemDoErro(error)); return; }
 
     if (!ehBase) {
       // Regrava a composição inteira: é pequena e evita calcular diferença.

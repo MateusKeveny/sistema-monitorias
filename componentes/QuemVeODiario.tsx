@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { dataHora } from '@/lib/formatar';
+import { mensagemDoErro } from '@/lib/erro-amigavel';
 
 export type VisibilidadeDoDiario = {
   tipo: string;
@@ -55,7 +56,7 @@ export default function QuemVeODiario({ configuracao }: { configuracao: Visibili
     for (const t of mudancas) {
       const { error } = await db.rpc('definir_visibilidade_diario',
         { p_tipo: t.chave, p_quem: valores[t.chave].quem, p_autor_ve: valores[t.chave].autor_ve });
-      if (error) { setOcupado(false); setErro(error.message); return; }
+      if (error) { setOcupado(false); setErro(await mensagemDoErro(error)); return; }
     }
     setOcupado(false);
     setAviso('Salvo. Já vale para todos os registros desses tipos.');

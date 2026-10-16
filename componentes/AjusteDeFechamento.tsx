@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
+import { mensagemDoErro } from '@/lib/erro-amigavel';
 
 const num = (v: number) => Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 2 });
 
@@ -44,7 +45,7 @@ export default function AjusteDeFechamento({
       p_fechamento: fechamentoId, p_campo: campo, p_valor: n, p_motivo: motivo.trim(),
     });
     setOcupado(false);
-    if (error) { setErro(error.message); return; }
+    if (error) { setErro(await mensagemDoErro(error)); return; }
     setAberto(false); setMotivo('');
     router.refresh();
   }
@@ -60,7 +61,7 @@ export default function AjusteDeFechamento({
       p_fechamento: fechamentoId, p_motivo: motivo.trim(),
     });
     setOcupado(false);
-    if (error) { setErro(error.message); return; }
+    if (error) { setErro(await mensagemDoErro(error)); return; }
     setAberto(false); setMotivo('');
     router.refresh();
   }

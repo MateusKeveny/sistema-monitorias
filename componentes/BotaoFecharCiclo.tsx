@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { mesRotulo } from '@/lib/formatar';
+import { mensagemDoErro } from '@/lib/erro-amigavel';
 
 /**
  * Congela a competência. O banco é quem decide: `fechar_ciclo` confere o papel
@@ -33,7 +34,7 @@ export default function BotaoFecharCiclo({
     const { data, error } = await criarClienteNavegador().rpc('fechar_ciclo', { p_mes: competencia });
     setOcupado(false);
 
-    if (error) { setErro(error.message); return; }
+    if (error) { setErro(await mensagemDoErro(error)); return; }
     setAviso(`${data} pessoa(s) fechadas em ${mesRotulo(competencia)}.`);
     router.refresh();
   }

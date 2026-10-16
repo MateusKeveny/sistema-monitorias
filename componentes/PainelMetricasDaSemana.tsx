@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from '@/componentes/Link';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { dataHora, diaMes, duracao } from '@/lib/formatar';
+import { mensagemDoErro } from '@/lib/erro-amigavel';
 
 export type RegistroDoDiario = { id: string; data: string; tipo: string; assunto: string };
 
@@ -69,7 +70,7 @@ export default function PainelMetricasDaSemana({
       p_tem_registro_diario: noDiario === 'sim', p_diario_registro_id: noDiario === 'sim' ? registro : null,
     });
     setOcupado(false);
-    if (error) { setErro(error.message); return; }
+    if (error) { setErro(await mensagemDoErro(error)); return; }
     setPedido(null);
     router.refresh();
   }
@@ -78,7 +79,7 @@ export default function PainelMetricasDaSemana({
     setOcupado(true); setErro(null);
     const { error } = await criarClienteNavegador().rpc('religar_metrica', { p_mes: competencia, p_semana: semana, p_canal: canal });
     setOcupado(false);
-    if (error) { setErro(error.message); return; }
+    if (error) { setErro(await mensagemDoErro(error)); return; }
     router.refresh();
   }
 

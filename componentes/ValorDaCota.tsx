@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { Quadro } from '@/componentes/ui';
 import type { AlteracaoDeValor, ValorDaCota as Valor } from '@/lib/tipos';
+import { mensagemDoErro } from '@/lib/erro-amigavel';
 
 const entrada = `rounded-md border border-slate-300 px-2 py-1 text-sm outline-none
                  focus:border-marca-600 disabled:bg-slate-50`;
@@ -66,7 +67,7 @@ export default function ValorDaCota({
       p_motivo: motivo.trim() || null,
     });
     setOcupado(false);
-    if (error) { setErro(error.message); return; }
+    if (error) { setErro(await mensagemDoErro(error)); return; }
     setMotivo('');
     setAviso(valor ? 'Valor corrigido e registrado no histórico.' : 'Valor definido.');
     router.refresh();

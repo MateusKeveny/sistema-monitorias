@@ -6,6 +6,7 @@ import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { mesRotulo } from '@/lib/formatar';
 import { NOMES_PAPEL, type Cargo, type CargoDaPessoa, type PapelUsuario, type Pessoa, type Saida } from '@/lib/tipos';
 import { ROTULO_TIPO, type AnotacaoGestor, type LeituraDaPessoa } from '@/lib/diario';
+import { mensagemDoErro } from '@/lib/erro-amigavel';
 
 const entrada = `rounded-lg border border-slate-300 bg-superficie px-2.5 py-1.5 text-sm outline-none
                  focus:border-marca-600 disabled:opacity-50`;
@@ -321,7 +322,7 @@ function Ficha({
     setOcupado(true); setErro(null); setAviso(null);
     const { error } = await acao();
     setOcupado(false);
-    if (error) { setErro(error.message); return false; }
+    if (error) { setErro(await mensagemDoErro(error)); return false; }
     if (ok) setAviso(ok);
     router.refresh();
     return true;
@@ -588,7 +589,7 @@ function Ficha({
                           setOcupado(true); setErro(null); setAviso(null);
                           const { data, error } = await db().rpc('redefinir_senha', { p_pessoa: pessoa.id });
                           setOcupado(false);
-                          if (error) { setErro(error.message); return; }
+                          if (error) { setErro(await mensagemDoErro(error)); return; }
                           setSenhaTemporaria(String(data)); setCopiada(null);
                           router.refresh();
                         }}>
@@ -630,7 +631,7 @@ function Ficha({
                       const { data, error } = await db().rpc('criar_acesso',
                         { p_pessoa: pessoa.id, p_email: novoAcesso.email.trim(), p_papel: novoAcesso.papel });
                       setOcupado(false);
-                      if (error) { setErro(error.message); return; }
+                      if (error) { setErro(await mensagemDoErro(error)); return; }
                       // A senha aparece na seção Acesso de quem já entra, que esta vira
                       // depois do refresh — o estado da ficha continua o mesmo.
                       setSenhaTemporaria(String(data)); setCopiada(null);

@@ -11,7 +11,7 @@ Escrito em 28/09/2026, atualizado em 08/10/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.51.0** · Monitorias **5.6.1** · Agenda **1.5.0** (16/10/2026) |
+| Publicado | Performance **1.51.1** · Monitorias **5.6.2** · Agenda **1.5.0** (16/10/2026) |
 | Branch | `painel-performance`, com os três sites (a `main` segue intocada) |
 | Migrações no banco | 01 a 60, todas aplicadas (a agenda tem banco próprio: 01 a 03) |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` · `painel-agenda.expansao.workers.dev` |
@@ -667,6 +667,15 @@ Três versões, cada uma publicada e conferida antes da próxima:
   são mais o caminho. Observação: o navegador embutido do Claude não mostra
   `confirm()` (responde "cancelar"); botões com confirmação se testam no
   navegador normal.
+- **Performance 1.51.1 · Monitorias 5.6.2** (sem migração): `lib/erro-amigavel.ts`
+  (`mensagemDoErro`): recusa do banco (42501, PGRST301/303, RLS, JWT) →
+  pergunta quem está logado (`getUser` + `papel_atual`); sem conta válida, avisa
+  e manda a `/login?erro=sessao-encerrada` em 2,5 s; com conta, "Você não tem
+  permissão". As 45 telas que faziam `setErro(error.message)` passaram a usá-la
+  (28 componentes), menos o `FormularioItem` da Agenda, que tem banco e
+  login próprios. Teste do gestor (16/10): conta apagada com a tela aberta foi
+  barrada pela RLS ao confirmar a leitura obrigatória; ao recarregar, vai ao
+  login.
 
 Visão de celular fica fora da revisão, por decisão do gestor. Os painéis são
 usados só no computador.

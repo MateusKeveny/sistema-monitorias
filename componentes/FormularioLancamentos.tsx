@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { Quadro, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import type { CargoDaPessoa, Lancamento, PesoCargo, Pessoa, RegraCota } from '@/lib/tipos';
+import { mensagemDoErro } from '@/lib/erro-amigavel';
 
 const entrada = `w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm outline-none
                  focus:border-marca-600 disabled:bg-slate-50`;
@@ -96,7 +97,7 @@ function NovoLancamento({
       observacao: f.observacao.trim() || null,
     });
     setOcupado(false);
-    if (error) { setErro(error.message); return; }
+    if (error) { setErro(await mensagemDoErro(error)); return; }
 
     // Mantém pessoa e semana: o normal é lançar várias regras seguidas.
     setF((s) => ({ ...vazio, pessoa: s.pessoa, semana: s.semana }));
@@ -107,7 +108,7 @@ function NovoLancamento({
     if (!confirm(`Excluir o lançamento "${rotuloRegra.get(l.regra) ?? l.regra}" de `
       + `${nomePessoa.get(l.pessoa_id) ?? 'pessoa'}?`)) return;
     const { error } = await criarClienteNavegador().from('lancamentos').delete().eq('id', l.id);
-    if (error) { setErro(error.message); return; }
+    if (error) { setErro(await mensagemDoErro(error)); return; }
     router.refresh();
   }
 

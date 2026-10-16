@@ -7,6 +7,7 @@ import {
   AUTORIZADORES, COR_SITUACAO, COR_TIPO, ROTULO_QUEM, ROTULO_SITUACAO, ROTULO_TIPO, TIPOS,
   juntarOutro, palavrasEncontradas, separarOutro, validade, type LeituraDiario, type RenovacaoDiario, type Subcategoria, type QuemAutorizou, type RegistroDiario, type TipoRegistro,
 } from '@/lib/diario';
+import { mensagemDoErro } from '@/lib/erro-amigavel';
 
 const entrada = `w-full rounded-xl border border-slate-300 bg-superficie px-3 py-2 text-sm outline-none
                  focus:border-marca-600 disabled:opacity-50`;
@@ -128,7 +129,7 @@ export default function DiarioDeBordo({
       ? await db.from('diario_registros').update(campos).eq('id', corrigindo)
       : await db.from('diario_registros').insert(campos);
     setOcupado(false);
-    if (error) { setErro(error.message); return; }
+    if (error) { setErro(await mensagemDoErro(error)); return; }
     setAviso(vaiAprovar
       ? 'Registro enviado para a aprovação do gestor ou do Pleno. Ele conclui quando for aprovado.'
       : corrigindo ? 'Registro corrigido.' : 'Registro concluído.');
@@ -161,7 +162,7 @@ export default function DiarioDeBordo({
       p_registro: id, p_aprovar: aprovar, p_comentario: comentario,
     });
     setOcupado(false);
-    if (error) { setErro(error.message); return; }
+    if (error) { setErro(await mensagemDoErro(error)); return; }
     setDevolvendo(null);
     setAviso(aprovar ? 'Registro aprovado e concluído.' : 'Registro devolvido ao autor.');
     router.refresh();
@@ -171,7 +172,7 @@ export default function DiarioDeBordo({
     setOcupado(true); setErro(null); setAviso(null);
     const { error } = await criarClienteNavegador().rpc('renovar_registro_diario', { p_registro: id, p_ate: ate });
     setOcupado(false);
-    if (error) { setErro(error.message); return; }
+    if (error) { setErro(await mensagemDoErro(error)); return; }
     setRenovando(null);
     setAviso('Validade renovada.');
     router.refresh();
@@ -182,7 +183,7 @@ export default function DiarioDeBordo({
     setOcupado(true); setErro(null);
     const { error } = await criarClienteNavegador().from('diario_registros').delete().eq('id', r.id);
     setOcupado(false);
-    if (error) { setErro(error.message); return; }
+    if (error) { setErro(await mensagemDoErro(error)); return; }
     router.refresh();
   }
 

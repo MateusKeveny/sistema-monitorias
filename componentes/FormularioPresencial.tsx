@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { Quadro, Vazio } from '@/componentes/ui';
 import { INICIO_PRESENCIAL, type Presencial } from '@/lib/tipos';
+import { mensagemDoErro } from '@/lib/erro-amigavel';
 
 const entrada = `rounded-md border border-slate-300 px-2 py-1 text-sm outline-none
                  focus:border-marca-600 disabled:bg-slate-50`;
@@ -110,7 +111,7 @@ export default function FormularioPresencial({
       observacao: form.observacao.trim() || null,
     });
     setOcupado(false);
-    if (error) { setErro(error.message); return; }
+    if (error) { setErro(await mensagemDoErro(error)); return; }
 
     // Mantém a data: o normal é registrar vários do mesmo dia.
     setForm((f) => ({ ...f, cliente_id: '', cliente_nome: '', demanda: '', observacao: '' }));
@@ -124,7 +125,7 @@ export default function FormularioPresencial({
     const { error, count } = await db.from('atendimentos_presenciais')
       .delete({ count: 'exact' }).eq('id', r.id);
     setOcupado(false);
-    if (error) { setErro(error.message); return; }
+    if (error) { setErro(await mensagemDoErro(error)); return; }
     if (!count) {
       setErro('Não foi possível excluir: a competência deste atendimento já está fechada.');
       return;

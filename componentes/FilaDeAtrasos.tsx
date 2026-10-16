@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { Quadro, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import { dataHora, tempoUtil } from '@/lib/formatar';
+import { mensagemDoErro } from '@/lib/erro-amigavel';
 
 export type ChamadoAtrasado = {
   protocolo: number;
@@ -71,7 +72,7 @@ export default function FilaDeAtrasos({ pendentes, decididos }: {
     const { error } = await criarClienteNavegador()
       .rpc('decidir_atraso_chamado', { p_protocolo: protocolo, p_decisao: decisao });
     setEnviando(null);
-    if (error) { setErro(error.message); return; }
+    if (error) { setErro(await mensagemDoErro(error)); return; }
     router.refresh();
   }
 

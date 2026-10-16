@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
+import { mensagemDoErro } from '@/lib/erro-amigavel';
 
 export type SituacaoAviso = {
   chave: 'semana_encerrada' | 'monitorias_liberadas' | 'lembrete_fechamento' | 'diario_novidades' | 'reporte_novo';
@@ -58,7 +59,7 @@ export default function AvisosTeams({ situacao }: { situacao: SituacaoAviso[] })
     const { error } = await criarClienteNavegador().from('avisos_teams')
       .update({ url, atualizado_em: new Date().toISOString() }).eq('chave', chave);
     setOcupado(null);
-    if (error) { setErro(error.message); return; }
+    if (error) { setErro(await mensagemDoErro(error)); return; }
     setEditando(({ [chave]: _, ...resto }) => resto);
     setAviso(url ? 'Endereço salvo. Use "Enviar teste" para conferir.' : 'Aviso desligado.');
     router.refresh();
@@ -68,7 +69,7 @@ export default function AvisosTeams({ situacao }: { situacao: SituacaoAviso[] })
     setOcupado(chave); setErro(null); setAviso(null);
     const { error } = await criarClienteNavegador().rpc('testar_aviso_teams', { p_chave: chave });
     setOcupado(null);
-    if (error) { setErro(error.message); return; }
+    if (error) { setErro(await mensagemDoErro(error)); return; }
     setAviso('Teste enviado. Confira no Teams; a situação ao lado se atualiza em alguns segundos.');
     // A resposta do Teams chega depois: recarrega para mostrar se foi entregue.
     setTimeout(() => router.refresh(), 4000);

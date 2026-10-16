@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import type { Subcategoria } from '@/lib/diario';
+import { mensagemDoErro } from '@/lib/erro-amigavel';
 
 const entrada = `min-w-0 flex-1 rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm outline-none
                  focus:border-marca-600 disabled:opacity-50`;
@@ -45,7 +46,7 @@ export default function SubcategoriasDiario({ subcategorias, usos }: {
     for (const [n, s] of nova.entries()) {
       if (s.ordem === n + 1) continue;
       const { error } = await db().update({ ordem: n + 1 }).eq('id', s.id);
-      if (error) { setErro(error.message); break; }
+      if (error) { setErro(await mensagemDoErro(error)); break; }
     }
     setOcupado(false);
     router.refresh();

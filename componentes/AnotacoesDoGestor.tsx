@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import type { AnotacaoGestor } from '@/lib/diario';
+import { mensagemDoErro } from '@/lib/erro-amigavel';
 
 const entrada = `w-full rounded-xl border border-slate-300 bg-superficie px-3 py-2 text-sm outline-none
                  focus:border-marca-600 disabled:opacity-50`;
@@ -54,7 +55,7 @@ export default function AnotacoesDoGestor({
       ? await db.from('diario_anotacoes').update(campos).eq('id', editando)
       : await db.from('diario_anotacoes').insert(campos);
     setOcupado(false);
-    if (error) { setErro(error.message); return; }
+    if (error) { setErro(await mensagemDoErro(error)); return; }
     setAviso(editando ? 'Anotação atualizada.' : 'Anotação salva.');
     setF(vazio); setEditando(null);
     router.refresh();
@@ -65,7 +66,7 @@ export default function AnotacoesDoGestor({
     setOcupado(true); setErro(null);
     const { error } = await criarClienteNavegador().from('diario_anotacoes').delete().eq('id', a.id);
     setOcupado(false);
-    if (error) { setErro(error.message); return; }
+    if (error) { setErro(await mensagemDoErro(error)); return; }
     router.refresh();
   }
 

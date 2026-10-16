@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
+import { mensagemDoErro } from '@/lib/erro-amigavel';
 
 /**
  * Exclusão de monitoria.
@@ -41,7 +42,7 @@ export default function BotaoExcluirMonitoria({
     });
 
     if (error) {
-      setErro(error.message);
+      setErro(await mensagemDoErro(error));
       setEnviando(false);
       return;
     }

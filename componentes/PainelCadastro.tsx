@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { Quadro, Tabela, Th, Td, Vazio } from '@/componentes/ui';
+import { mensagemDoErro } from '@/lib/erro-amigavel';
 
 type Registro = { id: string; nome: string; email?: string | null; ativo: boolean };
 
@@ -115,7 +116,7 @@ export default function PainelCadastro({
     const db = criarClienteNavegador();
     const { error } = await db.from(tabela).update({ ativo: !r.ativo }).eq('id', r.id);
     setOcupado(false);
-    if (error) setErro(error.message);
+    if (error) setErro(await mensagemDoErro(error));
     router.refresh();
   }
 

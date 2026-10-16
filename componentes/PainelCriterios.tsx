@@ -6,6 +6,7 @@ import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { Quadro, Tabela, Th, Td } from '@/componentes/ui';
 import { percentual } from '@/lib/formatar';
 import type { Criterio } from '@/lib/tipos';
+import { mensagemDoErro } from '@/lib/erro-amigavel';
 
 type Rascunho = { nome: string; peso: number };
 
@@ -127,7 +128,7 @@ export default function PainelCriterios({ criterios }: { criterios: Criterio[] }
 
     const { error } = await db.from('criterios').update(campos).eq('id', c.id);
     setOcupado(false);
-    if (error) { setErro(error.message); return; }
+    if (error) { setErro(await mensagemDoErro(error)); return; }
 
     setAviso(c.ativo
       ? `"${c.nome}" saiu do formulário. As monitorias antigas mantêm a resposta dele, `

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { Quadro } from '@/componentes/ui';
 import { mesDeCompetencia, mesRotulo } from '@/lib/formatar';
+import { mensagemDoErro } from '@/lib/erro-amigavel';
 
 export type NotaGuardada = {
   nome_no_arquivo: string;
@@ -57,7 +58,7 @@ export default function NotasGuardadas({
       ? await db.rpc('salvar_nome_hub', { p_pessoa: e.pessoa, p_nome: nome, p_extra: true })
       : await db.rpc('atribuir_guardadas', { p_nome: nome, p_pessoa: e.pessoa });
     setOcupado(null);
-    if (error) { setErro(error.message); return; }
+    if (error) { setErro(await mensagemDoErro(error)); return; }
     setAviso(`"${nome}" → ${pessoas.find((p) => p.id === e.pessoa)?.nome}: ${descrever(data as Resultado)}`);
     router.refresh();
   }
@@ -67,7 +68,7 @@ export default function NotasGuardadas({
     setOcupado(nome); setErro(null); setAviso(null);
     const { error } = await criarClienteNavegador().rpc('descartar_guardadas', { p_nome: nome });
     setOcupado(null);
-    if (error) { setErro(error.message); return; }
+    if (error) { setErro(await mensagemDoErro(error)); return; }
     setAviso(`Notas de "${nome}" descartadas.`);
     router.refresh();
   }

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { Quadro } from '@/componentes/ui';
 import { data as formatarData, dataHora, nota } from '@/lib/formatar';
+import { mensagemDoErro } from '@/lib/erro-amigavel';
 
 export type Solicitacao = {
   id: string;
@@ -37,7 +38,7 @@ export default function SolicitacoesDeExclusao({ pendentes }: { pendentes: Solic
     setOcupada(id); setErro(null);
     const { error } = await criarClienteNavegador().rpc('aprovar_exclusao', { p_solicitacao: id });
     setOcupada(null);
-    if (error) return setErro(error.message);
+    if (error) return setErro(await mensagemDoErro(error));
     router.refresh();
   }
 
@@ -47,7 +48,7 @@ export default function SolicitacoesDeExclusao({ pendentes }: { pendentes: Solic
       p_solicitacao: id, p_observacao: observacao,
     });
     setOcupada(null);
-    if (error) return setErro(error.message);
+    if (error) return setErro(await mensagemDoErro(error));
     setRecusando(null); setObservacao('');
     router.refresh();
   }

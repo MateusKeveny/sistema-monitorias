@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { Quadro, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import type { Pessoa } from '@/lib/tipos';
+import { mensagemDoErro } from '@/lib/erro-amigavel';
 
 export type LinhaVolume = {
   pessoa_id: string;
@@ -115,12 +116,12 @@ export default function VolumeSemanal({
     if (gravar.length) {
       const { error } = await db.from('volume_semanal')
         .upsert(gravar, { onConflict: 'pessoa_id,mes_competencia,semana,canal' });
-      if (error) { setOcupado(false); setErro(error.message); return; }
+      if (error) { setOcupado(false); setErro(await mensagemDoErro(error)); return; }
     }
     if (apagar.length) {
       const { error } = await db.from('volume_semanal').delete()
         .eq('mes_competencia', competencia).eq('canal', canal).eq('semana', semana).in('pessoa_id', apagar);
-      if (error) { setOcupado(false); setErro(error.message); return; }
+      if (error) { setOcupado(false); setErro(await mensagemDoErro(error)); return; }
     }
     setOcupado(false);
     setAviso(`${semana}ª semana salva: ${gravar.length} pessoa(s)${apagar.length ? `, ${apagar.length} removida(s)` : ''}.`);

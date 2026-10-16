@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { COR_TIPO, ROTULO_TIPO, validade, type RegistroDiario } from '@/lib/diario';
+import { mensagemDoErro } from '@/lib/erro-amigavel';
 
 const dataBR = (iso: string) => iso.slice(0, 10).split('-').reverse().join('/');
 
@@ -33,7 +34,7 @@ export default function LeituraObrigatoria({
     const { error } = await criarClienteNavegador().from('diario_leituras').insert({ registro_id: id });
     setOcupado(null);
     // Já confirmado (outra aba, clique duplo): conta como lido.
-    if (error && error.code !== '23505') { setErro(error.message); return; }
+    if (error && error.code !== '23505') { setErro(await mensagemDoErro(error)); return; }
     setLidos((s) => new Set(s).add(id));
   }
 

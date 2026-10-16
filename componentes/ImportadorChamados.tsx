@@ -6,6 +6,7 @@ import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { Quadro } from '@/componentes/ui';
 import { mesRotulo } from '@/lib/formatar';
 import { dataHoraDoExcel, lerPlanilha, type Linha } from '@/lib/xlsx-navegador';
+import { mensagemDoErro } from '@/lib/erro-amigavel';
 
 /** Coluna do ELO → campo do chamado. O nome da coluna é o do cabeçalho. */
 const COLUNAS: Record<string, string> = {
@@ -104,7 +105,7 @@ export default function ImportadorChamados() {
     setErro(null); setOcupado(`Importando ${lidos.length} chamados…`);
     const { data, error } = await criarClienteNavegador().rpc('importar_chamados', { p_linhas: lidos });
     setOcupado(null);
-    if (error) { setErro(error.message); return; }
+    if (error) { setErro(await mensagemDoErro(error)); return; }
     setResultado(data as Resultado);
     setConferencia(null); setLidos(null);
     router.refresh();

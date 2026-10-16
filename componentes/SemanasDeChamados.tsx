@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { Quadro } from '@/componentes/ui';
 import { dataHora, diaMes, periodoDaSemana } from '@/lib/formatar';
+import { mensagemDoErro } from '@/lib/erro-amigavel';
 
 export type SemanaDeChamados = {
   semana: number;
@@ -33,7 +34,7 @@ export default function SemanasDeChamados({ meses }: {
     const { error } = await criarClienteNavegador().rpc('marcar_semana_sem_chamados',
       { p_mes: competencia, p_semana: semana, p_marcar: marcar });
     setOcupado(null);
-    if (error) { setErro(error.message); return; }
+    if (error) { setErro(await mensagemDoErro(error)); return; }
     router.refresh();
   }
 

@@ -35,6 +35,19 @@ para o Performance.
 
 ---
 
+## Performance 1.51.1 · Monitorias 5.6.2
+
+Sem migração. Não muda a Agenda.
+
+- **Monitorias e Performance (correção): recusa do banco em português.**
+  Quando o banco recusa uma gravação, a tela não mostra mais "new row violates
+  row-level security policy…". Se a conta não vale mais (apagada, encerrada
+  ou vencida), avisa e leva ao login; se a pessoa existe mas a ação não é
+  dela, diz "Você não tem permissão para fazer isso". Vale em todas as telas
+  que gravam algo. Achado no teste do gestor de 16/10: uma conta apagada, com
+  a tela ainda aberta, foi barrada pelo banco — correto —, mas com a mensagem
+  técnica.
+
 ## Performance 1.51.0 · Monitorias 5.6.1
 
 Migração 68 (banco dos painéis). Não muda a Agenda.

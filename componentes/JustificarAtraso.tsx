@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
+import { mensagemDoErro } from '@/lib/erro-amigavel';
 
 /**
  * Justificativa de um chamado fora do prazo, escrita por quem o tratou
@@ -21,7 +22,7 @@ export default function JustificarAtraso({ protocolo, atual }: { protocolo: numb
     const { error } = await criarClienteNavegador()
       .rpc('justificar_atraso_chamado', { p_protocolo: protocolo, p_texto: texto });
     setEnviando(false);
-    if (error) { setErro(error.message); return; }
+    if (error) { setErro(await mensagemDoErro(error)); return; }
     setAberto(false);
     router.refresh();
   }

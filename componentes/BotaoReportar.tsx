@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from '@/componentes/Link';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
+import { mensagemDoErro } from '@/lib/erro-amigavel';
 
 const TIPOS_DE_PRINT = ['image/png', 'image/jpeg', 'image/webp'];
 const LIMITE_DO_PRINT = 5 * 1024 * 1024;
@@ -102,7 +103,7 @@ export default function BotaoReportar({
       navegador: contexto.navegador, descricao: descricao.trim(), esperado: esperado.trim() || null, print_path: printPath,
     }).select('id').single();
     setOcupado(false);
-    if (error) { setErro(error.message); return; }
+    if (error) { setErro(await mensagemDoErro(error)); return; }
     setEnviado(data.id as number);
     setDescricao(''); setEsperado(''); escolherPrint(null);
   }

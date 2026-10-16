@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
+import { mensagemDoErro } from '@/lib/erro-amigavel';
 
 export type Reporte = {
   id: number;
@@ -71,7 +72,7 @@ export default function PainelReportes({
     setOcupado(true); setErro(null);
     const { error } = await criarClienteNavegador().from('reportes').update(campos).eq('id', atual.id);
     setOcupado(false);
-    if (error) { setErro(error.message); return; }
+    if (error) { setErro(await mensagemDoErro(error)); return; }
     setResposta('');
     router.refresh();
   }

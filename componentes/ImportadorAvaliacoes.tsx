@@ -7,6 +7,7 @@ import { Quadro, Tabela, Th, Td } from '@/componentes/ui';
 import { data as formatarData, mesDeCompetencia, mesRotulo, semanaDoCiclo } from '@/lib/formatar';
 import { dataDoExcel, lerPlanilha, type Linha } from '@/lib/xlsx-navegador';
 import type { Pessoa } from '@/lib/tipos';
+import { mensagemDoErro } from '@/lib/erro-amigavel';
 
 type Origem = 'huggy' | 'diretores';
 
@@ -203,7 +204,7 @@ export default function ImportadorAvaliacoes({
         for (let i = 0; ; i += PAGINA) {
           const { data: pag, error } = await db.from(tabela).select('data, protocolo')
             .gte('data', de).lte('data', ate).order('data').order('protocolo').range(i, i + PAGINA - 1);
-          if (error) { setErro(error.message); setOcupado(null); return; }
+          if (error) { setErro(await mensagemDoErro(error)); setOcupado(null); return; }
           for (const r of pag ?? []) existentes.add(`${r.data}|${r.protocolo}`);
           if ((pag ?? []).length < PAGINA) break;
         }
