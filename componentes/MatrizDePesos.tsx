@@ -151,6 +151,9 @@ export default function MatrizDePesos({
     router.refresh();
   }
 
+  // O cargo de base: de onde a pontuação pode ser copiada para os outros (1.49.0).
+  const base = cargos.find((c) => c.nome === CARGO_BASE);
+
   const termo = busca.trim().toLocaleLowerCase('pt-BR');
   const nomeCargo = new Map(cargos.map((c) => [c.id, c.nome]));
 
@@ -188,6 +191,25 @@ export default function MatrizDePesos({
 
         {cargoAberto === 'novo' && (
           <NovoCargo cargos={cargos} pesos={pesos} onFechar={() => setCargoAberto(null)} />
+        )}
+        {typeof cargoAberto === 'number' && base && cargoAberto !== base.id && (
+          <CopiarDoCargoBase
+            key={`copiar-${cargoAberto}`}
+            destino={cargos.find((c) => c.id === cargoAberto)!}
+            grupos={GRUPOS.filter((g) => pontuaveis.some((r) => grupoDa(r) === g.chave))}
+            onCopiar={(grupos) => {
+              const destino = cargoAberto;
+              const copiadas = pontuaveis.filter((r) => grupos.includes(grupoDa(r)));
+              setCelulas((atual) => {
+                const novo = { ...atual };
+                for (const r of copiadas) novo[`${destino}|${r.chave}`] = { ...atual[`${base.id}|${r.chave}`] };
+                return novo;
+              });
+              const nomeDestino = curto(cargos.find((c) => c.id === destino)?.nome ?? '');
+              setMotivo((m) => m || `${nomeDestino} passa a pontuar como o ${curto(base.nome)}`);
+              setAviso(`Pontuação do ${curto(base.nome)} copiada para o ${nomeDestino} — confira na tabela e salve.`);
+            }}
+          />
         )}
         {typeof cargoAberto === 'number' && (
           <EditorDoCargo
@@ -362,6 +384,49 @@ export default function MatrizDePesos({
           </span>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Copiar a pontuação do Júnior (1.49.0): traz para outro cargo, de uma vez, os
+ * pesos que o cargo de base tem nos grupos escolhidos — antes era preciso
+ * digitar métrica por métrica. Nada vai ao banco aqui: as células copiadas
+ * viram alterações na matriz (em âmbar) e só valem com "Salvar e recalcular",
+ * com o motivo, e entram no histórico de pesos como qualquer alteração. Meta
+ * e média são do cargo e não são copiadas.
+ */
+function CopiarDoCargoBase({
+  destino, grupos, onCopiar,
+}: {
+  destino: Cargo;
+  grupos: readonly (typeof GRUPOS)[number][];
+  onCopiar: (grupos: string[]) => void;
+}) {
+  const [marcados, setMarcados] = useState<Set<string>>(new Set(grupos.map((g) => g.chave)));
+  return (
+    <div className="mx-5 mt-4 rounded-2xl border border-dashed border-marca-600/60 bg-marca-600/5 px-4 py-3">
+      <p className="text-sm font-semibold text-slate-900">Copiar a pontuação do {curto(CARGO_BASE)}</p>
+      <p className="mt-0.5 text-xs text-slate-500">
+        Traz para o {curto(destino.nome)} os pesos que o {curto(CARGO_BASE)} tem hoje, de uma vez. Os grupos
+        desmarcados ficam como estão. Meta e média não são copiadas.
+      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+        {grupos.map((g) => (
+          <label key={g.chave} className="inline-flex items-center gap-1.5 text-sm text-slate-700">
+            <input type="checkbox" checked={marcados.has(g.chave)}
+                   onChange={(e) => setMarcados((s) => {
+                     const n = new Set(s); if (e.target.checked) n.add(g.chave); else n.delete(g.chave); return n;
+                   })} />
+            <i className="inline-block h-2 w-2 rounded-full" style={{ background: g.cor }} />
+            {g.titulo}
+          </label>
+        ))}
+        <button type="button" disabled={!marcados.size} onClick={() => onCopiar([...marcados])}
+                className={`${botaoPrimario} ml-auto py-1.5`}>
+          Copiar para o {curto(destino.nome)}
+        </button>
+      </div>
     </div>
   );
 }

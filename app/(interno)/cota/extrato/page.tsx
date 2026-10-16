@@ -99,6 +99,11 @@ export default async function Extrato({
       .eq('pessoa_id', pessoaId).eq('mes_competencia', competencia).maybeSingle(),
   ]);
   const aoVivoAntecipado = competencia === atual ? aoVivoDaPessoa() : null;
+  // Semanas em que a gestão desligou o TME do canal (migração 66): o extrato
+  // diz "não contabilizado", sem o motivo (que é só da gestão). Sem a função
+  // no banco, simplesmente não marca nada.
+  const semTme = db.rpc('semanas_sem_tme', { p_mes: competencia })
+    .then((r) => new Set(((r.data ?? []) as { semana: number; canal: string }[]).map((x) => `${x.semana}|${x.canal}`)));
 
   // 1ª rodada: tabelas leves. Mês fechado não recalcula nada (1.39.5).
   const [pessoas, chamados, csat, faixasCsat, fechamento, pago, pesosDosCargos, referencias, cargos, cargoDaPessoa]
@@ -194,6 +199,7 @@ export default async function Extrato({
   const linhas: Linha[] = linhasFechadas
     ? (linhasFechadas as Omit<Linha, 'cargo_id'>[]).map((l) => ({ ...l, cargo_id: cargoId as number }))
     : aoVivo;
+  const semanasSemTme = await semTme;
   const faixas = (faixasCsat.data ?? []) as Faixa[];
   const semanal = (csat.data ?? []) as CsatSemana[];
   const resultado = congelado
@@ -579,9 +585,11 @@ export default async function Extrato({
                       const doCanal = naOrdem(daSemana.filter((l) => chaveCanal(l.origem) === canal));
                       const c = csatDe(canal === 'geral' ? null : canal as Canal, semana);
                       const somaCanal = doCanal.reduce((a, l) => a + Number(l.cota), 0);
+                      const tmeFora = semanasSemTme.has(`${semana}|${canal}`);
                       return (
                         <Quadro key={canal} titulo={`${NOME_CANAL[canal]} · ${semana}ª semana`}
-                                subtitulo={c ? `C-SAT ${percentual(Number(c.csat))} · ${c.positivas} de ${c.avaliacoes}` : undefined}
+                                subtitulo={[c ? `C-SAT ${percentual(Number(c.csat))} · ${c.positivas} de ${c.avaliacoes}` : null,
+                                  tmeFora ? 'TME não contabilizado nesta semana' : null].filter(Boolean).join(' · ') || undefined}
                                 acao={<span className={`text-sm font-semibold tabular-nums ${
                                   somaCanal < 0 ? 'text-rose-700' : 'text-slate-900'}`}>{num(somaCanal)} pts</span>}>
                           <table className="w-full text-sm">

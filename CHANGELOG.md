@@ -35,6 +35,23 @@ para o Performance.
 
 ---
 
+## Performance 1.49.0
+
+Migração 66 (banco dos painéis). Não muda as Monitorias nem a Agenda.
+
+- **Performance (atualização): copiar a pontuação do Júnior.** Em
+  Configuração › Pesos por cargo, ao abrir um cargo que não é o Júnior, o
+  quadro "Copiar a pontuação do Júnior" traz de uma vez os pesos dele, nos
+  grupos escolhidos. As células copiadas ficam em âmbar e só valem com
+  "Salvar e recalcular", com o motivo — e entram no histórico de pesos. Meta
+  e média não são copiadas.
+- **Performance (atualização): Métricas da semana.** Tela nova em Administrar,
+  só do gestor: o TME de cada semana e canal (Expansão e Diretores — o tempo
+  de resposta dos Diretores é o próprio TME Diretores) pode deixar de contar.
+  Desligar pede o motivo e pergunta se houve registro no diário de bordo, e
+  qual. Vale para a equipe toda do canal, só em mês aberto; o motivo é só da
+  gestão, e o Extrato de cada um mostra "TME não contabilizado nesta semana".
+
 ## Performance 1.48.1
 
 Migração 65 (banco dos painéis). Não muda as Monitorias nem a Agenda.

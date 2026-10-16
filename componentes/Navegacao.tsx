@@ -45,6 +45,8 @@ export const ITENS: Record<Sistema, Item[]> = {
     // Férias: quem vê é decidido por ve_ferias (cargo Pleno ou Analista conta), não só pelo papel.
     { href: '/cota/ferias', rotulo: 'Férias', papeis: ['gestor', 'qualidade', 'operador'], grupo: 'Administrar' },
     { href: '/cota/acessos', rotulo: 'Acessos', papeis: ['gestor'], grupo: 'Administrar' },
+    // Desligar o TME de uma semana, com justificativa (migração 66).
+    { href: '/cota/metricas', rotulo: 'Métricas da semana', papeis: ['gestor'], grupo: 'Administrar' },
     { href: '/cota/configuracao', rotulo: 'Configuração', papeis: ['gestor'], grupo: 'Administrar' },
     { href: '/reportes', rotulo: 'Reports de problemas', papeis: ['gestor'], grupo: 'Administrar' },
   ],

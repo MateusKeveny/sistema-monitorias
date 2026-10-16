@@ -11,7 +11,7 @@ Escrito em 28/09/2026, atualizado em 08/10/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.43.0** · Monitorias **5.5.2** · Agenda **1.3.0** (14/10/2026) |
+| Publicado | Performance **1.49.0** · Monitorias **5.5.2** · Agenda **1.5.0** (16/10/2026) |
 | Branch | `painel-performance`, com os três sites (a `main` segue intocada) |
 | Migrações no banco | 01 a 60, todas aplicadas (a agenda tem banco próprio: 01 a 03) |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` · `painel-agenda.expansao.workers.dev` |
@@ -623,6 +623,23 @@ Três versões, cada uma publicada e conferida antes da próxima:
   (`semanas_sem_chamados`). Na agenda, `agenda_disparar_ciclo` chama o site
   na hora do resumo; o site manda "Relatórios do ciclo para subir" só se a
   ponte tiver `sem_volume:` ou `sem_chamados:`.
+- **Performance 1.49.0** (**migração 66**): (1) `MatrizDePesos` ganha
+  `CopiarDoCargoBase` — com o editor de um cargo aberto (não o
+  `CARGO_BASE`), copia para a matriz os pesos do Júnior nos grupos marcados
+  (`grupoDa`); vira alteração pendente, salva pelo mesmo upsert com motivo
+  (histórico da migração 56). (2) Métricas da semana: tabela
+  `metricas_desligadas` (mês, semana, canal, motivo, `tem_registro_diario`,
+  `diario_registro_id`), leitura só do gestor; `desligar_metrica` /
+  `religar_metrica` (gestor, recusam mês com fechamento);
+  `metrica_desligada()` (security definer) usada no trecho do TME de
+  `vw_extrato_quantidades` — recriada com o texto exato da 55 mais o
+  filtro; `semanas_sem_tme()` para o Extrato marcar a semana sem o motivo;
+  gatilho `resumo_mudou` na tabela. Conferência da migração: view idêntica
+  antes/depois (0/0). Teste real de 16/10 (autorizado): TME da 1ª semana de
+  outubro da Expansão desligado e religado — o Extrato do Pedro Lucas foi de
+  2.060 a 2.102 (+42, a faixa −1 × 42 atendimentos), com o aviso, e voltou a
+  2.060; o resumo acompanhou nas duas vezes. Tela: `/cota/metricas`
+  (`PainelMetricasDaSemana`).
 
 Visão de celular fica fora da revisão, por decisão do gestor. Os painéis são
 usados só no computador.
