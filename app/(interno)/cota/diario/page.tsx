@@ -33,7 +33,8 @@ export default async function Diario({
   const ehGestor = perfil.papel === 'gestor';
 
   const [{ data: registros }, { data: pessoas }, { data: aprova }, { data: concluiDireto }, { data: renovacoes },
-    { data: leituras }, { data: privados }, { data: anotacoes }, { data: equipe }, { data: subcategorias }] = await Promise.all([
+    { data: leituras }, { data: privados }, { data: anotacoes }, { data: equipe }, { data: subcategorias },
+    { data: visibilidade }] = await Promise.all([
     // Os últimos 500: bastam para a consulta do dia a dia. A busca por um
     // protocolo antigo está na consulta do site de Monitorias.
     db.from('diario_registros').select('*')
@@ -60,6 +61,9 @@ export default async function Diario({
       : Promise.resolve({ data: [] }),
     // Subcategorias de problema operacional (migração 46).
     db.from('diario_subcategorias').select('*').order('ordem'),
+    // Quem vê cada tipo (migração 67): decide os filtros da tela; os registros
+    // em si já vêm filtrados pelo banco.
+    db.from('diario_visibilidade').select('tipo, quem'),
   ]);
 
   const nomes: Record<string, string> = Object.fromEntries(
@@ -68,8 +72,17 @@ export default async function Diario({
   const aguardandoPrivados = aprova === true
     ? listaPrivados.filter((r) => r.situacao === 'aguardando' && r.pessoa_id !== perfil.id).length : 0;
 
+  // Tipos que a pessoa vê por inteiro. Sem a configuração (antes da migração
+  // 67), a regra antiga: todos veem tudo, menos o problema operacional.
+  const config = (visibilidade ?? []) as { tipo: string; quem: string }[];
+  const tiposDaEquipe = config.length
+    ? config.filter((v) => v.quem === 'todos' || (v.quem === 'gestao' && aprova === true) || (v.quem === 'gestor' && ehGestor))
+      .map((v) => v.tipo)
+    : ['processo', 'treinamento', 'autorizacao', 'excecao', ...(aprova === true ? ['problema'] : [])];
+
   const diario = (
     <DiarioDeBordo
+      tiposDaEquipe={tiposDaEquipe}
       registros={(registros ?? []) as RegistroDiario[]}
       renovacoes={(renovacoes ?? []) as RenovacaoDiario[]}
       leituras={aprova === true ? (leituras ?? []) as LeituraDiario[] : []}

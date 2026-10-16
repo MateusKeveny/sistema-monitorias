@@ -45,6 +45,7 @@ const vazio = {
  */
 export default function DiarioDeBordo({
   registros, renovacoes, leituras, subcategorias, nomes, pessoaId, ehGestor, aprova, concluiDireto, hoje, filtroInicial,
+  tiposDaEquipe = ['processo', 'treinamento', 'autorizacao', 'excecao'],
 }: {
   registros: RegistroDiario[];
   /** Renovações de validade, da mais recente à mais antiga. */
@@ -58,6 +59,8 @@ export default function DiarioDeBordo({
   ehGestor: boolean;
   /** Gestor ou Pleno: aprova e devolve o que aguarda. */
   aprova: boolean;
+  /** Tipos que a pessoa vê por inteiro, para os filtros (migração 67). */
+  tiposDaEquipe?: string[];
   /** Gestor, Pleno ou Analista: a autorização da gestão já nasce concluída. */
   concluiDireto: boolean;
   hoje: string;
@@ -336,8 +339,11 @@ export default function DiarioDeBordo({
                  className="w-72 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm outline-none focus:border-marca-600" />
         </div>
         <div className="mb-2 flex flex-wrap gap-1.5">
-          {([['todos', 'Todos'], ['processo', 'Processos'], ['treinamento', 'Treinamentos'], ['autorizacao', 'Autorizações'],
-            ['excecao', 'Exceções'], ...(aprova ? [['problema', 'Problemas'] as const] : []), ['meus', 'Meus'], ['aguardando', `Aguardando aprovação${aguardando ? ` · ${aguardando}` : ''}`],
+          {([['todos', 'Todos'],
+            // Um filtro por tipo que a pessoa vê por inteiro (migração 67, Configuração ›
+            // Diário de bordo); o que ela vê só por ter registrado fica em Meus.
+            ...(([['processo', 'Processos'], ['treinamento', 'Treinamentos'], ['autorizacao', 'Autorizações'],
+              ['excecao', 'Exceções'], ['problema', 'Problemas']] as const).filter(([k]) => tiposDaEquipe.includes(k))), ['meus', 'Meus'], ['aguardando', `Aguardando aprovação${aguardando ? ` · ${aguardando}` : ''}`],
             ['vencendo', `Vencendo${vencendo ? ` · ${vencendo}` : ''}`],
             ...(aprova ? [['leitura', `Leitura pendente${leituraPendente ? ` · ${leituraPendente}` : ''}`] as const] : [])] as const)
             .map(([k, r]) => (

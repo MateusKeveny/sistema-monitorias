@@ -11,7 +11,7 @@ Escrito em 28/09/2026, atualizado em 08/10/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.49.0** · Monitorias **5.5.2** · Agenda **1.5.0** (16/10/2026) |
+| Publicado | Performance **1.50.0** · Monitorias **5.6.0** · Agenda **1.5.0** (16/10/2026) |
 | Branch | `painel-performance`, com os três sites (a `main` segue intocada) |
 | Migrações no banco | 01 a 60, todas aplicadas (a agenda tem banco próprio: 01 a 03) |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` · `painel-agenda.expansao.workers.dev` |
@@ -640,6 +640,17 @@ Três versões, cada uma publicada e conferida antes da próxima:
   2.060 a 2.102 (+42, a faixa −1 × 42 atendimentos), com o aviso, e voltou a
   2.060; o resumo acompanhou nas duas vezes. Tela: `/cota/metricas`
   (`PainelMetricasDaSemana`).
+- **Performance 1.50.0 · Monitorias 5.6.0** (**migração 67**): tabela
+  `diario_visibilidade` (tipo, quem: todos | gestao | gestor, `autor_ve`),
+  mudada pela tela via `definir_visibilidade_diario` (só gestor).
+  `pessoa_ve_diario(pessoa, tipo, autor)` — "gestão" igual a
+  `aprova_diario()` (gestor ou cargo Pleno hoje), calculada para qualquer
+  pessoa — é a regra de `diario_leitura` (substitui a da 51) e filtra
+  `leituras_do_diario` (a da 39); `aviso_diario_novo` (a da 51) só avisa
+  tipo visível a todos. Tela: `QuemVeODiario` na aba Diário de bordo da
+  Configuração; `DiarioDeBordo` recebe `tiposDaEquipe` para os filtros.
+  Conferido: configuração inicial e contagem por tipo (6 processos, 3
+  autorizações, 3 exceções, 2 problemas); telas do gestor sem falha.
 
 Visão de celular fica fora da revisão, por decisão do gestor. Os painéis são
 usados só no computador.

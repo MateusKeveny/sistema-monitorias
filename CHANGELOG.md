@@ -35,6 +35,22 @@ para o Performance.
 
 ---
 
+## Performance 1.50.0 · Monitorias 5.6.0
+
+Migração 67 (banco dos painéis). Não muda a Agenda.
+
+- **Performance e Monitorias (atualização): quem vê cada tipo de registro do
+  diário é configurável.** Configuração › Diário de bordo ganha "Quem vê cada
+  tipo de registro": para Processo, Treinamento, Autorização, Exceção e
+  Problema operacional, quem vê (todos, a gestão — gestor e Pleno — ou só o
+  gestor) e se quem registrou continua vendo o próprio. Começa com
+  **autorização e exceção só para a gestão**, cada um vendo o que registrou;
+  problema operacional da gestão; processo e treinamento para todos. A regra é
+  do banco: vale também na consulta do diário pelo Monitorias, e os filtros do
+  diário mostram só os tipos que a pessoa vê. Se processo ou treinamento forem
+  restritos, a leitura obrigatória só é cobrada de quem vê e o aviso não vai
+  para o canal do Teams.
+
 ## Performance 1.49.0
 
 Migração 66 (banco dos painéis). Não muda as Monitorias nem a Agenda.

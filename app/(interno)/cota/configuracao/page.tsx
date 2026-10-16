@@ -5,6 +5,7 @@ import PainelRegras from '@/componentes/PainelRegras';
 import Abas from '@/componentes/Abas';
 import AvisosTeams, { type SituacaoAviso } from '@/componentes/AvisosTeams';
 import SubcategoriasDiario from '@/componentes/SubcategoriasDiario';
+import QuemVeODiario, { type VisibilidadeDoDiario } from '@/componentes/QuemVeODiario';
 import HistoricoDePesos, { type AlteracaoDePeso } from '@/componentes/HistoricoDePesos';
 import type { Subcategoria } from '@/lib/diario';
 import { hojeNoBrasil, mesDeCompetencia } from '@/lib/formatar';
@@ -32,6 +33,7 @@ export default async function ConfiguracaoDaCota({
   const [
     { data: pessoas }, { data: cargos }, { data: regras },
     { data: pesos }, { data: referencias }, { data: historico }, { data: avisos }, { data: subcategorias }, { data: usosSub }, { data: alteracoes },
+    { data: visibilidade },
   ] = await Promise.all([
     db.from('pessoas').select('id, ativo, desligado_em'),
     db.from('cargos').select('*').eq('ativo', true).order('ordem'),
@@ -46,6 +48,8 @@ export default async function ConfiguracaoDaCota({
     db.from('diario_registros').select('subcategoria_id').not('subcategoria_id', 'is', null),
     // Histórico de alteração de pesos (migração 56).
     db.from('pesos_historico').select('*').order('alterado_em', { ascending: false }).limit(300),
+    // Quem vê cada tipo de registro do diário (migração 67).
+    db.from('diario_visibilidade').select('*'),
   ]);
 
   const usos: Record<number, number> = {};
@@ -123,7 +127,12 @@ export default async function ConfiguracaoDaCota({
           {
             chave: 'diario',
             rotulo: 'Diário de bordo',
-            conteudo: <SubcategoriasDiario subcategorias={(subcategorias ?? []) as Subcategoria[]} usos={usos} />,
+            conteudo: (
+              <div className="space-y-6">
+                <QuemVeODiario configuracao={(visibilidade ?? []) as VisibilidadeDoDiario[]} />
+                <SubcategoriasDiario subcategorias={(subcategorias ?? []) as Subcategoria[]} usos={usos} />
+              </div>
+            ),
           },
         ]}
       />
