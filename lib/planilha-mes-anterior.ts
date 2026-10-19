@@ -148,11 +148,12 @@ function lerPessoa(aba: string, linhas: Linha[]): Omit<PessoaDaPlanilha, 'volume
     linhas: linhasExtrato, porSemana };
 }
 
-/** O ciclo de 26 a 25 que termina no "dd/mm" da última semana. */
-function cicloDe(fimDia: number, fimMes: number, ano: number) {
+/** O ciclo de 26 a 25 que termina no mês da última semana. */
+function cicloDe(fimMes: number, ano: number) {
   const mes = `${ano}-${String(fimMes).padStart(2, '0')}-01`;
   const anterior = new Date(Date.UTC(ano, fimMes - 2, 26)).toISOString().slice(0, 10);
-  const ate = `${ano}-${String(fimMes).padStart(2, '0')}-${String(fimDia).padStart(2, '0')}`;
+  // O ciclo sempre fecha no dia 25 (a planilha de agosto escreve "19/08 a 26/08").
+  const ate = `${ano}-${String(fimMes).padStart(2, '0')}-25`;
   return { mes, de: anterior, ate };
 }
 
@@ -185,7 +186,7 @@ export function lerMesDaPlanilha(abas: Map<string, Linha[]>): MesDaPlanilha {
   for (const l of brutas) if (typeof l.C === 'number') { const a = Number(dataDoExcel(l.C).slice(0, 4)); anos.set(a, (anos.get(a) ?? 0) + 1); }
   const ano = [...anos.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? new Date().getFullYear();
   if (!ultimoPeriodo) throw new Error('Não achei os períodos das semanas na aba de volume.');
-  const { mes, de, ate } = cicloDe(Number(ultimoPeriodo[3]), Number(ultimoPeriodo[4]), ano);
+  const { mes, de, ate } = cicloDe(Number(ultimoPeriodo[4]), ano);
 
   const fora = { depois: 0, antes: 0, semData: 0, repetidas: 0 };
   const vistas = new Set<string>();

@@ -35,6 +35,19 @@ para o Performance.
 
 ---
 
+## Performance 1.54.0
+
+Migração 70 (banco dos painéis). Não muda as Monitorias nem a Agenda.
+
+- **Performance (atualização): importar só o volume de um mês do sistema.**
+  Na aba Importar › Mês anterior, um mês já fechado pelo sistema e sem volume
+  (caso de agosto/2026, que entrou só pelo resultado e pelas avaliações) entra
+  no modo **Só o volume**: da planilha vêm finalizados, transferidos, fila, TMA
+  e TME por pessoa e semana, e Diretores e Executivos. O fechamento e as
+  avaliações não mudam; "Desfazer" apaga só esse volume. O ciclo lido da
+  planilha passa a fechar sempre no dia 25. Volume de agosto/2026 importado
+  pelo gestor em 19/10 (Backup_Metas_08-2026).
+
 ## Performance 1.53.0
 
 Sem migração. Não muda as Monitorias nem a Agenda.

@@ -11,9 +11,9 @@ Escrito em 28/09/2026, atualizado em 08/10/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.53.0** · Monitorias **5.6.2** · Agenda **1.5.0** (19/10/2026) |
+| Publicado | Performance **1.54.0** · Monitorias **5.6.2** · Agenda **1.5.0** (19/10/2026) |
 | Branch | `painel-performance`, com os três sites (a `main` segue intocada) |
-| Migrações no banco | 01 a 69, todas aplicadas (a agenda tem banco próprio: 01 a 03) |
+| Migrações no banco | 01 a 70, todas aplicadas (a agenda tem banco próprio: 01 a 03) |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` · `painel-agenda.expansao.workers.dev` |
 
 ### Revisão de design (28/09/2026)
@@ -698,6 +698,12 @@ Três versões, cada uma publicada e conferida antes da próxima:
   pesos (linha de valor digitado fica como está) e as derivadas (multiplicador
   sobre o realizado; atestado e média da equipe em proporção). Cenário vazio
   bate com o resultado de hoje (conferido em outubro: 11 pessoas, 39.903 pts).
+- **Performance 1.54.0** (migração 70): `importacoes_mes.tipo` ('completo' |
+  'volume') e `importar_volume_mes(p jsonb)` — só mês fechado pelo sistema e
+  sem nenhum volume; grava só `volume_semanal`. A tela recebe `semVolume`
+  (meses fechados sem volume) e entra no modo "Só o volume". Agosto/2026
+  importado em 19/10 do `Backup_Metas_08-2026.xlsm` (o `09_2026` é versão
+  anterior: aba da Clara copiada da Allana e C-SAT semanal repetido no Resumo).
 
 Visão de celular fica fora da revisão, por decisão do gestor. Os painéis são
 usados só no computador.

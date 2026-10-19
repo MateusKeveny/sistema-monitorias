@@ -58,11 +58,18 @@ export default async function ImportarAvaliacoes({
   if (aba === 'mes-anterior') {
     const [{ data: cadastro }, { data: feitas }, { data: primeiro }] = await Promise.all([
       db.from('pessoas').select('id, nome, email, nome_hub, ativo').order('nome'),
-      db.from('importacoes_mes').select('id, mes_competencia, arquivo, importado_por_nome, importado_em, resumo')
+      db.from('importacoes_mes').select('id, mes_competencia, arquivo, importado_por_nome, importado_em, resumo, tipo')
         .order('mes_competencia', { ascending: false }),
       db.from('fechamentos_cota').select('mes_competencia').is('importacao_id', null)
         .order('mes_competencia').limit(1).maybeSingle(),
     ]);
+    // Meses fechados pelo sistema e sem volume (1.54.0): deles, só o volume.
+    const { data: fechadosDoSistema } = await db.from('fechamentos_cota').select('mes_competencia')
+      .is('importacao_id', null).limit(1000);
+    const mesesFechados = [...new Set(((fechadosDoSistema ?? []) as { mes_competencia: string }[]).map((f) => f.mes_competencia))];
+    const contagens = await Promise.all(mesesFechados.map((m) => db.from('volume_semanal')
+      .select('id', { count: 'exact', head: true }).eq('mes_competencia', m).then((r) => r.count ?? 0)));
+    const semVolume = mesesFechados.filter((_, i) => contagens[i] === 0);
     return (
       <div className="space-y-6">
         <div>
@@ -75,7 +82,8 @@ export default async function ImportarAvaliacoes({
         ) : (
           <ImportadorMesAnterior pessoas={(cadastro ?? []) as PessoaDoCadastro[]}
                                  importacoes={(feitas ?? []) as ImportacaoFeita[]}
-                                 primeiroDoSistema={(primeiro as { mes_competencia: string } | null)?.mes_competencia ?? null} />
+                                 primeiroDoSistema={(primeiro as { mes_competencia: string } | null)?.mes_competencia ?? null}
+                                 semVolume={semVolume} />
         )}
       </div>
     );
