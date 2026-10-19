@@ -35,6 +35,20 @@ para o Performance.
 
 ---
 
+## Performance 1.53.0
+
+Sem migração. Não muda as Monitorias nem a Agenda.
+
+- **Performance (atualização): simulação de cenários.** Nova tela
+  **Simulação** (Administrar, só o gestor), sobre o mês aberto: tirar ou
+  devolver o TME de uma semana de um canal, mudar os limites das faixas de
+  C-SAT, os pesos e a meta de um cargo, tirar uma semana de uma pessoa (ex.:
+  atestado) e somar presenciais. Mostra por pessoa hoje × simulado, quem
+  passa a bater ou deixa de bater a meta, e os totais da equipe. Nada é
+  gravado: o cálculo roda na tela a partir do extrato de hoje; recarregar
+  descarta. Quem recebe pela média tem a média refeita na proporção dos
+  resultados simulados dos cargos de referência.
+
 ## Performance 1.52.0
 
 Migração 69 (banco dos painéis). Não muda as Monitorias nem a Agenda.

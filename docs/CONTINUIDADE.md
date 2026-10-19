@@ -11,7 +11,7 @@ Escrito em 28/09/2026, atualizado em 08/10/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.52.0** · Monitorias **5.6.2** · Agenda **1.5.0** (19/10/2026) |
+| Publicado | Performance **1.53.0** · Monitorias **5.6.2** · Agenda **1.5.0** (19/10/2026) |
 | Branch | `painel-performance`, com os três sites (a `main` segue intocada) |
 | Migrações no banco | 01 a 69, todas aplicadas (a agenda tem banco próprio: 01 a 03) |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` · `painel-agenda.expansao.workers.dev` |
@@ -690,6 +690,14 @@ Três versões, cada uma publicada e conferida antes da próxima:
   importados em 19/10 (Emanuelly Vieira cadastrada como histórico; Clara =
   Luciana Freire pelo e-mail). Pendente, se o gestor quiser: o volume de
   agosto, que nunca entrou (o backup de agosto o tem).
+- **Performance 1.53.0** (sem migração): `/cota/simulacao` (gestor) carrega o
+  extrato do mês aberto (resumo ou view, em páginas de 1.000) e o
+  `lib/simulacao.ts` refaz no navegador: semanas tiradas, TME
+  invertido (semana desligada em Métricas volta pela faixa do TME da equipe ×
+  finalizados), faixas de C-SAT reescolhidas pelo C-SAT da semana, presenciais,
+  pesos (linha de valor digitado fica como está) e as derivadas (multiplicador
+  sobre o realizado; atestado e média da equipe em proporção). Cenário vazio
+  bate com o resultado de hoje (conferido em outubro: 11 pessoas, 39.903 pts).
 
 Visão de celular fica fora da revisão, por decisão do gestor. Os painéis são
 usados só no computador.
