@@ -17,7 +17,8 @@ type Categoria = 'pts' | 'csat' | 'vol' | 'tme' | 'mon';
 type Serie = { id: string; nome: string; valores: (number | null)[] };
 
 const PERIODOS = [3, 6, 12];
-/** O Comparativo começa aqui: antes de agosto/2026 o sistema não tinha dados. */
+/** O Comparativo começa aqui: antes de agosto/2026 o sistema não tinha dados —
+ *  a não ser os meses importados das planilhas (migração 69), que adiantam o início. */
 const PRIMEIRO_MES = '2026-08-01';
 const NOMES_MES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 const CANAIS: Canal[] = ['huggy', 'diretores'];
@@ -77,13 +78,19 @@ export default async function Comparativo({
 }) {
   const { n, cat } = await searchParams;
   // O perfil, o mês padrão e a situação do resumo saem juntos (1.41.2).
-  const [perfil, { competencia: fim }] = await todas([exigirPerfil(), resolverCompetencia(), situacaoDoResumo()]);
+  const [perfil, { competencia: fim }, , importado] = await todas([exigirPerfil(), resolverCompetencia(), situacaoDoResumo(),
+    // O mês importado mais antigo (1.52.0). Antes da migração 69 a tabela não
+    // existe e a consulta volta vazia, sem derrubar a tela.
+    criarClienteServidor().then((db) => db.from('importacoes_mes').select('mes_competencia')
+      .order('mes_competencia').limit(1).maybeSingle().then((r) => (r.data as { mes_competencia: string } | null)?.mes_competencia ?? null)),
+  ]);
+  const inicio = importado && importado < PRIMEIRO_MES ? importado : PRIMEIRO_MES;
   const periodo = PERIODOS.includes(Number(n)) ? Number(n) : 6;
   const veOTime = perfil.papel !== 'operador';
   // Só a partir de agosto/2026, o primeiro mês com dados do sistema (decisão
   // do gestor, 14/10/2026): os meses antes disso apareciam como "sem dado" e
   // custavam ~1 s de cálculo ao vivo.
-  const meses = mesesAte(fim, periodo).filter((m) => m >= PRIMEIRO_MES);
+  const meses = mesesAte(fim, periodo).filter((m) => m >= inicio);
   const de = meses[0];
 
   const db = await criarClienteServidor();

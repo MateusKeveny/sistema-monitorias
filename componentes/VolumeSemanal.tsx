@@ -13,6 +13,8 @@ export type LinhaVolume = {
   finalizados: number;
   tma_seg: number | null;
   tme_seg: number | null;
+  transferidos?: number | null;
+  enviados_fila?: number | null;
 };
 
 /** Segundos → "H:MM:SS". As horas passam de 24 sem virar dia. */
@@ -35,7 +37,7 @@ function paraSegundos(texto: string): number | null {
   return h * 3600 + m * 60 + s;
 }
 
-type Rascunho = Record<string, { finalizados: string; tma: string; tme: string }>;
+type Rascunho = Record<string, { finalizados: string; tma: string; tme: string; transf: string; fila: string }>;
 
 const entrada = `w-24 rounded-md border border-slate-300 px-2 py-1 text-right text-sm tabular-nums
                  outline-none focus:border-marca-600 disabled:bg-slate-50`;
@@ -68,6 +70,8 @@ export default function VolumeSemanal({
   esperados: string[];
 }) {
   const esperado = new Set(esperados);
+  // Transferidos e fila só existem no relatório do Huggy (Expansão).
+  const comFila = canal === 'huggy';
   // Esperados primeiro, na ordem do nome; depois quem não atendeu na última.
   const pessoas = [...todas].sort((a, b) =>
     Number(esperado.has(b.id)) - Number(esperado.has(a.id)) || a.nome.localeCompare(b.nome, 'pt-BR'));
@@ -85,6 +89,8 @@ export default function VolumeSemanal({
       finalizados: v ? String(v.finalizados) : '',
       tma: paraTempo(v?.tma_seg ?? null),
       tme: paraTempo(v?.tme_seg ?? null),
+      transf: v?.transferidos != null ? String(v.transferidos) : '',
+      fila: v?.enviados_fila != null ? String(v.enviados_fila) : '',
     }];
   })));
 
@@ -95,19 +101,27 @@ export default function VolumeSemanal({
 
     for (const p of pessoas) {
       const d = rascunho[p.id];
-      const vazio = !d.finalizados.trim() && !d.tma.trim() && !d.tme.trim();
+      const vazio = !d.finalizados.trim() && !d.tma.trim() && !d.tme.trim() && !d.transf.trim() && !d.fila.trim();
       if (vazio) { if (daSemana.has(p.id)) apagar.push(p.id); continue; }
 
       const finalizados = Number(d.finalizados || 0);
       const tma = paraSegundos(d.tma);
       const tme = paraSegundos(d.tme);
+      // Transferidos e fila (1.52.0): não pontuam, servem à leitura de volume.
+      const transf = d.transf.trim() ? Number(d.transf) : null;
+      const fila = d.fila.trim() ? Number(d.fila) : null;
+      if ([transf, fila].some((x) => x != null && (!Number.isInteger(x) || x < 0))) {
+        setErro(`Transferidos ou fila inválido para ${p.nome}.`); return;
+      }
       if (!Number.isInteger(finalizados) || finalizados < 0) { setErro(`Finalizados inválido para ${p.nome}.`); return; }
       if (Number.isNaN(tma) || Number.isNaN(tme)) {
         setErro(`Tempo inválido para ${p.nome}. Use H:MM:SS ou MM:SS.`); return;
       }
       gravar.push({
         pessoa_id: p.id, mes_competencia: competencia, semana, canal,
-        finalizados, tma_seg: tma, tme_seg: tme, atualizado_em: new Date().toISOString(),
+        finalizados, tma_seg: tma, tme_seg: tme,
+        ...(comFila ? { transferidos: transf, enviados_fila: fila } : {}),
+        atualizado_em: new Date().toISOString(),
       });
     }
 
@@ -128,7 +142,7 @@ export default function VolumeSemanal({
     router.refresh();
   }
 
-  const set = (id: string, campo: 'finalizados' | 'tma' | 'tme', valor: string) =>
+  const set = (id: string, campo: 'finalizados' | 'tma' | 'tme' | 'transf' | 'fila', valor: string) =>
     setRascunho((r) => ({ ...r, [id]: { ...r[id], [campo]: valor } }));
 
   const total = pessoas.reduce((a, p) => a + (Number(rascunho[p.id]?.finalizados) || 0), 0);
@@ -161,6 +175,8 @@ export default function VolumeSemanal({
               <Th className="text-right">Finalizados</Th>
               <Th className="text-right">TMA</Th>
               <Th className="text-right">TME</Th>
+              {comFila && <Th className="text-right">Transferidos</Th>}
+              {comFila && <Th className="text-right">Fila</Th>}
             </tr>
           </thead>
           <tbody>
@@ -201,6 +217,13 @@ export default function VolumeSemanal({
                            aria-label={`TME de ${p.nome}`}
                            onChange={(e) => set(p.id, 'tme', e.target.value)} className={`${entrada} ${borda}`} />
                   </Td>
+                  {comFila && (['transf', 'fila'] as const).map((campo) => (
+                    <Td key={campo} className="text-right">
+                      <input inputMode="numeric" value={d[campo]} disabled={ocupado} placeholder="opcional"
+                             aria-label={`${campo === 'transf' ? 'Transferidos' : 'Enviados para fila'} de ${p.nome}`}
+                             onChange={(e) => set(p.id, campo, e.target.value)} className={`${entrada} w-20`} />
+                    </Td>
+                  ))}
                 </tr>
               );
             })}
@@ -212,6 +235,7 @@ export default function VolumeSemanal({
                 {total.toLocaleString('pt-BR')}
               </td>
               <td /><td />
+              {comFila && <><td /><td /></>}
             </tr>
           </tfoot>
         </Tabela>

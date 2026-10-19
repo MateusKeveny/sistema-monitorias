@@ -1,6 +1,7 @@
 import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
 import ImportadorAvaliacoes from '@/componentes/ImportadorAvaliacoes';
 import ImportadorChamados from '@/componentes/ImportadorChamados';
+import ImportadorMesAnterior, { type ImportacaoFeita, type PessoaDoCadastro } from '@/componentes/ImportadorMesAnterior';
 import FilaDeAtrasos, { type ChamadoAtrasado } from '@/componentes/FilaDeAtrasos';
 import NotasGuardadas, { type NotaGuardada } from '@/componentes/NotasGuardadas';
 import SemanasDeChamados, { type SemanaDeChamados } from '@/componentes/SemanasDeChamados';
@@ -37,13 +38,13 @@ export default async function ImportarAvaliacoes({
   // dependem das contagens do Hub, então a aba deles sai antes delas.
   const abas = (
     <div role="tablist" className="inline-flex rounded-xl bg-superficie p-1 shadow-sm">
-      {([['hub', 'Avaliações (Hub)'], ['chamados', 'Chamados (ELO)']] as const).map(([chave, rotulo]) => {
-        const ativa = (aba === 'chamados') === (chave === 'chamados');
+      {([['hub', 'Avaliações (Hub)'], ['chamados', 'Chamados (ELO)'], ['mes-anterior', 'Mês anterior (planilha)']] as const).map(([chave, rotulo]) => {
+        const ativa = chave === 'hub' ? aba !== 'chamados' && aba !== 'mes-anterior' : aba === chave;
         return (
           // <a> e não Link: carrega a página inteira. Pelo Link, a troca de aba
             // não completava no navegador do Analista (1.38.1); o endereço direto abria.
             <a key={chave} role="tab" aria-selected={ativa}
-                href={chave === 'chamados' ? '/cota/importar?aba=chamados' : '/cota/importar'}
+                href={chave === 'hub' ? '/cota/importar' : `/cota/importar?aba=${chave}`}
                 className={`rounded-lg px-4 py-1.5 text-sm font-medium ${ativa
                   ? 'bg-marca-600 font-semibold text-white' : 'text-slate-600 hover:text-slate-900'}`}>
             {rotulo}
@@ -52,6 +53,33 @@ export default async function ImportarAvaliacoes({
       })}
     </div>
   );
+
+  // Meses antes do sistema (1.52.0, migração 69): o "Dashboard Expansão" de cada mês.
+  if (aba === 'mes-anterior') {
+    const [{ data: cadastro }, { data: feitas }, { data: primeiro }] = await Promise.all([
+      db.from('pessoas').select('id, nome, email, nome_hub, ativo').order('nome'),
+      db.from('importacoes_mes').select('id, mes_competencia, arquivo, importado_por_nome, importado_em, resumo')
+        .order('mes_competencia', { ascending: false }),
+      db.from('fechamentos_cota').select('mes_competencia').is('importacao_id', null)
+        .order('mes_competencia').limit(1).maybeSingle(),
+    ]);
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">Importar</h1>
+          <p className="mt-1 text-sm text-sobre-fundo-suave">Cada relatório na sua aba. A planilha é lida no seu computador.</p>
+          <div className="mt-3">{abas}</div>
+        </div>
+        {feitas == null && primeiro == null ? (
+          <Quadro titulo="Mês anterior"><p className="text-sm text-slate-600">Falta rodar a migração 69 no banco.</p></Quadro>
+        ) : (
+          <ImportadorMesAnterior pessoas={(cadastro ?? []) as PessoaDoCadastro[]}
+                                 importacoes={(feitas ?? []) as ImportacaoFeita[]}
+                                 primeiroDoSistema={(primeiro as { mes_competencia: string } | null)?.mes_competencia ?? null} />
+        )}
+      </div>
+    );
+  }
 
   if (aba === 'chamados') {
     const campos = 'protocolo, titulo, responsavel, aberto_em, concluido_em, tempo_util, tempo_interno, tempo_ti, motivo_atraso, observacao, justificativa, justificado_por_nome, justificado_em, decisao, decidido_por_nome, decidido_em';

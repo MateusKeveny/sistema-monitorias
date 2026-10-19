@@ -35,6 +35,27 @@ para o Performance.
 
 ---
 
+## Performance 1.52.0
+
+Migração 69 (banco dos painéis). Não muda as Monitorias nem a Agenda.
+
+- **Performance (atualização): importar mês anterior.** Em Importar, a aba
+  **Mês anterior (planilha)** traz os meses antes do sistema a partir do
+  "Dashboard Expansão" de cada mês: uma linha por atendimento (com nota e
+  tabulação), o volume por pessoa e semana (finalizados, transferidos, fila,
+  TMA e TME), Diretores e Executivos (canal Diretores-Expansão) e o resultado
+  de cada pessoa, que entra **congelado** como na planilha, linha a linha no
+  extrato. A prévia confere, por pessoa, se as 4 semanas mais o que só conta
+  no mês dão o resultado. E-mail sem cadastro não é descartado: liga-se a uma
+  pessoa ou se cadastra como histórico (inativa, sem login, fora das
+  monitorias). Monitorias da planilha não entram. "Desfazer" apaga a
+  importação inteira. O Comparativo passa a começar no mês importado mais
+  antigo; a C-SAT desses meses é a do sistema (positivas sobre avaliações do
+  mês inteiro), não a média de médias da planilha. Junho e julho/2026
+  importados pelo gestor em 19/10.
+- **Performance (atualização): transferidos e fila no volume.** Lançamentos ›
+  Volume (Expansão) ganha as colunas opcionais Transferidos e Fila. Não pontuam.
+
 ## Performance 1.51.1 · Monitorias 5.6.2
 
 Sem migração. Não muda a Agenda.

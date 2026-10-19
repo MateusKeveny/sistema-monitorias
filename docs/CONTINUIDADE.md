@@ -11,9 +11,9 @@ Escrito em 28/09/2026, atualizado em 08/10/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.51.1** · Monitorias **5.6.2** · Agenda **1.5.0** (16/10/2026) |
+| Publicado | Performance **1.52.0** · Monitorias **5.6.2** · Agenda **1.5.0** (19/10/2026) |
 | Branch | `painel-performance`, com os três sites (a `main` segue intocada) |
-| Migrações no banco | 01 a 60, todas aplicadas (a agenda tem banco próprio: 01 a 03) |
+| Migrações no banco | 01 a 69, todas aplicadas (a agenda tem banco próprio: 01 a 03) |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` · `painel-agenda.expansao.workers.dev` |
 
 ### Revisão de design (28/09/2026)
@@ -676,6 +676,20 @@ Três versões, cada uma publicada e conferida antes da próxima:
   login próprios. Teste do gestor (16/10): conta apagada com a tela aberta foi
   barrada pela RLS ao confirmar a leitura obrigatória; ao recarregar, vai ao
   login.
+- **Performance 1.52.0** (migração 69): `lib/planilha-mes-anterior.ts` lê o
+  "Dashboard Expansão" no navegador (abas por pessoa com "Tiragem semanal",
+  "Volume de atendimentos e TME", "Atendimentos e Avaliações"); o ciclo sai do
+  período da última semana e o ano das datas. `importar_mes_anterior(p jsonb)`
+  (gestor, security definer) grava avaliacoes, volume_semanal e
+  fechamentos_cota/fechamento_linhas com `importacao_id` (cascata para o
+  `desfazer_importacao_mes`); recusa mês ≥ primeiro fechamento do sistema
+  (agosto/2026), mês já importado, fechado ou com volume. Linhas do extrato com
+  regra `planilha_*`. Pessoa sem cadastro → `pessoas` inativa com
+  `criada_pela_importacao`. O aviso "mês fechado" do Teams ignora fechamento
+  importado. Comparativo: início = mês importado mais antigo. Junho e julho
+  importados em 19/10 (Emanuelly Vieira cadastrada como histórico; Clara =
+  Luciana Freire pelo e-mail). Pendente, se o gestor quiser: o volume de
+  agosto, que nunca entrou (o backup de agosto o tem).
 
 Visão de celular fica fora da revisão, por decisão do gestor. Os painéis são
 usados só no computador.

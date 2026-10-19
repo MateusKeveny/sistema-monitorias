@@ -64,7 +64,7 @@ export default async function LancamentosDeCota({
     db.from('lancamentos').select('*').eq('mes_competencia', competencia).eq('canal', canal)
       .order('criado_em', { ascending: false }),
     db.from('vw_lancamentos_a_conferir').select('*').eq('mes_competencia', competencia),
-    db.from('volume_semanal').select('pessoa_id, semana, finalizados, tma_seg, tme_seg')
+    db.from('volume_semanal').select('pessoa_id, semana, finalizados, tma_seg, tme_seg, transferidos, enviados_fila')
       .eq('mes_competencia', competencia).eq('canal', canal),
     // A última semana do mês anterior: base de quem se espera na 1ª semana.
     db.from('volume_semanal').select('pessoa_id, semana')
