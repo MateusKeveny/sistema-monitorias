@@ -35,6 +35,16 @@ para o Performance.
 
 ---
 
+## Performance 2.0.1
+
+Sem migração. Não muda as Monitorias nem a Agenda.
+
+- **Performance (correção): aviso de pendentes de realocação no fechamento.**
+  O aviso antes de fechar o mês, que já cobrava quem está sem cargo e as
+  faixas que não fecham, passa a cobrar também volume e lançamentos
+  pendentes de realocação (de quem está em cargo sem cota): fechar sem
+  decidir congelaria esses pontos fora de todo mundo.
+
 ## Performance 2.0.0
 
 Migração 71 (banco dos painéis). Não muda as Monitorias nem a Agenda.

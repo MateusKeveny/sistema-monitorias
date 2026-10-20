@@ -47,7 +47,7 @@ export default async function Fechamento({
   const { competencia, atual } = await resolverCompetencia(mes);
 
   const db = await criarClienteServidor();
-  const [abertos, fechados, semCargo, conferir, alteracoes, valor, pagamento, correcoes, volumes, monitorias, avaliados]
+  const [abertos, fechados, semCargo, conferir, alteracoes, valor, pagamento, correcoes, volumes, monitorias, avaliados, realocar]
     = await todas([
     db.from('vw_cota_mensal').select('pessoa_id, pessoa, cargo, resultado, meta')
       .eq('mes_competencia', competencia).order('resultado', { ascending: false }),
@@ -68,6 +68,8 @@ export default async function Fechamento({
     db.from('volume_semanal').select('semana, canal').eq('mes_competencia', competencia),
     db.from('vw_monitorias').select('operador_id, semana_mes').eq('mes_referencia', competencia),
     db.from('pessoas').select('id, nome').eq('avaliado', true).eq('ativo', true).order('nome'),
+    // Pendentes de realocação (migração 71): não pontuam para ninguém.
+    db.from('vw_lancamentos_pendentes').select('pessoa, tipo').eq('mes_competencia', competencia),
   ]);
 
   const lista = (abertos.data ?? []) as Aberto[];
@@ -82,6 +84,14 @@ export default async function Fechamento({
   }
   if ((conferir.data ?? []).length) {
     avisos.push(`${(conferir.data ?? []).length} lançamento(s) com faixas que não fecham com o total.`);
+  }
+
+  // Volume ou lançamento de quem está em cargo sem cota (ou sem cargo) não
+  // entra para ninguém: fechar sem decidir congela esses pontos fora (2.0.1).
+  const aRealocar = (realocar.data ?? []) as { pessoa: string; tipo: string }[];
+  if (aRealocar.length) {
+    avisos.push(`${aRealocar.length} ${aRealocar.length === 1 ? 'registro pendente' : 'registros pendentes'} de realocação `
+      + `(${[...new Set(aRealocar.map((p) => p.pessoa))].join(', ')}): não pontuam para ninguém. Decida em Lançamentos antes de fechar.`);
   }
 
   // ------------------------------------------------------- Antes de fechar
