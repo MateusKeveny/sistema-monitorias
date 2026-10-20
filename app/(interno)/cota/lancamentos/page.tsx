@@ -1,6 +1,7 @@
 import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
 import FormularioLancamentos from '@/componentes/FormularioLancamentos';
 import VolumeSemanal, { type LinhaVolume } from '@/componentes/VolumeSemanal';
+import LancamentosPendentes, { type Pendente } from '@/componentes/RealocacaoDeLancamentos';
 import SeletorDeDetalhe, { type Destaque } from '@/componentes/SeletorDeDetalhe';
 import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
 import { Quadro, Tabela, Th, Td } from '@/componentes/ui';
@@ -56,7 +57,7 @@ export default async function LancamentosDeCota({
   ]);
   const hoje = hojeNoBrasil();
 
-  const [pessoas, regras, pesos, historico, lancamentos, conferencia, volumes, anterior] = await Promise.all([
+  const [pessoas, regras, pesos, historico, lancamentos, conferencia, volumes, anterior, pendentes, cargos] = await Promise.all([
     db.from('pessoas').select('*').order('nome'),
     db.from('regras').select('*').eq('manual', true).eq('ativo', true).order('ordem'),
     db.from('pesos_por_cargo').select('cargo_id, regra, peso, ativo').eq('ativo', true),
@@ -64,11 +65,14 @@ export default async function LancamentosDeCota({
     db.from('lancamentos').select('*').eq('mes_competencia', competencia).eq('canal', canal)
       .order('criado_em', { ascending: false }),
     db.from('vw_lancamentos_a_conferir').select('*').eq('mes_competencia', competencia),
-    db.from('volume_semanal').select('pessoa_id, semana, finalizados, tma_seg, tme_seg, transferidos, enviados_fila')
+    db.from('volume_semanal').select('id, pessoa_id, semana, finalizados, tma_seg, tme_seg, transferidos, enviados_fila')
       .eq('mes_competencia', competencia).eq('canal', canal),
     // A última semana do mês anterior: base de quem se espera na 1ª semana.
     db.from('volume_semanal').select('pessoa_id, semana')
       .eq('mes_competencia', mesAnterior(competencia)).eq('canal', canal),
+    // Pendentes de realocação (migração 71): de todos os meses abertos.
+    db.from('vw_lancamentos_pendentes').select('*').order('mes_competencia').order('pessoa'),
+    db.from('cargos').select('*'),
   ]);
 
   const listaVolumes = (volumes.data ?? []) as LinhaVolume[];
@@ -84,6 +88,9 @@ export default async function LancamentosDeCota({
   const listaPessoas = ((pessoas.data ?? []) as Pessoa[])
     .filter((p) => p.ativo || comDadoNoMes.has(p.id));
   const nomePessoa = new Map(((pessoas.data ?? []) as Pessoa[]).map((p) => [p.id, p.nome]));
+  // Para quem dá para passar um registro: ativo e num cargo que recebe cota.
+  const semCota = new Set(((cargos.data ?? []) as { id: number; recebe_cota?: boolean }[])
+    .filter((c) => c.recebe_cota === false).map((c) => c.id));
 
   // Volume só para quem pontua por finalizado neste canal, no cargo vigente.
   const listaHistorico = (historico.data ?? []) as CargoDaPessoa[];
@@ -95,6 +102,9 @@ export default async function LancamentosDeCota({
   const pessoasDoVolume = listaPessoas
     .filter((p) => { const c = cargoDe(p.id); return c != null && cargosComAtendimento.has(c); });
   const doVolume = new Set(pessoasDoVolume.map((p) => p.id));
+  const recebem = ((pessoas.data ?? []) as Pessoa[])
+    .filter((p) => { const c = cargoDe(p.id); return p.ativo && c != null && !semCota.has(c); })
+    .map((p) => ({ id: p.id, nome: p.nome }));
   const lancadosNa = (s: number) =>
     new Set(listaVolumes.filter((v) => v.semana === s && doVolume.has(v.pessoa_id)).map((v) => v.pessoa_id));
 
@@ -165,7 +175,7 @@ export default async function LancamentosDeCota({
         <VolumeSemanal
           key={`${competencia}-${canal}-${s}`}
           canal={canal} competencia={competencia} semana={s} periodo={periodo}
-          pessoas={pessoasDoVolume} volumes={listaVolumes} esperados={[...esperados]}
+          pessoas={pessoasDoVolume} volumes={listaVolumes} esperados={[...esperados]} recebem={recebem}
         />
       ),
     };
@@ -251,6 +261,8 @@ export default async function LancamentosDeCota({
           ))}
         </div>
       </div>
+
+      <LancamentosPendentes pendentes={(pendentes.data ?? []) as Pendente[]} pessoas={recebem} />
 
       <SeletorDeDetalhe key={`${competencia}-${canal}`} destaques={destaques} inicial={inicial} alternar
                         rotulo="Situação do mês" grade="sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5" />

@@ -6,8 +6,10 @@ import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { Quadro, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import type { Pessoa } from '@/lib/tipos';
 import { mensagemDoErro } from '@/lib/erro-amigavel';
+import { MoverPara } from '@/componentes/RealocacaoDeLancamentos';
 
 export type LinhaVolume = {
+  id?: number;
   pessoa_id: string;
   semana: number;
   finalizados: number;
@@ -53,8 +55,10 @@ const entrada = `w-24 rounded-md border border-slate-300 px-2 py-1 text-right te
  * como referência para pegar erro de digitação.
  */
 export default function VolumeSemanal({
-  competencia, canal, semana, periodo, pessoas: todas, volumes, esperados,
+  competencia, canal, semana, periodo, pessoas: todas, volumes, esperados, recebem = [],
 }: {
+  /** Para quem dá para mover o volume (⇄ mover, migração 71). */
+  recebem?: { id: string; nome: string }[];
   competencia: string;
   /** 'huggy' = Expansão · 'diretores' = Diretores-Expansão. */
   canal: 'huggy' | 'diretores';
@@ -177,6 +181,7 @@ export default function VolumeSemanal({
               <Th className="text-right">TME</Th>
               {comFila && <Th className="text-right">Transferidos</Th>}
               {comFila && <Th className="text-right">Fila</Th>}
+              <Th />
             </tr>
           </thead>
           <tbody>
@@ -224,6 +229,11 @@ export default function VolumeSemanal({
                              onChange={(e) => set(p.id, campo, e.target.value)} className={`${entrada} w-20`} />
                     </Td>
                   ))}
+                  <Td className="whitespace-nowrap">
+                    {daSemana.get(p.id)?.id != null && (
+                      <MoverPara tipo="volume" id={Number(daSemana.get(p.id)!.id)} de={p.id} pessoas={recebem} recarregar />
+                    )}
+                  </Td>
                 </tr>
               );
             })}
@@ -236,6 +246,7 @@ export default function VolumeSemanal({
               </td>
               <td /><td />
               {comFila && <><td /><td /></>}
+              <td />
             </tr>
           </tfoot>
         </Tabela>

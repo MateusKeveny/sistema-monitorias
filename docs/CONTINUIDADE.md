@@ -11,9 +11,9 @@ Escrito em 28/09/2026, atualizado em 08/10/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **1.54.0** · Monitorias **5.6.2** · Agenda **1.5.0** (19/10/2026) |
+| Publicado | Performance **2.0.0** · Monitorias **5.6.2** · Agenda **1.5.0** (20/10/2026) |
 | Branch | `painel-performance`, com os três sites (a `main` segue intocada) |
-| Migrações no banco | 01 a 70, todas aplicadas (a agenda tem banco próprio: 01 a 03) |
+| Migrações no banco | 01 a 71, todas aplicadas (a agenda tem banco próprio: 01 a 03) |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` · `painel-agenda.expansao.workers.dev` |
 
 ### Revisão de design (28/09/2026)
@@ -704,6 +704,16 @@ Três versões, cada uma publicada e conferida antes da próxima:
   (meses fechados sem volume) e entra no modo "Só o volume". Agosto/2026
   importado em 19/10 do `Backup_Metas_08-2026.xlsm` (o `09_2026` é versão
   anterior: aba da Clara copiada da Allana e C-SAT semanal repetido no Resumo).
+- **Performance 2.0.0** (migração 71): `cargos.recebe_cota`;
+  `cargo_na_competencia` devolve nulo para cargo sem cota (todo o cálculo
+  depende dela); `vw_sem_cargo` passa a olhar se há cargo nenhum. Cargo
+  "Diretora" (sem cota) e a Luciana nele desde 06/2026; os fechamentos dela
+  (06 e 07/2026, os únicos que existiam) retirados com registro em
+  `fechamento_alteracoes` (campo 'retirada'). `vw_lancamentos_pendentes`,
+  `mover_volume` (soma na mesma semana/canal, tempos ponderados),
+  `mover_lancamento`, `resolver_pendente` ('manter' marca `sem_cota_ok`,
+  'apagar'), tudo em `realocacoes`. Simulação: `tmeMinimos`, `pesosTodos` e a
+  projeção sobre `semanasLancadas` (semanas com volume).
 
 Visão de celular fica fora da revisão, por decisão do gestor. Os painéis são
 usados só no computador.

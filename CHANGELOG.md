@@ -35,6 +35,32 @@ para o Performance.
 
 ---
 
+## Performance 2.0.0
+
+Migração 71 (banco dos painéis). Não muda as Monitorias nem a Agenda.
+**Crítico (1º número):** reescreve competência já fechada — os fechamentos
+da Luciana Freire de junho (213 pts) e julho (183 pts) foram retirados, por
+decisão do gestor (20/10/2026). Cada um ficou registrado em
+`fechamento_alteracoes` antes de sair.
+
+- **Performance (atualização): cargo sem cota.** Em Configuração › Pesos por
+  cargo, cada cargo tem **Recebe cota**. Desligado, quem está no cargo não tem
+  extrato nem resultado a partir do mês em que entrou nele, e sai do
+  fechamento, da exportação, da pontuação no Comparativo e das médias. O
+  acesso é o do papel. Cargo novo **Diretora** (sem cota); a Luciana está
+  nele desde 06/2026, com o papel Gestor (vê tudo) e fora das listas e médias.
+- **Performance (atualização): realocação de lançamentos.** Em Lançamentos,
+  o quadro **Pendentes de realocação** lista volume e lançamentos do mês
+  aberto de quem está sem cargo ou em cargo sem cota (não pontuam para
+  ninguém): passar para outra pessoa, manter sem cota ou apagar. E **⇄ mover**
+  em cada volume semanal e lançamento manual, para corrigir a pessoa sem
+  digitar de novo (volume na mesma semana e canal soma). Tudo registrado.
+- **Performance (atualização): simulação com TME e projeção.** Faixas de TME
+  por canal com limite (minutos) e pontos editáveis — a faixa de cada semana é
+  reescolhida pelo TME da equipe —, e a **projeção do mês**: a média das
+  semanas com volume lançado, já com o cenário, vale para as que faltam; quem
+  deve bater a meta.
+
 ## Performance 1.54.0
 
 Migração 70 (banco dos painéis). Não muda as Monitorias nem a Agenda.

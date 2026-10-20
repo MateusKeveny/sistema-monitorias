@@ -6,6 +6,7 @@ import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { Quadro, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import type { CargoDaPessoa, Lancamento, PesoCargo, Pessoa, RegraCota } from '@/lib/tipos';
 import { mensagemDoErro } from '@/lib/erro-amigavel';
+import { MoverPara } from '@/componentes/RealocacaoDeLancamentos';
 
 const entrada = `w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm outline-none
                  focus:border-marca-600 disabled:bg-slate-50`;
@@ -230,11 +231,15 @@ function NovoLancamento({
                   </Td>
                   <Td className="text-xs text-slate-500">{l.observacao ?? ''}</Td>
                   <Td className="text-xs text-slate-500">{l.lancado_por_nome ?? '—'}</Td>
-                  <Td>
-                    <button type="button" onClick={() => excluir(l)}
-                            className="text-xs text-slate-500 hover:text-rose-700 hover:underline">
-                      excluir
-                    </button>
+                  <Td className="whitespace-nowrap">
+                    <span className="inline-flex items-center gap-3">
+                      <MoverPara tipo="lancamento" id={Number(l.id)} de={l.pessoa_id}
+                                 pessoas={pessoas.filter((p) => p.ativo).map((p) => ({ id: p.id, nome: p.nome }))} />
+                      <button type="button" onClick={() => excluir(l)}
+                              className="text-xs text-slate-500 hover:text-rose-700 hover:underline">
+                        excluir
+                      </button>
+                    </span>
                   </Td>
                 </tr>
               ))}

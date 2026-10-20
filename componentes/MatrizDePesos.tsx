@@ -258,8 +258,8 @@ export default function MatrizDePesos({
                           </span>
                         </span>
                         {([
-                          ['Meta', meta != null ? `${numero(Number(meta))} pts` : '—'],
-                          ['Recebe', media ? `média ×${numero(Number(media.peso))}${qtd ? ' + pelo que faz' : ''}` : 'pelo que faz'],
+                          ['Meta', c.recebe_cota === false ? '—' : meta != null ? `${numero(Number(meta))} pts` : '—'],
+                          ['Recebe', c.recebe_cota === false ? 'sem cota' : media ? `média ×${numero(Number(media.peso))}${qtd ? ' + pelo que faz' : ''}` : 'pelo que faz'],
                           ['Média de', media && refs.length ? refs.join(' + ') : '—'],
                           ['Métricas', qtd ? `${qtd} pontuam` : 'nenhuma'],
                         ] as const).map(([rotulo, valor]) => (
@@ -453,6 +453,8 @@ function EditorDoCargo({
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [motivo, setMotivo] = useState('');
+  // Cargo sem cota (migração 71): quem está nele não tem extrato nem resultado.
+  const [recebeCota, setRecebeCota] = useState(cargo.recebe_cota !== false);
   const ehBase = cargo.nome === CARGO_BASE;
 
   async function salvar() {
@@ -468,6 +470,15 @@ function EditorDoCargo({
     if (cargos.some((c) => c.id !== cargo.id && c.nome.trim().toLowerCase() === nomeNovo.toLowerCase())) {
       setErro(`Já existe um cargo chamado "${nomeNovo}".`); return;
     }
+    if (!recebeCota) {
+      if (ehBase) { setErro(`"${CARGO_BASE}" é a base dos demais e sempre recebe cota.`); return; }
+      setOcupado(true); setErro(null);
+      const { error } = await criarClienteNavegador().from('cargos')
+        .update({ nome: nomeNovo, recebe_cota: false }).eq('id', cargo.id);
+      setOcupado(false);
+      if (error) { setErro(await mensagemDoErro(error)); return; }
+      onFechar(); router.refresh(); return;
+    }
     if (!Number.isFinite(metaNum) || metaNum <= 0) { setErro('Informe uma meta maior que zero.'); return; }
     // Mudou meta ou média: o motivo é obrigatório, como na matriz (migração 56).
     const mudouPeso = metaNum !== Number(pesoDe.get(REGRA_META)?.peso ?? NaN)
@@ -481,8 +492,8 @@ function EditorDoCargo({
     const db = criarClienteNavegador();
     const agora = new Date().toISOString();
 
-    if (nomeNovo !== cargo.nome) {
-      const { error } = await db.from('cargos').update({ nome: nomeNovo }).eq('id', cargo.id);
+    if (nomeNovo !== cargo.nome || cargo.recebe_cota === false) {
+      const { error } = await db.from('cargos').update({ nome: nomeNovo, recebe_cota: true }).eq('id', cargo.id);
       if (error) {
         setOcupado(false);
         setErro(/duplicate|unique/i.test(error.message) ? `Já existe um cargo chamado "${nomeNovo}".` : error.message);
@@ -543,6 +554,13 @@ function EditorDoCargo({
           </span>
         </label>
         {!ehBase && (
+          <label className="flex items-center gap-2 pb-2 text-sm text-slate-700"
+                 title="Desligado: quem está neste cargo não tem extrato nem resultado, a partir do mês em que entrou nele">
+            <input type="checkbox" checked={recebeCota} disabled={ocupado} onChange={(e) => setRecebeCota(e.target.checked)} />
+            Recebe cota
+          </label>
+        )}
+        {!ehBase && recebeCota && (
           <label className="flex items-center gap-2 pb-2 text-sm text-slate-700">
             <input type="checkbox" checked={recebeMedia} disabled={ocupado} onChange={(e) => setRecebeMedia(e.target.checked)} />
             Recebe pela média de outros cargos
@@ -559,7 +577,7 @@ function EditorDoCargo({
         </button>
       </div>
 
-      {!ehBase && recebeMedia && (
+      {!ehBase && recebeCota && recebeMedia && (
         <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-slate-200 pt-3 text-sm text-slate-700">
           <label className="flex items-center gap-2">
             Multiplicador
@@ -577,7 +595,9 @@ function EditorDoCargo({
         </div>
       )}
       <p className="mt-2 text-xs text-slate-500">
-        {recebeMedia
+        {!recebeCota
+          ? 'Sem cota: quem está neste cargo (a partir do mês em que entrou) não tem extrato nem resultado e sai do fechamento, da exportação e das médias. O acesso é o do papel.'
+          : recebeMedia
           ? 'Média do resultado mensal de quem está nos cargos marcados, multiplicada. As métricas da tabela continuam somando por cima.'
           : 'Os pesos de cada métrica se editam direto na tabela.'}
       </p>

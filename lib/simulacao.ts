@@ -1,19 +1,24 @@
 /**
- * Simulação de cenários (1.53.0): o extrato do mês aberto refeito na tela,
- * sem gravar nada.
+ * Simulação de cenários (1.53.0; faixas de TME e projeção na 2.0.0): o extrato
+ * do mês aberto refeito na tela, sem gravar nada.
  *
  * Parte das linhas de hoje (as mesmas do extrato: quantidade × peso) e aplica
  * o cenário por cima, na ordem em que o banco calcula:
  *
  *   1. semanas tiradas de uma pessoa (ex.: atestado) — as linhas da semana saem;
- *   2. TME de uma semana de um canal — a faixa sai (ou volta, se hoje está
- *      desligada em Métricas da semana: aí é refeita pelo TME da equipe);
+ *   2. TME — a semana que sai ou volta (desligada hoje em Métricas da semana)
+ *      e, se os limites das faixas mudaram, a faixa de cada semana reescolhida
+ *      pelo TME médio da equipe e aplicada aos finalizados de cada um;
  *   3. faixas de C-SAT com outros limites — a faixa da semana é reescolhida
  *      pelo C-SAT da semana e aplicada à mesma base;
  *   4. atendimentos presenciais a mais;
- *   5. pesos diferentes — cada linha vira quantidade × peso novo;
+ *   5. pesos diferentes (por cargo, ou de uma regra em todos os cargos, como os
+ *      pontos das faixas de TME) — cada linha vira quantidade × peso novo;
  *   6. o que deriva do resto: o multiplicador sobre o realizado, o atestado e
  *      a média da equipe (quem recebe pela média).
+ *
+ * A projeção do mês estende o ritmo: a média das semanas com dado, já com o
+ * cenário, vale para as semanas que faltam; o que é do mês entra como está.
  *
  * A média e o atestado são refeitos em proporção (média simulada dos cargos
  * de referência ÷ média de hoje), e não pela função do banco: é uma conta de
@@ -48,6 +53,8 @@ export type Base = {
 export type Cenario = {
   /** "semana|canal" com a faixa de TME invertida em relação a hoje. */
   tmeInvertido: string[];
+  /** chave da faixa de TME → novo mínimo (segundos). */
+  tmeMinimos: Record<string, number>;
   /** "pessoa|semana" tiradas. */
   semanasFora: string[];
   /** chave da faixa de C-SAT → novo mínimo (fração, ex.: 0,9). */
@@ -56,38 +63,61 @@ export type Cenario = {
   presenciais: Record<string, number>;
   /** "cargo|regra" → peso. */
   pesos: Record<string, number>;
+  /** regra → peso em todos os cargos que a pontuam (ex.: pontos das faixas de TME). */
+  pesosTodos: Record<string, number>;
   /** cargo → meta (pts). */
   metas: Record<string, number>;
 };
 
-export const CENARIO_VAZIO: Cenario = { tmeInvertido: [], semanasFora: [], csatMinimos: {}, presenciais: {}, pesos: {}, metas: {} };
+export const CENARIO_VAZIO: Cenario = {
+  tmeInvertido: [], tmeMinimos: {}, semanasFora: [], csatMinimos: {}, presenciais: {}, pesos: {}, pesosTodos: {}, metas: {},
+};
 
 const DERIVADAS = new Set(['media_da_equipe', 'media_sobre_realizado', 'atestado']);
-const GRUPO_TME: Record<string, string> = { huggy: 'tme', diretores: 'tme_diretores' };
+export const GRUPO_TME: Record<string, string> = { huggy: 'tme', diretores: 'tme_diretores' };
 const r4 = (v: number) => Math.round(v * 10_000) / 10_000;
 
 /** A faixa (de um grupo) em que um valor cai. */
-function faixaDe(faixas: Faixa[], grupo: string, valor: number) {
+export function faixaDe(faixas: Faixa[], grupo: string, valor: number) {
   return faixas.find((f) => f.grupo === grupo
     && (f.faixa_min == null || valor >= f.faixa_min) && (f.faixa_max == null || valor < f.faixa_max));
 }
 
 /**
- * Faixas de C-SAT com os mínimos do cenário. Cada faixa vai do seu mínimo até
- * o mínimo da faixa de cima — mudar um mínimo move a fronteira das duas.
+ * As faixas de um grupo com os mínimos do cenário. Cada faixa vai do seu
+ * mínimo até o mínimo da faixa de cima — mudar um mínimo move a fronteira das
+ * duas. Serve ao C-SAT e às faixas de TME.
  */
-export function faixasDeCsat(faixas: Faixa[], minimos: Record<string, number>): Faixa[] {
-  const csat = faixas.filter((f) => f.grupo === 'csat')
+export function faixasDoGrupo(faixas: Faixa[], grupo: string, minimos: Record<string, number>): Faixa[] {
+  const doGrupo = faixas.filter((f) => f.grupo === grupo)
     .map((f) => ({ ...f, faixa_min: f.chave in minimos ? minimos[f.chave] : f.faixa_min }))
     .sort((a, b) => (a.faixa_min ?? -Infinity) - (b.faixa_min ?? -Infinity));
-  return csat.map((f, i) => ({ ...f, faixa_max: csat[i + 1]?.faixa_min ?? null }));
+  return doGrupo.map((f, i) => ({ ...f, faixa_max: doGrupo[i + 1]?.faixa_min ?? null }));
 }
+export const faixasDeCsat = (faixas: Faixa[], minimos: Record<string, number>) => faixasDoGrupo(faixas, 'csat', minimos);
 
-export type Resultado = { pessoa_id: string; pessoa: string; cargo: string | null; hoje: number; simulado: number; metaHoje: number | null; metaSimulada: number | null };
+export type Resultado = {
+  pessoa_id: string; pessoa: string; cargo: string | null;
+  hoje: number; simulado: number; projecao: number;
+  metaHoje: number | null; metaSimulada: number | null;
+};
+
+/**
+ * Semanas do mês já lançadas: as que têm volume (o volume é digitado quando a
+ * semana fecha). As avaliações chegam durante a semana, então uma semana só
+ * com avaliações ainda está correndo. Sem volume nenhum, valem as linhas.
+ */
+export function semanasLancadas(base: Base): Set<number> {
+  const comVolume = new Set(base.volume.map((v) => v.semana));
+  return comVolume.size ? comVolume
+    : new Set(base.linhas.filter((l) => l.semana != null && !DERIVADAS.has(l.regra)).map((l) => l.semana as number));
+}
+export const semanasComDado = (base: Base) => semanasLancadas(base).size;
 
 export function simular(base: Base, cen: Cenario): Resultado[] {
   const peso = new Map(base.pesos.map((p) => [`${p.cargo_id}|${p.regra}`, Number(p.peso)]));
-  const pesoDe = (cargo: number, regra: string) => cen.pesos[`${cargo}|${regra}`] ?? peso.get(`${cargo}|${regra}`) ?? 0;
+  const pesoDe = (cargo: number, regra: string) =>
+    cen.pesos[`${cargo}|${regra}`] ?? (peso.has(`${cargo}|${regra}`) ? cen.pesosTodos[regra] ?? peso.get(`${cargo}|${regra}`)! : 0);
   const cargoDe = new Map<string, LinhaDoExtrato>();
   for (const l of base.linhas) if (!cargoDe.has(l.pessoa_id)) cargoDe.set(l.pessoa_id, l);
   const rotulo = new Map(base.faixas.map((f) => [f.chave, f.rotulo]));
@@ -96,19 +126,27 @@ export function simular(base: Base, cen: Cenario): Resultado[] {
   const fora = new Set(cen.semanasFora);
   let linhas = base.linhas.filter((l) => !DERIVADAS.has(l.regra) && !(l.semana != null && fora.has(`${l.pessoa_id}|${l.semana}`)));
 
-  // 2. TME.
+  // 2. TME, canal a canal.
   const desligado = new Set(base.tmeDesligado);
-  for (const k of cen.tmeInvertido) {
-    const [s, canal] = k.split('|'); const semana = Number(s);
-    if (!desligado.has(k)) {
-      linhas = linhas.filter((l) => !(l.semana === semana && l.origem === canal && l.grupo === GRUPO_TME[canal]));
-    } else {
+  const invertido = new Set(cen.tmeInvertido);
+  for (const canal of Object.keys(GRUPO_TME)) {
+    const grupo = GRUPO_TME[canal];
+    const limitesMudaram = base.faixas.some((f) => f.grupo === grupo && f.chave in cen.tmeMinimos);
+    const semanasMexidas = [1, 2, 3, 4].filter((s) => invertido.has(`${s}|${canal}`));
+    if (!limitesMudaram && !semanasMexidas.length) continue;
+    const faixas = faixasDoGrupo(base.faixas, grupo, cen.tmeMinimos);
+    // Semanas a refazer: todas, se os limites mudaram; senão, só as invertidas.
+    const refazer = limitesMudaram ? [1, 2, 3, 4] : semanasMexidas;
+    linhas = linhas.filter((l) => !(l.semana != null && refazer.includes(l.semana) && l.origem === canal && l.grupo === grupo));
+    for (const semana of refazer) {
+      const k = `${semana}|${canal}`;
+      const conta = desligado.has(k) ? invertido.has(k) : !invertido.has(k);
       const t = base.tme.find((x) => x.semana === semana && x.canal === canal)?.tme_seg;
-      const f = t ? faixaDe(base.faixas, GRUPO_TME[canal], t) : undefined;
+      const f = conta && t ? faixaDe(faixas, grupo, t) : undefined;
       if (!f) continue;
       for (const v of base.volume.filter((x) => x.semana === semana && x.canal === canal)) {
         const ref = cargoDe.get(v.pessoa_id);
-        if (!ref || fora.has(`${v.pessoa_id}|${semana}`)) continue;
+        if (!ref || fora.has(`${v.pessoa_id}|${semana}`) || !peso.has(`${ref.cargo_id}|${f.chave}`)) continue;
         linhas.push({ ...ref, semana, origem: canal, regra: f.chave, rotulo: f.rotulo, grupo: f.grupo, ordem: f.ordem,
           quantidade: v.finalizados, peso: 0, cota: 0 });
       }
@@ -138,19 +176,38 @@ export function simular(base: Base, cen: Cenario): Resultado[] {
   // Linha de valor digitado pelo gestor (cota ≠ quantidade × peso) fica como está.
   linhas = linhas.map((l) => {
     const novo = l.cota === 0 && l.peso === 0;
-    const mudou = `${l.cargo_id}|${l.regra}` in cen.pesos;
+    const mudou = `${l.cargo_id}|${l.regra}` in cen.pesos || l.regra in cen.pesosTodos;
     const regular = Math.abs(l.quantidade * l.peso - l.cota) < 0.01;
     if (!novo && !(mudou && regular)) return l;
     const p = pesoDe(l.cargo_id, l.regra);
     return { ...l, peso: p, cota: r4(l.quantidade * p) };
   });
 
-  // 6. O que deriva do resto.
+  // Pontos diretos, e a projeção deles para o mês inteiro.
+  // Projeção: o que é do mês entra como está; das semanas, só as já lançadas,
+  // e a média delas vale para cada semana que falta (a semana correndo, que
+  // só tem parte das avaliações, é trocada pela média).
+  const lancadas = semanasLancadas(base);
   const direto = new Map<string, number>();
-  for (const l of linhas) direto.set(l.pessoa_id, (direto.get(l.pessoa_id) ?? 0) + l.cota);
+  const doMes = new Map<string, number>();
+  const nasLancadas = new Map<string, number>();
+  const somar = (m: Map<string, number>, id: string, v: number) => m.set(id, (m.get(id) ?? 0) + v);
+  for (const l of linhas) {
+    somar(direto, l.pessoa_id, l.cota);
+    if (l.semana == null) somar(doMes, l.pessoa_id, l.cota);
+    else if (lancadas.has(l.semana)) somar(nasLancadas, l.pessoa_id, l.cota);
+  }
+  const diretoProj = new Map<string, number>();
+  for (const id of direto.keys()) {
+    const semanasDela = [...lancadas].filter((s) => !fora.has(`${id}|${s}`)).length;
+    const porSemana = semanasDela > 0 ? (nasLancadas.get(id) ?? 0) / semanasDela : 0;
+    diretoProj.set(id, lancadas.size >= 4 ? direto.get(id)!
+      : (doMes.get(id) ?? 0) + (nasLancadas.get(id) ?? 0) + porSemana * (4 - lancadas.size));
+  }
   const diretoHoje = new Map<string, number>();
   for (const l of base.linhas) if (!DERIVADAS.has(l.regra)) diretoHoje.set(l.pessoa_id, (diretoHoje.get(l.pessoa_id) ?? 0) + l.cota);
 
+  // 6. O que deriva do resto.
   const derivadas = base.linhas.filter((l) => DERIVADAS.has(l.regra));
   const semMedia = (id: string, d: number) => {
     let total = d;
@@ -169,25 +226,34 @@ export function simular(base: Base, cen: Cenario): Resultado[] {
 
   const pessoas = base.pessoas;
   const hoje = new Map(pessoas.map((p) => [p.pessoa_id, Number(p.resultado)]));
-  const simulado = new Map<string, number>();
   const recebeMedia = new Set(derivadas.filter((l) => l.regra === 'media_da_equipe').map((l) => l.pessoa_id));
-  for (const p of pessoas) if (!recebeMedia.has(p.pessoa_id)) simulado.set(p.pessoa_id, semMedia(p.pessoa_id, direto.get(p.pessoa_id) ?? 0));
 
-  for (const id of recebeMedia) {
-    const l = derivadas.find((x) => x.pessoa_id === id && x.regra === 'media_da_equipe')!;
-    const refs = new Set(base.referencias.filter((r) => r.cargo_id === l.cargo_id).map((r) => r.referencia_id));
-    const quem = pessoas.filter((p) => p.compoe_media && refs.has(cargoDe.get(p.pessoa_id)?.cargo_id ?? -1) && !recebeMedia.has(p.pessoa_id));
-    const soma = (m: Map<string, number>) => quem.reduce((a, p) => a + (m.get(p.pessoa_id) ?? 0), 0);
-    const proporcao = quem.length && soma(hoje) ? soma(simulado) / soma(hoje) : 1;
-    const p = pesoDe(l.cargo_id, 'media_da_equipe');
-    simulado.set(id, semMedia(id, direto.get(id) ?? 0) + l.quantidade * proporcao * p);
-  }
+  /** Resultado de todos a partir dos pontos diretos (simulados ou projetados). */
+  const totais = (dir: Map<string, number>) => {
+    const r = new Map<string, number>();
+    for (const p of pessoas) if (!recebeMedia.has(p.pessoa_id)) r.set(p.pessoa_id, semMedia(p.pessoa_id, dir.get(p.pessoa_id) ?? 0));
+    for (const id of recebeMedia) {
+      const l = derivadas.find((x) => x.pessoa_id === id && x.regra === 'media_da_equipe')!;
+      const refs = new Set(base.referencias.filter((x) => x.cargo_id === l.cargo_id).map((x) => x.referencia_id));
+      const quem = pessoas.filter((p) => p.compoe_media && refs.has(cargoDe.get(p.pessoa_id)?.cargo_id ?? -1) && !recebeMedia.has(p.pessoa_id));
+      const soma = (m: Map<string, number>) => quem.reduce((a, p) => a + (m.get(p.pessoa_id) ?? 0), 0);
+      const proporcao = quem.length && soma(hoje) ? soma(r) / soma(hoje) : 1;
+      const p = pesoDe(l.cargo_id, 'media_da_equipe');
+      r.set(id, semMedia(id, dir.get(id) ?? 0) + l.quantidade * proporcao * p);
+    }
+    return r;
+  };
+  const simulado = totais(direto);
+  const projetado = totais(diretoProj);
 
   return pessoas.map((p) => {
     const cargo = cargoDe.get(p.pessoa_id)?.cargo_id;
     const metaSim = cargo != null && `${cargo}` in cen.metas ? cen.metas[`${cargo}`] : p.meta;
-    return { pessoa_id: p.pessoa_id, pessoa: p.pessoa, cargo: p.cargo, hoje: Number(p.resultado),
+    return {
+      pessoa_id: p.pessoa_id, pessoa: p.pessoa, cargo: p.cargo, hoje: Number(p.resultado),
       simulado: r4(simulado.get(p.pessoa_id) ?? Number(p.resultado)),
-      metaHoje: p.meta == null ? null : Number(p.meta), metaSimulada: metaSim == null ? null : Number(metaSim) };
+      projecao: r4(projetado.get(p.pessoa_id) ?? Number(p.resultado)),
+      metaHoje: p.meta == null ? null : Number(p.meta), metaSimulada: metaSim == null ? null : Number(metaSim),
+    };
   });
 }

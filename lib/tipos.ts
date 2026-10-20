@@ -163,7 +163,8 @@ export type LinhaFeedback = {
 // Painel de cota
 // ---------------------------------------------------------------------------
 
-export type Cargo = { id: number; nome: string; ordem: number; ativo: boolean };
+/** recebe_cota (migração 71): desligado, quem está no cargo não tem extrato nem resultado. */
+export type Cargo = { id: number; nome: string; ordem: number; ativo: boolean; recebe_cota?: boolean };
 
 /** Catálogo: o que pontua. Quanto vale fica em `PesoCargo`. */
 export type RegraCota = {

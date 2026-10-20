@@ -2,7 +2,7 @@
 
 import { Fragment, useMemo, useState } from 'react';
 import { diaMes, duracao } from '@/lib/formatar';
-import { CENARIO_VAZIO, simular, type Base, type Cenario } from '@/lib/simulacao';
+import { CENARIO_VAZIO, faixaDe, faixasDoGrupo, semanasComDado, simular, type Base, type Cenario } from '@/lib/simulacao';
 
 const CANAIS = [['huggy', 'Expansão', 'tme'], ['diretores', 'Diretores-Expansão', 'tme_diretores']] as const;
 const pts = (v: number) => Math.round(v).toLocaleString('pt-BR');
@@ -47,7 +47,7 @@ export default function SimuladorDeCenarios({ base, periodos, cargos }: {
 
   const alternar = <K extends 'tmeInvertido' | 'semanasFora'>(campo: K, chave: string) =>
     setCen((c) => ({ ...c, [campo]: c[campo].includes(chave) ? c[campo].filter((x) => x !== chave) : [...c[campo], chave] }));
-  const definir = <K extends 'csatMinimos' | 'presenciais' | 'pesos' | 'metas'>(campo: K, chave: string, valor: number | null, hoje: number | null) =>
+  const definir = <K extends 'csatMinimos' | 'tmeMinimos' | 'presenciais' | 'pesos' | 'pesosTodos' | 'metas'>(campo: K, chave: string, valor: number | null, hoje: number | null) =>
     setCen((c) => {
       const mapa = { ...c[campo] } as Record<string, number>;
       if (valor == null || Number.isNaN(valor) || valor === hoje) delete mapa[chave]; else mapa[chave] = valor;
@@ -62,7 +62,16 @@ export default function SimuladorDeCenarios({ base, periodos, cargos }: {
   const faixasCsat = base.faixas.filter((f) => f.grupo === 'csat').sort((a, b) => (b.faixa_min ?? -1) - (a.faixa_min ?? -1));
   const nomeCargo = new Map(cargos.map((c) => [c.id, c.nome]));
 
+  // Projeção (2.0.0): quantas semanas já têm dado, e quem deve bater a meta.
+  const comDado = semanasComDado(base);
+  const naMetaProj = comMeta.filter((r) => r.metaSimulada != null && r.projecao >= r.metaSimulada).length;
+  /** Pontos de hoje de uma faixa: o peso nos cargos que a pontuam (normalmente um só valor). */
+  const pontosHoje = (regra: string) => [...new Set(base.pesos.filter((p) => p.regra === regra).map((p) => Number(p.peso)))];
+  const minutos = (seg: number | null) => seg == null ? null : Math.round((seg / 60) * 10) / 10;
+
   const descricao = [
+    ...Object.entries(cen.tmeMinimos).map(([k, v]) => `${rotulo.get(k)}: a partir de ${minutos(v)} min`),
+    ...Object.entries(cen.pesosTodos).map(([k, v]) => `${rotulo.get(k) ?? k}: ${pontosHoje(k).join('/')} → ${v} pts`),
     ...cen.tmeInvertido.map((k) => {
       const [s, c] = k.split('|');
       return `TME ${c === 'huggy' ? 'Expansão' : 'Diretores'} ${s}ª sem. ${base.tmeDesligado.includes(k) ? 'volta a contar' : 'fora'}`;
@@ -101,7 +110,7 @@ export default function SimuladorDeCenarios({ base, periodos, cargos }: {
                 {[1, 2, 3, 4].map((s) => {
                   const k = `${s}|${canal}`;
                   const t = base.tme.find((x) => x.semana === s && x.canal === canal)?.tme_seg ?? null;
-                  const f = t ? base.faixas.find((x) => x.grupo === grupo && (x.faixa_min == null || t >= x.faixa_min) && (x.faixa_max == null || t < x.faixa_max)) : null;
+                  const f = t ? faixaDe(faixasDoGrupo(base.faixas, grupo, cen.tmeMinimos), grupo, t) : null;
                   const hojeConta = !base.tmeDesligado.includes(k);
                   const conta = cen.tmeInvertido.includes(k) ? !hojeConta : hojeConta;
                   return (
@@ -117,6 +126,45 @@ export default function SimuladorDeCenarios({ base, periodos, cargos }: {
                   );
                 })}
               </div>
+              {/* Faixas e pontos de TME (2.0.0): limite em minutos e pontos por atendimento, em todos os cargos. */}
+              <table className="mt-2 w-full text-sm">
+                <thead>
+                  <tr className="text-left text-[11px] text-slate-500">
+                    <th className="pb-1 font-medium">Faixa</th>
+                    <th className="pb-1 text-right font-medium">A partir de (min)</th>
+                    <th className="pb-1 text-right font-medium">Pontos</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {base.faixas.filter((x) => x.grupo === grupo).sort((a, b) => (a.faixa_min ?? -1) - (b.faixa_min ?? -1)).map((x) => {
+                    const hojeMin = minutos(x.faixa_min);
+                    const simMin = x.chave in cen.tmeMinimos ? minutos(cen.tmeMinimos[x.chave]) : null;
+                    const hojePts = pontosHoje(x.chave);
+                    const simPts = cen.pesosTodos[x.chave];
+                    return (
+                      <tr key={x.chave} className="border-t border-slate-100">
+                        <td className="py-1 pr-2 text-xs text-slate-700">{x.rotulo}</td>
+                        <td className="py-1 text-right">
+                          {hojeMin == null ? <span className="text-xs text-slate-400">desde 0</span> : (
+                            <input type="number" step="1" min="0" aria-label={`Início de ${x.rotulo} em minutos`}
+                                   value={simMin ?? hojeMin}
+                                   onChange={(e) => definir('tmeMinimos', x.chave, e.target.value === '' ? null : Number(e.target.value) * 60, x.faixa_min)}
+                                   className={`${entrada} w-16 ${simMin != null ? 'border-amber-500 bg-amber-500/10' : 'border-slate-300'}`} />
+                          )}
+                        </td>
+                        <td className="py-1 pl-2 text-right">
+                          {hojePts.length === 0 ? <span className="text-xs text-slate-400">não pontua</span> : (
+                            <input type="number" step="0.25" aria-label={`Pontos de ${x.rotulo}`} title={`Hoje: ${hojePts.join(' / ')}`}
+                                   value={simPts ?? hojePts[0]}
+                                   onChange={(e) => definir('pesosTodos', x.chave, e.target.value === '' ? null : Number(e.target.value), hojePts.length === 1 ? hojePts[0] : null)}
+                                   className={`${entrada} w-16 ${simPts != null ? 'border-amber-500 bg-amber-500/10' : 'border-slate-300'}`} />
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           ))}
 
@@ -195,8 +243,10 @@ export default function SimuladorDeCenarios({ base, periodos, cargos }: {
         </section>
 
         <section className="rounded-[20px] bg-superficie px-5 py-4 shadow-sm">
-          <div className="mb-3 grid gap-2.5 sm:grid-cols-3">
+          <div className="mb-3 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
             {[
+              ['Na meta · projeção do mês', `${naMetaProj} de ${comMeta.length}`,
+                <span key="s" className="text-xs font-normal text-slate-500">{comDado >= 4 ? 'mês completo' : `${comDado} de 4 semanas com dado`}</span>],
               ['Na meta', `${naMetaSim} de ${comMeta.length}`, <Diferenca key="m" d={naMetaSim - naMetaHoje} sufixo={Math.abs(naMetaSim - naMetaHoje) === 1 ? ' pessoa' : ' pessoas'} />],
               ['Pontos da equipe', pts(totalSim), <Diferenca key="p" d={totalSim - totalHoje} />],
               ['Média por pessoa', pts(resultado.length ? totalSim / resultado.length : 0), <Diferenca key="d" d={resultado.length ? (totalSim - totalHoje) / resultado.length : 0} />],
@@ -216,6 +266,8 @@ export default function SimuladorDeCenarios({ base, periodos, cargos }: {
                 <th className="border-b border-slate-200 px-2 py-2 text-right font-medium">Simulado</th>
                 <th className="border-b border-slate-200 px-2 py-2 text-right font-medium">Diferença</th>
                 <th className="border-b border-slate-200 py-2 pl-2 font-medium">Meta</th>
+                <th className="border-b border-slate-200 bg-marca-600/5 px-2 py-2 text-right font-medium">Projeção do mês</th>
+                <th className="border-b border-slate-200 bg-marca-600/5 py-2 pl-2 font-medium">Meta na projeção</th>
               </tr>
             </thead>
             <tbody>
@@ -242,10 +294,17 @@ export default function SimuladorDeCenarios({ base, periodos, cargos }: {
                             ? <span className={`rounded-full px-2 py-px text-[11px] ${depois ? 'bg-marca-600/15 text-marca-700 dark:text-marca-400' : 'bg-slate-100 text-slate-500'}`}>{depois ? 'na meta' : 'abaixo'}</span>
                             : <span className={`rounded-full px-2 py-px text-[11px] font-semibold ${depois ? 'bg-marca-600/25 text-marca-700 dark:text-marca-400' : 'bg-rose-500/15 text-rose-700 dark:text-rose-400'}`}>{depois ? 'passa a bater' : 'deixa de bater'}</span>}
                       </td>
+                      <td className="bg-marca-600/5 px-2 py-2 text-right font-semibold text-slate-900">{pts(r.projecao)}</td>
+                      <td className="bg-marca-600/5 py-2 pl-2">
+                        {r.metaSimulada == null ? <span className="text-xs text-slate-400">—</span>
+                          : r.projecao >= r.metaSimulada
+                            ? <span className="rounded-full bg-marca-600/15 px-2 py-px text-[11px] text-marca-700 dark:text-marca-400">deve bater</span>
+                            : <span className="rounded-full bg-slate-100 px-2 py-px text-[11px] text-slate-500">não deve bater</span>}
+                      </td>
                     </tr>
                     {aqui && (
                       <tr className="border-b border-slate-100 bg-slate-50">
-                        <td colSpan={5} className="px-3 py-2.5">
+                        <td colSpan={7} className="px-3 py-2.5">
                           <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
                             <span>Tirar semana:</span>
                             {[1, 2, 3, 4].map((s) => {
@@ -275,7 +334,7 @@ export default function SimuladorDeCenarios({ base, periodos, cargos }: {
           <p className="mt-2 text-xs text-slate-500">
             Clique numa pessoa para tirar uma semana dela ou somar presenciais. Quem recebe pela média da equipe tem a média
             refeita na proporção dos resultados simulados dos cargos de referência (o atestado também, na proporção) — é uma
-            conta de simulação, próxima da do fechamento.
+            conta de simulação, próxima da do fechamento. Projeção do mês: a média das semanas com dado, já com o cenário, vale para as semanas que faltam; o que é do mês entra como está.
           </p>
         </section>
       </div>
