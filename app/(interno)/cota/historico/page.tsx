@@ -74,6 +74,10 @@ export default async function Historico({
   ]);
 
   const meses = (fechados ?? []) as Fechamento[];
+  // Valor do RH (migração 73): quando existe, é o que a pessoa recebeu.
+  const { data: doRh } = await db.from('valores_rh').select('mes_competencia, valor').eq('pessoa_id', pessoaId);
+  const valorRh = new Map(((doRh ?? []) as { mes_competencia: string; valor: number }[])
+    .map((v) => [v.mes_competencia, Number(v.valor)]));
   const pagamento = new Map(((pagamentos ?? []) as PagamentoMensal[])
     .map((p) => [p.mes_competencia, p]));
 
@@ -85,7 +89,7 @@ export default async function Historico({
 
   const linhas = (detalhe ?? []) as LinhaFechada[];
   const totalPago = meses.reduce(
-    (a, m) => a + Number(pagamento.get(m.mes_competencia)?.valor ?? 0), 0);
+    (a, m) => a + (valorRh.get(m.mes_competencia) ?? Number(pagamento.get(m.mes_competencia)?.valor ?? 0)), 0);
 
   // Os meses do mais antigo ao mais recente, para a linha.
   const serie = [...meses].reverse();
@@ -163,6 +167,7 @@ export default async function Historico({
 
         const doMes = linhas.filter((l) => l.fechamento_id === m.id);
         const pago = pagamento.get(m.mes_competencia);
+        const doRhNoMes = valorRh.get(m.mes_competencia);
         const canais = [...new Set(doMes.map((l) => l.origem ?? 'geral'))]
           .sort((a, b) => (a === 'geral' ? 1 : 0) - (b === 'geral' ? 1 : 0));
 
@@ -184,13 +189,19 @@ export default async function Historico({
                   {pago && !pago.atingiu_meta && (
                     <span className="text-xs text-slate-500">abaixo da meta</span>
                   )}
-                  {pago?.atingiu_meta && pago.valor != null && (
+                  {doRhNoMes != null ? (
+                    <span className="font-semibold tabular-nums text-marca-700 dark:text-marca-400">
+                      {reais(doRhNoMes)}
+                    </span>
+                  ) : pago?.atingiu_meta && pago.valor != null && (
                     <span className="font-semibold tabular-nums text-marca-700 dark:text-marca-400">
                       {reais(pago.valor)}
                     </span>
                   )}
                 </span>
-                {pago?.atingiu_meta && pago.valor != null && (
+                {doRhNoMes != null ? (
+                  <span className="text-right text-[11px] text-slate-500">valor encaminhado pelo RH</span>
+                ) : pago?.atingiu_meta && pago.valor != null && (
                   <span className="text-right text-[11px] text-slate-500 opacity-60">
                     *Valores aproximados. Os valores reais são encaminhados via Teams.
                   </span>
@@ -203,7 +214,7 @@ export default async function Historico({
               {pago && Number(pago.bonus) > 0 && (
                 <> · bônus de equipe <strong>+{num(Number(pago.bonus))}</strong> pts</>
               )}
-              {pago?.atingiu_meta && pago.valor == null && <> · valor por ponto ainda não informado</>}
+              {pago?.atingiu_meta && pago.valor == null && doRhNoMes == null && <> · valor por ponto ainda não informado</>}
             </p>
 
             {/* O detalhe fica recolhido: aberto, o histórico virava uma página

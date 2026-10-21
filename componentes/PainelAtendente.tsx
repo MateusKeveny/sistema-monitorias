@@ -119,7 +119,11 @@ export default async function PainelAtendente({
   const semanasCsat = todoCsat.filter((s) => s.mes_competencia === competencia);
   const volumes = todoVolume.filter((v) => v.mes_competencia === competencia);
   const linhas = (extrato.data ?? []) as LinhaExtrato[];
-  const historico = (fechados.data ?? []) as Pagamento[];
+  // Valor do RH (migração 73): quando existe, é o valor do mês (2.2.2).
+  const { data: doRh } = await db.from('valores_rh').select('mes_competencia, valor').eq('pessoa_id', pessoaId);
+  const valorRh = new Map(((doRh ?? []) as { mes_competencia: string; valor: number }[]).map((v) => [v.mes_competencia, Number(v.valor)]));
+  const historico = ((fechados.data ?? []) as Pagamento[])
+    .map((m) => (valorRh.has(m.mes_competencia) ? { ...m, valor: valorRh.get(m.mes_competencia)! } : m));
   const todasRegras = (regras.data ?? []) as Regra[];
   const tmesEquipe = (tmeEquipe.data ?? []) as { semana: number; canal: Canal; tme_seg: number | null }[];
   const cargoId = linhas[0]?.cargo_id;

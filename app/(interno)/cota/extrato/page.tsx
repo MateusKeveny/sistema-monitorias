@@ -416,15 +416,16 @@ export default async function Extrato({
               </div>
             ) : <span />}
 
-            {pagamento ? (
+            {valorRh != null ? (
+              // Valor do RH (2.2.2): é o que a pessoa recebe, com ou sem valor por ponto.
+              <div className="md:text-right">
+                <p className="text-2xl font-semibold tabular-nums text-marca-700 dark:text-marca-400">{reais(valorRh)}</p>
+                <p className="mt-0.5 text-xs text-slate-500">valor encaminhado pelo RH</p>
+              </div>
+            ) : pagamento ? (
               <div className="md:text-right">
                 {pagamento.atingiu_meta ? (
-                  valorRh != null ? (
-                    <>
-                      <p className="text-2xl font-semibold tabular-nums text-marca-700 dark:text-marca-400">{reais(valorRh)}</p>
-                      <p className="mt-0.5 text-xs text-slate-500">valor encaminhado pelo RH</p>
-                    </>
-                  ) : pagamento.valor == null ? (
+                  pagamento.valor == null ? (
                     <p className="text-sm text-slate-600">Valor por ponto ainda não informado.</p>
                   ) : (
                     <>

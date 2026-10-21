@@ -35,6 +35,17 @@ para o Performance.
 
 ---
 
+## Performance 2.2.2
+
+Sem migração. Não muda as Monitorias nem a Agenda.
+
+- **Performance (correção): valor do RH para o atendente.** O extrato só
+  mostrava o valor do RH quando o valor por ponto do mês já estava definido;
+  sem ele, aparecia "Valor por ponto ainda não informado". Agora o valor do
+  RH aparece sempre que existe — no extrato, no Histórico (e no "Total
+  recebido") e em "Seus últimos meses" no Início. Achado no teste do gestor
+  com o acesso do Pedro (setembro/2026).
+
 ## Performance 2.2.1 · Monitorias 5.6.3 · Agenda 1.5.1
 
 Sem migração. Vale para os três sites.
