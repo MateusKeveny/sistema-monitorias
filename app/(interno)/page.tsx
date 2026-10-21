@@ -3,6 +3,8 @@ import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { Quadro, Indicador, EtiquetaNota, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import EvolucaoMensal from '@/componentes/GraficoEvolucao';
 import CoberturaDoCiclo from '@/componentes/CoberturaDoCiclo';
+import OQueMaisSeRepete from '@/componentes/OQueMaisSeRepete';
+import { janelaDe, repeticoesDaEquipe } from '@/lib/repeticoes';
 import SolicitacoesDeExclusao, { type Solicitacao } from '@/componentes/SolicitacoesDeExclusao';
 import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
 import { nota, mesRotulo, mesCurto, percentual, data as formatarData, hojeNoBrasil, mesDeCompetencia } from '@/lib/formatar';
@@ -63,7 +65,7 @@ export default async function Painel({
   const ehOperador = perfil.papel === 'operador';
 
   const [{ data: criterios }, { data: recentes }, { data: porSemana }, { data: ativos },
-         { data: solicitacoes, error: erroSolicitacoes }] =
+         { data: solicitacoes, error: erroSolicitacoes }, repetidos] =
     await Promise.all([
       // A view respeita a RLS: para um operador estes já são os critérios que
       // ele próprio reprovou, não os do time.
@@ -94,6 +96,8 @@ export default async function Painel({
             .eq('status', 'pendente')
             .order('solicitada_em')
         : Promise.resolve({ data: null, error: null }),
+      // O que mais se repete na equipe (5.7.0): só para quem enxerga o time.
+      ehOperador ? Promise.resolve(null) : repeticoesDaEquipe(db, janelaDe(mes)),
     ]);
 
   const linhas = ranking
@@ -410,6 +414,10 @@ export default async function Painel({
           )}
         </Quadro>
       </div>
+
+      {repetidos && (
+        <OQueMaisSeRepete linhas={repetidos.linhas} janela={janelaDe(mes)} equipe={{ monitoradas: repetidos.monitoradas }} />
+      )}
 
       {!ehOperador && (
         <CoberturaDoCiclo linhas={cobertura} semanasEncerradas={semanasEncerradas} competencia={mes} comLink />

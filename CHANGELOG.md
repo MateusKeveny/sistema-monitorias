@@ -35,6 +35,25 @@ para o Performance.
 
 ---
 
+## Performance 2.7.0 · Monitorias 5.7.0
+
+Sem migração. Não muda a Agenda.
+
+- **Monitorias (atualização): lista "Por atendente".** Na lista de
+  monitorias, com um atendente escolhido, a tela abre no formato do
+  Performance: "O que mais se repete" e as monitorias em blocos, mês a mês,
+  cada uma com o link para abrir. O botão "Tabela" volta à tabela; sem
+  atendente, ou na busca por código/protocolo, continua a tabela.
+- **Monitorias e Performance (atualização): "O que mais se repete na
+  equipe".** Na tela inicial do site de Monitorias (gestor e qualidade) e em
+  Monitorias da equipe, no Performance: os critérios reprovados nos últimos 3
+  meses em toda a equipe, até 10, com quantas pessoas tiveram cada um no mês
+  mais recente.
+- **Performance (correção): tendência do "O que mais se repete".** Comparava
+  a contagem do mês, e o mês em andamento, com menos monitorias, parecia
+  sempre melhor. Agora compara as vezes por monitoria de cada mês, com uma
+  margem para não chamar ruído de mudança.
+
 ## Performance 2.6.0
 
 Migração 76 (banco dos painéis). Não muda as Monitorias nem a Agenda.

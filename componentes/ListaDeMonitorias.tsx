@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from '@/componentes/Link';
 import { codigoMonitoria, data as formatarData, nota as formatarNota } from '@/lib/formatar';
 
 export type MonitoriaDaLista = {
@@ -29,7 +30,11 @@ const tomDe = (m: MonitoriaDaLista) =>
  * por falha crítica aparecia como "Todos os critérios atendidos", porque o
  * motivo do zeramento não é um critério reprovado.
  */
-export default function ListaDeMonitorias({ monitorias }: { monitorias: MonitoriaDaLista[] }) {
+export default function ListaDeMonitorias({ monitorias, comLink = false }: {
+  monitorias: MonitoriaDaLista[];
+  /** No site de Monitorias o código abre a monitoria (editar, excluir, reportar ficam lá). */
+  comLink?: boolean;
+}) {
   const [filtro, setFiltro] = useState<Filtro>('todas');
   const aMelhorar = monitorias.filter((m) => m.zerado || m.reprovados.length > 0);
   const criticas = monitorias.filter((m) => m.zerado);
@@ -67,7 +72,11 @@ export default function ListaDeMonitorias({ monitorias }: { monitorias: Monitori
                 <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
                   <span className="font-semibold tabular-nums text-slate-900">{formatarData(m.data_atendimento)} · {m.semana_mes}ª semana</span>
                   {m.canal && <span className="rounded-full bg-slate-100 px-2 py-px text-xs text-slate-700">{m.canal}</span>}
-                  <span className="ml-auto text-xs tabular-nums text-slate-400">{codigoMonitoria(m.codigo)}</span>
+                  {comLink ? (
+                    <Link href={`/monitorias/${m.id}`} className="ml-auto text-xs font-semibold tabular-nums text-marca-700 hover:underline dark:text-marca-400">
+                      {codigoMonitoria(m.codigo)} · abrir ›
+                    </Link>
+                  ) : <span className="ml-auto text-xs tabular-nums text-slate-400">{codigoMonitoria(m.codigo)}</span>}
                 </div>
                 <p className="text-[12.5px] text-slate-500">
                   Protocolo <span className="tabular-nums text-slate-600">{m.protocolo}</span>

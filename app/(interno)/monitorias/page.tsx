@@ -4,12 +4,15 @@ import { Quadro, EtiquetaNota, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import { data as formatarData, mesRotulo, codigoMonitoria } from '@/lib/formatar';
 import type { Monitoria, Operador } from '@/lib/tipos';
 import { ateOMesAberto, mesAbertoDasMonitorias } from '@/lib/mes-aberto';
+import MonitoriasPorAtendente from '@/componentes/MonitoriasPorAtendente';
 
 export const dynamic = 'force-dynamic';
 
 type Busca = {
   operador?: string; mes?: string; zeradas?: string; pagina?: string;
   ordenar?: string; direcao?: string; busca?: string;
+  /** 'tabela' volta à tabela com um atendente escolhido (5.7.0). */
+  ver?: string;
 };
 
 const POR_PAGINA = 100;
@@ -44,6 +47,9 @@ export default async function ListaMonitorias({
   const filtros = await searchParams;
   const db = await criarClienteServidor();
 
+  // Com um atendente escolhido, a tela abre no formato do Performance (5.7.0).
+  // A busca por código ou protocolo continua sendo da tabela.
+  const porAtendente = perfil.papel !== 'operador' && !!filtros.operador && !filtros.busca && filtros.ver !== 'tabela';
   const pagina = Math.max(1, Number(filtros.pagina) || 1);
   const inicio = (pagina - 1) * POR_PAGINA;
 
@@ -62,7 +68,8 @@ export default async function ListaMonitorias({
   let consulta = db.from('vw_monitorias').select('*', { count: 'exact' })
     .order(ordenar, { ascending: crescente })
     .order('id')
-    .range(inicio, inicio + POR_PAGINA - 1);
+    // Por atendente a tabela não aparece: daqui só sai o total do cabeçalho.
+    .range(inicio, porAtendente ? inicio : inicio + POR_PAGINA - 1);
 
   // Só até o mês aberto (migração 30): monitoria de mês ainda não liberado
   // fica guardada, fora da lista, até a cota do aberto ser fechada.
@@ -111,6 +118,7 @@ export default async function ListaMonitorias({
     if (atual.busca) p.set('busca', atual.busca);
     if (atual.ordenar) p.set('ordenar', atual.ordenar);
     if (atual.direcao) p.set('direcao', atual.direcao);
+    if (atual.ver) p.set('ver', atual.ver);
     if (atual.pagina && atual.pagina !== '1') p.set('pagina', atual.pagina);
     const q = p.toString();
     return q ? `/monitorias?${q}` : '/monitorias';
@@ -177,6 +185,7 @@ export default async function ListaMonitorias({
         {/* Filtrar não desfaz a ordenação escolhida. */}
         <input type="hidden" name="ordenar" value={ordenar} />
         <input type="hidden" name="direcao" value={crescente ? 'asc' : 'desc'} />
+        {filtros.ver && <input type="hidden" name="ver" value={filtros.ver} />}
 
         {/* Vem primeiro porque é o caminho mais curto até um registro: quem
             sabe o número não precisa de filtro nenhum. */}
@@ -216,8 +225,22 @@ export default async function ListaMonitorias({
         <Link href="/monitorias" className="px-2 text-sm text-sobre-fundo-suave hover:underline">
           limpar
         </Link>
+        {perfil.papel !== 'operador' && filtros.operador && !filtros.busca && (
+          <span className="ml-auto inline-flex overflow-hidden rounded-lg border border-slate-300 bg-superficie text-sm">
+            {([['', 'Por atendente'], ['tabela', 'Tabela']] as const).map(([v, rotulo]) => (
+              <Link key={rotulo} href={link({ ver: v || undefined, pagina: '1' })} aria-current={(filtros.ver ?? '') === v ? 'page' : undefined}
+                    className={`px-3 py-1.5 ${(filtros.ver ?? '') === v ? 'bg-slate-100 font-semibold text-slate-900' : 'text-slate-600 hover:bg-slate-50'}`}>
+                {rotulo}
+              </Link>
+            ))}
+          </span>
+        )}
       </form>
 
+      {porAtendente ? (
+        <MonitoriasPorAtendente operadorId={filtros.operador!} mes={filtros.mes || undefined}
+                                soZeradas={filtros.zeradas === 'sim'} aberto={aberto} />
+      ) : (<>
       <Quadro>
         {monitorias.length === 0 ? (
           <Vazio>Nenhuma monitoria encontrada com esses filtros.</Vazio>
@@ -321,6 +344,7 @@ export default async function ListaMonitorias({
           ) : <span />}
         </nav>
       )}
+      </>)}
     </div>
   );
 }
