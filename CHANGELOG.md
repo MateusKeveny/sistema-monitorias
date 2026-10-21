@@ -35,6 +35,19 @@ para o Performance.
 
 ---
 
+## Performance 2.5.0
+
+Sem migração. Não muda as Monitorias nem a Agenda.
+
+- **Performance (atualização): lista de monitorias do atendente mais clara.**
+  Cada monitoria fica num bloco próprio, com a nota em destaque à esquerda e
+  a cor da faixa; o que melhorar vem em quadros separados, um por critério, e
+  o parecer à parte. Em cada mês, filtros: Todas · Com algo a melhorar ·
+  Falha crítica.
+- **Performance (correção): monitoria zerada por falha crítica.** Aparecia
+  como "Todos os critérios atendidos", porque o motivo do zeramento não é um
+  critério reprovado. Agora mostra "Por que zerou" com o motivo registrado.
+
 ## Performance 2.4.0
 
 Migração 75 (banco dos painéis). Segredo novo no Worker do Performance:

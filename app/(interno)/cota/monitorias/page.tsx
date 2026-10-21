@@ -1,9 +1,10 @@
 import Link from '@/componentes/Link';
 import GraficoDeLinha, { type PontoDaLinha } from '@/componentes/GraficoDeLinha';
 import CoberturaDoCiclo from '@/componentes/CoberturaDoCiclo';
+import ListaDeMonitorias from '@/componentes/ListaDeMonitorias';
 import { EtiquetaNota, Painel, Quadro, Secao, Tabela, Td, Th, Vazio } from '@/componentes/ui';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
-import { codigoMonitoria, data as formatarData, hojeNoBrasil, mesRotulo, percentual } from '@/lib/formatar';
+import { hojeNoBrasil, mesRotulo, percentual } from '@/lib/formatar';
 import { ateOMesAberto, mesAbertoDasMonitorias } from '@/lib/mes-aberto';
 import type { LinhaCriterio, LinhaRanking } from '@/lib/tipos';
 
@@ -11,7 +12,7 @@ export const dynamic = 'force-dynamic';
 
 type Monitoria = {
   id: string; codigo: number; protocolo: string; data_atendimento: string; mes_referencia: string;
-  semana_mes: number; nota_final: number; zerado: boolean; parecer: string | null;
+  semana_mes: number; nota_final: number; zerado: boolean; motivo_zeramento: string | null; parecer: string | null;
   canal: string | null; monitor: string | null;
 };
 type Apontamento = { monitoria_id: string; criterio: string; observacao: string | null };
@@ -56,7 +57,7 @@ export default async function MonitoriasDoAtendente({
 
   const aberto = await mesAbertoDasMonitorias();
   const { data } = await db.from('vw_monitorias')
-    .select('id, codigo, protocolo, data_atendimento, mes_referencia, semana_mes, nota_final, zerado, parecer, canal, monitor')
+    .select('id, codigo, protocolo, data_atendimento, mes_referencia, semana_mes, nota_final, zerado, motivo_zeramento, parecer, canal, monitor')
     .eq('operador_id', pessoaId).lte('mes_referencia', aberto)
     .order('data_atendimento', { ascending: false }).order('codigo', { ascending: false })
     .limit(300);
@@ -139,36 +140,10 @@ export default async function MonitoriasDoAtendente({
               <Painel key={m}>
                 <Secao titulo={mesRotulo(m)}
                        subtitulo={`${doMes(m).length} monitoria${doMes(m).length === 1 ? '' : 's'}${nota != null ? ` · nota média ${percentual(nota)}` : ''}`}>
-                  <ul className="-my-2 divide-y divide-slate-100">
-                    {doMes(m).map((x) => {
-                      const reprovados = falhas.get(x.id) ?? [];
-                      return (
-                        <li key={x.id} className="py-3">
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                            <span className="font-semibold tabular-nums text-slate-800">{x.protocolo}</span>
-                            <span className="tabular-nums text-slate-400/70">{codigoMonitoria(x.codigo)}</span>
-                            <span className="tabular-nums text-slate-500">{formatarData(x.data_atendimento)} · {x.semana_mes}ª semana</span>
-                            {x.canal && <span className="text-slate-500">{x.canal}</span>}
-                            {x.monitor && <span className="text-xs text-slate-400">por {x.monitor}</span>}
-                            <span className="ml-auto"><EtiquetaNota valor={Number(x.nota_final)} zerado={x.zerado} /></span>
-                          </div>
-                          {reprovados.length > 0 ? (
-                            <ul className="mt-1.5 space-y-0.5 text-sm text-slate-600">
-                              {reprovados.map((f) => (
-                                <li key={f.criterio}>
-                                  <span className="text-rose-600">✕</span> {f.criterio}
-                                  {f.observacao && <span className="text-slate-500"> — {f.observacao}</span>}
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <p className="mt-1.5 text-sm text-marca-700 dark:text-marca-400">Todos os critérios atendidos.</p>
-                          )}
-                          {x.parecer && <p className="mt-1 text-xs italic text-slate-500">{x.parecer}</p>}
-                        </li>
-                      );
-                    })}
-                  </ul>
+                  <ListaDeMonitorias monitorias={doMes(m).map((x) => ({
+                    ...x, nota_final: Number(x.nota_final),
+                    reprovados: (falhas.get(x.id) ?? []).map(({ criterio, observacao }) => ({ criterio, observacao })),
+                  }))} />
                 </Secao>
               </Painel>
             );
