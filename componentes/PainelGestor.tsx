@@ -196,8 +196,12 @@ export default async function PainelGestor({
       acao: 'Fechar', href: `/cota/fechamento?mes=${mes}`,
     });
   }
+  // Com o valor do RH informado (migração 73), o valor por ponto é só para
+  // conferir: não vira pendência (2.3.1).
+  const { data: mesesComRh } = await db.from('valores_rh').select('mes_competencia').in('mes_competencia', meses);
+  const temRh = (m: string) => (mesesComRh ?? []).some((v) => v.mes_competencia === m);
   for (const m of meses) {
-    if (fechadoEm(m) && !temValor(m)) {
+    if (fechadoEm(m) && !temValor(m) && !temRh(m)) {
       pendencias.push({
         texto: `Valor por ponto de ${nomeDoMes(m)} não informado`, grave: true,
         acao: 'Informar', href: `/cota/fechamento?mes=${m.slice(0, 7)}`,

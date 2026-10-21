@@ -35,6 +35,16 @@ para o Performance.
 
 ---
 
+## Performance 2.3.1
+
+Sem migração. Não muda as Monitorias nem a Agenda.
+
+- **Performance (correção): valor por ponto com o valor do RH informado.**
+  Com o valor do RH informado no mês, o valor por ponto deixa de ser cobrado:
+  sai a pendência "Valor por ponto … não informado" do Início, e no
+  Pagamento o aviso vira uma nota (o valor por ponto fica opcional, para
+  conferir o calculado com o do RH).
+
 ## Performance 2.3.0
 
 Migração 74 (banco dos painéis). Não muda as Monitorias nem a Agenda.

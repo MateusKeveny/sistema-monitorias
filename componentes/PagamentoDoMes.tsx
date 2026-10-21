@@ -87,7 +87,11 @@ export default function PagamentoDoMes({
   // conferido aqui e um número somado na tela vira número citado em reunião.
   return (
     <Quadro titulo={titulo}>
-      {semValor ? (
+      {semValor && valoresRh.length > 0 ? (
+        <p className="mb-4 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700 ring-1 ring-slate-300">
+          Valor do RH informado. O valor por ponto é opcional: com ele, a tela confere o calculado com o do RH.
+        </p>
+      ) : semValor ? (
         <p className={`mb-4 rounded-lg px-3 py-2 text-sm ring-1 ${
           atrasado(competencia)
             ? 'bg-amber-50 text-amber-900 ring-amber-600/20'
