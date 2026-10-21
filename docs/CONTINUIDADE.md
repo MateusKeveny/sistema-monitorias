@@ -726,6 +726,11 @@ Três versões, cada uma publicada e conferida antes da próxima:
   pendentes), `registrar_conferencia()` e pg_cron `conferencia-do-calculo`
   (09:00 UTC). Tela `/cota/conferencia`. Transferidos/fila: colunas
   removidas e as três funções que gravavam refeitas.
+- **Build (21/10/2026):** o OpenNext passou a recusar o Next.js 15 (mais de 2
+  anos desde o lançamento). Os scripts `cf:*` usam
+  `--dangerouslyUseUnsupportedNextVersion` por decisão do gestor, para publicar
+  a 2.1.0 sem esperar. **Pendente:** atualizar para o Next.js 16, como tarefa
+  própria e com teste das telas dos três sites; depois, tirar a opção.
 
 Visão de celular fica fora da revisão, por decisão do gestor. Os painéis são
 usados só no computador.
