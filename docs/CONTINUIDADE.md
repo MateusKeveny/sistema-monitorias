@@ -11,9 +11,9 @@ Escrito em 28/09/2026, atualizado em 08/10/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **2.0.1** · Monitorias **5.6.2** · Agenda **1.5.0** (20/10/2026) |
+| Publicado | Performance **2.1.0** · Monitorias **5.6.2** · Agenda **1.5.0** (21/10/2026) |
 | Branch | `painel-performance`, com os três sites (a `main` segue intocada) |
-| Migrações no banco | 01 a 71, todas aplicadas (a agenda tem banco próprio: 01 a 03) |
+| Migrações no banco | 01 a 72, todas aplicadas (a agenda tem banco próprio: 01 a 03) |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` · `painel-agenda.expansao.workers.dev` |
 
 ### Revisão de design (28/09/2026)
@@ -714,6 +714,18 @@ Três versões, cada uma publicada e conferida antes da próxima:
   `mover_lancamento`, `resolver_pendente` ('manter' marca `sem_cota_ok`,
   'apagar'), tudo em `realocacoes`. Simulação: `tmeMinimos`, `pesosTodos` e a
   projeção sobre `semanasLancadas` (semanas com volume).
+- **Performance 2.1.0** (migração 72): `lib/colar-do-hub.ts` (texto copiado do
+  Hub, um valor por linha; resolvidos → finalizados, TME útil → TME) no
+  `VolumeSemanal`; nome não reconhecido ligado à mão vai para
+  `salvar_nome_hub(p_extra)`. `ProjecaoDaCota` (cliente) +
+  `lib/base-do-mes.ts`: projeção pela `simular` sem cenário, semanas lançadas
+  pelo `vw_tme_equipe`; o multiplicador da média sai da própria linha.
+  `conferencias_calculo`, `conferir_calculo()` (resumo × view — pula se há
+  mudança na fila, porque a API barra o delete sem where do
+  `atualizar_resumo`; fechamentos ≥ 09/2026 sem ajuste manual; sem cargo +
+  pendentes), `registrar_conferencia()` e pg_cron `conferencia-do-calculo`
+  (09:00 UTC). Tela `/cota/conferencia`. Transferidos/fila: colunas
+  removidas e as três funções que gravavam refeitas.
 
 Visão de celular fica fora da revisão, por decisão do gestor. Os painéis são
 usados só no computador.

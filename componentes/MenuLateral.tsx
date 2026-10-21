@@ -35,6 +35,7 @@ const ICONES: Record<string, React.ReactNode> = {
   // Sol no horizonte: as férias da equipe (migração 61).
   '/cota/ferias': <><path d="M3 15h14M5.5 15a4.5 4.5 0 0 1 9 0M10 5v2M4.6 7.6l1.4 1.4M15.4 7.6 14 9" /></>,
   // Cronômetro: as métricas de tempo da semana (migração 66).
+  '/cota/conferencia': <><path d="M4 10.5l3.5 3.5L16 5.5" /><path d="M4 4h6M4 16h12" /></>,
   '/cota/simulacao': <><path d="M7 3h6M8 3v5l-4.5 7.5A1 1 0 0 0 4.4 17h11.2a1 1 0 0 0 .9-1.5L12 8V3" /><path d="M6 12.5h8" /></>,
   '/cota/metricas': <><circle cx="10" cy="11" r="6" /><path d="M10 8v3l2 1.5M8.5 3h3M10 3v2" /></>,
   '/cota/acessos': <><circle cx="10" cy="10" r="6.5" /><path d="M10 6.5V10l2.5 1.5" /></>,

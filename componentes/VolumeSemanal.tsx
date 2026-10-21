@@ -7,6 +7,7 @@ import { Quadro, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import type { Pessoa } from '@/lib/tipos';
 import { mensagemDoErro } from '@/lib/erro-amigavel';
 import { MoverPara } from '@/componentes/RealocacaoDeLancamentos';
+import { lerColagemDoHub, type LinhaDoHub } from '@/lib/colar-do-hub';
 
 export type LinhaVolume = {
   id?: number;
@@ -15,8 +16,6 @@ export type LinhaVolume = {
   finalizados: number;
   tma_seg: number | null;
   tme_seg: number | null;
-  transferidos?: number | null;
-  enviados_fila?: number | null;
 };
 
 /** Segundos → "H:MM:SS". As horas passam de 24 sem virar dia. */
@@ -39,7 +38,9 @@ function paraSegundos(texto: string): number | null {
   return h * 3600 + m * 60 + s;
 }
 
-type Rascunho = Record<string, { finalizados: string; tma: string; tme: string; transf: string; fila: string }>;
+type Rascunho = Record<string, { finalizados: string; tma: string; tme: string }>;
+
+const normalizar = (v: string) => v.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
 
 const entrada = `w-24 rounded-md border border-slate-300 px-2 py-1 text-right text-sm tabular-nums
                  outline-none focus:border-marca-600 disabled:bg-slate-50`;
@@ -74,8 +75,6 @@ export default function VolumeSemanal({
   esperados: string[];
 }) {
   const esperado = new Set(esperados);
-  // Transferidos e fila só existem no relatório do Huggy (Expansão).
-  const comFila = canal === 'huggy';
   // Esperados primeiro, na ordem do nome; depois quem não atendeu na última.
   const pessoas = [...todas].sort((a, b) =>
     Number(esperado.has(b.id)) - Number(esperado.has(a.id)) || a.nome.localeCompare(b.nome, 'pt-BR'));
@@ -93,8 +92,6 @@ export default function VolumeSemanal({
       finalizados: v ? String(v.finalizados) : '',
       tma: paraTempo(v?.tma_seg ?? null),
       tme: paraTempo(v?.tme_seg ?? null),
-      transf: v?.transferidos != null ? String(v.transferidos) : '',
-      fila: v?.enviados_fila != null ? String(v.enviados_fila) : '',
     }];
   })));
 
@@ -105,18 +102,12 @@ export default function VolumeSemanal({
 
     for (const p of pessoas) {
       const d = rascunho[p.id];
-      const vazio = !d.finalizados.trim() && !d.tma.trim() && !d.tme.trim() && !d.transf.trim() && !d.fila.trim();
+      const vazio = !d.finalizados.trim() && !d.tma.trim() && !d.tme.trim();
       if (vazio) { if (daSemana.has(p.id)) apagar.push(p.id); continue; }
 
       const finalizados = Number(d.finalizados || 0);
       const tma = paraSegundos(d.tma);
       const tme = paraSegundos(d.tme);
-      // Transferidos e fila (1.52.0): não pontuam, servem à leitura de volume.
-      const transf = d.transf.trim() ? Number(d.transf) : null;
-      const fila = d.fila.trim() ? Number(d.fila) : null;
-      if ([transf, fila].some((x) => x != null && (!Number.isInteger(x) || x < 0))) {
-        setErro(`Transferidos ou fila inválido para ${p.nome}.`); return;
-      }
       if (!Number.isInteger(finalizados) || finalizados < 0) { setErro(`Finalizados inválido para ${p.nome}.`); return; }
       if (Number.isNaN(tma) || Number.isNaN(tme)) {
         setErro(`Tempo inválido para ${p.nome}. Use H:MM:SS ou MM:SS.`); return;
@@ -124,7 +115,6 @@ export default function VolumeSemanal({
       gravar.push({
         pessoa_id: p.id, mes_competencia: competencia, semana, canal,
         finalizados, tma_seg: tma, tme_seg: tme,
-        ...(comFila ? { transferidos: transf, enviados_fila: fila } : {}),
         atualizado_em: new Date().toISOString(),
       });
     }
@@ -146,7 +136,39 @@ export default function VolumeSemanal({
     router.refresh();
   }
 
-  const set = (id: string, campo: 'finalizados' | 'tma' | 'tme' | 'transf' | 'fila', valor: string) =>
+  // Colar do Hub (2.1.0): lê a tabela copiada do Hub e preenche o quadro —
+  // nada é gravado até "Salvar", como na digitação.
+  const [colando, setColando] = useState(false);
+  const [colado, setColado] = useState('');
+  const [lidoDoHub, setLidoDoHub] = useState<LinhaDoHub[] | null>(null);
+  const [ligar, setLigar] = useState<Record<string, string>>({});
+  const [vindoDoHub, setVindoDoHub] = useState<Set<string>>(new Set());
+  const porNomeHub = new Map<string, Pessoa>();
+  for (const p of pessoas) for (const n of [p.nome_hub, ...(p.nomes_hub_extras ?? []), p.nome]) if (n) porNomeHub.set(normalizar(n), p);
+  const casar = (l: LinhaDoHub) => porNomeHub.get(normalizar(l.nome)) ?? pessoas.find((p) => p.id === ligar[l.nome]);
+
+  async function preencherDoHub() {
+    if (!lidoDoHub) return;
+    const novo = { ...rascunho }; const vieram = new Set<string>();
+    for (const l of lidoDoHub) {
+      const p = casar(l);
+      if (!p) continue;
+      novo[p.id] = { finalizados: String(l.resolvidos), tma: paraTempo(l.tmaSeg), tme: paraTempo(l.tmeUtilSeg) };
+      vieram.add(p.id);
+    }
+    setRascunho(novo); setVindoDoHub(vieram);
+    // Quem foi ligado à mão fica lembrado como outro Nome no Hub da pessoa.
+    const db = criarClienteNavegador();
+    for (const l of lidoDoHub) {
+      if (!porNomeHub.has(normalizar(l.nome)) && ligar[l.nome]) {
+        await db.rpc('salvar_nome_hub', { p_pessoa: ligar[l.nome], p_nome: l.nome, p_extra: true });
+      }
+    }
+    setColando(false); setLidoDoHub(null); setColado(''); setLigar({});
+    setAviso(`${vieram.size} pessoa(s) preenchidas do Hub. Confira e clique em Salvar ${semana}ª semana.`);
+  }
+
+  const set = (id: string, campo: 'finalizados' | 'tma' | 'tme', valor: string) =>
     setRascunho((r) => ({ ...r, [id]: { ...r[id], [campo]: valor } }));
 
   const total = pessoas.reduce((a, p) => a + (Number(rascunho[p.id]?.finalizados) || 0), 0);
@@ -169,6 +191,81 @@ export default function VolumeSemanal({
       {erro && <p className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800 ring-1 ring-rose-600/20">{erro}</p>}
       {aviso && <p className="mb-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-emerald-600/20">{aviso}</p>}
 
+      {pessoas.length > 0 && !colando && (
+        <button type="button" onClick={() => setColando(true)} disabled={ocupado}
+                className="mb-3 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:border-marca-600">
+          Colar do Hub
+        </button>
+      )}
+      {colando && (
+        <div className="mb-4 rounded-xl border border-marca-600/40 bg-slate-50 px-4 py-3">
+          <p className="text-sm font-semibold text-slate-900">Colar do Hub</p>
+          <p className="text-xs text-slate-500">
+            No Hub, filtre o canal {canal === 'huggy' ? 'Expansão' : 'Diretores-Expansão'} e o período {periodo}, selecione a
+            tabela de analistas e copie (Ctrl+C). Entram os <b>resolvidos</b> (como finalizados), o TMA e o <b>TME útil</b>.
+          </p>
+          <textarea value={colado} onChange={(e) => { setColado(e.target.value); setLidoDoHub(null); }}
+                    placeholder="Cole a tabela do Hub aqui…" aria-label="Tabela copiada do Hub"
+                    className="mt-2 min-h-28 w-full rounded-lg border border-slate-300 bg-superficie px-3 py-2 font-mono text-xs text-slate-900 outline-none focus:border-marca-600" />
+          {lidoDoHub && (
+            lidoDoHub.length === 0 ? <p className="mt-2 text-sm text-rose-700">Não reconheci nenhuma linha. Copie a tabela inteira, com o cabeçalho.</p> : (
+              <table className="mt-2 w-full text-sm tabular-nums">
+                <thead><tr className="text-left text-xs text-slate-500">
+                  <th className="py-1 font-medium">No Hub</th><th className="py-1 font-medium">No cadastro</th>
+                  <th className="py-1 text-right font-medium">Finalizados</th><th className="py-1 text-right font-medium">TMA</th>
+                  <th className="py-1 text-right font-medium">TME útil</th><th />
+                </tr></thead>
+                <tbody>
+                  {lidoDoHub.map((l) => {
+                    const automatico = porNomeHub.get(normalizar(l.nome));
+                    const p = casar(l);
+                    const antes = p ? daSemana.get(p.id) : undefined;
+                    return (
+                      <tr key={l.nome} className={`border-t border-slate-200 ${antes ? 'bg-amber-500/10' : ''}`}>
+                        <td className="py-1.5 pr-2 text-slate-700">{l.nome}</td>
+                        <td className="py-1.5 pr-2">
+                          {automatico ? <span className="text-slate-800">{automatico.nome}</span> : (
+                            <span className="inline-flex items-center gap-1.5">
+                              <span className="rounded-full bg-amber-500/15 px-2 py-px text-xs text-amber-700 dark:text-amber-300">não reconhecido</span>
+                              <select value={ligar[l.nome] ?? ''} onChange={(e) => setLigar((s) => ({ ...s, [l.nome]: e.target.value }))}
+                                      className="rounded-md border border-slate-300 bg-superficie px-1.5 py-0.5 text-xs text-slate-800">
+                                <option value="">Deixar de fora</option>
+                                {pessoas.map((x) => <option key={x.id} value={x.id}>{x.nome}</option>)}
+                              </select>
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-1.5 text-right font-semibold">{l.resolvidos.toLocaleString('pt-BR')}</td>
+                        <td className="py-1.5 text-right">{paraTempo(l.tmaSeg) || '—'}</td>
+                        <td className="py-1.5 text-right">{paraTempo(l.tmeUtilSeg) || '—'}</td>
+                        <td className="py-1.5 pl-2 text-xs text-amber-700 dark:text-amber-300">{antes ? `substitui ${antes.finalizados}` : ''}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )
+          )}
+          <div className="mt-2 flex flex-wrap justify-end gap-2">
+            <button type="button" onClick={() => { setColando(false); setLidoDoHub(null); setColado(''); setLigar({}); }}
+                    className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700">Cancelar</button>
+            {!lidoDoHub ? (
+              <button type="button" onClick={() => setLidoDoHub(lerColagemDoHub(colado))} disabled={!colado.trim()}
+                      className="rounded-lg bg-marca-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-40">Ler</button>
+            ) : lidoDoHub.length > 0 && (
+              <button type="button" onClick={preencherDoHub}
+                      className="rounded-lg bg-marca-600 px-3 py-1.5 text-sm font-semibold text-white">Preencher a {semana}ª semana</button>
+            )}
+          </div>
+          {lidoDoHub && lidoDoHub.length > 0 && (
+            <p className="mt-1 text-xs text-slate-500">
+              Preencher só coloca os números no quadro abaixo; nada é gravado até <b>Salvar {semana}ª semana</b>. Em âmbar, quem
+              já tinha volume lançado. Quem você ligar à mão fica lembrado para as próximas semanas.
+            </p>
+          )}
+        </div>
+      )}
+
       {pessoas.length === 0 ? (
         <Vazio>Ninguém com cargo que pontue por atendimento nesta competência.</Vazio>
       ) : (
@@ -179,8 +276,6 @@ export default function VolumeSemanal({
               <Th className="text-right">Finalizados</Th>
               <Th className="text-right">TMA</Th>
               <Th className="text-right">TME</Th>
-              {comFila && <Th className="text-right">Transferidos</Th>}
-              {comFila && <Th className="text-right">Fila</Th>}
               <Th />
             </tr>
           </thead>
@@ -192,7 +287,7 @@ export default function VolumeSemanal({
               const ref = anterior.get(p.id);
               const borda = falta ? 'border-dashed' : '';
               return (
-                <tr key={p.id}>
+                <tr key={p.id} className={vindoDoHub.has(p.id) ? 'bg-marca-600/5' : ''}>
                   <Td className={`font-medium ${fora ? 'text-slate-400' : 'text-slate-800'}`}>
                     {p.nome}
                     {!p.ativo && <span className="ml-2 text-xs text-slate-500">· desligado</span>}
@@ -222,13 +317,6 @@ export default function VolumeSemanal({
                            aria-label={`TME de ${p.nome}`}
                            onChange={(e) => set(p.id, 'tme', e.target.value)} className={`${entrada} ${borda}`} />
                   </Td>
-                  {comFila && (['transf', 'fila'] as const).map((campo) => (
-                    <Td key={campo} className="text-right">
-                      <input inputMode="numeric" value={d[campo]} disabled={ocupado} placeholder="opcional"
-                             aria-label={`${campo === 'transf' ? 'Transferidos' : 'Enviados para fila'} de ${p.nome}`}
-                             onChange={(e) => set(p.id, campo, e.target.value)} className={`${entrada} w-20`} />
-                    </Td>
-                  ))}
                   <Td className="whitespace-nowrap">
                     {daSemana.get(p.id)?.id != null && (
                       <MoverPara tipo="volume" id={Number(daSemana.get(p.id)!.id)} de={p.id} pessoas={recebem} recarregar />
@@ -245,7 +333,6 @@ export default function VolumeSemanal({
                 {total.toLocaleString('pt-BR')}
               </td>
               <td /><td />
-              {comFila && <><td /><td /></>}
               <td />
             </tr>
           </tfoot>

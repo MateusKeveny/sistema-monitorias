@@ -7,6 +7,7 @@ import { criarClienteServidor } from '@/lib/supabase/servidor';
 import { corDoCsat, hojeNoBrasil, percentual, semanaDoCiclo } from '@/lib/formatar';
 import { mesAnterior } from '@/lib/competencia';
 import { fonteDoMes } from '@/lib/resumo';
+import ProjecaoDaCota from '@/componentes/ProjecaoDaCota';
 import { limiteDeRenovacao, pessoasComLeituraPendente, type LeituraDiario } from '@/lib/diario';
 import { todas } from '@/lib/consultas';
 
@@ -160,7 +161,6 @@ export default async function PainelGestor({
   const semanasLancadas = new Set(todoVolume.filter((v) => v.mes_competencia === competencia).map((v) => v.semana)).size;
   const projetar = competencia === atual && semanasLancadas > 0 && semanasLancadas < 4;
   const projecao = (resultado: number) => (resultado * 4) / semanasLancadas;
-  const naMetaProjetado = comDireito.filter((c) => projecao(Number(c.resultado)) >= Number(c.meta)).length;
 
   // ---------- Pendências ----------
   // O que precisa do gestor, cada uma com o caminho de onde se resolve.
@@ -203,6 +203,16 @@ export default async function PainelGestor({
         acao: 'Informar', href: `/cota/fechamento?mes=${m.slice(0, 7)}`,
       });
     }
+  }
+  // Conferência do cálculo (migração 72): divergência na última rodada. Fora
+  // do todas(): sem a migração, a tabela não existe e a tela segue.
+  const { data: conferencia } = await db.from('conferencias_calculo').select('falhas')
+    .order('rodada_em', { ascending: false }).limit(1).maybeSingle();
+  if (conferencia?.falhas) {
+    pendencias.push({
+      texto: `Conferência do cálculo: ${conferencia.falhas} divergência${conferencia.falhas > 1 ? 's' : ''}`,
+      acao: 'Ver', href: '/cota/conferencia', grave: true,
+    });
   }
   if ((semCargo.data ?? []).length) {
     const n = (semCargo.data ?? []).length;
@@ -543,12 +553,6 @@ export default async function PainelGestor({
           <Comparacao melhor={naMeta - (naMetaAntes ?? naMeta) >= 0}
                       texto={naMetaAntes == null || comDireito.length === 0 ? null
                         : naMeta === naMetaAntes ? 'igual' : `${seta(naMeta - naMetaAntes)} ${Math.abs(naMeta - naMetaAntes)}`} />
-          {projetar && comDireito.length > 0 && (
-            <p className="mt-0.5 text-xs text-slate-600">
-              Projeção: <b className={naMetaProjetado === comDireito.length ? 'text-marca-700 dark:text-marca-400' : 'text-amber-700'}>
-                {naMetaProjetado} de {comDireito.length}</b> no fim do ciclo
-            </p>
-          )}
           {abaixo.length > 0 && (
             <p className="mt-1 text-xs text-slate-600">{abaixo.map((c) => primeiroNome(c.pessoa)).join(', ')} abaixo</p>
           )}
@@ -558,7 +562,12 @@ export default async function PainelGestor({
         <Painel>
           <Secao titulo="Pontuação de cota" acao={<Link href="/cota/comparativo?cat=pts" className="whitespace-nowrap rounded-full border border-slate-200 px-2.5 py-0.5 text-xs text-slate-600 hover:border-marca-600">comparar meses ›</Link>}
                  subtitulo={`${cotas[0]?.meta ? `Meta de ${inteiro(Number(cotas[0].meta))} pontos. ` : ''}Basta um com direito abaixo da meta para o bônus de equipe não sair.`}>
-            {cotas.length === 0 ? <Vazio>Sem pontuação nesta competência.</Vazio> : (
+            {cotas.length === 0 ? <Vazio>Sem pontuação nesta competência.</Vazio> : competencia === atual ? (
+              // Mês aberto (2.1.0): quem bate a meta no ritmo atual, com a mesma
+              // conta da Simulação. A cota do cargo Gestor não aparece.
+              <ProjecaoDaCota competencia={competencia} fonte={{ extrato: fonte.extrato, mensal: fonte.mensal }}
+                              modo="equipe" ocultarCargos={['Gestor']} />
+            ) : (
               <div className="-mx-6 overflow-x-auto sm:-mx-7">
                 <table className="w-full text-[15px]">
                   <thead>

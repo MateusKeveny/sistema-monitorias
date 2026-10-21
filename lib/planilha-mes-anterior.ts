@@ -7,8 +7,8 @@ import { dataDoExcel, type Linha } from '@/lib/xlsx-navegador';
  *   - uma aba por pessoa: os 4 blocos semanais ("Tiragem semanal") com
  *     Categoria · Pontuação · Feito · Cota, o bloco "Cota Mensal" à direita e,
  *     no rodapé, o nome completo e o e-mail;
- *   - "Volume de atendimentos e TME": por semana e pessoa, finalizados, fila,
- *     transferidos, TMA e TME (em fração de dia);
+ *   - "Volume de atendimentos e TME": por semana e pessoa, finalizados, TMA e
+ *     TME (em fração de dia); fila e transferidos não entram (2.1.0);
  *   - "Atendimentos e Avaliações": uma linha por atendimento.
  *
  * Daqui sai o que a migração 69 grava. O resultado é o da planilha, congelado;
@@ -18,7 +18,7 @@ import { dataDoExcel, type Linha } from '@/lib/xlsx-navegador';
 
 export type VolumeDaSemana = {
   semana: number; canal: 'huggy' | 'diretores'; finalizados: number;
-  transferidos: number | null; enviados_fila: number | null; tma_seg: number | null; tme_seg: number | null;
+  tma_seg: number | null; tme_seg: number | null;
 };
 export type LinhaDoExtrato = {
   semana: number | null; origem: string | null; regra: string; rotulo: string; grupo: string;
@@ -167,7 +167,7 @@ export function lerMesDaPlanilha(abas: Map<string, Linha[]>): MesDaPlanilha {
   }
 
   // Volume: blocos por semana, linhas por nome completo.
-  const volume = new Map<string, Map<number, { fin: number | null; fila: number | null; transf: number | null; tma: number | null; tme: number | null }>>();
+  const volume = new Map<string, Map<number, { fin: number | null; tma: number | null; tme: number | null }>>();
   let semana = 0; let ultimoPeriodo: RegExpExecArray | null = null;
   for (const l of abas.get(nomeVolume)!) {
     const b = txt(l.B);
@@ -176,7 +176,7 @@ export function lerMesDaPlanilha(abas: Map<string, Linha[]>): MesDaPlanilha {
     if (!semana || !b || b === 'Nome' || b === 'Total') continue;
     const k = comparavel(b);
     if (!volume.has(k)) volume.set(k, new Map());
-    volume.get(k)!.set(semana, { fin: num(l.C), fila: num(l.D), transf: num(l.E), tma: segundos(l.G), tme: segundos(l.I) });
+    volume.get(k)!.set(semana, { fin: num(l.C), tma: segundos(l.G), tme: segundos(l.I) });
   }
   if (semana !== 4) avisos.push(`A aba de volume tem ${semana} semana(s); o sistema usa 4.`);
 
@@ -212,10 +212,10 @@ export function lerMesDaPlanilha(abas: Map<string, Linha[]>): MesDaPlanilha {
     for (let s = 1; s <= 4; s++) {
       const v = vol?.get(s);
       if (v && (v.fin != null || v.tme != null)) {
-        linhas.push({ semana: s, canal: 'huggy', finalizados: v.fin ?? 0, transferidos: v.transf, enviados_fila: v.fila, tma_seg: v.tma, tme_seg: v.tme });
+        linhas.push({ semana: s, canal: 'huggy', finalizados: v.fin ?? 0, tma_seg: v.tma, tme_seg: v.tme });
       }
       const dir = porSemana.get(s)?.dir ?? 0;
-      if (dir > 0) linhas.push({ semana: s, canal: 'diretores', finalizados: dir, transferidos: null, enviados_fila: null, tma_seg: null, tme_seg: null });
+      if (dir > 0) linhas.push({ semana: s, canal: 'diretores', finalizados: dir, tma_seg: null, tme_seg: null });
     }
     if (p.resultado == null) avisos.push(`${aba}: sem resultado no bloco Cota Mensal.`);
     return { ...p, volume: linhas };

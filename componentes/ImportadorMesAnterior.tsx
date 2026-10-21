@@ -91,7 +91,7 @@ export default function ImportadorMesAnterior({
   }, [pessoas, lido]);
 
   // Só o volume (1.54.0, migração 70): mês já fechado pelo sistema, sem volume.
-  // Entram só finalizados, fila, transferidos e tempos; fechamento e avaliações
+  // Entram só finalizados e tempos; fechamento e avaliações
   // ficam como estão. Só quem tem volume precisa de pessoa, e só do cadastro.
   const soVolume = !!lido && !!primeiroDoSistema && lido.mes >= primeiroDoSistema && semVolume.includes(lido.mes);
   const comVolume = lido ? lido.pessoas.filter((p) => !soVolume || p.volume.length > 0) : [];
@@ -106,12 +106,11 @@ export default function ImportadorMesAnterior({
   const totais = useMemo(() => {
     if (!lido) return null;
     const vol = lido.pessoas.flatMap((p) => p.volume);
-    const soma = (canal: string, campo: 'finalizados' | 'transferidos' | 'enviados_fila') =>
+    const soma = (canal: string, campo: 'finalizados') =>
       vol.filter((v) => v.canal === canal).reduce((a, v) => a + (v[campo] ?? 0), 0);
     const validas = lido.avaliacoes.filter((a) => a.nota != null && a.nota >= 1 && a.nota <= 5);
     return {
-      finalizados: soma('huggy', 'finalizados'), transferidos: soma('huggy', 'transferidos'),
-      fila: soma('huggy', 'enviados_fila'), diretores: soma('diretores', 'finalizados'),
+      finalizados: soma('huggy', 'finalizados'), diretores: soma('diretores', 'finalizados'),
       validas: validas.length, positivas: validas.filter((a) => a.nota! >= 4).length,
     };
   }, [lido]);
@@ -134,7 +133,7 @@ export default function ImportadorMesAnterior({
     if (soVolume) {
       const { data, error } = await criarClienteNavegador().rpc('importar_volume_mes', { p: {
         mes: lido.mes, arquivo,
-        resumo: { finalizados: totais.finalizados, transferidos: totais.transferidos, fila: totais.fila,
+        resumo: { finalizados: totais.finalizados,
           diretores: totais.diretores, pessoas: comVolume.length },
         vinculos: chaves.map((c) => ({ chave: c, pessoa_id: escolhas[c] })),
         pessoas: comVolume.map((p) => ({ chave: p.chave, volume: p.volume })),
@@ -246,17 +245,17 @@ export default function ImportadorMesAnterior({
           {soVolume && (
             <p className="mb-3 rounded-xl border-2 border-marca-600 bg-marca-600/8 px-4 py-3 text-sm text-slate-700">
               <b className="text-slate-900">Só o volume.</b> {mesRotulo(lido.mes)} já está no sistema, fechado, com as avaliações.
-              Desta planilha entram só os finalizados, transferidos, fila, TMA e TME por pessoa e semana, e os atendimentos de
+              Desta planilha entram só os finalizados, TMA e TME por pessoa e semana, e os atendimentos de
               Diretores e Executivos. <b className="text-slate-900">O resultado fechado e as avaliações não mudam.</b>
             </p>
           )}
           <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
             {(soVolume ? [
-              ['Atendimentos finalizados (Huggy)', fmt(totais.finalizados), `${fmt(totais.transferidos)} transferidos · ${fmt(totais.fila)} enviados para fila`],
+              ['Atendimentos finalizados (Huggy)', fmt(totais.finalizados), 'canal Expansão'],
               ['Diretores e Executivos', fmt(totais.diretores), 'canal Diretores-Expansão'],
               ['Pessoas com volume', fmt(comVolume.length), `de ${lido.pessoas.length} abas`],
             ] : [
-              ['Atendimentos finalizados (Huggy)', fmt(totais.finalizados), `${fmt(totais.transferidos)} transferidos · ${fmt(totais.fila)} enviados para fila`],
+              ['Atendimentos finalizados (Huggy)', fmt(totais.finalizados), 'canal Expansão'],
               ['Avaliações no ciclo', fmt(lido.avaliacoes.length), `${fmt(totais.validas)} com nota 1 a 5`],
               ['C-SAT da equipe', pct(totais.validas ? totais.positivas / totais.validas : null), `${fmt(totais.positivas)} positivas de ${fmt(totais.validas)} · sobre o mês inteiro`],
               ['Diretores e Executivos', fmt(totais.diretores), 'canal Diretores-Expansão'],
@@ -303,9 +302,9 @@ export default function ImportadorMesAnterior({
             <table className="w-full text-sm tabular-nums">
               <thead>
                 <tr className="text-left text-xs text-slate-500">
-                  {(soVolume ? ['Na planilha', 'No cadastro', 'Sem 1', 'Sem 2', 'Sem 3', 'Sem 4', 'Transf.', 'Fila', 'TME médio', 'Dir.+Exec.']
-                    : ['Na planilha', 'No cadastro', 'Sem 1', 'Sem 2', 'Sem 3', 'Sem 4', 'Transf.', 'Fila', 'Notas 1–5', 'C-SAT', 'Dir.+Exec.', 'Resultado', 'Semanas + mês']).map((h, i) => (
-                    <th key={h} className={`whitespace-nowrap border-b border-slate-200 px-1.5 py-2 font-medium ${i >= 2 && i <= 11 ? 'text-right' : ''}`}>{h}</th>
+                  {(soVolume ? ['Na planilha', 'No cadastro', 'Sem 1', 'Sem 2', 'Sem 3', 'Sem 4', 'TME médio', 'Dir.+Exec.']
+                    : ['Na planilha', 'No cadastro', 'Sem 1', 'Sem 2', 'Sem 3', 'Sem 4', 'Notas 1–5', 'C-SAT', 'Dir.+Exec.', 'Resultado', 'Semanas + mês']).map((h, i) => (
+                    <th key={h} className={`whitespace-nowrap border-b border-slate-200 px-1.5 py-2 font-medium ${i >= 2 && i <= 9 ? 'text-right' : ''}`}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -313,7 +312,6 @@ export default function ImportadorMesAnterior({
                 {comVolume.map((p) => {
                   const auto = casar(p.email, p.nome);
                   const huggy = (s: number) => p.volume.find((v) => v.canal === 'huggy' && v.semana === s)?.finalizados ?? null;
-                  const soma = (campo: 'transferidos' | 'enviados_fila') => p.volume.reduce((a, v) => a + (v[campo] ?? 0), 0);
                   const dir = p.volume.filter((v) => v.canal === 'diretores').reduce((a, v) => a + v.finalizados, 0);
                   const { validas, csat } = daPessoa(p.chave);
                   return (
@@ -326,8 +324,6 @@ export default function ImportadorMesAnterior({
                         {auto && escolhas[p.chave] === auto.id && <span className="ml-1 text-xs text-slate-400">· {auto.como}</span>}
                       </td>
                       {[1, 2, 3, 4].map((s) => <td key={s} className="px-1.5 py-2 text-right">{fmt(huggy(s))}</td>)}
-                      <td className="px-1.5 py-2 text-right">{fmt(soma('transferidos'))}</td>
-                      <td className="px-1.5 py-2 text-right">{fmt(soma('enviados_fila'))}</td>
                       {soVolume ? <>
                         <td className="px-1.5 py-2 text-right">{tmeMedio(p.volume)}</td>
                         <td className="px-1.5 py-2 text-right">{fmt(dir)}</td>
@@ -351,7 +347,7 @@ export default function ImportadorMesAnterior({
                 {!soVolume && lido.soAvaliacoes.map((c) => (
                   <tr key={c} className="border-b border-slate-100">
                     <td className="whitespace-nowrap px-1.5 py-2 text-slate-600"><code>{c}</code></td>
-                    <td className="px-1.5 py-2" colSpan={12}>
+                    <td className="px-1.5 py-2" colSpan={10}>
                       <EscolhaDePessoa valor={escolhas[c] ?? ''} pessoas={ativos} disabled={ocupado}
                                        onChange={(v) => setEscolhas((s) => ({ ...s, [c]: v }))} />
                       <span className="ml-2 text-xs text-slate-500">só avaliações ({fmt(daPessoa(c).validas)} com nota)</span>

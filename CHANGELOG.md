@@ -35,6 +35,31 @@ para o Performance.
 
 ---
 
+## Performance 2.1.0
+
+Migração 72 (banco dos painéis). Não muda as Monitorias nem a Agenda.
+
+- **Performance (atualização): colar do Hub.** No volume da semana, **Colar do
+  Hub** lê a tabela de analistas copiada do Hub (Ctrl+C, filtrada por canal e
+  semana) e preenche o quadro: resolvidos como finalizados, TMA e TME útil
+  (decisão do gestor, 21/10/2026). Casa pelo Nome no Hub; quem não casar fica
+  em alerta e, ligado à mão, é lembrado. Nada é gravado até "Salvar".
+- **Performance (atualização): projeção do mês.** No Início do gestor, o quadro
+  de pontuação do mês aberto mostra, por pessoa, a barra do que já fez e até
+  onde chega no ritmo atual, com "na meta / deve bater / em risco / abaixo", e
+  os totais (na meta hoje, devem bater, em risco). A cota do cargo Gestor não
+  aparece. O atendente ganha "Seu ritmo": hoje → no ritmo atual e quanto falta
+  por semana. Mesma conta da Simulação.
+- **Performance (atualização): conferência do cálculo.** Todo dia às 06:00
+  (e em "Conferir agora"), de setembro/2026 em diante: resumo do mês = cálculo
+  completo; fechamentos: soma das linhas = resultado congelado; ninguém
+  pontuando fora; e, na tela, a simulação sem cenário = resultado de hoje.
+  Divergência vira pendência no Início. Já na primeira rodada achou a
+  projeção zerando a média de quem recebe pela média — corrigido antes de
+  publicar.
+- **Performance (correção): sem transferidos e fila.** Saem das telas e do
+  banco (não são mais métrica no Hub).
+
 ## Performance 2.0.1
 
 Sem migração. Não muda as Monitorias nem a Agenda.

@@ -7,6 +7,7 @@ import { criarClienteServidor } from '@/lib/supabase/servidor';
 import { codigoMonitoria, data as formatarData, percentual } from '@/lib/formatar';
 import { mesAnterior } from '@/lib/competencia';
 import { fonteDoMes } from '@/lib/resumo';
+import ProjecaoDaCota from '@/componentes/ProjecaoDaCota';
 import { todas, conferida } from '@/lib/consultas';
 
 const CANAIS: { chave: Canal; rotulo: string }[] = [
@@ -592,6 +593,11 @@ export default async function PainelAtendente({
                 </span>
               ))}
             </div>
+          )}
+          {/* Seu ritmo (2.1.0): onde fecha o mês, com a mesma conta da Simulação. */}
+          {competencia === atual && (
+            <ProjecaoDaCota competencia={competencia} fonte={{ extrato: fonte.extrato, mensal: fonte.mensal }}
+                            modo="pessoa" pessoaId={pessoaId} />
           )}
           <SeletorDeDetalhe destaques={destaques} />
         </div>

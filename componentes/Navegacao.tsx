@@ -49,6 +49,8 @@ export const ITENS: Record<Sistema, Item[]> = {
     { href: '/cota/metricas', rotulo: 'Métricas da semana', papeis: ['gestor'], grupo: 'Administrar' },
     // Cenários sobre o mês aberto, sem gravar (1.53.0).
     { href: '/cota/simulacao', rotulo: 'Simulação', papeis: ['gestor'], grupo: 'Administrar' },
+    // Se o cálculo bate entre si; roda sozinha às 06:00 (2.1.0).
+    { href: '/cota/conferencia', rotulo: 'Conferência do cálculo', papeis: ['gestor'], grupo: 'Administrar' },
     { href: '/cota/configuracao', rotulo: 'Configuração', papeis: ['gestor'], grupo: 'Administrar' },
     { href: '/reportes', rotulo: 'Reports de problemas', papeis: ['gestor'], grupo: 'Administrar' },
   ],

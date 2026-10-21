@@ -48,6 +48,9 @@ export type Base = {
   tmeDesligado: string[];
   volume: VolumeDaSemana[];
   csat: CsatDaSemana[];
+  /** Semanas já lançadas, quando quem chama sabe melhor (a tela do atendente só
+   *  enxerga o próprio volume; ali vem do TME da equipe). */
+  semanasLancadas?: number[];
 };
 
 export type Cenario = {
@@ -108,6 +111,7 @@ export type Resultado = {
  * com avaliações ainda está correndo. Sem volume nenhum, valem as linhas.
  */
 export function semanasLancadas(base: Base): Set<number> {
+  if (base.semanasLancadas) return new Set(base.semanasLancadas);
   const comVolume = new Set(base.volume.map((v) => v.semana));
   return comVolume.size ? comVolume
     : new Set(base.linhas.filter((l) => l.semana != null && !DERIVADAS.has(l.regra)).map((l) => l.semana as number));
@@ -238,7 +242,9 @@ export function simular(base: Base, cen: Cenario): Resultado[] {
       const quem = pessoas.filter((p) => p.compoe_media && refs.has(cargoDe.get(p.pessoa_id)?.cargo_id ?? -1) && !recebeMedia.has(p.pessoa_id));
       const soma = (m: Map<string, number>) => quem.reduce((a, p) => a + (m.get(p.pessoa_id) ?? 0), 0);
       const proporcao = quem.length && soma(hoje) ? soma(r) / soma(hoje) : 1;
-      const p = pesoDe(l.cargo_id, 'media_da_equipe');
+      // O multiplicador do cenário, ou o da própria linha (a projeção carrega o
+      // extrato sem a tabela de pesos).
+      const p = cen.pesos[`${l.cargo_id}|media_da_equipe`] ?? cen.pesosTodos.media_da_equipe ?? l.peso;
       r.set(id, semMedia(id, dir.get(id) ?? 0) + l.quantidade * proporcao * p);
     }
     return r;
