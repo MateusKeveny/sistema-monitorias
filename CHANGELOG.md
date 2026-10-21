@@ -35,6 +35,22 @@ para o Performance.
 
 ---
 
+## Performance 2.2.1 · Monitorias 5.6.3 · Agenda 1.5.1
+
+Sem migração. Vale para os três sites.
+
+- **Os três (correção): Next.js 16.** Next.js 15.5 → 16.4.2, OpenNext
+  (Cloudflare) 1.20.13 e wrangler 4.151. O Next.js 15 saiu do suporte em
+  21/10/2026 (dois anos do lançamento) e a publicação vinha usando uma
+  liberação; agora volta a uma versão com correções de segurança, sem a
+  liberação. Nada muda no uso. Testadas antes de publicar: 22 telas do
+  Performance, 15 das Monitorias e as da Agenda, mais login, sessão e o
+  redirecionamento entre sites. Pendente, à parte: o arquivo `middleware.ts`
+  passou a se chamar `proxy.ts` no Next.js 16 (o nome antigo segue valendo).
+- **Performance (correção): salvar o valor do RH.** O botão mostra "Salvo,
+  atualizando a tela…" enquanto o Fechamento recarrega — antes parecia que
+  nada tinha acontecido.
+
 ## Performance 2.2.0
 
 Migração 73 (banco dos painéis). Não muda as Monitorias nem a Agenda.

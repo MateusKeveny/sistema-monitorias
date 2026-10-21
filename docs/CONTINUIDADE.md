@@ -11,7 +11,7 @@ Escrito em 28/09/2026, atualizado em 08/10/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **2.2.0** · Monitorias **5.6.2** · Agenda **1.5.0** (21/10/2026) |
+| Publicado | Performance **2.2.1** · Monitorias **5.6.3** · Agenda **1.5.1** (21/10/2026) |
 | Branch | `painel-performance`, com os três sites (a `main` segue intocada) |
 | Migrações no banco | 01 a 73, todas aplicadas (a agenda tem banco próprio: 01 a 03) |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` · `painel-agenda.expansao.workers.dev` |
@@ -733,8 +733,9 @@ Três versões, cada uma publicada e conferida antes da próxima:
 - **Build (21/10/2026):** o OpenNext passou a recusar o Next.js 15 (mais de 2
   anos desde o lançamento). Os scripts `cf:*` usam
   `--dangerouslyUseUnsupportedNextVersion` por decisão do gestor, para publicar
-  a 2.1.0 sem esperar. **Pendente:** atualizar para o Next.js 16, como tarefa
-  própria e com teste das telas dos três sites; depois, tirar a opção.
+  a 2.1.0 sem esperar. **Resolvido na 2.2.1 / 5.6.3 / 1.5.1:** Next.js 16.4.2,
+  OpenNext 1.20.13, wrangler 4.151, sem a opção. Pendente: renomear
+  `middleware.ts` para `proxy.ts` (muda o runtime na Cloudflare; testar à parte).
 
 Visão de celular fica fora da revisão, por decisão do gestor. Os painéis são
 usados só no computador.
