@@ -3,7 +3,7 @@ import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
 import BotaoFecharCiclo from '@/componentes/BotaoFecharCiclo';
 import AjusteDeFechamento from '@/componentes/AjusteDeFechamento';
 import ValorDaCota from '@/componentes/ValorDaCota';
-import PagamentoDoMes from '@/componentes/PagamentoDoMes';
+import PagamentoDoMes, { type ValorRh } from '@/componentes/PagamentoDoMes';
 import type {
   AlteracaoDeValor, PagamentoMensal, ValorDaCota as ValorDaCotaTipo,
 } from '@/lib/tipos';
@@ -71,6 +71,11 @@ export default async function Fechamento({
     // Pendentes de realocação (migração 71): não pontuam para ninguém.
     db.from('vw_lancamentos_pendentes').select('pessoa, tipo').eq('mes_competencia', competencia),
   ]);
+
+  // Valor encaminhado pelo RH (migração 73). Fora do todas(): sem a migração,
+  // a tabela não existe e a tela segue sem a coluna preenchida.
+  const { data: valoresRh } = await db.from('valores_rh')
+    .select('pessoa_id, valor, informado_por_nome, informado_em').eq('mes_competencia', competencia);
 
   const lista = (abertos.data ?? []) as Aberto[];
   const congelados = (fechados.data ?? []) as Fechado[];
@@ -256,6 +261,7 @@ export default async function Fechamento({
           <PagamentoDoMes
             competencia={competencia}
             linhas={(pagamento.data ?? []) as PagamentoMensal[]}
+            valoresRh={(valoresRh ?? []) as ValorRh[]}
           />
         </>
       )}

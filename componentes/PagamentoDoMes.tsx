@@ -1,6 +1,15 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Quadro, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import { hojeNoBrasil } from '@/lib/formatar';
 import type { PagamentoMensal } from '@/lib/tipos';
+import { criarClienteNavegador } from '@/lib/supabase/cliente';
+import { mensagemDoErro } from '@/lib/erro-amigavel';
+
+/** Valor que o RH mandou pagar a uma pessoa (migração 73). */
+export type ValorRh = { pessoa_id: string; valor: number; informado_por_nome: string | null; informado_em: string };
 
 const pontos = (v: number | null | undefined) =>
   v == null ? '—' : Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 2 });
@@ -23,14 +32,42 @@ function atrasado(competencia: string) {
  * Pontuação vem do fechamento; o bônus de equipe sai de 10% da média do cargo
  * de referência, e só quando todos os que têm direito bateram a meta — um que
  * não bate, ninguém recebe. O valor por ponto é informado pelo gestor.
+ *
+ * Valor do RH (2.2.0): o que o RH mandou pagar a cada um, digitado aqui. Com
+ * valor por ponto, aparece ao lado do calculado e a tela diz se confere.
  */
 export default function PagamentoDoMes({
-  competencia, linhas, titulo = 'Pagamento',
+  competencia, linhas, titulo = 'Pagamento', valoresRh = [],
 }: {
   competencia: string;
   linhas: PagamentoMensal[];
   titulo?: string;
+  valoresRh?: ValorRh[];
 }) {
+  const router = useRouter();
+  const doRh = new Map(valoresRh.map((v) => [v.pessoa_id, Number(v.valor)]));
+  const paraTexto = (v: number | undefined) => (v == null ? '' : v.toFixed(2).replace('.', ','));
+  const [rascunho, setRascunho] = useState<Record<string, string>>(
+    () => Object.fromEntries(linhas.map((l) => [l.pessoa_id, paraTexto(doRh.get(l.pessoa_id))])));
+  const [motivo, setMotivo] = useState('');
+  const [ocupado, setOcupado] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
+  const lerReais = (t: string) => { const x = t.trim().replace(/\./g, '').replace(',', '.'); return x === '' ? null : Number(x); };
+  const mudados = linhas.filter((l) => lerReais(rascunho[l.pessoa_id] ?? '') !== (doRh.get(l.pessoa_id) ?? null));
+  const precisaMotivo = mudados.some((l) => doRh.has(l.pessoa_id));
+
+  async function salvarRh() {
+    const valores = mudados.map((l) => ({ pessoa_id: l.pessoa_id, valor: lerReais(rascunho[l.pessoa_id] ?? '') }));
+    if (valores.some((v) => v.valor != null && (!Number.isFinite(v.valor) || v.valor < 0))) { setErro('Valor inválido. Use 1234,56.'); return; }
+    if (precisaMotivo && !motivo.trim()) { setErro('Escreva o motivo: um valor já informado está mudando.'); return; }
+    setOcupado(true); setErro(null); setAviso(null);
+    const { error } = await criarClienteNavegador().rpc('salvar_valores_rh', { p_mes: competencia, p_valores: valores, p_motivo: motivo.trim() || null });
+    setOcupado(false);
+    if (error) { setErro(await mensagemDoErro(error)); return; }
+    setMotivo(''); setAviso(`${valores.length} valor(es) do RH salvo(s).`);
+    router.refresh();
+  }
   if (!linhas.length) {
     return (
       <Quadro titulo={titulo}>
@@ -78,7 +115,9 @@ export default function PagamentoDoMes({
             <Th className="w-28 text-right">Pontos</Th>
             <Th className="w-28 text-right">Bônus</Th>
             <Th className="w-32 text-right">Total de pontos</Th>
-            <Th className="w-32 text-right">Valor</Th>
+            <Th className="w-32 text-right">Calculado</Th>
+            <Th className="w-36 text-right">Valor do RH (R$)</Th>
+            <Th className="w-40" />
           </tr>
         </thead>
         <tbody>
@@ -101,12 +140,52 @@ export default function PagamentoDoMes({
                   ? reais(l.valor)
                   : <span className="text-xs font-normal text-slate-400">abaixo da meta</span>}
               </Td>
+              <Td className="text-right">
+                <input value={rascunho[l.pessoa_id] ?? ''} disabled={!l.atingiu_meta || ocupado} inputMode="decimal"
+                       placeholder={l.atingiu_meta ? '0,00' : '—'} aria-label={`Valor do RH para ${l.pessoa_nome}`}
+                       onChange={(e) => setRascunho((r) => ({ ...r, [l.pessoa_id]: e.target.value }))}
+                       className={`w-28 rounded-md border px-2 py-1 text-right text-sm tabular-nums outline-none focus:border-marca-600 disabled:bg-slate-50 ${
+                         mudados.includes(l) ? 'border-amber-500 bg-amber-500/10' : 'border-slate-300 bg-superficie'}`} />
+              </Td>
+              <Td className="whitespace-nowrap">
+                {(() => {
+                  if (!l.atingiu_meta) return null;
+                  const rh = doRh.get(l.pessoa_id);
+                  if (rh == null) return <span className="rounded-full bg-amber-500/15 px-2 py-px text-[11px] font-semibold text-amber-700 dark:text-amber-300">falta o valor do RH</span>;
+                  if (l.valor == null) return <span className="rounded-full bg-marca-600/15 px-2 py-px text-[11px] font-semibold text-marca-700 dark:text-marca-400">informado</span>;
+                  const d = rh - Number(l.valor);
+                  return Math.abs(d) < 0.01
+                    ? <span className="rounded-full bg-marca-600/15 px-2 py-px text-[11px] font-semibold text-marca-700 dark:text-marca-400">confere</span>
+                    : <span className="rounded-full bg-amber-500/15 px-2 py-px text-[11px] font-semibold text-amber-700 dark:text-amber-300">diferença {d > 0 ? '+' : ''}{reais(d)}</span>;
+                })()}
+              </Td>
             </tr>
           ))}
         </tbody>
       </Tabela>
 
+      {(mudados.length > 0 || erro || aviso) && (
+        <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+          {erro && <span className="mr-auto rounded-lg bg-rose-50 px-3 py-1.5 text-sm text-rose-800 ring-1 ring-rose-600/20">{erro}</span>}
+          {aviso && !mudados.length && <span className="mr-auto rounded-lg bg-emerald-50 px-3 py-1.5 text-sm text-emerald-800 ring-1 ring-emerald-600/20">{aviso}</span>}
+          {precisaMotivo && (
+            <input value={motivo} onChange={(e) => setMotivo(e.target.value)} disabled={ocupado} placeholder="Motivo da mudança (obrigatório)"
+                   className="min-w-64 flex-1 rounded-md border border-slate-300 bg-superficie px-2 py-1.5 text-sm outline-none focus:border-marca-600" />
+          )}
+          {mudados.length > 0 && <>
+            <button type="button" disabled={ocupado} onClick={() => { setRascunho(Object.fromEntries(linhas.map((l) => [l.pessoa_id, paraTexto(doRh.get(l.pessoa_id))]))); setErro(null); }}
+                    className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50">Desfazer</button>
+            <button type="button" disabled={ocupado} onClick={salvarRh}
+                    className="rounded-lg bg-marca-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-marca-700 disabled:opacity-40">
+              {ocupado ? 'Salvando…' : `Salvar ${mudados.length} valor(es) do RH`}
+            </button>
+          </>}
+        </div>
+      )}
+
       <p className="mt-4 text-xs text-slate-500">
+        <b>Valor do RH:</b> o que o RH mandou pagar a cada um; é o que o atendente vê no extrato. Mudar um valor já
+        informado pede o motivo, e toda mudança fica registrada.{' '}
         Quem fecha abaixo da meta não recebe — é para isso que a meta existe.
         O bônus é {Math.round(Number(primeira.percentual_bonus) * 10000) / 100}% da média do cargo
         de referência e só sai quando <strong>todos</strong> os que têm direito batem a meta. Pleno

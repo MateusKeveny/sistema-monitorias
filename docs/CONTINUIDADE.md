@@ -11,9 +11,9 @@ Escrito em 28/09/2026, atualizado em 08/10/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **2.1.0** · Monitorias **5.6.2** · Agenda **1.5.0** (21/10/2026) |
+| Publicado | Performance **2.2.0** · Monitorias **5.6.2** · Agenda **1.5.0** (21/10/2026) |
 | Branch | `painel-performance`, com os três sites (a `main` segue intocada) |
-| Migrações no banco | 01 a 72, todas aplicadas (a agenda tem banco próprio: 01 a 03) |
+| Migrações no banco | 01 a 73, todas aplicadas (a agenda tem banco próprio: 01 a 03) |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` · `painel-agenda.expansao.workers.dev` |
 
 ### Revisão de design (28/09/2026)
@@ -726,6 +726,10 @@ Três versões, cada uma publicada e conferida antes da próxima:
   pendentes), `registrar_conferencia()` e pg_cron `conferencia-do-calculo`
   (09:00 UTC). Tela `/cota/conferencia`. Transferidos/fila: colunas
   removidas e as três funções que gravavam refeitas.
+- **Performance 2.2.0** (migração 73): `valores_rh` (pessoa × mês, só quem
+  fechou e bateu a meta) e `salvar_valores_rh(p_mes, p_valores, p_motivo)`,
+  com `valores_rh_alteracoes`. `PagamentoDoMes` virou componente de cliente
+  com a coluna; o extrato mostra o valor do RH quando existe.
 - **Build (21/10/2026):** o OpenNext passou a recusar o Next.js 15 (mais de 2
   anos desde o lançamento). Os scripts `cf:*` usam
   `--dangerouslyUseUnsupportedNextVersion` por decisão do gestor, para publicar

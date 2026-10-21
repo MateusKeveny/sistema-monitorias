@@ -35,6 +35,18 @@ para o Performance.
 
 ---
 
+## Performance 2.2.0
+
+Migração 73 (banco dos painéis). Não muda as Monitorias nem a Agenda.
+
+- **Performance (atualização): valor encaminhado pelo RH.** No Fechamento,
+  quadro Pagamento, a coluna **Valor do RH (R$)**: o gestor digita o que o RH
+  mandou pagar a cada pessoa que bateu a meta. Com valor por ponto
+  informado, a tela mostra o calculado ao lado e diz se confere ou a
+  diferença; sem ele, só guarda e mostra. Mudar um valor já informado pede o
+  motivo; tudo fica em `valores_rh_alteracoes`. O atendente vê no extrato o
+  valor do RH no lugar do calculado (decisão do gestor, 21/10/2026).
+
 ## Performance 2.1.0
 
 Migração 72 (banco dos painéis). Não muda as Monitorias nem a Agenda.

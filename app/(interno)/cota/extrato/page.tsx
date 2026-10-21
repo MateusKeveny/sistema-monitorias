@@ -146,6 +146,11 @@ export default async function Extrato({
   // Sem isto o mesmo mês aparece com dois números — agosto/2026 chegou a
   // mostrar 330 pts aqui e 7.050 no histórico, depois de a planilha do
   // cálculo externo ser importada.
+  // Valor do RH (migração 73): quando existe, é o que a pessoa recebe.
+  const { data: doRh } = fechamento.data
+    ? await db.from('valores_rh').select('valor, informado_em').eq('pessoa_id', pessoaId).eq('mes_competencia', competencia).maybeSingle()
+    : { data: null };
+  const valorRh = doRh ? Number((doRh as { valor: number }).valor) : null;
   const pagamento = pago.data as
     { atingiu_meta: boolean; bonus: number; pontos_pagos: number;
       valor_por_ponto: number | null; valor: number | null } | null;
@@ -414,7 +419,12 @@ export default async function Extrato({
             {pagamento ? (
               <div className="md:text-right">
                 {pagamento.atingiu_meta ? (
-                  pagamento.valor == null ? (
+                  valorRh != null ? (
+                    <>
+                      <p className="text-2xl font-semibold tabular-nums text-marca-700 dark:text-marca-400">{reais(valorRh)}</p>
+                      <p className="mt-0.5 text-xs text-slate-500">valor encaminhado pelo RH</p>
+                    </>
+                  ) : pagamento.valor == null ? (
                     <p className="text-sm text-slate-600">Valor por ponto ainda não informado.</p>
                   ) : (
                     <>
