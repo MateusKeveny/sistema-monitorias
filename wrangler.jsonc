@@ -33,6 +33,11 @@
       "name": "painel-performance",
       "observability": {
         "enabled": true
+      },
+      // Aviso no computador (2.4.0): a mesma chave VAPID da Agenda; a privada é
+      // segredo do Worker: `node scripts/chaves-da-agenda.js performance`.
+      "vars": {
+        "VAPID_PUBLICA": "BCQCqXSYb9IlViA4t1M6eso9tLXIWz__I3VN6JMITHsq_sEuG6zVm14UyLgLn_UJux1V42ianEW4fOpF4P6lxyA"
       }
     },
     // Terceiro site: a Agenda da Gestão (migração 59), também pelo endereço —

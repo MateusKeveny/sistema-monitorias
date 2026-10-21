@@ -131,6 +131,8 @@ export default function VolumeSemanal({
         .eq('mes_competencia', competencia).eq('canal', canal).eq('semana', semana).in('pessoa_id', apagar);
       if (error) { setOcupado(false); setErro(await mensagemDoErro(error)); return; }
     }
+    // Aviso no computador (2.4.0): entrega os avisos novos a quem ativou.
+    fetch('/api/cota/avisos/enviar', { method: 'POST' }).catch(() => {});
     setOcupado(false);
     setAviso(`${semana}ª semana salva: ${gravar.length} pessoa(s)${apagar.length ? `, ${apagar.length} removida(s)` : ''}.`);
     router.refresh();

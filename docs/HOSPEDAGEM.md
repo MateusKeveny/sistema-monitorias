@@ -1,37 +1,39 @@
-# Hospedagem — Monitorias de Qualidade e Painel de Performance
+# Hospedagem — Monitorias de Qualidade, Painel de Performance e Agenda da Gestão
 
 Documento para a equipe de TI avaliar a migração para servidores internos da
-IGreen. Situação em 09/10/2026.
+IGreen. Situação em 21/10/2026.
 
 ---
 
-## 1. O que são os dois sistemas
+## 1. O que são os três sistemas
 
-**Um único código-fonte atende os dois sistemas.** Não são dois projetos: é um
-aplicativo Next.js publicado duas vezes. Cada publicação mostra só o seu
-sistema.
+**Um único código-fonte atende os três sistemas.** Não são três projetos: é um
+aplicativo Next.js (versão 16) publicado três vezes. Cada publicação mostra só
+o seu sistema.
 
 | Sistema | Endereço atual | Versão | Para que serve |
 |---|---|---|---|
-| Monitorias de Qualidade | `painel-monitorias.expansao.workers.dev` | 5.5.2 | Monitorias de qualidade dos atendimentos: lançamento por sorteio de protocolo, painel, relatórios e consulta ao diário de bordo |
-| Painel de Performance | `painel-performance.expansao.workers.dev` | 1.42.0 | Cota de pontos por cargo: importação das avaliações (Hub) e dos chamados do Analista (painel ELO), lançamentos, extrato, fechamento, pagamento, exportação para o portal, atendentes, diário de bordo, consulta das monitorias, acessos e histórico de alteração de pesos |
+| Monitorias de Qualidade | `painel-monitorias.expansao.workers.dev` | 5.6.3 | Monitorias de qualidade dos atendimentos: lançamento por sorteio de protocolo, painel, relatórios e consulta ao diário de bordo |
+| Painel de Performance | `painel-performance.expansao.workers.dev` | 2.4.0 | Cota de pontos por cargo: importação das avaliações (Hub), do volume (colado do Hub) e dos chamados do Analista (painel ELO), importação de meses anteriores por planilha, lançamentos, extrato, projeção, simulação de cenários, fechamento, pagamento (com o valor encaminhado pelo RH), conferência diária do cálculo, avisos no sino e no canto da tela (Web Push), exportação para o portal, atendentes, diário de bordo, consulta das monitorias, acessos e histórico de pesos |
+| Agenda da Gestão | `painel-agenda.expansao.workers.dev` | 1.5.1 | Agenda pessoal do gestor com lembretes no computador/celular (Web Push e Telegram). **Banco e login próprios** (outro projeto Supabase) |
 
 Qual sistema cada publicação mostra é decidido em `lib/sistema.ts`:
 
 - endereço começando com `painel-performance.` → Performance;
+- endereço começando com `painel-agenda.` → Agenda;
 - qualquer outro endereço → Monitorias, **a menos que** a variável de ambiente
-  `SISTEMA=cota` esteja definida, e aí → Performance.
+  `SISTEMA` esteja definida: `cota` → Performance, `agenda` → Agenda.
 
-Num servidor interno, cada sistema roda como **uma instância separada**. Por
-isso eles são entregues em **dois pacotes**, cada um já configurado para o seu
-sistema e com o arquivo `LEIA-ME.txt` de publicação:
+Num servidor interno, cada sistema roda como **uma instância separada**. Os
+pacotes abaixo foram montados para os dois painéis; a Agenda usa o mesmo
+código com `SISTEMA=agenda` e as variáveis do banco dela (seção 5):
 
 | Pacote | Sistema | Variável |
 |---|---|---|
 | `Monitorias de Qualidade - codigo.zip` | Monitorias | `SISTEMA` vazio |
 | `Painel de Performance - codigo.zip` | Performance | `SISTEMA=cota` |
 
-Os dois pacotes têm o mesmo código. Uma correção feita em um precisa ser
+Os pacotes têm o mesmo código. Uma correção feita em um precisa ser
 aplicada no outro — ou, melhor, mantida num repositório só e publicada nos dois.
 
 > O antigo "Painel de Performance" (projeto Vite, em
@@ -43,24 +45,28 @@ aplicada no outro — ou, melhor, mantida num repositório só e publicada nos d
 ## 2. Como está hospedado hoje
 
 ```
-Navegador ──HTTPS──► Cloudflare Workers (2 Workers, plano gratuito)
+Navegador ──HTTPS──► Cloudflare Workers (3 Workers, plano gratuito)
                           │
-                          └──HTTPS──► Supabase (PostgreSQL + login)
-                                        projeto uahkplwssonbxzydjytb
+                          ├──HTTPS──► Supabase dos painéis (PostgreSQL + login)
+                          │             projeto uahkplwssonbxzydjytb
+                          └──HTTPS──► Supabase da Agenda (outro projeto, login próprio)
 
-Better Stack ──► /api/saude  (monitoramento de queda, nos dois sites)
+Better Stack ──► /api/saude  (monitoramento de queda, nos três sites)
 
-Supabase ──HTTPS──► Microsoft Teams (avisos automáticos, pg_net + pg_cron)
-Supabase ──pg_cron──► resumo do mês aberto, recalculado a cada minuto se algo mudou
+Supabase dos painéis ──HTTPS──► Microsoft Teams (avisos automáticos, pg_net + pg_cron)
+Supabase dos painéis ──pg_cron──► resumo do mês aberto (a cada minuto) e conferência do cálculo (06:00)
+Supabase da Agenda ──pg_net──► /api/agenda/enviar ──► Web Push / Telegram (lembretes)
+Performance ──Web Push──► computador do atendente (avisos do sino, para quem ativou)
 ```
 
 | Camada | Serviço | Plano | Observação |
 |---|---|---|---|
-| Aplicação | Cloudflare Workers — `painel-monitorias` e `painel-performance` | Gratuito | Conta da operação Expansão |
-| Banco de dados | Supabase (PostgreSQL 15+) | Verificar no painel do Supabase | Também faz o **login** dos usuários |
-| Monitoramento | Better Stack | Gratuito | Vigia `/api/saude` dos dois sites |
+| Aplicação | Cloudflare Workers — `painel-monitorias`, `painel-performance` e `painel-agenda` | Gratuito | Conta da operação Expansão. Publicação com OpenNext (`npm run cf:deploy`) |
+| Banco de dados | Supabase (PostgreSQL 15+) — dois projetos: o dos painéis e o da Agenda | Verificar no painel do Supabase | Também faz o **login** dos usuários |
+| Monitoramento | Better Stack | Gratuito | Vigia `/api/saude` dos sites |
 | Avisos | Microsoft Teams (Workflows) | — | O **banco** posta os cartões: semana encerrada, mês fechado, lembrete de fechamento, novidades do diário, report novo |
-| Tarefas agendadas | pg_cron, dentro do banco | — | `avisos-das-oito` (todo dia às 8h) e `resumo-do-mes` (a cada minuto: mantém pronto o cálculo do mês aberto) |
+| Tarefas agendadas | pg_cron, dentro do banco | — | Painéis: `avisos-das-oito` (8h), `resumo-do-mes` (a cada minuto: mantém pronto o cálculo do mês aberto) e `conferencia-do-calculo` (06:00: confere se o cálculo bate entre si). Agenda: `agenda-avisos` e `agenda-ciclo` (a cada minuto) |
+| Notificações no computador | Web Push (padrão dos navegadores) | — | Chave VAPID única para Agenda e Performance; a privada é segredo dos Workers |
 
 ### Por que migrar
 
@@ -76,6 +82,9 @@ telas foram otimizadas para caber nisso, mas é um teto baixo:
   **está confirmado** e o sistema já opera no teto;
 - a alternativa sem migrar é o plano pago dos Workers (US$ 5/mês, 30 s de
   processamento por acesso). Decisão do gestor: aguardar a migração;
+- em 21/10/2026 o Next.js 15 saiu do suporte e o sistema foi para o Next.js
+  16 (2.2.1 / 5.6.3 / 1.5.1). Com ele, um erro 1102 ainda pode aparecer numa
+  primeira carga mais pesada; o F5 resolve;
 - em 13/10/2026 o impacto foi reduzido: a renovação do login passou para o
   navegador (1.39.2 — um 1102 não derruba mais a sessão) e as telas ficaram
   mais leves (1.39.3 a 1.40.0 — consultas em paralelo, mês fechado lido do
@@ -94,12 +103,12 @@ Num servidor próprio esse limite **não existe**.
 
 | Item | Requisito |
 |---|---|
-| Sistema | Linux ou Windows Server com **Node.js 20 ou superior** (testado no 24) |
-| Memória | estimativa: ~512 MB por instância (duas instâncias: ~1 GB) |
+| Sistema | Linux ou Windows Server com **Node.js 20.9 ou superior** (exigência do Next.js 16; testado no 24) |
+| Memória | estimativa: ~512 MB por instância (três instâncias: ~1,5 GB) |
 | Disco | estimativa: ~500 MB por instância, com as dependências |
 | Rede de saída | HTTPS (443) para `*.supabase.co`, se o banco continuar no Supabase. Com o banco interno, o **servidor do banco** precisa de saída HTTPS para os endereços de Workflows do Microsoft Teams (avisos) |
 | Rede de entrada | HTTPS obrigatório, com proxy reverso (Nginx, IIS, Apache) na frente do Node |
-| Endereços | Dois nomes internos, um por sistema. Ex.: `monitorias.igreen.local` e `performance.igreen.local` |
+| Endereços | Três nomes internos, um por sistema. Ex.: `monitorias.igreen.local`, `performance.igreen.local` e `agenda.igreen.local` |
 
 HTTPS é obrigatório: o login usa cookies de sessão seguros, que o navegador não
 envia em conexão sem criptografia.
@@ -108,7 +117,7 @@ envia em conexão sem criptografia.
 
 ## 4. Como publicar no servidor
 
-Os comandos são os mesmos nas duas instâncias; só muda a variável `SISTEMA`.
+Os comandos são os mesmos nas três instâncias; só muda a variável `SISTEMA`.
 
 ```bash
 # 1. Instalar as dependências (usa as versões exatas do package-lock.json)
@@ -122,6 +131,7 @@ npm run build
 # 4. Subir o servidor (escolha a porta)
 npx next start -p 3000        # Monitorias
 SISTEMA=cota npx next start -p 3001   # Performance
+SISTEMA=agenda npx next start -p 3002 # Agenda
 ```
 
 Para manter no ar após reinício do servidor, use o gerenciador de serviços da
@@ -153,7 +163,12 @@ instância.
 | `SUPABASE_URL` | Somente scripts de manutenção (`scripts/`) | Não |
 | `SUPABASE_SERVICE_ROLE_KEY` | Somente scripts de manutenção | **Sim — dá acesso total ao banco.** Nunca colocar no servidor web |
 | `SENHA_PADRAO` | Somente o script de criação de acesso | **Sim** |
-| `SISTEMA` | Aplicação | Não. `cota` na instância do Performance; vazio na de Monitorias |
+| `SISTEMA` | Aplicação | Não. `cota` no Performance; `agenda` na Agenda; vazio nas Monitorias |
+| `NEXT_PUBLIC_AGENDA_SUPABASE_URL` / `NEXT_PUBLIC_AGENDA_SUPABASE_ANON_KEY` | Agenda (projeto Supabase dela) | Não — públicas |
+| `VAPID_PUBLICA` | Agenda e Performance (notificações no computador) | Não — vai para o navegador |
+| `VAPID_PRIVADA` | Agenda e Performance (assinatura das notificações) | **Sim** |
+| `AGENDA_SEGREDO` / `PONTE_SEGREDO` | Agenda (chamadas do banco da agenda e ponte com o dos painéis) | **Sim** |
+| `TELEGRAM_TOKEN` | Agenda (lembretes pelo Telegram) | **Sim** |
 
 As variáveis `NEXT_PUBLIC_*` são embutidas no momento do `npm run build`:
 trocar o valor exige gerar o build de novo.
@@ -201,7 +216,8 @@ migração leva os dois de uma vez.
 ### Estrutura
 
 As migrações estão em `supabase/`, numeradas na ordem em que foram aplicadas
-(01 a 58). O banco de produção já está com **todas aplicadas**.
+(01 a 75). O banco de produção já está com **todas aplicadas**. As da Agenda
+estão em `supabase/agenda/` (01 a 04), no projeto dela.
 
 - `00-instalar-tudo.sql` é um atalho antigo que junta as primeiras migrações;
   não usar junto com elas.
@@ -224,10 +240,15 @@ O banco novo precisa oferecer, além do PostgreSQL e do login:
   dado muda e a tarefa recalcula. **Sem a tarefa, nada quebra e nenhum número
   fica errado**: passados 40 minutos sem atualização, as telas voltam sozinhas
   ao cálculo ao vivo — só ficam mais lentas (~3 s no Extrato).
+- **pg_cron roda a conferência do cálculo** (migração 72, tarefa
+  `conferencia-do-calculo`, 06:00): confere se o resumo bate com o cálculo
+  completo e se os fechamentos somam o resultado congelado. Divergência vira
+  pendência na tela do gestor; nada é corrigido sozinho.
 - **As tarefas agendadas não vão na cópia.** Elas ficam no esquema `cron`,
-  fora do `public`. Depois de restaurar o banco, recriar as duas rodando de
-  novo o bloco final `do $ … cron.schedule …` das migrações 40 e 58, e
-  conferir com `select jobname, schedule, active from cron.job;`.
+  fora do `public`. Depois de restaurar o banco, recriá-las rodando de novo o
+  bloco final `do $ … cron.schedule …` das migrações 40, 58 e 72 (e, no
+  banco da Agenda, das migrações 01 e 03 dela), e conferir com
+  `select jobname, schedule, active from cron.job;`.
 - **Storage** (migração 44). O bucket privado `reportes` guarda os prints
   anexados em "Reportar problema". A cópia do banco **não** leva os arquivos:
   eles precisam ser copiados à parte, ou os reports antigos ficam sem imagem.
@@ -254,7 +275,7 @@ O banco novo precisa oferecer, além do PostgreSQL e do login:
 `GET /api/saude` consulta o banco de verdade e responde:
 
 ```json
-{"estado":"ok","sistema":"cota","versao":"5.5.2","versoes":{"monitorias":"5.5.2","cota":"1.42.0"},"ms":95}
+{"estado":"ok","sistema":"cota","versao":"5.6.3","versoes":{"monitorias":"5.6.3","cota":"2.4.0","agenda":"1.5.1"},"ms":95}
 ```
 
 - `200` com `"estado":"ok"`: aplicação e banco funcionando;
@@ -275,7 +296,8 @@ ferramenta de monitoramento da TI.
 | `supabase/` | Migrações do banco, em ordem |
 | `scripts/` | Scripts de manutenção (importação; criação de acesso, hoje substituída pelo botão "Criar acesso" na ficha do atendente) — uso manual |
 | `docs/` | Documentação, incluindo este arquivo e o modelo da cota |
-| `middleware.ts` | Controle de sessão e separação entre os dois sistemas |
+| `middleware.ts` | Controle de sessão e separação entre os três sistemas. O Next.js 16 sugere o nome `proxy.ts`; ficou o antigo porque, na Cloudflare, o novo roda em modo experimental (num servidor próprio, a troca é livre) |
+| `public/agenda-sw.js`, `public/cota-sw.js` | Service workers das notificações no computador (Agenda e Performance) |
 | `package.json` / `package-lock.json` | Dependências com versões exatas |
 | `.env.example` | Modelo das variáveis (sem valores) |
 

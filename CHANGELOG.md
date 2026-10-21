@@ -35,6 +35,24 @@ para o Performance.
 
 ---
 
+## Performance 2.4.0
+
+Migração 75 (banco dos painéis). Segredo novo no Worker do Performance:
+`VAPID_PRIVADA` (`node scripts/chaves-da-agenda.js performance`). Não muda as
+Monitorias nem a Agenda.
+
+- **Performance (atualização): avisos também no canto da tela.** No sino,
+  "Receber também no canto da tela" inscreve o computador para receber os
+  avisos (semana lançada, valor do mês) como notificação do navegador, mesmo
+  com o painel fechado — o mesmo mecanismo da Agenda (Web Push), sem Teams.
+  Quem envia é o próprio site, logo depois que o gestor salva o volume ou os
+  valores do RH. No Brave é preciso ligar "Usar os serviços do Google para
+  mensagens push". Os avisos que já existiam não são reenviados.
+- **Correção (só no computador de desenvolvimento): sessão em laço.** Em
+  localhost os três sistemas dividem os cookies, e o painel lia o login
+  vencido da Agenda e ficava em "Renovando a sua sessão…". Cada sistema lê
+  agora só o cookie do seu projeto. Nos sites publicados nada muda.
+
 ## Performance 2.3.1
 
 Sem migração. Não muda as Monitorias nem a Agenda.

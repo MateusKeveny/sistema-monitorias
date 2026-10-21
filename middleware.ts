@@ -27,7 +27,9 @@ export async function middleware(requisicao: NextRequest) {
   const publica = agenda
     ? caminho === entrar || caminho === renovar
     : caminho.startsWith('/login') || caminho.startsWith('/auth');
-  const projeto = agenda ? projetoDaAgenda() : undefined;
+  // Cada sistema lê só o cookie do seu projeto: em localhost as portas
+  // dividem os cookies, e o da agenda vencido mandava o painel renovar em laço.
+  const projeto = projetoDe(agenda ? process.env.NEXT_PUBLIC_AGENDA_SUPABASE_URL : process.env.NEXT_PUBLIC_SUPABASE_URL);
   const cookies = requisicao.cookies.getAll();
 
   // Sem cookie de sessão não há ninguém logado: vai ao login (1.35.4).
@@ -57,9 +59,9 @@ export async function middleware(requisicao: NextRequest) {
 }
 
 /** "https://abcd.supabase.co" → "abcd", o miolo do nome do cookie `sb-abcd-auth-token`. */
-function projetoDaAgenda(): string | undefined {
+function projetoDe(url: string | undefined): string | undefined {
   try {
-    return new URL(process.env.NEXT_PUBLIC_AGENDA_SUPABASE_URL ?? '').hostname.split('.')[0] || undefined;
+    return new URL(url ?? '').hostname.split('.')[0] || undefined;
   } catch {
     return undefined;
   }
@@ -89,5 +91,5 @@ export const config = {
   // pelo banco e pela notificação, e o webhook do Telegram — essas conferem o
   // segredo por conta própria.
   // eslint-disable-next-line max-len
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/saude|api/agenda/enviar|api/agenda/acao|api/agenda/telegram|agenda-sw.js|agenda.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/saude|api/agenda/enviar|api/agenda/acao|api/agenda/telegram|agenda-sw.js|cota-sw.js|agenda.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 };

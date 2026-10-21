@@ -14,6 +14,10 @@
  *     Grava VAPID_PRIVADA, AGENDA_SEGREDO e PONTE_SEGREDO como segredos do
  *     Worker painel-agenda (wrangler secret put … --env agenda).
  *
+ *   node scripts/chaves-da-agenda.js performance
+ *     Grava a mesma VAPID_PRIVADA como segredo do Worker painel-performance
+ *     (aviso no computador dos avisos do sino, 2.4.0).
+ *
  *   node scripts/chaves-da-agenda.js sql
  *     Escreve em dados/ (fora do git) os dois inserts de configuração:
  *       agenda-config.sql — para o SQL Editor do projeto da AGENDA;
@@ -103,6 +107,15 @@ if (passo === 'projeto') {
       { cwd: raiz, input: valores[nome], stdio: ['pipe', 'inherit', 'inherit'], shell: true });
     if (r.status !== 0) process.exit(r.status ?? 1);
   }
+} else if (passo === 'performance') {
+  // Aviso no computador do Performance (2.4.0): a mesma chave privada VAPID da
+  // agenda, como segredo do Worker painel-performance.
+  const { valores } = ler();
+  faltando(valores, ['VAPID_PRIVADA']);
+  console.log('Gravando VAPID_PRIVADA no Worker painel-performance…');
+  const r = spawnSync('npx', ['wrangler', 'secret', 'put', 'VAPID_PRIVADA', '--env', 'performance'],
+    { cwd: raiz, input: valores.VAPID_PRIVADA, stdio: ['pipe', 'inherit', 'inherit'], shell: true });
+  if (r.status !== 0) process.exit(r.status ?? 1);
 } else if (passo === 'sql') {
   const { valores } = ler();
   faltando(valores, ['AGENDA_SEGREDO', 'PONTE_SEGREDO']);
@@ -143,5 +156,5 @@ on conflict (chave) do update set valor = excluded.valor;
     console.log('Webhook do bot registrado.');
   }).catch((e) => { console.error(`Sem resposta do Telegram: ${e.message}`); process.exit(1); });
 } else {
-  console.log('Uso: node scripts/chaves-da-agenda.js projeto <url> <anon> | gerar | worker | sql | telegram');
+  console.log('Uso: node scripts/chaves-da-agenda.js projeto <url> <anon> | gerar | worker | performance | sql | telegram');
 }

@@ -68,6 +68,8 @@ export default function PagamentoDoMes({
     const { error } = await criarClienteNavegador().rpc('salvar_valores_rh', { p_mes: competencia, p_valores: valores, p_motivo: motivo.trim() || null });
     setOcupado(false);
     if (error) { setErro(await mensagemDoErro(error)); return; }
+    // Aviso no computador (2.4.0): entrega os avisos novos a quem ativou.
+    fetch('/api/cota/avisos/enviar', { method: 'POST' }).catch(() => {});
     setMotivo(''); setAviso(`${valores.length} valor(es) do RH salvo(s).`);
     iniciar(() => router.refresh());
   }

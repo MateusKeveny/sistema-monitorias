@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from '@/componentes/Link';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { dataHora } from '@/lib/formatar';
+import AvisoNoComputador from '@/componentes/AvisoNoComputador';
 
 type Aviso = { id: number; titulo: string; texto: string | null; link: string | null; criado_em: string; lido_em: string | null };
 
@@ -87,6 +88,7 @@ export default function SinoDeAvisos() {
               })}
             </ul>
           )}
+          <AvisoNoComputador />
         </div>
       )}
     </div>
