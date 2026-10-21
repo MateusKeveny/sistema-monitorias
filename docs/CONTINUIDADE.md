@@ -11,9 +11,9 @@ Escrito em 28/09/2026, atualizado em 08/10/2026. Para o modelo de dados completo
 
 | | |
 |---|---|
-| Publicado | Performance **2.2.2** · Monitorias **5.6.3** · Agenda **1.5.1** (21/10/2026) |
+| Publicado | Performance **2.3.0** · Monitorias **5.6.3** · Agenda **1.5.1** (21/10/2026) |
 | Branch | `painel-performance`, com os três sites (a `main` segue intocada) |
-| Migrações no banco | 01 a 73, todas aplicadas (a agenda tem banco próprio: 01 a 03) |
+| Migrações no banco | 01 a 74, todas aplicadas (a agenda tem banco próprio: 01 a 03) |
 | Endereços | `painel-performance.expansao.workers.dev` · `painel-monitorias.expansao.workers.dev` · `painel-agenda.expansao.workers.dev` |
 
 ### Revisão de design (28/09/2026)
@@ -730,6 +730,11 @@ Três versões, cada uma publicada e conferida antes da próxima:
   fechou e bateu a meta) e `salvar_valores_rh(p_mes, p_valores, p_motivo)`,
   com `valores_rh_alteracoes`. `PagamentoDoMes` virou componente de cliente
   com a coluna; o extrato mostra o valor do RH quando existe.
+- **Performance 2.3.0** (migração 74): `avisos_da_pessoa` (chave única por
+  aviso), gatilhos `aviso_semana_lancada` (volume_semanal, mês aberto, sem
+  importação) e `aviso_valor_do_mes` (valores_rh), `marcar_avisos_lidos()`;
+  `SinoDeAvisos` no `MenuLateral` (só no Performance), lido no navegador.
+  Aviso no canto da tela (Web Push, como a Agenda) ficou como opção futura.
 - **Build (21/10/2026):** o OpenNext passou a recusar o Next.js 15 (mais de 2
   anos desde o lançamento). Os scripts `cf:*` usam
   `--dangerouslyUseUnsupportedNextVersion` por decisão do gestor, para publicar

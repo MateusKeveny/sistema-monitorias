@@ -35,6 +35,19 @@ para o Performance.
 
 ---
 
+## Performance 2.3.0
+
+Migração 74 (banco dos painéis). Não muda as Monitorias nem a Agenda.
+
+- **Performance (atualização): o sino de avisos.** No topo do menu do
+  Performance, um sino com o número de novidades. O atendente é avisado
+  quando a semana dele é lançada (o primeiro volume da pessoa na semana,
+  digitado ou colado do Hub) e quando o valor do mês sai (o valor do RH).
+  Cada aviso leva ao extrato ou ao histórico; abrir a lista marca como lido.
+  Sem Teams e sem permissão do navegador — decisão do gestor, 21/10/2026.
+  Cada aviso sai uma vez; volume importado de planilha não avisa. Os valores
+  do RH de setembro, já informados, avisaram ao rodar a migração.
+
 ## Performance 2.2.2
 
 Sem migração. Não muda as Monitorias nem a Agenda.

@@ -7,6 +7,7 @@ import BotaoTema from '@/componentes/BotaoTema';
 import BotaoReportar from '@/componentes/BotaoReportar';
 import { ITENS, type Item } from '@/componentes/Navegacao';
 import { NOME_SISTEMA, type SistemaDoPainel as Sistema } from '@/lib/sistema';
+import SinoDeAvisos from '@/componentes/SinoDeAvisos';
 import { NOMES_PAPEL, type Perfil } from '@/lib/tipos';
 
 /** Ícones de traço, desenhados para 20×20, por endereço, nos dois sistemas. */
@@ -92,9 +93,11 @@ export default function MenuLateral({ perfil, versao, sistema, avisosReporte = 0
   return (
     <aside className="sem-impressao sticky top-0 hidden h-screen flex-col gap-0.5 overflow-y-auto border-r
                       border-slate-200 bg-superficie px-3.5 py-5 lg:flex">
-      <span className="px-2.5 pb-5 text-sm font-bold tracking-tight text-marca-700 dark:text-marca-400">
+      <div className="flex items-center justify-between gap-2 pb-5 pl-2.5 text-sm font-bold tracking-tight text-marca-700 dark:text-marca-400">
         {NOME_SISTEMA[sistema]}
-      </span>
+        {/* Avisos da pessoa (2.3.0): semana lançada e valor do mês. */}
+        {sistema === 'cota' && <SinoDeAvisos />}
+      </div>
 
       <nav className="flex flex-col gap-0.5" aria-label="Menu">
         {visiveis.map((item) => {
