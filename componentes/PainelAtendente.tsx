@@ -2,12 +2,13 @@ import Link from '@/componentes/Link';
 import { NoCanal, ProvedorDeCanal, type Canal } from '@/componentes/Canal';
 import GraficoDeLinha, { type PontoDaLinha } from '@/componentes/GraficoDeLinha';
 import SeletorDeDetalhe, { type Destaque } from '@/componentes/SeletorDeDetalhe';
-import { BarraDeMeta, EtiquetaNota, Painel, Secao, Vazio } from '@/componentes/ui';
+import { BarraDeMeta, Painel, Secao, Vazio } from '@/componentes/ui';
 import { criarClienteServidor } from '@/lib/supabase/servidor';
-import { codigoMonitoria, data as formatarData, percentual } from '@/lib/formatar';
+import { percentual } from '@/lib/formatar';
 import { mesAnterior } from '@/lib/competencia';
 import { fonteDoMes } from '@/lib/resumo';
 import ProjecaoDaCota from '@/componentes/ProjecaoDaCota';
+import ListaDeMonitorias from '@/componentes/ListaDeMonitorias';
 import { todas, conferida } from '@/lib/consultas';
 
 const CANAIS: { chave: Canal; rotulo: string }[] = [
@@ -31,7 +32,8 @@ type Pagamento = {
 type Regra = { chave: string; rotulo: string; grupo: string; faixa_min: number | null; ordem: number };
 type Monitoria = {
   id: string; codigo: number; protocolo: string; data_atendimento: string; mes_referencia: string;
-  semana_mes: number; nota_final: number; zerado: boolean; parecer: string | null;
+  semana_mes: number; nota_final: number; zerado: boolean; motivo_zeramento: string | null; parecer: string | null;
+  canal: string | null; monitor: string | null;
 };
 type Apontamento = { monitoria_id: string; criterio: string; observacao: string | null };
 
@@ -107,7 +109,7 @@ export default async function PainelAtendente({
     db.from('vw_tme_equipe').select('semana, canal, tme_seg').eq('mes_competencia', competencia),
     db.from(fonteAntes.mensal).select('resultado').eq('pessoa_id', pessoaId).eq('mes_competencia', anterior).maybeSingle(),
     db.from('vw_monitorias')
-      .select('id, codigo, protocolo, data_atendimento, mes_referencia, semana_mes, nota_final, zerado, parecer')
+      .select('id, codigo, protocolo, data_atendimento, mes_referencia, semana_mes, nota_final, zerado, motivo_zeramento, parecer, canal, monitor')
       .eq('operador_id', pessoaId)
       .order('data_atendimento', { ascending: false }).order('codigo', { ascending: false })
       .limit(20),
@@ -521,37 +523,10 @@ export default async function PainelAtendente({
           <Painel>
             <Secao titulo="Suas monitorias" acao={<Link href="/cota/monitorias" className="whitespace-nowrap rounded-full border border-slate-200 px-2.5 py-0.5 text-xs text-slate-600 hover:border-marca-600">ver todas ›</Link>} subtitulo="As mais recentes primeiro, com os critérios a melhorar.">
               {lista.length === 0 ? <Vazio>Nenhuma monitoria registrada.</Vazio> : (
-                <ul className="-my-2 divide-y divide-slate-100">
-                  {lista.slice(0, 8).map((m) => {
-                    const falhas = apontamentos.get(m.id) ?? [];
-                    return (
-                      <li key={m.id} className="py-3">
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                          {/* Sem link para o site de Monitorias: os critérios e o
-                              parecer já estão aqui, e o histórico completo fica
-                              em "ver todas". */}
-                          <span className="font-semibold tabular-nums text-slate-800">{m.protocolo}</span>
-                          <span className="tabular-nums text-slate-400/70">{codigoMonitoria(m.codigo)}</span>
-                          <span className="tabular-nums text-slate-500">{formatarData(m.data_atendimento)} · {m.semana_mes}ª semana</span>
-                          <span className="ml-auto"><EtiquetaNota valor={Number(m.nota_final)} zerado={m.zerado} /></span>
-                        </div>
-                        {falhas.length > 0 ? (
-                          <ul className="mt-1.5 space-y-0.5 text-sm text-slate-600">
-                            {falhas.map((f) => (
-                              <li key={f.criterio}>
-                                <span className="text-rose-600">✕</span> {f.criterio}
-                                {f.observacao && <span className="text-slate-500"> — {f.observacao}</span>}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="mt-1.5 text-sm text-marca-700 dark:text-marca-400">Todos os critérios atendidos.</p>
-                        )}
-                        {m.parecer && <p className="mt-1 text-xs italic text-slate-500">{m.parecer}</p>}
-                      </li>
-                    );
-                  })}
-                </ul>
+                <ListaDeMonitorias monitorias={lista.slice(0, 8).map((m) => ({
+                  ...m, nota_final: Number(m.nota_final),
+                  reprovados: (apontamentos.get(m.id) ?? []).map(({ criterio, observacao }) => ({ criterio, observacao })),
+                }))} />
               )}
             </Secao>
           </Painel>

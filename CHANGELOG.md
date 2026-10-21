@@ -35,6 +35,24 @@ para o Performance.
 
 ---
 
+## Performance 2.6.0
+
+Migração 76 (banco dos painéis). Não muda as Monitorias nem a Agenda.
+
+- **Performance (atualização): "O que mais se repete".** Na tela de
+  monitorias do atendente, entre o gráfico e a lista do mês: os critérios
+  reprovados nos últimos 3 meses, com a contagem de cada mês, o total, a
+  tendência (aumentou, diminuiu, estável ou resolvido) e a última observação
+  — o ponto de partida para o feedback. A falha crítica entra como uma linha
+  própria.
+- **Performance (atualização): aviso de semana de monitorias concluída.** No
+  sino, quando sai a 4ª monitoria da pessoa numa semana do ciclo. Um aviso
+  por semana; mês ainda não liberado não avisa. Só no sino: as monitorias são
+  salvas no site de Monitorias, que não dispara o aviso no canto da tela.
+- **Performance (atualização): "Suas monitorias" no Início do atendente** no
+  formato novo da 2.5.0 (blocos, filtros e o motivo da falha crítica, que
+  também aparecia ali como "Todos os critérios atendidos").
+
 ## Performance 2.5.0
 
 Sem migração. Não muda as Monitorias nem a Agenda.

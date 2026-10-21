@@ -4,8 +4,9 @@ import CoberturaDoCiclo from '@/componentes/CoberturaDoCiclo';
 import ListaDeMonitorias from '@/componentes/ListaDeMonitorias';
 import { EtiquetaNota, Painel, Quadro, Secao, Tabela, Td, Th, Vazio } from '@/componentes/ui';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
-import { hojeNoBrasil, mesRotulo, percentual } from '@/lib/formatar';
+import { data as formatarData, hojeNoBrasil, mesRotulo, percentual } from '@/lib/formatar';
 import { ateOMesAberto, mesAbertoDasMonitorias } from '@/lib/mes-aberto';
+import { mesAnterior } from '@/lib/competencia';
 import type { LinhaCriterio, LinhaRanking } from '@/lib/tipos';
 
 export const dynamic = 'force-dynamic';
@@ -134,6 +135,8 @@ export default async function MonitoriasDoAtendente({
             </Painel>
           )}
 
+          <OQueMaisSeRepete ultimo={ultimo} monitorias={monitorias} falhas={falhas} />
+
           {meses.map((m) => {
             const nota = notaDoMes(m);
             return (
@@ -155,6 +158,88 @@ export default async function MonitoriasDoAtendente({
         <Link href="/cota/comparativo?cat=mon" className="underline">Comparativo de monitoria da equipe ›</Link>
       </p>
     </div>
+  );
+}
+
+/** Cor da contagem no mês: mais forte quanto mais vezes o critério apareceu. */
+const TOM_DA_CONTAGEM = ['bg-slate-100 font-normal text-slate-400', 'bg-rose-500/20 text-rose-700',
+  'bg-rose-500/35 text-rose-700', 'bg-rose-500/60 text-white'];
+
+/**
+ * O que mais se repete (2.6.0): os critérios reprovados nos últimos 3 meses,
+ * com a contagem de cada mês, a tendência e a última observação — o ponto de
+ * partida para o feedback. A falha crítica entra como uma linha própria.
+ * Tendência: o mês mais recente contra o anterior; "resolvido" é o que
+ * apareceu antes e sumiu nos dois últimos meses.
+ */
+function OQueMaisSeRepete({ ultimo, monitorias, falhas }: {
+  ultimo: string; monitorias: Monitoria[]; falhas: Map<string, Apontamento[]>;
+}) {
+  const janela = [mesAnterior(mesAnterior(ultimo)), mesAnterior(ultimo), ultimo];
+  // As monitorias vêm da mais recente para a mais antiga: a primeira
+  // ocorrência de cada critério é a última observação.
+  const porCriterio = new Map<string, { meses: number[]; ultima: { data: string; texto: string | null } }>();
+  const contar = (criterio: string, m: Monitoria, texto: string | null) => {
+    const i = janela.indexOf(m.mes_referencia);
+    if (i < 0) return;
+    const linha = porCriterio.get(criterio)
+      ?? porCriterio.set(criterio, { meses: [0, 0, 0], ultima: { data: m.data_atendimento, texto } }).get(criterio)!;
+    linha.meses[i]++;
+  };
+  for (const m of monitorias) {
+    if (m.zerado) contar('Falha crítica', m, m.motivo_zeramento);
+    for (const a of falhas.get(m.id) ?? []) contar(a.criterio, m, a.observacao);
+  }
+  const linhas = [...porCriterio.entries()]
+    .map(([criterio, l]) => ({ criterio, ...l, total: l.meses.reduce((a, b) => a + b, 0) }))
+    .sort((a, b) => b.total - a.total || b.ultima.data.localeCompare(a.ultima.data));
+  if (linhas.length === 0) return null;
+
+  const tendencia = ([antes, anterior, atual]: number[]) =>
+    antes > 0 && anterior === 0 && atual === 0 ? { texto: '✓ resolvido', cor: 'text-marca-700 dark:text-marca-400' }
+      : atual > anterior ? { texto: '▲ aumentou', cor: 'text-rose-700' }
+        : atual < anterior ? { texto: '▼ diminuiu', cor: 'text-marca-700 dark:text-marca-400' }
+          : { texto: '= estável', cor: 'font-normal text-slate-500' };
+
+  return (
+    <Quadro titulo="O que mais se repete" subtitulo="Critérios reprovados nos últimos 3 meses — o ponto de partida para o feedback.">
+      <Tabela noQuadro>
+        <thead>
+          <tr>
+            <Th>Critério</Th>
+            {janela.map((m) => <Th key={m} className="text-center">{NOMES_MES[Number(m.slice(5, 7)) - 1]}</Th>)}
+            <Th className="text-center">Total</Th>
+            <Th>Tendência</Th>
+          </tr>
+        </thead>
+        <tbody>
+          {linhas.map((l) => {
+            const t = tendencia(l.meses);
+            const sumiu = l.meses[1] === 0 && l.meses[2] === 0;
+            return (
+              <tr key={l.criterio}>
+                <Td className="align-top">
+                  <span className={`font-semibold ${l.criterio === 'Falha crítica' ? 'text-rose-700' : 'text-slate-900'}`}>{l.criterio}</span>
+                  <span className="mt-0.5 line-clamp-2 text-[12.5px] text-slate-500" title={l.ultima.texto ?? undefined}>
+                    <span className="font-medium text-slate-600">Última, {formatarData(l.ultima.data).slice(0, 5)}</span>
+                    {sumiu ? ' — não apareceu mais desde então.' : l.ultima.texto ? `: ${l.ultima.texto}` : ''}
+                  </span>
+                </Td>
+                {l.meses.map((q, i) => (
+                  <Td key={i} className="text-center align-top">
+                    <span className={`inline-grid h-6 min-w-[1.6rem] place-items-center rounded-md text-[12.5px] font-semibold tabular-nums ${TOM_DA_CONTAGEM[Math.min(q, 3)]}`}>
+                      {q || '—'}
+                    </span>
+                  </Td>
+                ))}
+                <Td className="text-center align-top font-bold tabular-nums">{l.total}</Td>
+                <Td className={`whitespace-nowrap align-top text-[12.5px] font-semibold ${t.cor}`}>{t.texto}</Td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </Tabela>
+    </Quadro>
   );
 }
 
