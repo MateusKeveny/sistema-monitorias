@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Quadro, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import { hojeNoBrasil } from '@/lib/formatar';
@@ -53,6 +53,9 @@ export default function PagamentoDoMes({
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  // Depois de gravar, a tela inteira do fechamento é refeita (alguns segundos):
+  // o botão diz que está atualizando, em vez de parecer que nada aconteceu (2.2.1).
+  const [atualizando, iniciar] = useTransition();
   const lerReais = (t: string) => { const x = t.trim().replace(/\./g, '').replace(',', '.'); return x === '' ? null : Number(x); };
   const mudados = linhas.filter((l) => lerReais(rascunho[l.pessoa_id] ?? '') !== (doRh.get(l.pessoa_id) ?? null));
   const precisaMotivo = mudados.some((l) => doRh.has(l.pessoa_id));
@@ -66,7 +69,7 @@ export default function PagamentoDoMes({
     setOcupado(false);
     if (error) { setErro(await mensagemDoErro(error)); return; }
     setMotivo(''); setAviso(`${valores.length} valor(es) do RH salvo(s).`);
-    router.refresh();
+    iniciar(() => router.refresh());
   }
   if (!linhas.length) {
     return (
@@ -164,15 +167,18 @@ export default function PagamentoDoMes({
         </tbody>
       </Tabela>
 
+      {atualizando && (
+        <p className="mt-3 text-right text-sm text-slate-600">Salvo, atualizando a tela…</p>
+      )}
       {(mudados.length > 0 || erro || aviso) && (
         <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
           {erro && <span className="mr-auto rounded-lg bg-rose-50 px-3 py-1.5 text-sm text-rose-800 ring-1 ring-rose-600/20">{erro}</span>}
-          {aviso && !mudados.length && <span className="mr-auto rounded-lg bg-emerald-50 px-3 py-1.5 text-sm text-emerald-800 ring-1 ring-emerald-600/20">{aviso}</span>}
+          {aviso && (atualizando || !mudados.length) && <span className="mr-auto rounded-lg bg-emerald-50 px-3 py-1.5 text-sm text-emerald-800 ring-1 ring-emerald-600/20">{aviso}</span>}
           {precisaMotivo && (
             <input value={motivo} onChange={(e) => setMotivo(e.target.value)} disabled={ocupado} placeholder="Motivo da mudança (obrigatório)"
                    className="min-w-64 flex-1 rounded-md border border-slate-300 bg-superficie px-2 py-1.5 text-sm outline-none focus:border-marca-600" />
           )}
-          {mudados.length > 0 && <>
+          {mudados.length > 0 && !atualizando && <>
             <button type="button" disabled={ocupado} onClick={() => { setRascunho(Object.fromEntries(linhas.map((l) => [l.pessoa_id, paraTexto(doRh.get(l.pessoa_id))]))); setErro(null); }}
                     className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50">Desfazer</button>
             <button type="button" disabled={ocupado} onClick={salvarRh}
