@@ -10,7 +10,8 @@ import { criarClienteServidor } from '@/lib/supabase/servidor';
  * resumo nunca calculado ou tarefa parada — voltam às views, como antes.
  *
  * As tabelas têm as mesmas colunas das views, então trocar a fonte é trocar
- * o nome em `.from()`. O fechamento e a exportação continuam nas views.
+ * o nome em `.from()`. A exportação continua nas views; o Fechamento usa o
+ * resumo para a prévia (2.8.1) — fechar calcula no banco.
  */
 export type SituacaoDoResumo = { mes_competencia: string; atualizado_em: string | null; pendente: boolean };
 

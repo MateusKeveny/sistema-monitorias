@@ -35,6 +35,20 @@ para o Performance.
 
 ---
 
+## Performance 2.8.1
+
+Sem migração. Não muda as Monitorias nem a Agenda.
+
+- **Performance (correção): valores de um mês aparecendo no outro.** No
+  Fechamento, ao trocar de mês pelas setas, os campos do Pagamento (valor do
+  RH) e do valor por ponto continuavam com o que estava no mês anterior — e
+  salvar gravaria no mês novo. Agora cada mês recomeça os campos.
+- **Performance (correção): Fechamento lento.** A tela recalculava a cota do
+  mês inteiro a cada acesso (3 a 6 s), até em mês fechado. Agora lê o resumo
+  pronto no mês aberto e, em mês já fechado, não recalcula: "Conferir quem
+  ficou em aberto" faz o cálculo só quando pedido. Abre em 0,6 a 1 s. Fechar
+  continua igual — o banco calcula na hora.
+
 ## Performance 2.8.0
 
 Migração 77 (banco dos painéis). Não muda as Monitorias nem a Agenda.

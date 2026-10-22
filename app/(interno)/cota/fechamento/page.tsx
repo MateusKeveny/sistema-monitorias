@@ -12,6 +12,7 @@ import { dataHora, hojeNoBrasil, mesRotulo, semanaDoCiclo } from '@/lib/formatar
 import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
 import { resolverCompetencia } from '@/lib/competencia';
 import { todas } from '@/lib/consultas';
+import { fonteDoMes } from '@/lib/resumo';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,21 +41,33 @@ const num = (v: number) => Number(v).toLocaleString('pt-BR', { maximumFractionDi
 export default async function Fechamento({
   searchParams,
 }: {
-  searchParams: Promise<{ mes?: string }>;
+  searchParams: Promise<{ mes?: string; conferir?: string }>;
 }) {
   await exigirGestor();
-  const { mes } = await searchParams;
+  const { mes, conferir: pediuConferir } = await searchParams;
   const { competencia, atual } = await resolverCompetencia(mes);
 
   const db = await criarClienteServidor();
+
+  // O cálculo ao vivo da cota leva de 3 a 6 segundos (2.8.1). O fechar_ciclo
+  // calcula no banco, sozinho; a tela só precisa dele para a prévia e para
+  // quem ficou em aberto. Mês no resumo: lê o resumo (migração 58). Mês já
+  // fechado e fora do resumo: não calcula ao abrir — conferir quem ficou de
+  // fora vira um botão.
+  const [fonte, { count: jaFechou }] = await Promise.all([
+    fonteDoMes(competencia),
+    db.from('fechamentos_cota').select('id', { count: 'exact', head: true }).eq('mes_competencia', competencia),
+  ]);
+  const semCalculo = fonte.resumo == null && (jaFechou ?? 0) > 0 && pediuConferir !== '1';
+  const vazio = Promise.resolve({ data: [] as never[], error: null });
   const [abertos, fechados, semCargo, conferir, alteracoes, valor, pagamento, correcoes, volumes, monitorias, avaliados, realocar]
     = await todas([
-    db.from('vw_cota_mensal').select('pessoa_id, pessoa, cargo, resultado, meta')
+    semCalculo ? vazio : db.from(fonte.mensal).select('pessoa_id, pessoa, cargo, resultado, meta')
       .eq('mes_competencia', competencia).order('resultado', { ascending: false }),
     db.from('fechamentos_cota')
       .select('id, pessoa_id, pessoa_nome, cargo, resultado, meta, fechado_por_nome, fechado_em')
       .eq('mes_competencia', competencia).order('resultado', { ascending: false }),
-    db.from('vw_sem_cargo').select('nome').eq('mes_competencia', competencia),
+    semCalculo ? vazio : db.from(fonte.semCargo).select('nome').eq('mes_competencia', competencia),
     db.from('vw_lancamentos_a_conferir').select('bloco').eq('mes_competencia', competencia),
     db.from('fechamento_alteracoes')
       .select('id, pessoa_nome, campo, valor_anterior, valor_novo, motivo, autor_nome, criado_em')
@@ -253,12 +266,16 @@ export default async function Fechamento({
 
       {congelados.length > 0 && (
         <>
+          {/* key: trocar de mês recomeça os campos (2.8.1). Sem ela, o que estava
+              digitado num mês continuava na tela do outro, e salvava lá. */}
           <ValorDaCota
+            key={`valor-${competencia}`}
             competencia={competencia}
             valor={(valor.data ?? null) as ValorDaCotaTipo | null}
             alteracoes={(correcoes.data ?? []) as AlteracaoDeValor[]}
           />
           <PagamentoDoMes
+            key={`pagamento-${competencia}`}
             competencia={competencia}
             linhas={(pagamento.data ?? []) as PagamentoMensal[]}
             valoresRh={(valoresRh ?? []) as ValorRh[]}
@@ -267,9 +284,17 @@ export default async function Fechamento({
       )}
 
       <Quadro
-        titulo={congelados.length ? `Ainda em aberto (${pendentes.length})` : `Prévia do fechamento (${pendentes.length})`}
+        titulo={semCalculo ? 'Ainda em aberto' : congelados.length ? `Ainda em aberto (${pendentes.length})` : `Prévia do fechamento (${pendentes.length})`}
       >
-        {pendentes.length === 0 ? (
+        {semCalculo ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600">
+            <span>Mês fechado. Para ver se alguém ficou de fora, a cota é recalculada — leva alguns segundos.</span>
+            <Link href={`/cota/fechamento?mes=${mesCurto}&conferir=1`}
+                  className="rounded-lg border border-slate-300 px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-50">
+              Conferir quem ficou em aberto
+            </Link>
+          </div>
+        ) : pendentes.length === 0 ? (
           <Vazio>
             {congelados.length
               ? 'Todo mundo desta competência já está fechado.'
