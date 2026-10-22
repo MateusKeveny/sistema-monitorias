@@ -35,6 +35,15 @@ para o Performance.
 
 ---
 
+## Performance 2.8.2
+
+Sem migração. Não muda as Monitorias nem a Agenda.
+
+- **Performance (correção): Fechamento mais rápido.** As consultas da tela
+  esperavam umas pelas outras em quatro etapas (login, origem do cálculo,
+  dados, valores do RH); agora saem juntas, com a conferência do gestor. Os
+  dados da tela ficam prontos em 0,2 a 0,3 s.
+
 ## Performance 2.8.1
 
 Sem migração. Não muda as Monitorias nem a Agenda.

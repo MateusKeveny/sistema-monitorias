@@ -43,31 +43,18 @@ export default async function Fechamento({
 }: {
   searchParams: Promise<{ mes?: string; conferir?: string }>;
 }) {
-  await exigirGestor();
   const { mes, conferir: pediuConferir } = await searchParams;
   const { competencia, atual } = await resolverCompetencia(mes);
-
   const db = await criarClienteServidor();
 
-  // O cálculo ao vivo da cota leva de 3 a 6 segundos (2.8.1). O fechar_ciclo
-  // calcula no banco, sozinho; a tela só precisa dele para a prévia e para
-  // quem ficou em aberto. Mês no resumo: lê o resumo (migração 58). Mês já
-  // fechado e fora do resumo: não calcula ao abrir — conferir quem ficou de
-  // fora vira um botão.
-  const [fonte, { count: jaFechou }] = await Promise.all([
-    fonteDoMes(competencia),
-    db.from('fechamentos_cota').select('id', { count: 'exact', head: true }).eq('mes_competencia', competencia),
-  ]);
-  const semCalculo = fonte.resumo == null && (jaFechou ?? 0) > 0 && pediuConferir !== '1';
-  const vazio = Promise.resolve({ data: [] as never[], error: null });
-  const [abertos, fechados, semCargo, conferir, alteracoes, valor, pagamento, correcoes, volumes, monitorias, avaliados, realocar]
-    = await todas([
-    semCalculo ? vazio : db.from(fonte.mensal).select('pessoa_id, pessoa, cargo, resultado, meta')
-      .eq('mes_competencia', competencia).order('resultado', { ascending: false }),
+  // Tudo o que não depende de nada sai junto, já com a conferência do gestor
+  // (2.8.2): antes eram quatro esperas em fila. Sem ser gestor, exigirGestor
+  // redireciona antes de qualquer dado ir para a tela — e a RLS já barra.
+  const independentes = todas([
+    exigirGestor(),
     db.from('fechamentos_cota')
       .select('id, pessoa_id, pessoa_nome, cargo, resultado, meta, fechado_por_nome, fechado_em')
       .eq('mes_competencia', competencia).order('resultado', { ascending: false }),
-    semCalculo ? vazio : db.from(fonte.semCargo).select('nome').eq('mes_competencia', competencia),
     db.from('vw_lancamentos_a_conferir').select('bloco').eq('mes_competencia', competencia),
     db.from('fechamento_alteracoes')
       .select('id, pessoa_nome, campo, valor_anterior, valor_novo, motivo, autor_nome, criado_em')
@@ -83,12 +70,30 @@ export default async function Fechamento({
     db.from('pessoas').select('id, nome').eq('avaliado', true).eq('ativo', true).order('nome'),
     // Pendentes de realocação (migração 71): não pontuam para ninguém.
     db.from('vw_lancamentos_pendentes').select('pessoa, tipo').eq('mes_competencia', competencia),
+    // Valor encaminhado pelo RH (migração 73).
+    db.from('valores_rh').select('pessoa_id, valor, informado_por_nome, informado_em').eq('mes_competencia', competencia),
   ]);
 
-  // Valor encaminhado pelo RH (migração 73). Fora do todas(): sem a migração,
-  // a tabela não existe e a tela segue sem a coluna preenchida.
-  const { data: valoresRh } = await db.from('valores_rh')
-    .select('pessoa_id, valor, informado_por_nome, informado_em').eq('mes_competencia', competencia);
+  // O cálculo ao vivo da cota leva de 3 a 6 segundos (2.8.1). O fechar_ciclo
+  // calcula no banco, sozinho; a tela só precisa dele para a prévia e para
+  // quem ficou em aberto. Mês no resumo: lê o resumo (migração 58). Mês já
+  // fechado e fora do resumo: não calcula ao abrir — conferir quem ficou de
+  // fora vira um botão.
+  const [fonte, { count: jaFechou }] = await Promise.all([
+    fonteDoMes(competencia),
+    db.from('fechamentos_cota').select('id', { count: 'exact', head: true }).eq('mes_competencia', competencia),
+  ]);
+  const semCalculo = fonte.resumo == null && (jaFechou ?? 0) > 0 && pediuConferir !== '1';
+  const vazio = Promise.resolve({ data: [] as never[], error: null });
+  const [[, fechados, conferir, alteracoes, valor, pagamento, correcoes, volumes, monitorias, avaliados, realocar, { data: valoresRh }],
+    [abertos, semCargo]] = await Promise.all([
+    independentes,
+    todas([
+      semCalculo ? vazio : db.from(fonte.mensal).select('pessoa_id, pessoa, cargo, resultado, meta')
+        .eq('mes_competencia', competencia).order('resultado', { ascending: false }),
+      semCalculo ? vazio : db.from(fonte.semCargo).select('nome').eq('mes_competencia', competencia),
+    ]),
+  ]);
 
   const lista = (abertos.data ?? []) as Aberto[];
   const congelados = (fechados.data ?? []) as Fechado[];
