@@ -35,6 +35,16 @@ para o Performance.
 
 ---
 
+## Agenda da Gestão 1.7.0
+
+`supabase/agenda/06-itens-do-resumo.sql` (banco da agenda). Não muda as
+Monitorias nem o Performance.
+
+- **Agenda (atualização): resumo do dia por extenso no Telegram.** Em vez de
+  "3 para hoje · 1 atrasado", o resumo lista o que está agendado hoje (com
+  horário ou "dia inteiro"), os atrasados (desde quando), as pendências do
+  sistema e os avisos de férias. A notificação do celular segue curta.
+
 ## Agenda da Gestão 1.6.0
 
 `supabase/agenda/05-horario-de-termino.sql` (banco da agenda) e migração 78

@@ -1,5 +1,6 @@
 import { chavesVapid, dbSemSessao, segredoDaAgenda } from '@/lib/agenda/envio';
 import { feriasDoPerformance, pendenciasDoPerformance } from '@/lib/agenda/ponte';
+import { textoDoResumo, type ItemDoResumo } from '@/lib/agenda/resumo';
 import { hoje as hojeNoBrasil } from '@/lib/agenda/tempo';
 import { avisosDeFerias, type PeriodoDeFerias } from '@/lib/ferias';
 import { chamarTelegram, mensagemDoAviso, tokenDoTelegram } from '@/lib/agenda/telegram';
@@ -62,13 +63,18 @@ export async function POST(requisicao: Request) {
   // as pendências; as de cada usuário, do banco da agenda.
   const resumos = envios.filter((e) => e.tag?.startsWith('resumo-'));
   const hoje = hojeNoBrasil();
-  const [equipe, minhas] = resumos.length ? await Promise.all([
+  const usuarios = [...new Set(resumos.map((e) => e.usuario_id).filter(Boolean))];
+  const [equipe, minhas, itens] = resumos.length ? await Promise.all([
     resumos.some((e) => e.pendencias) ? feriasDoPerformance() : Promise.resolve(null),
-    dbSemSessao().rpc('agenda_minhas_ferias_resumo', {
-      p_segredo: segredo,
-      p_usuarios: [...new Set(resumos.map((e) => e.usuario_id).filter(Boolean))],
-    }).then((r) => (r.data ?? []) as { usuario_id: string; inicio: string; fim: string }[]),
-  ]) : [null, []];
+    dbSemSessao().rpc('agenda_minhas_ferias_resumo', { p_segredo: segredo, p_usuarios: usuarios })
+      .then((r) => (r.data ?? []) as { usuario_id: string; inicio: string; fim: string }[]),
+    // O que está agendado hoje e o atrasado, para o resumo por extenso no
+    // Telegram (agenda/06). Sem a função, o resumo segue com as contagens.
+    resumos.some((e) => e.telegram != null)
+      ? dbSemSessao().rpc('agenda_itens_do_resumo', { p_segredo: segredo, p_usuarios: usuarios })
+          .then((r) => (r.error ? null : (r.data ?? []) as (ItemDoResumo & { usuario_id: string })[]))
+      : Promise.resolve(null),
+  ]) : [null, [], null];
   const feriasDe = (e: Envio) => {
     const meus: PeriodoDeFerias[] = minhas.filter((m) => m.usuario_id === e.usuario_id)
       .map((m, i) => ({ id: `minha-${i}`, pessoa: 'você', inicio: m.inicio, fim: m.fim, minha: true }));
@@ -83,6 +89,16 @@ export async function POST(requisicao: Request) {
     const ferias = feriasDe(e);
     const linha = partes.length ? partes.join(' · ') : ferias.length ? null : 'Nada marcado para hoje. Bom trabalho!';
     return [linha, ...ferias.map((t) => `🏖 ${t}`)].filter(Boolean).join('\n');
+  };
+
+  // No Telegram cabe o dia inteiro: a lista do que está agendado em vez das contagens.
+  const corpoNoTelegram = (e: Envio) => {
+    if (!e.tag?.startsWith('resumo-') || !itens) return corpoDe(e);
+    return textoDoResumo({
+      itens: itens.filter((i) => i.usuario_id === e.usuario_id),
+      pendencias: e.pendencias ? lista : [],
+      ferias: feriasDe(e),
+    });
   };
 
   await Promise.all(envios.slice(0, 200).map(async (e) => {
@@ -101,7 +117,7 @@ export async function POST(requisicao: Request) {
         if (!token) return;
         const { status, json } = await chamarTelegram(token, 'sendMessage', {
           chat_id: e.telegram,
-          ...mensagemDoAviso({ titulo: e.titulo, corpo: corpoDe(e), url: e.url || '/agenda', item: e.item_id }),
+          ...mensagemDoAviso({ titulo: e.titulo, corpo: corpoNoTelegram(e), url: e.url || '/agenda', item: e.item_id }),
         });
         if (status === 403) conversasMortas.push(e.telegram);
         else if (status < 300) entregues++;
