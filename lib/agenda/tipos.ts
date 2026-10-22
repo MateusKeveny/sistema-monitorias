@@ -32,11 +32,13 @@ export type ItemAgenda = {
   lembrar_em: string | null;
   dia_inteiro: boolean;
   regra: string | null;
+  /** Hora de término, 'HH:MM:SS' (agenda/05). */
+  hora_fim: string | null;
   concluido_em: string | null;
 };
 
 export const COLUNAS_ITEM =
-  'id, titulo, observacao, categoria, prioridade, vence_em, lembrar_em, dia_inteiro, regra, concluido_em';
+  'id, titulo, observacao, categoria, prioridade, vence_em, lembrar_em, dia_inteiro, regra, hora_fim, concluido_em';
 
 /** Uma pendência calculada pelo banco (pendencias_do_gestor). */
 export type Pendencia = {

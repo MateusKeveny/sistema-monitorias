@@ -20,10 +20,14 @@ export type Interpretacao = {
   titulo: string;
   dia: string | null;
   hora: string | null;
+  /** Fim do compromisso, em "das 14h às 16h" (agenda/05). */
+  horaFim: string | null;
   regra: string | null;
   categoria: Categoria;
   prioridade: Prioridade;
 };
+
+const hhmm = (h: number, m: number) => `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 
 type Agora = { dia: string; hora: string };
 
@@ -165,6 +169,43 @@ export function interpretar(texto: string, agora: Agora = { dia: hoje(), hora: h
     dia = somarDias(agora.dia, 8 - diaDaSemana(agora.dia));   // próxima segunda
   }
 
+  // ---------- Quando: das … às … ----------
+  // "das 14h00 às 16h00", "das 9 às 11", "14:00 - 15:30", "de 14h até 16h",
+  // "entre 10 e 11h". Sem "das/de/entre" na frente, ao menos um lado precisa
+  // de "h" ou ":" — senão "dia 20 a 25" viraria horário.
+  let horaFim: string | null = null;
+  if (!hora) {
+    const H = '(\\d{1,2})(?:\\s*(?:h|:)\\s*(\\d{2})?|\\s*h)?';
+    const faixa = achar(new RegExp(
+      `\\b(das|de|entre)?\\s*${H}\\s*(?:hs?|horas)?\\s*(?:as|a|ate|-|–|e)\\s*(?:as\\s+)?${H}\\s*(?:hs?|horas)?(?!\\s*\\/)\\b`));
+    if (faixa) {
+      const [, prefixo, h1, m1, h2, m2] = faixa;
+      const marcado = /h|:/.test(faixa[0].replace(/horas?|hs/g, 'h'));
+      const ehE = /\se\s/.test(faixa[0]);
+      const comAs = /\sas\s/.test(faixa[0]);
+      // "de 3 a 5 pessoas" não é horário: com "de" (ou nada) na frente, precisa
+      // de "h", ":" ou "às"; "das" e "entre" bastam.
+      const horario = marcado || comAs || prefixo === 'das' || prefixo === 'entre';
+      let ini = Number(h1); let fim = Number(h2);
+      if (horario && (!ehE || prefixo === 'entre') && ini <= 23 && fim <= 23
+          && Number(m1 ?? 0) <= 59 && Number(m2 ?? 0) <= 59) {
+        if (achar(/\b(?:da|de|a)\s+(?:tarde|noite)\b/)) { if (ini < 12) ini += 12; if (fim < 12) fim += 12; }
+        else achar(/\b(?:da|de)\s+manha\b/);
+        // "das 11 às 1": o fim passa do meio-dia.
+        if (fim < ini && fim + 12 <= 23) fim += 12;
+        if (fim * 60 + Number(m2 ?? 0) > ini * 60 + Number(m1 ?? 0)) {
+          hora = hhmm(ini, Number(m1 ?? 0));
+          horaFim = hhmm(fim, Number(m2 ?? 0));
+        }
+      }
+      // Não era faixa de horário: devolve o trecho ao texto para as outras regras.
+      if (!hora) {
+        const [a, b] = remover.pop()!;
+        t = t.slice(0, a) + normalizar(texto).slice(a, b) + t.slice(b);
+      }
+    }
+  }
+
   // ---------- Quando: a hora ----------
   if (!hora) {
     if (achar(/\b(?:(?:as|ao|a|pelo|pelas)\s+)?meio[\s-]dia\b/)) hora = '12:00';
@@ -210,5 +251,5 @@ export function interpretar(texto: string, agora: Agora = { dia: hoje(), hora: h
   const n = normalizar(texto);
   const categoria = CATEGORIA_POR_PALAVRA.find(([re]) => re.test(n))?.[1] ?? 'geral';
 
-  return { titulo, dia, hora, regra, categoria, prioridade };
+  return { titulo, dia, hora, horaFim, regra, categoria, prioridade };
 }

@@ -25,6 +25,9 @@ export type Entrada =
 
 export const diaDoItem = (i: ItemAgenda) => (i.lembrar_em ? diaLocal(i.lembrar_em) : null);
 
+/** "14:00" ou, com horário de término (agenda/05), "14:00–16:00". */
+export const faixaDeHora = (i: ItemAgenda, hora: string) => (i.hora_fim ? `${hora}–${i.hora_fim.slice(0, 5)}` : hora);
+
 export function atrasado(i: ItemAgenda, agora: Agora): boolean {
   if (!i.lembrar_em) return false;
   const dia = diaLocal(i.lembrar_em);
@@ -56,13 +59,13 @@ export function planoDoDia(itens: ItemAgenda[], pendencias: Pendencia[], agora: 
 
     const minutos = hora ? (Date.parse(i.lembrar_em) - agora.instante) / 60_000 : Infinity;
     if (minutos <= 60) {
-      empurrar(3, i.lembrar_em, { ...base, motivo: `Daqui a ${Math.max(1, Math.round(minutos))} min · ${hora}`, tom: 'agora' });
+      empurrar(3, i.lembrar_em, { ...base, motivo: `Daqui a ${Math.max(1, Math.round(minutos))} min · ${faixaDeHora(i, hora!)}`, tom: 'agora' });
     } else if (i.prioridade === 1) {
-      empurrar(5, hora ?? '99', { ...base, motivo: hora ? `Prioridade alta · ${hora}` : 'Prioridade alta', tom: 'normal' });
+      empurrar(5, hora ?? '99', { ...base, motivo: hora ? `Prioridade alta · ${faixaDeHora(i, hora)}` : 'Prioridade alta', tom: 'normal' });
     } else if (i.prioridade === 3) {
-      empurrar(8, hora ?? '99', { ...base, motivo: hora ? `Quando der · ${hora}` : 'Quando der', tom: 'normal' });
+      empurrar(8, hora ?? '99', { ...base, motivo: hora ? `Quando der · ${faixaDeHora(i, hora)}` : 'Quando der', tom: 'normal' });
     } else {
-      empurrar(6, hora ?? '99', { ...base, motivo: hora ? `Às ${hora}` : 'Hoje', tom: 'normal' });
+      empurrar(6, hora ?? '99', { ...base, motivo: hora ? (i.hora_fim ? `Das ${hora} às ${i.hora_fim.slice(0, 5)}` : `Às ${hora}`) : 'Hoje', tom: 'normal' });
     }
   }
 

@@ -35,6 +35,22 @@ para o Performance.
 
 ---
 
+## Agenda da Gestão 1.6.0
+
+`supabase/agenda/05-horario-de-termino.sql` (banco da agenda) e migração 78
+(banco dos painéis). Não muda as Monitorias nem o Performance.
+
+- **Agenda (atualização): começo e fim.** "das 14h00 às 16h00", "das 9 às
+  11", "14:00 - 15:30", "de 14h até 16h" e "entre 10 e 11h" viram compromisso
+  das 14:00 às 16:00 — antes ficava só um dos horários e o resto ia para o
+  título. O formulário ganha **Até**, a lista mostra "14:00–16:00" e o aviso
+  diz "Das 14:00 às 16:00".
+- **Agenda (atualização): excluir pelo menu.** O menu ⋯ de cada linha tem
+  **Excluir**; no que se repete, **Excluir repetição** apaga a série toda.
+- **Agenda (correção): valor por ponto preso.** A ponte seguia a regra antiga
+  e cobrava o valor por ponto de mês que já tem o valor do RH; agora segue a
+  do painel (2.3.1).
+
 ## Performance 2.8.2
 
 Sem migração. Não muda as Monitorias nem a Agenda.

@@ -2,7 +2,7 @@ import EntradaRapida from '@/componentes/agenda/EntradaRapida';
 import ListaDaAgenda, { type Grupo } from '@/componentes/agenda/ListaDaAgenda';
 import { Painel } from '@/componentes/ui';
 import { criarServidorDaAgenda, exigirUsuario } from '@/lib/agenda/db-servidor';
-import { agoraNoBrasil, atrasado, diaDoItem, linhaDoTempo } from '@/lib/agenda/plano';
+import { agoraNoBrasil, atrasado, diaDoItem, faixaDeHora, linhaDoTempo } from '@/lib/agenda/plano';
 import { rotuloDoDia } from '@/lib/agenda/tempo';
 import { descreverRegra } from '@/lib/agenda/regras';
 import { COLUNAS_ITEM, type ItemAgenda } from '@/lib/agenda/tipos';
@@ -35,7 +35,7 @@ export default async function Proximos() {
       titulo: rotuloDoDia(dia, agora.dia),
       subtitulo: `${ocorrencias.length} ${ocorrencias.length > 1 ? 'itens' : 'item'}`,
       linhas: ocorrencias.map((o) => ({
-        tipo: 'item', chave: o.item.id, item: o.item, projetada: o.projetada, motivo: o.hora ?? 'Dia inteiro',
+        tipo: 'item', chave: o.item.id, item: o.item, projetada: o.projetada, motivo: o.hora ? faixaDeHora(o.item, o.hora) : 'Dia inteiro',
       })),
     })),
   ];

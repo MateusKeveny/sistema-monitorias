@@ -71,6 +71,19 @@ export default function ListaDaAgenda({ grupos }: { grupos: Grupo[] }) {
     router.refresh();
   }
 
+  // No recorrente, apaga a série: as repetições projetadas são o mesmo item.
+  async function excluir(item: ItemAgenda) {
+    const pergunta = item.regra
+      ? `Excluir "${item.titulo}" e todas as próximas repetições? Não dá para desfazer.`
+      : `Excluir "${item.titulo}"? Não dá para desfazer.`;
+    if (!confirm(pergunta)) return;
+    setEscondidos((s) => new Set(s).add(item.id));
+    const { error } = await criarClienteDaAgenda().from('agenda_itens').delete().eq('id', item.id);
+    if (error) avisar(`Não foi possível excluir: ${error.message}`);
+    else avisar(item.regra ? 'Repetição excluída' : 'Excluído');
+    router.refresh();
+  }
+
   return (
     <>
       {grupos.map((g) => {
@@ -89,7 +102,7 @@ export default function ListaDaAgenda({ grupos }: { grupos: Grupo[] }) {
                 {linhas.map((l) => l.tipo === 'pendencia'
                   ? <LinhaPendencia key={l.chave} linha={l} />
                   : <LinhaItem key={`${l.chave}:${l.projetada ? 'p' : 'r'}`} linha={l} aoConcluir={concluir}
-                               aoAdiar={adiar} aoEditar={setEditando} />)}
+                               aoAdiar={adiar} aoExcluir={excluir} aoEditar={setEditando} />)}
               </ul>
             )}
           </section>
@@ -140,10 +153,11 @@ function Numero({ n }: { n?: number }) {
   return <span className="w-5 shrink-0 text-right text-xs font-semibold tabular-nums text-slate-400">{n}</span>;
 }
 
-function LinhaItem({ linha, aoConcluir, aoAdiar, aoEditar }: {
+function LinhaItem({ linha, aoConcluir, aoAdiar, aoExcluir, aoEditar }: {
   linha: Extract<Linha, { tipo: 'item' }>;
   aoConcluir: (i: ItemAgenda) => void;
   aoAdiar: (i: ItemAgenda, para: string, rotulo: string) => void;
+  aoExcluir: (i: ItemAgenda) => void;
   aoEditar: (i: ItemAgenda) => void;
 }) {
   const { item, projetada } = linha;
@@ -176,7 +190,7 @@ function LinhaItem({ linha, aoConcluir, aoAdiar, aoEditar }: {
         {item.observacao && <p className="mt-0.5 line-clamp-2 text-xs text-slate-500">{item.observacao}</p>}
       </button>
 
-      {!projetada && item.lembrar_em && <MenuAdiar item={item} aoAdiar={aoAdiar} />}
+      <MenuDoItem item={item} aoAdiar={aoAdiar} aoExcluir={aoExcluir} podeAdiar={!projetada && !!item.lembrar_em} />
     </li>
   );
 }
@@ -202,7 +216,13 @@ function opcoesDeAdiar(item: ItemAgenda): { rotulo: string; para: string }[] {
   ];
 }
 
-function MenuAdiar({ item, aoAdiar }: { item: ItemAgenda; aoAdiar: (i: ItemAgenda, para: string, rotulo: string) => void }) {
+/** O menu ⋯ da linha: adiar (quando tem data) e excluir — no recorrente, a série toda. */
+function MenuDoItem({ item, aoAdiar, aoExcluir, podeAdiar }: {
+  item: ItemAgenda;
+  aoAdiar: (i: ItemAgenda, para: string, rotulo: string) => void;
+  aoExcluir: (i: ItemAgenda) => void;
+  podeAdiar: boolean;
+}) {
   const [aberto, setAberto] = useState(false);
   const caixa = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -214,19 +234,28 @@ function MenuAdiar({ item, aoAdiar }: { item: ItemAgenda; aoAdiar: (i: ItemAgend
 
   return (
     <div ref={caixa} className="relative shrink-0">
-      <button onClick={() => setAberto((a) => !a)} aria-label="Adiar" aria-expanded={aberto}
+      <button onClick={() => setAberto((a) => !a)} aria-label="Mais opções" aria-expanded={aberto}
               className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
-        <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="10" cy="10.5" r="6.5" /><path d="M10 7v3.5l2.3 1.4M3.5 4 6 2M16.5 4 14 2" /></svg>
+        <svg viewBox="0 0 20 20" className="h-5 w-5" fill="currentColor"><circle cx="4.5" cy="10" r="1.5" /><circle cx="10" cy="10" r="1.5" /><circle cx="15.5" cy="10" r="1.5" /></svg>
       </button>
       {aberto && (
-        <div className="absolute right-0 top-full z-20 mt-1 w-44 rounded-xl border border-slate-200 bg-superficie p-1 shadow-lg">
-          <p className="px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">Adiar para</p>
-          {opcoesDeAdiar(item).map((o) => (
-            <button key={o.rotulo} onClick={() => { setAberto(false); aoAdiar(item, o.para, o.rotulo); }}
-                    className="block w-full rounded-lg px-2.5 py-1.5 text-left text-sm text-slate-700 hover:bg-slate-50">
-              {o.rotulo.replace(/^./, (c) => c.toUpperCase())}
-            </button>
-          ))}
+        <div className="absolute right-0 top-full z-20 mt-1 w-48 rounded-xl border border-slate-200 bg-superficie p-1 shadow-lg">
+          {podeAdiar && (
+            <>
+              <p className="px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">Adiar para</p>
+              {opcoesDeAdiar(item).map((o) => (
+                <button key={o.rotulo} onClick={() => { setAberto(false); aoAdiar(item, o.para, o.rotulo); }}
+                        className="block w-full rounded-lg px-2.5 py-1.5 text-left text-sm text-slate-700 hover:bg-slate-50">
+                  {o.rotulo.replace(/^./, (c) => c.toUpperCase())}
+                </button>
+              ))}
+              <div className="my-1 border-t border-slate-100" />
+            </>
+          )}
+          <button onClick={() => { setAberto(false); aoExcluir(item); }}
+                  className="block w-full rounded-lg px-2.5 py-1.5 text-left text-sm font-medium text-rose-700 hover:bg-rose-50">
+            {item.regra ? 'Excluir repetição' : 'Excluir'}
+          </button>
         </div>
       )}
     </div>

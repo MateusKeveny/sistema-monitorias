@@ -53,7 +53,7 @@ export default function EntradaRapida({ focar = false }: { focar?: boolean }) {
 
   const fichas = leitura ? [
     leitura.dia ? rotuloDoDia(leitura.dia) : 'Sem data',
-    leitura.hora ?? (leitura.dia ? 'Dia inteiro' : null),
+    leitura.hora ? (leitura.horaFim ? `${leitura.hora}–${leitura.horaFim}` : leitura.hora) : (leitura.dia ? 'Dia inteiro' : null),
     descreverRegra(leitura.regra),
     leitura.categoria !== 'geral' ? categoria(leitura.categoria).rotulo : null,
     leitura.prioridade === 1 ? 'Prioridade alta' : leitura.prioridade === 3 ? 'Prioridade baixa' : null,
@@ -90,7 +90,7 @@ export default function EntradaRapida({ focar = false }: { focar?: boolean }) {
       )}
       {!leitura && (
         <button type="button"
-                onClick={() => setFormulario({ titulo: '', dia: null, hora: null, regra: null, categoria: 'geral', prioridade: 2, observacao: null })}
+                onClick={() => setFormulario({ titulo: '', dia: null, hora: null, horaFim: null, regra: null, categoria: 'geral', prioridade: 2, observacao: null })}
                 className="mt-2 px-1 text-xs font-medium text-slate-500 hover:text-slate-800">
           ou preencher o formulário completo
         </button>

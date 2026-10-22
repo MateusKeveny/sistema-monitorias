@@ -6,7 +6,7 @@ import { criarServidorDaAgenda, exigirUsuario } from '@/lib/agenda/db-servidor';
 import { feriasDoPerformance, pendenciasDoPerformance } from '@/lib/agenda/ponte';
 import { avisosDeFerias } from '@/lib/ferias';
 import { mesDeCompetencia, periodoDaSemana, semanaDoCiclo, diaMes } from '@/lib/formatar';
-import { agoraNoBrasil, atrasado, diaDoItem, linhaDoTempo, planoDoDia } from '@/lib/agenda/plano';
+import { agoraNoBrasil, atrasado, diaDoItem, faixaDeHora, linhaDoTempo, planoDoDia } from '@/lib/agenda/plano';
 import { dataPorExtenso, diasEntre, nomeDoMes, rotuloDoDia, somarDias } from '@/lib/agenda/tempo';
 import { COLUNAS_ITEM, type ItemAgenda, type Pendencia } from '@/lib/agenda/tipos';
 
@@ -70,7 +70,7 @@ export default async function MeuDia({ searchParams }: { searchParams: Promise<{
       titulo: rotuloDoDia(dia, agora.dia),
       linhas: ocorrencias.map((o) => ({
         tipo: 'item', chave: o.item.id, item: o.item, projetada: o.projetada,
-        motivo: o.hora ?? 'Dia inteiro', tom: 'normal',
+        motivo: o.hora ? faixaDeHora(o.item, o.hora) : 'Dia inteiro', tom: 'normal',
       })),
     })),
     {

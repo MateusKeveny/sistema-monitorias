@@ -13,6 +13,8 @@ export type Rascunho = {
   titulo: string;
   dia: string | null;
   hora: string | null;
+  /** Fim do compromisso ("das 14h às 16h"), opcional (agenda/05). */
+  horaFim: string | null;
   regra: string | null;
   categoria: Categoria;
   prioridade: Prioridade;
@@ -24,6 +26,7 @@ export const rascunhoDoItem = (i: ItemAgenda): Rascunho => ({
   regra: i.regra,
   dia: i.vence_em ? diaLocal(i.vence_em) : null,
   hora: i.vence_em && !i.dia_inteiro ? horaLocal(i.vence_em) : null,
+  horaFim: i.hora_fim ? i.hora_fim.slice(0, 5) : null,
 });
 
 type TipoRepeticao = '' | 'diaria' | 'dias_uteis' | 'semanal' | 'mensal_dia' | 'mensal:ultimo' | 'mensal:ultimo_util';
@@ -54,7 +57,10 @@ export async function salvarRascunho(r: Rascunho): Promise<string | null> {
     regra: r.regra,
     vence_em: dia ? instante(dia, r.hora) : null,
     dia_inteiro: !!dia && !r.hora,
+    // Só vale com hora de início e depois dela.
+    hora_fim: r.hora && r.horaFim && r.horaFim > r.hora ? r.horaFim : null,
   };
+  if (r.hora && r.horaFim && r.horaFim <= r.hora) return 'O fim precisa ser depois do início.';
   const db = criarClienteDaAgenda();
   const { error } = r.id
     ? await db.from('agenda_itens').update(linha).eq('id', r.id)
@@ -99,7 +105,9 @@ export default function FormularioItem({ inicial, aoFechar }: { inicial: Rascunh
   }
 
   async function excluir() {
-    if (!r.id || !confirm('Excluir este lembrete? Não dá para desfazer.')) return;
+    if (!r.id || !confirm(inicial.regra
+      ? 'Excluir este lembrete e todas as próximas repetições? Não dá para desfazer.'
+      : 'Excluir este lembrete? Não dá para desfazer.')) return;
     const { error } = await criarClienteDaAgenda().from('agenda_itens').delete().eq('id', r.id);
     if (error) { setErro(error.message); return; }
     aoFechar(true);
@@ -128,16 +136,21 @@ export default function FormularioItem({ inicial, aoFechar }: { inicial: Rascunh
                  onChange={(e) => mudar('titulo', e.target.value)} />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-[1.4fr_1fr_1fr] gap-3">
           <div>
             <label className={rotulo} htmlFor="dia">{regra ? 'A partir de' : 'Dia'}</label>
             <input id="dia" type="date" className={campo} value={r.dia ?? ''}
                    onChange={(e) => mudar('dia', e.target.value || null)} />
           </div>
           <div>
-            <label className={rotulo} htmlFor="hora">Hora <span className="font-normal text-slate-400">(opcional)</span></label>
+            <label className={rotulo} htmlFor="hora">Das <span className="font-normal text-slate-400">(opc.)</span></label>
             <input id="hora" type="time" className={campo} value={r.hora ?? ''}
                    onChange={(e) => mudar('hora', e.target.value || null)} />
+          </div>
+          <div>
+            <label className={rotulo} htmlFor="horaFim">Até <span className="font-normal text-slate-400">(opc.)</span></label>
+            <input id="horaFim" type="time" className={campo} value={r.horaFim ?? ''} disabled={!r.hora}
+                   onChange={(e) => mudar('horaFim', e.target.value || null)} />
           </div>
         </div>
         {!r.hora && (r.dia || regra) && (
