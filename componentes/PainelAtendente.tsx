@@ -477,7 +477,7 @@ export default async function PainelAtendente({
                           </span>
                         )}
                         <span className="text-right tabular-nums">
-                          {!m.atingiu_meta ? <span className="text-slate-500">abaixo da meta</span>
+                          {!m.atingiu_meta && !valorRh.has(m.mes_competencia) ? <span className="text-slate-500">abaixo da meta</span>
                             : m.valor == null ? <span className="text-slate-500">valor a definir</span>
                               : <span className="font-semibold text-marca-700 dark:text-marca-400">{reais(Number(m.valor))}</span>}
                         </span>

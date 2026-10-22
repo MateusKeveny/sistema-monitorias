@@ -25,6 +25,8 @@ const reais = (v: number) =>
  *
  * Corrigir um valor já definido exige motivo e fica no histórico, pelo mesmo
  * motivo do ajuste de fechamento: número que vira pagamento não muda calado.
+ * Remover também (2.8.0, migração 77): com o valor do RH informado, o valor
+ * por ponto pode sair, e a remoção entra no histórico.
  */
 export default function ValorDaCota({
   competencia, valor, alteracoes,
@@ -73,6 +75,17 @@ export default function ValorDaCota({
     router.refresh();
   }
 
+  async function remover() {
+    if (!motivo.trim()) { setErro('Remover o valor por ponto exige motivo.'); return; }
+    setOcupado(true); setErro(null); setAviso(null);
+    const { error } = await criarClienteNavegador().rpc('remover_valor_da_cota', { p_mes: competencia, p_motivo: motivo.trim() });
+    setOcupado(false);
+    if (error) { setErro(await mensagemDoErro(error)); return; }
+    setMotivo(''); setPorPonto('');
+    setAviso('Valor por ponto removido e registrado no histórico.');
+    router.refresh();
+  }
+
   return (
     <Quadro titulo="Valor por ponto">
       {erro && (
@@ -108,7 +121,7 @@ export default function ValorDaCota({
             </span>
             <input
               value={motivo} disabled={ocupado} className={`${entrada} w-full`}
-              placeholder="Obrigatório para alterar"
+              placeholder="Obrigatório para alterar ou remover"
               onChange={(e) => setMotivo(e.target.value)}
             />
           </label>
@@ -117,6 +130,12 @@ export default function ValorDaCota({
                 className={`${botaoPrimario} mb-0.5`}>
           {ocupado ? 'Salvando…' : valor ? 'Corrigir valor' : 'Definir valor'}
         </button>
+        {valor && (
+          <button type="button" onClick={remover} disabled={ocupado}
+                  className="mb-0.5 rounded-lg border border-rose-600/40 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-40">
+            Remover valor
+          </button>
+        )}
       </div>
 
       {valor && (
@@ -136,7 +155,7 @@ export default function ValorDaCota({
           <ul className="flex flex-col gap-1.5 text-xs text-slate-600">
             {alteracoes.map((a) => (
               <li key={a.id}>
-                {reais(Number(a.valor_antes ?? 0))} → {reais(Number(a.valor_depois ?? 0))}
+                {reais(Number(a.valor_antes ?? 0))} → {a.valor_depois == null ? 'removido' : reais(Number(a.valor_depois))}
                 {' · '}{a.motivo}
                 {' · '}{a.alterado_por_nome ?? 'sistema'}, {dataHora(a.alterado_em)}
               </li>

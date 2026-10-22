@@ -35,6 +35,8 @@ function atrasado(competencia: string) {
  *
  * Valor do RH (2.2.0): o que o RH mandou pagar a cada um, digitado aqui. Com
  * valor por ponto, aparece ao lado do calculado e a tela diz se confere.
+ * Vale para qualquer pessoa fechada no mês (2.8.0, migração 77): se o RH
+ * pagou quem ficou abaixo da meta, é isso que vale.
  */
 export default function PagamentoDoMes({
   competencia, linhas, titulo = 'Pagamento', valoresRh = [],
@@ -150,16 +152,19 @@ export default function PagamentoDoMes({
                   : <span className="text-xs font-normal text-slate-400">abaixo da meta</span>}
               </Td>
               <Td className="text-right">
-                <input value={rascunho[l.pessoa_id] ?? ''} disabled={!l.atingiu_meta || ocupado} inputMode="decimal"
-                       placeholder={l.atingiu_meta ? '0,00' : '—'} aria-label={`Valor do RH para ${l.pessoa_nome}`}
+                <input value={rascunho[l.pessoa_id] ?? ''} disabled={ocupado} inputMode="decimal"
+                       placeholder="0,00" aria-label={`Valor do RH para ${l.pessoa_nome}`}
                        onChange={(e) => setRascunho((r) => ({ ...r, [l.pessoa_id]: e.target.value }))}
                        className={`w-28 rounded-md border px-2 py-1 text-right text-sm tabular-nums outline-none focus:border-marca-600 disabled:bg-slate-50 ${
                          mudados.includes(l) ? 'border-amber-500 bg-amber-500/10' : 'border-slate-300 bg-superficie'}`} />
               </Td>
               <Td className="whitespace-nowrap">
                 {(() => {
-                  if (!l.atingiu_meta) return null;
                   const rh = doRh.get(l.pessoa_id);
+                  if (!l.atingiu_meta) {
+                    return rh == null ? null
+                      : <span className="rounded-full bg-slate-500/15 px-2 py-px text-[11px] font-semibold text-slate-600">pago pelo RH</span>;
+                  }
                   if (rh == null) return <span className="rounded-full bg-amber-500/15 px-2 py-px text-[11px] font-semibold text-amber-700 dark:text-amber-300">falta o valor do RH</span>;
                   if (l.valor == null) return <span className="rounded-full bg-marca-600/15 px-2 py-px text-[11px] font-semibold text-marca-700 dark:text-marca-400">informado</span>;
                   const d = rh - Number(l.valor);
@@ -198,7 +203,8 @@ export default function PagamentoDoMes({
       <p className="mt-4 text-xs text-slate-500">
         <b>Valor do RH:</b> o que o RH mandou pagar a cada um; é o que o atendente vê no extrato. Mudar um valor já
         informado pede o motivo, e toda mudança fica registrada.{' '}
-        Quem fecha abaixo da meta não recebe — é para isso que a meta existe.
+        Pelo cálculo, quem fecha abaixo da meta não recebe — é para isso que a meta existe; se o RH pagou mesmo
+        assim, informe o valor dele.
         O bônus é {Math.round(Number(primeira.percentual_bonus) * 10000) / 100}% da média do cargo
         de referência e só sai quando <strong>todos</strong> os que têm direito batem a meta. Pleno
         e Gestor não recebem: já são remunerados pela média multiplicada. Quem trabalhou a

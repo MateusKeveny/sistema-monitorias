@@ -35,6 +35,19 @@ para o Performance.
 
 ---
 
+## Performance 2.8.0
+
+Migração 77 (banco dos painéis). Não muda as Monitorias nem a Agenda.
+
+- **Performance (atualização): valor do RH para quem ficou abaixo da meta.**
+  O valor do RH é o que o RH mandou pagar: agora vale para qualquer pessoa
+  fechada no mês, não só para quem bateu a meta. No Pagamento, a linha fica
+  com "pago pelo RH"; o atendente vê o valor no extrato, no histórico e no
+  Início. Pedido ao corrigir agosto (22/10/2026).
+- **Performance (atualização): remover o valor por ponto.** No fechamento,
+  "Remover valor" tira o valor por ponto do mês, com motivo; a remoção entra
+  no histórico de correções como "removido".
+
 ## Performance 2.7.0 · Monitorias 5.7.0
 
 Sem migração. Não muda a Agenda.
