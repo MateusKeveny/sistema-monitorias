@@ -68,11 +68,17 @@ type Guardada = {
   nota: number; tabulacao: string | null; origem_arquivo: string;
 };
 
+/** Atendimento em outro setor (migração 78): demanda extra pendente, sem pontos. */
+type OutroSetor = {
+  pessoa_id: string; data: string; protocolo: string; setor: string; nota: number | null;
+  mes_competencia: string; semana: number; origem_arquivo: string;
+};
+
 type AnaliseArquivo = {
   nome: string;
   aba: string | null;
   formato: 'hub' | 'huggy' | null;
-  /** Arquivo fora: sem as colunas, ilegível ou com setor desconhecido. */
+  /** Arquivo fora: sem as colunas ou ilegível. */
   erro: string | null;
   lidas: number;
   semNota: number;
@@ -82,6 +88,10 @@ type AnaliseArquivo = {
   jaImportadas: number;
   novas: Avaliacao[];
   guardar: Guardada[];
+  outroSetor: OutroSetor[];
+  /** Atendimentos de outro setor de atendente não reconhecido: ficam de fora. */
+  outroSetorSemPessoa: number;
+  outroSetorJa: number;
   periodo: [string, string] | null;
 };
 
@@ -124,7 +134,7 @@ export default function ImportadorAvaliacoes({
   async function lerArquivo(f: File, vistas: Set<string>): Promise<AnaliseArquivo> {
     const a: AnaliseArquivo = {
       nome: f.name, aba: null, formato: null, erro: null, lidas: 0, semNota: 0, semData: 0, robo: 0,
-      repetidasNoLote: 0, jaImportadas: 0, novas: [], guardar: [], periodo: null,
+      repetidasNoLote: 0, jaImportadas: 0, novas: [], guardar: [], outroSetor: [], outroSetorSemPessoa: 0, outroSetorJa: 0, periodo: null,
     };
     let abas: Map<string, Linha[]>;
     try { abas = await lerPlanilha(f); } catch (e) {
@@ -136,9 +146,26 @@ export default function ImportadorAvaliacoes({
     const [nomeAba, [cabecalho, ...linhas]] = aba;
     const col = acharColunas(cabecalho)!;
     a.aba = nomeAba; a.formato = col.setor ? 'hub' : 'huggy'; a.lidas = linhas.length;
-    const desconhecidos = new Map<string, number>();
-
     for (const l of linhas) {
+      // Outro setor (2.9.0): qualquer setor fora de Expansão e Diretores-Expansão
+      // vira demanda extra pendente — com ou sem nota. Antes, recusava o arquivo.
+      if (col.setor) {
+        const setor = String(l[col.setor] ?? '').trim();
+        if (!SETORES[normalizar(setor)]) {
+          const atendente = String(l[col.atendente] ?? '').trim();
+          const data = lerData(l[col.data]);
+          if (ehRobo(atendente) || !data || !setor) continue;
+          const protocolo = String(l[col.protocolo] ?? '').trim();
+          if (vistas.has(`${data}|${protocolo}`)) { a.repetidasNoLote++; continue; }
+          vistas.add(`${data}|${protocolo}`);
+          const pessoa = porNomeHub.get(normalizar(atendente));
+          if (!pessoa) { a.outroSetorSemPessoa++; continue; }
+          const nota = Number(l[col.nota]);
+          a.outroSetor.push({ pessoa_id: pessoa.id, data, protocolo, setor, nota: nota >= 1 && nota <= 5 ? nota : null,
+            mes_competencia: mesDeCompetencia(data), semana: semanaDoCiclo(data), origem_arquivo: f.name });
+          continue;
+        }
+      }
       const nota = Number(l[col.nota]);
       // Só avaliações contam. Atendimento sem nota não é assunto da importação.
       if (!(nota >= 1 && nota <= 5)) { a.semNota++; continue; }
@@ -146,12 +173,7 @@ export default function ImportadorAvaliacoes({
       if (!data) { a.semData++; continue; }
 
       let origem: Origem = 'huggy';
-      if (col.setor) {
-        const setor = String(l[col.setor] ?? '');
-        const o = SETORES[normalizar(setor)];
-        if (!o) { desconhecidos.set(setor || '(vazio)', (desconhecidos.get(setor || '(vazio)') ?? 0) + 1); continue; }
-        origem = o;
-      }
+      if (col.setor) origem = SETORES[normalizar(String(l[col.setor] ?? '').trim())];
 
       const atendente = String(l[col.atendente] ?? '').trim();
       if (ehRobo(atendente)) { a.robo++; continue; }
@@ -170,13 +192,7 @@ export default function ImportadorAvaliacoes({
       }
     }
 
-    // Setor desconhecido costuma ser arquivo errado: o arquivo inteiro fica de fora.
-    if (desconhecidos.size) {
-      a.erro = `Setores desconhecidos: ${[...desconhecidos].map(([n, q]) => `${n} (${q})`).join(', ')}. Confira se é o relatório certo.`;
-      a.novas = []; a.guardar = [];
-      return a;
-    }
-    const datas = [...a.novas, ...a.guardar].map((c) => c.data).sort();
+    const datas = [...a.novas, ...a.guardar, ...a.outroSetor].map((c) => c.data).sort();
     if (datas.length) a.periodo = [datas[0], datas[datas.length - 1]];
     return a;
   }
@@ -209,7 +225,19 @@ export default function ImportadorAvaliacoes({
           if ((pag ?? []).length < PAGINA) break;
         }
       }
+      // Outro setor já guardado (pendente, lançado ou descartado) não volta.
+      const jaOutro = new Set<string>();
+      for (let i = 0; ; i += PAGINA) {
+        const { data: pag, error } = await db.from('atendimentos_outro_setor').select('data, protocolo')
+          .gte('data', de).lte('data', ate).order('data').order('protocolo').range(i, i + PAGINA - 1);
+        if (error) { setErro(await mensagemDoErro(error)); setOcupado(null); return; }
+        for (const r of pag ?? []) jaOutro.add(`${r.data}|${r.protocolo}`);
+        if ((pag ?? []).length < PAGINA) break;
+      }
       for (const a of validos) {
+        const antesOutro = a.outroSetor.length;
+        a.outroSetor = a.outroSetor.filter((c) => !jaOutro.has(`${c.data}|${c.protocolo}`));
+        a.outroSetorJa = antesOutro - a.outroSetor.length;
         const antes = a.novas.length + a.guardar.length;
         a.novas = a.novas.filter((c) => !existentes.has(`${c.data}|${c.protocolo}`));
         a.guardar = a.guardar.filter((c) => !existentes.has(`${c.data}|${c.protocolo}`));
@@ -224,13 +252,18 @@ export default function ImportadorAvaliacoes({
   const ok = (arquivos ?? []).filter((a) => !a.erro);
   const novas = ok.flatMap((a) => a.novas);
   const guardar = ok.flatMap((a) => a.guardar);
+  const outroSetor = ok.flatMap((a) => a.outroSetor);
+  const outroSetorJa = ok.reduce((s2, a) => s2 + a.outroSetorJa, 0);
+  const outroSetorSemPessoa = ok.reduce((s2, a) => s2 + a.outroSetorSemPessoa, 0);
+  const [guardarOutro, setGuardarOutro] = useState(true);
+  const levarOutro = guardarOutro ? outroSetor : [];
   const periodoTotal = useMemo(() => {
     const d = [...novas, ...guardar].map((c) => c.data).sort();
     return d.length ? [d[0], d[d.length - 1]] as [string, string] : null;
   }, [novas, guardar]);
 
   async function importar() {
-    if (!arquivos || (!novas.length && !guardar.length)) return;
+    if (!arquivos || (!novas.length && !guardar.length && !levarOutro.length)) return;
     setOcupado('Importando…'); setErro(null);
     const db = criarClienteNavegador();
     const agora = new Date().toISOString();
@@ -259,6 +292,18 @@ export default function ImportadorAvaliacoes({
       }
     }
 
+    for (let i = 0; i < levarOutro.length; i += lote) {
+      const { error } = await db.from('atendimentos_outro_setor').upsert(
+        levarOutro.slice(i, i + lote).map((o) => ({ ...o, importado_por: importadoPor, importado_em: agora })),
+        { onConflict: 'data,protocolo', ignoreDuplicates: true },
+      );
+      if (error) {
+        setErro(`As avaliações entraram, mas os atendimentos de outro setor não foram guardados: ${await mensagemDoErro(error)}.`);
+        setOcupado(null);
+        return;
+      }
+    }
+
     // Avisa Pleno e qualidade no Teams que as monitorias podem começar
     // (migração 40) — uma vez, com o período de todos os arquivos.
     let avisou = false;
@@ -269,6 +314,7 @@ export default function ImportadorAvaliacoes({
 
     setSucesso(`${novas.length} avaliações importadas`
       + (guardar.length ? ` e ${guardar.length} guardadas sem atendente reconhecido` : '')
+      + (levarOutro.length ? `; ${levarOutro.length} atendimento${levarOutro.length > 1 ? 's' : ''} de outro setor pendente${levarOutro.length > 1 ? 's' : ''} em Lançamentos` : '')
       + ` de ${ok.length} arquivo${ok.length > 1 ? 's' : ''}.`
       + (avisou ? ' A monitoria foi avisada no Teams.' : ''));
     setArquivos(null);
@@ -297,6 +343,17 @@ export default function ImportadorAvaliacoes({
     }
     return m;
   }, [novas]);
+
+  /** Outro setor por pessoa, setor, mês e semana — como vai aparecer em Lançamentos. */
+  const outroPorGrupo = useMemo(() => {
+    const m = new Map<string, { pessoa: string; setor: string; mes: string; semana: number; qtd: number }>();
+    for (const o of outroSetor) {
+      const k = `${o.pessoa_id}|${o.setor}|${o.mes_competencia}|${o.semana}`;
+      if (!m.has(k)) m.set(k, { pessoa: nomePessoa.get(o.pessoa_id) ?? '—', setor: o.setor, mes: o.mes_competencia, semana: o.semana, qtd: 0 });
+      m.get(k)!.qtd++;
+    }
+    return [...m.values()].sort((x, y) => x.pessoa.localeCompare(y.pessoa) || x.mes.localeCompare(y.mes) || x.semana - y.semana);
+  }, [outroSetor, nomePessoa]);
 
   /** Guardadas por nome como veio no arquivo. */
   const guardarPorNome = [...guardar.reduce((m, g) => m.set(g.nome_no_arquivo, (m.get(g.nome_no_arquivo) ?? 0) + 1),
@@ -330,7 +387,8 @@ export default function ImportadorAvaliacoes({
         Relatórios de atendimentos do Hub (<code>.xlsx</code>), um ou vários de uma vez. Entram só as avaliações com nota
         de 1 a 5: os setores <strong>Expansão</strong> e <strong>Diretores-Expansão</strong> são contados separadamente.
         A mesma avaliação (data e protocolo) entra uma vez só. Nota de atendente não reconhecido fica guardada;
-        conversa só com o robô é ignorada.
+        conversa só com o robô é ignorada. Atendimento de <strong>outro setor</strong> vira demanda extra pendente, para
+        decidir em Lançamentos.
       </p>
 
       <label className="flex cursor-pointer flex-col items-center gap-1 rounded-2xl border-2 border-dashed border-slate-300
@@ -405,6 +463,50 @@ export default function ImportadorAvaliacoes({
             </div>
           )}
 
+          {(outroPorGrupo.length > 0 || outroSetorJa > 0 || outroSetorSemPessoa > 0) && (
+            <section className="rounded-lg ring-1 ring-slate-200">
+              <header className="border-b border-slate-100 px-4 py-2.5">
+                <h3 className="text-sm font-semibold text-slate-800">Atendimentos de outros setores</h3>
+                <p className="text-xs text-slate-500">
+                  Fora de Expansão e Diretores-Expansão. Ficam guardados como demanda extra pendente, sem pontos, para você
+                  decidir em Lançamentos — lançar com a regra que escolher ou descartar. A nota deles não entra no C-SAT.
+                </p>
+              </header>
+              <div className="px-4 py-3">
+                {outroPorGrupo.length > 0 && (
+                  <label className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
+                    <input type="checkbox" checked={guardarOutro} onChange={(e) => setGuardarOutro(e.target.checked)}
+                           disabled={!!ocupado} className="h-4 w-4 accent-marca-600" />
+                    Guardar como demanda extra pendente
+                  </label>
+                )}
+                {outroPorGrupo.length > 0 ? (
+                  <Tabela>
+                    <thead>
+                      <tr><Th>Pessoa</Th><Th>Setor</Th><Th>Mês · semana</Th><Th className="text-right">Atendimentos</Th></tr>
+                    </thead>
+                    <tbody>
+                      {outroPorGrupo.map((g) => (
+                        <tr key={`${g.pessoa}|${g.setor}|${g.mes}|${g.semana}`} className={guardarOutro ? '' : 'opacity-50'}>
+                          <Td>{g.pessoa}</Td>
+                          <Td><span className="rounded-full bg-slate-100 px-2 py-px text-xs text-slate-700">{g.setor}</span></Td>
+                          <Td className="whitespace-nowrap">{mesRotulo(g.mes)} · {g.semana}ª</Td>
+                          <Td className="text-right font-semibold tabular-nums">{g.qtd}</Td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </Tabela>
+                ) : <p className="text-sm text-slate-500">Nenhum atendimento novo de outro setor.</p>}
+                {(outroSetorJa > 0 || outroSetorSemPessoa > 0) && (
+                  <p className="mt-2 text-xs text-slate-500">
+                    {outroSetorJa > 0 && `${outroSetorJa} já guardado${outroSetorJa > 1 ? 's' : ''} antes, não entra${outroSetorJa > 1 ? 'm' : ''} de novo. `}
+                    {outroSetorSemPessoa > 0 && `${outroSetorSemPessoa} de pessoas sem ficha no painel (a equipe do outro setor), ignorados.`}
+                  </p>
+                )}
+              </div>
+            </section>
+          )}
+
           <div className="grid items-start gap-4 xl:grid-cols-2">
             {CANAIS.map((canal) => {
               const linhas = resumo.filter((r) => r.origem === canal);
@@ -458,10 +560,11 @@ export default function ImportadorAvaliacoes({
                     className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40">
               Cancelar
             </button>
-            <button type="button" onClick={importar} disabled={!!ocupado || (!novas.length && !guardar.length)}
+            <button type="button" onClick={importar} disabled={!!ocupado || (!novas.length && !guardar.length && !levarOutro.length)}
                     className="rounded-lg bg-marca-600 px-4 py-2 text-sm font-semibold text-white hover:bg-marca-700 disabled:opacity-40">
-              {!novas.length && !guardar.length ? 'Nada novo para importar'
-                : `Importar ${novas.length}${guardar.length ? ` e guardar ${guardar.length}` : ''}`}
+              {!novas.length && !guardar.length && !levarOutro.length ? 'Nada novo para importar'
+                : `Importar ${novas.length}${guardar.length ? ` e guardar ${guardar.length}` : ''}`
+                  + (levarOutro.length ? ` · ${levarOutro.length} de outro setor pendente${levarOutro.length > 1 ? 's' : ''}` : '')}
             </button>
           </div>
         </div>

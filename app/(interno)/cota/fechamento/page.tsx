@@ -73,6 +73,10 @@ export default async function Fechamento({
     // Valor encaminhado pelo RH (migração 73).
     db.from('valores_rh').select('pessoa_id, valor, informado_por_nome, informado_em').eq('mes_competencia', competencia),
   ]);
+  // Atendimentos de outro setor sem decisão (migração 78). Fora do todas():
+  // sem a migração, a tabela não existe e a tela segue sem o aviso.
+  const outroSetor = db.from('atendimentos_outro_setor').select('pessoa_id, pessoas(nome)')
+    .eq('mes_competencia', competencia).eq('situacao', 'pendente');
 
   // O cálculo ao vivo da cota leva de 3 a 6 segundos (2.8.1). O fechar_ciclo
   // calcula no banco, sozinho; a tela só precisa dele para a prévia e para
@@ -95,6 +99,7 @@ export default async function Fechamento({
     ]),
   ]);
 
+  const outroPendentes = ((await outroSetor).data ?? []) as unknown as { pessoa_id: string; pessoas: { nome: string } | null }[];
   const lista = (abertos.data ?? []) as Aberto[];
   const congelados = (fechados.data ?? []) as Fechado[];
   const jaFechados = new Set(congelados.map((f) => f.pessoa_id));
@@ -143,6 +148,11 @@ export default async function Fechamento({
   if ((conferir.data ?? []).length) {
     antesDeFechar.push({ acao: { rotulo: 'Conferir', href: `/cota/lancamentos?mes=${mesCurto}` },
       texto: <>{(conferir.data ?? []).length} lançamento(s) com faixas que não fecham com o total</> });
+  }
+  if (outroPendentes.length) {
+    antesDeFechar.push({ acao: { rotulo: 'Decidir', href: `/cota/lancamentos?mes=${mesCurto}` },
+      texto: <>{outroPendentes.length} atendimento{outroPendentes.length > 1 ? 's' : ''} em outros setores pendente{outroPendentes.length > 1 ? 's' : ''} de decisão
+        ({[...new Set(outroPendentes.map((o) => o.pessoas?.nome?.split(/\s+/).slice(0, 2).join(' ') ?? '—'))].join(', ')}) — fechando sem decidir, ficam fora do mês</> });
   }
   if (semVolume.length) {
     antesDeFechar.push({ acao: { rotulo: 'Importar', href: '/cota/importar' },

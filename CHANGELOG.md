@@ -61,6 +61,25 @@ Monitorias nem o Performance.
   e cobrava o valor por ponto de mês que já tem o valor do RH; agora segue a
   do painel (2.3.1).
 
+## Performance 2.9.0
+
+Migração 78 (banco dos painéis). Não muda as Monitorias nem a Agenda.
+
+- **Performance (atualização): atendimentos de outros setores viram demanda
+  extra pendente.** O relatório do Hub com setor que não é Expansão nem
+  Diretores-Expansão (o iGreen Mob, por exemplo) era recusado inteiro. Agora
+  as avaliações entram normalmente e os atendimentos do outro setor — com ou
+  sem nota, por pessoa e semana — ficam guardados sem pontos, com a opção já
+  marcada na importação. Em Lançamentos, "Demandas extras pendentes": escolher
+  a regra e lançar (vira um lançamento normal, com a quantidade de
+  atendimentos) ou descartar. O Fechamento avisa o que ainda está pendente.
+  O mesmo atendimento (data e protocolo) não é guardado duas vezes; a nota
+  dele não entra no C-SAT; atendimento de quem não tem ficha no painel fica
+  de fora. A pontuação fica para quando a regra existir — decisão do gestor,
+  26/10/2026.
+- **Plano da 3.0 (documento):** setores e canais em árvore, em
+  `docs/PLANO-SETORES.md`, para aprovação. Nada do sistema muda.
+
 ## Performance 2.8.2
 
 Sem migração. Não muda as Monitorias nem a Agenda.
