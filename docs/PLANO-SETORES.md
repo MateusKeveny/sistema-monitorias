@@ -1,6 +1,8 @@
 # Plano · Setores e canais em árvore (Performance 3.0)
 
-Rascunho para aprovação do gestor, 26/10/2026. Nada aqui foi feito ainda.
+Plano aprovado em desenho pelo gestor em 26/10/2026, com a prévia das telas
+(Configuração › Setores e canais, ficha da pessoa, cargos e pesos, extrato,
+lançamentos e importação). Nada aqui foi feito ainda.
 
 ## Objetivo
 
@@ -55,17 +57,37 @@ Setor do Hub que não está na árvore vira demanda extra pendente (2.9.0).
    regra com peso por canal. É a etapa que reescreve dados: **antes e depois,
    a cota de cada pessoa em cada mês tem de bater centavo por centavo**
    (a conferência diária e uma comparação mês a mês, guardada antes de rodar).
-4. **Setor na pessoa e no fechamento** (3.1.0) — pessoas, cargos, meta, valor
-   por ponto, fechamento e exportação por setor; seletor de setor nas telas.
+4. **Setor na pessoa, no fechamento e no acesso** (3.1.0) — pessoas, cargos,
+   meta, valor por ponto, fechamento e exportação por setor; seletor de setor
+   nas telas; gestor restrito ao seu setor e o papel administrador (ver
+   "Acesso por setor").
 5. **Limpeza** (3.1.x) — sai o texto `huggy`/`diretores` e as travas antigas.
 
 Meses fechados não mudam em nenhuma etapa: o fechamento guarda as linhas
 congeladas (`fechamento_linhas`), e elas só ganham o `canal_id`.
 
-## Decisões pendentes
+## Decisões do gestor (26/10/2026)
 
-1. Existe um segundo setor previsto? Define se as etapas 4 e 5 vêm logo ou
-   ficam para quando ele chegar.
-2. Pessoa em mais de um setor no mesmo mês (empréstimo): fica de fora (cada
-   pessoa num setor por mês, como o cargo) ou precisa existir?
-3. Gestor por setor (cada gestor vê só o seu) ou um gestor para todos?
+1. **Sem segundo setor por enquanto, mas tudo pronto para ele**: as cinco
+   etapas são feitas, e criar um setor novo vira cadastro, sem código.
+2. **Uma pessoa, um setor por mês** — como o cargo, com histórico. Sem
+   empréstimo entre setores no mesmo mês.
+3. **Cada gestor vê e mexe só no seu setor**, e nasce um papel novo,
+   **administrador do sistema**, que vê todos os setores para manutenção e
+   ajustes (cadastro da árvore, cargos, correções).
+4. Canal pode **copiar as métricas** de outro (finalizados, C-SAT e notas,
+   TME opcional), acompanhando as mudanças do original — é o caso do iGreen
+   Mob, que copia a Expansão. Outubro/2026 fica como demanda extra (2.9.0),
+   porque foi de fato extra.
+
+## Acesso por setor (entra na etapa 4)
+
+- `pessoas.papel` ganha `administrador`. O gestor ganha o setor dele; as
+  funções de acesso (`eh_gestor`, `ve_o_time` e as políticas das tabelas)
+  passam a perguntar "gestor **deste** setor", e o administrador passa em
+  todas.
+- É a parte mais sensível: cada tabela e view com RLS é revista, e o teste
+  inclui um gestor de setor tentando ler e gravar dados do outro setor — tem
+  de dar zero linhas e erro.
+- Quem hoje é gestor vira administrador **e** gestor da Expansão, para nada
+  mudar no dia da troca.
