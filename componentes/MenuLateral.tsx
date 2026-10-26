@@ -25,6 +25,8 @@ const ICONES: Record<string, React.ReactNode> = {
   '/cota/historico': <path d="M3 16h14M6 13V9M10 13V5M14 13v-3" />,
   // Prancheta com o visto: as monitorias de qualidade (1.35.5).
   '/cota/monitorias': <><rect x="4.5" y="3.5" width="11" height="14" rx="1.5" /><path d="M8 3.5h4v2H8zM7.5 11l2 2 3.5-4" /></>,
+  // Estrela: as avaliações de 1 a 5 (2.10.0).
+  '/cota/csat': <path d="m10 3 2.1 4.4 4.9.6-3.6 3.3.9 4.8L10 13.8 5.7 16.1l.9-4.8L3 8l4.9-.6Z" />,
   // Caderno aberto: o diário de bordo.
   '/cota/diario': <><path d="M5 3.5h8.5A1.5 1.5 0 0 1 15 5v11.5H6.5A1.5 1.5 0 0 1 5 15z" /><path d="M8 7h4M8 10h4" /></>,
   '/cota/presencial': <><circle cx="10" cy="7" r="3" /><path d="M4 17c1-3 3.5-4.5 6-4.5s5 1.5 6 4.5" /></>,

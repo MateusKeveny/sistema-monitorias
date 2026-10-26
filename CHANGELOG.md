@@ -61,6 +61,22 @@ Monitorias nem o Performance.
   e cobrava o valor por ponto de mês que já tem o valor do RH; agora segue a
   do painel (2.3.1).
 
+## Performance 2.10.0
+
+Sem migração. Não muda as Monitorias nem a Agenda.
+
+- **Performance (atualização): "Meu C-SAT" no menu.** Uma tela para cada
+  atendente ver as próprias avaliações do Hub — as mesmas do cálculo do C-SAT
+  — separadas de 1 a 5, com o total, as positivas (4 e 5) e as abaixo de 4.
+  As notas 1 a 3 vêm em lista, com data, tabulação e o protocolo, com um ícone
+  discreto para copiar e revisar o atendimento. Um quadro por canal; setas de
+  mês. Vale para qualquer cargo (o Início do Pleno e do Analista não tem
+  C-SAT). Gestor e qualidade escolhem a pessoa.
+- **Cópia de teste do Performance** (`painel-performance-teste`,
+  `npm run cf:deploy:teste`): o mesmo código e o mesmo banco, para acompanhar
+  uma mudança antes do site oficial. Só nela o gestor tem "Ver como", que abre
+  o Início de um atendente como ele vê.
+
 ## Performance 2.9.1
 
 Sem migração. Não muda as Monitorias nem a Agenda.

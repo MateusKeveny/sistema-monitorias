@@ -36,6 +36,8 @@ export const ITENS: Record<Sistema, Item[]> = {
     { href: '/cota/extrato', rotulo: 'Extrato', papeis: ['gestor', 'qualidade', 'operador'] },
     { href: '/cota/historico', rotulo: 'Histórico', papeis: ['gestor', 'qualidade', 'operador'] },
     { href: '/cota/monitorias', rotulo: 'Monitorias', papeis: ['gestor', 'qualidade', 'operador'] },
+    // As avaliações de 1 a 5, com o protocolo para revisar (2.10.0).
+    { href: '/cota/csat', rotulo: 'Meu C-SAT', papeis: ['gestor', 'qualidade', 'operador'] },
     { href: '/cota/diario', rotulo: 'Diário de bordo', papeis: ['gestor', 'qualidade', 'operador'], grupo: 'Registrar' },
     { href: '/cota/presencial', rotulo: 'Presencial', papeis: ['gestor', 'qualidade', 'operador'], grupo: 'Registrar' },
     { href: '/cota/lancamentos', rotulo: 'Lançamentos', papeis: ['gestor'], grupo: 'Registrar' },

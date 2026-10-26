@@ -40,6 +40,21 @@
         "VAPID_PUBLICA": "BCQCqXSYb9IlViA4t1M6eso9tLXIWz__I3VN6JMITHsq_sEuG6zVm14UyLgLn_UJux1V42ianEW4fOpF4P6lxyA"
       }
     },
+    // Cópia de teste do Performance (2.10.0): o mesmo código e o MESMO banco,
+    // para o gestor acompanhar uma mudança antes do site oficial. O nome não
+    // termina em "painel-performance.", então o sistema vem de SISTEMA=cota.
+    // COPIA_DE_TESTE liga o "Ver como atendente" — só aqui.
+    // Publicar: npm run cf:deploy:teste
+    "teste": {
+      "name": "painel-performance-teste",
+      "observability": {
+        "enabled": true
+      },
+      "vars": {
+        "SISTEMA": "cota",
+        "COPIA_DE_TESTE": "1"
+      }
+    },
     // Terceiro site: a Agenda da Gestão (migração 59), também pelo endereço —
     // o nome precisa começar com "painel-agenda". A chave pública VAPID é
     // pública de verdade (vai para o navegador); a privada e o segredo do

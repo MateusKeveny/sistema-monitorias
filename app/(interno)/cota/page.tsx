@@ -11,6 +11,7 @@ import { limiteDeRenovacao, pessoasComLeituraPendente, type LeituraDiario } from
 import { fonteDoMes, situacaoDoResumo } from '@/lib/resumo';
 import CarimboDoResumo from '@/componentes/CarimboDoResumo';
 import { todas } from '@/lib/consultas';
+import VerComoAtendente from '@/componentes/VerComoAtendente';
 
 export const dynamic = 'force-dynamic';
 
@@ -79,10 +80,10 @@ const nomeCurto = (nome: string) => nome.trim().split(/\s+/).slice(0, 2).join(' 
 export default async function InicioCota({
   searchParams,
 }: {
-  searchParams: Promise<{ canal?: string; mes?: string }>;
+  searchParams: Promise<{ canal?: string; mes?: string; ver_como?: string }>;
 }) {
   // O perfil e a competência saem juntos (1.39.4): um não depende do outro.
-  const { canal: canalPedido, mes } = await searchParams;
+  const { canal: canalPedido, mes, ver_como: verComo } = await searchParams;
   const [perfil, { competencia, atual, emAberto }] = await todas([
     exigirPerfil(), resolverCompetencia(mes), situacaoDoResumo(),
   ]);
@@ -140,10 +141,40 @@ export default async function InicioCota({
   // Gestor: mesmo topo, com a visão da equipe no lugar da própria cota. O
   // selo busca o fechamento sozinho, ao mesmo tempo que o painel (1.39.4) —
   // antes o painel esperava por ele.
+  // Cópia de teste (painel-performance-teste): o gestor pode abrir o Início de
+  // um atendente para acompanhar uma mudança antes de publicar. Só existe com
+  // COPIA_DE_TESTE=1, que só o Worker de teste tem (wrangler.jsonc).
+  const copiaDeTeste = process.env.COPIA_DE_TESTE === '1' && perfil.papel === 'gestor';
+  if (copiaDeTeste && verComo) {
+    // O painel que a pessoa vê de verdade: Pleno e Analista (média) têm o seu.
+    const dbTeste = await criarClienteServidor();
+    const [{ data: cargoTeste }, { data: mediasTeste }] = await todas([
+      dbTeste.from('cargos_da_pessoa').select('cargo_id').eq('pessoa_id', verComo).lte('desde', competencia)
+        .order('desde', { ascending: false }).limit(1),
+      dbTeste.from('pesos_por_cargo').select('cargo_id, ativo').eq('regra', 'media_da_equipe'),
+    ]);
+    const cargoDaPessoa = cargoTeste?.[0]?.cargo_id as number | undefined;
+    const pelaMedia = !!cargoDaPessoa && (mediasTeste ?? []).some((m) => m.cargo_id === cargoDaPessoa && m.ativo);
+    return (
+      <div className="space-y-4">
+        <VerComoAtendente atual={verComo} />
+        {pelaMedia ? (
+          <ProvedorDeCanal inicial={canalPedido === 'diretores' ? 'diretores' : 'huggy'}>
+            <PainelPleno pessoaId={verComo} cargoId={cargoDaPessoa!} competencia={competencia} />
+          </ProvedorDeCanal>
+        ) : (
+          <PainelAtendente pessoaId={verComo} competencia={competencia} atual={atual} canalPedido={canalPedido}
+                           topo={<Topo selo={null} direita={<AbasDeCanal />} />} />
+        )}
+      </div>
+    );
+  }
+
   if (perfil.papel === 'gestor') {
     return (
       <ProvedorDeCanal inicial={canalPedido === 'diretores' ? 'diretores' : 'huggy'}>
         <div className="space-y-6">
+          {copiaDeTeste && <VerComoAtendente />}
           <Topo selo={<SeloDoGestor competencia={competencia} atual={atual} />} direita={<AbasDeCanal />} />
           <PainelGestor competencia={competencia} atual={atual} />
         </div>
