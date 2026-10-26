@@ -12,7 +12,7 @@ setor virar cadastro, em árvore, e tudo — leitura do Hub, importação,
 lançamentos, regras, pesos e fechamento — passar a seguir o cadastro:
 
 ```
-Expansão                      ← setor: pessoas, cargos, meta, valor por ponto, fechamento
+Suporte Conexão Expansão      ← setor: pessoas, cargos, meta, valor por ponto, fechamento
 ├── Expansão                  ← canal: nomes no Hub, volume, C-SAT, TME, pesos de finalizado
 └── Diretores-Expansão        ← canal
 ```
@@ -80,6 +80,14 @@ congeladas (`fechamento_linhas`), e elas só ganham o `canal_id`.
    Mob, que copia a Expansão. Outubro/2026 fica como demanda extra (2.9.0),
    porque foi de fato extra.
 
+5. **Vale a partir de novembro/2026.** Outubro está em fechamento e fica no
+   formato atual. Nenhuma etapa que mexa em tela de lançamento, importação ou
+   cálculo é publicada antes de outubro fechado.
+6. **O setor de hoje se chama "Suporte Conexão Expansão"**, com os canais
+   Expansão e Diretores-Expansão. Tudo o que já está gravado (até outubro)
+   entra nele, sem mudar valor, para consulta de histórico; o iGreen Mob passa
+   a ser canal a partir de novembro.
+
 ## Acesso por setor (entra na etapa 4)
 
 - `pessoas.papel` ganha `administrador`. O gestor ganha o setor dele; as
@@ -89,5 +97,5 @@ congeladas (`fechamento_linhas`), e elas só ganham o `canal_id`.
 - É a parte mais sensível: cada tabela e view com RLS é revista, e o teste
   inclui um gestor de setor tentando ler e gravar dados do outro setor — tem
   de dar zero linhas e erro.
-- Quem hoje é gestor vira administrador **e** gestor da Expansão, para nada
+- Quem hoje é gestor vira administrador **e** gestor do Suporte Conexão Expansão, para nada
   mudar no dia da troca.
