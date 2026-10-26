@@ -46,10 +46,10 @@ Setor do Hub que não está na árvore vira demanda extra pendente (2.9.0).
 
 ## Etapas (cada uma com prévia, teste e publicação)
 
-1. **Cadastro e leitura do Hub** (2.10.0) — tabelas `setores` e `canais`, tela
+1. **Cadastro e leitura do Hub** (2.11.0) — tabelas `setores` e `canais`, tela
    em Configuração, e a importação do Hub e o Colar do Hub lendo os nomes do
    cadastro em vez do código. Cálculo intocado.
-2. **Canal por id, em paralelo** (2.11.0) — `canal_id` preenchido ao lado do
+2. **Canal por id, em paralelo** (2.12.0) — `canal_id` preenchido ao lado do
    texto antigo, gravado pelas telas; as abas de Lançamentos e da importação
    vêm do cadastro. Cálculo ainda lê o texto.
 3. **Cálculo pelo cadastro** (3.0.0) — a cadeia da cota, o resumo e a
