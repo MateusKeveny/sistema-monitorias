@@ -48,7 +48,9 @@ export default function DemandasExtrasPendentes({ pendentes, pessoas, regras }: 
   // desconto (peso negativo, como atraso e uso do celular), atestado,
   // transferências, chamados e presencial — nenhuma conta atendimento de outro setor.
   const FORA = new Set(['atestado', 'transferencias', 'presencial', 'huggy_atendimento', 'diretores_atendimento']);
-  const opcoes = regras.filter((r) => !r.valor_manual && Number(r.peso) > 0 && !FORA.has(r.chave) && !r.chave.startsWith('chamados'));
+  // As métricas do bypass de outro setor (migração 81) só entram pelo cálculo dele.
+  const opcoes = regras.filter((r) => !r.valor_manual && Number(r.peso) > 0 && !FORA.has(r.chave)
+    && !r.chave.startsWith('chamados') && !r.chave.startsWith('outro_setor_'));
 
   async function decidir(ids: number[], regra: string | null) {
     if (regra === null && !confirm(`Descartar ${ids.length} atendimento${ids.length > 1 ? 's' : ''}? Não vão pontuar.`)) return;

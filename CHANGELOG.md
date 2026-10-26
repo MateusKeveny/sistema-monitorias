@@ -61,6 +61,27 @@ Monitorias nem o Performance.
   e cobrava o valor por ponto de mês que já tem o valor do RH; agora segue a
   do painel (2.3.1).
 
+## Performance 2.11.0
+
+Migrações 80 e 81 (banco dos painéis). Não muda as Monitorias nem a Agenda.
+
+- **Performance (atualização): bypass de outubro para outro setor com as
+  regras da Expansão.** PROVISÓRIO, até a árvore de setores (plano da 3.0).
+  Em Lançamentos, "Outro setor com as regras da Expansão": cola-se a tabela
+  de analistas do Hub filtrada no setor (o iGreen Mob), por semana — só os
+  atendentes da equipe entram; quem é da equipe do setor ou não tem cota
+  aparece identificado e é ignorado — e "Calcular pontos" lança, com os
+  pesos da Expansão copiados cargo a cargo: atendimento (resolvidos × peso),
+  a faixa de C-SAT da semana (calculada só com as avaliações do setor) e as
+  notas de 1 a 5. Calcular de novo substitui. Não muda o cálculo da cota:
+  tudo entra como lançamento. Decisão do gestor, 26/10/2026.
+- **Performance (atualização): outro setor em quadro próprio no extrato.**
+  No resumo do mês e nos cartões de semana, "iGreen Mob · regras da Expansão",
+  separado dos finalizados da Expansão.
+- **Performance (correção): demanda extra pendente.** Sai a opção que contava
+  as linhas do relatório de C-SAT como volume (o volume vem dos resolvidos do
+  Hub); os lançamentos feitos por ela em outubro foram desfeitos.
+
 ## Performance 2.10.0
 
 Sem migração. Não muda as Monitorias nem a Agenda.

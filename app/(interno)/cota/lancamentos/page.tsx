@@ -3,6 +3,7 @@ import FormularioLancamentos from '@/componentes/FormularioLancamentos';
 import VolumeSemanal, { type LinhaVolume } from '@/componentes/VolumeSemanal';
 import LancamentosPendentes, { type Pendente } from '@/componentes/RealocacaoDeLancamentos';
 import DemandasExtrasPendentes, { type AtendimentoOutroSetor } from '@/componentes/DemandasExtrasPendentes';
+import BypassOutroSetor, { type VolumeOutroSetor } from '@/componentes/BypassOutroSetor';
 import SeletorDeDetalhe, { type Destaque } from '@/componentes/SeletorDeDetalhe';
 import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
 import { Quadro, Tabela, Th, Td } from '@/componentes/ui';
@@ -58,7 +59,7 @@ export default async function LancamentosDeCota({
   ]);
   const hoje = hojeNoBrasil();
 
-  const [pessoas, regras, pesos, historico, lancamentos, conferencia, volumes, anterior, pendentes, cargos, outroSetor] = await Promise.all([
+  const [pessoas, regras, pesos, historico, lancamentos, conferencia, volumes, anterior, pendentes, cargos, outroSetor, setoresDoMes, volumesOutro] = await Promise.all([
     db.from('pessoas').select('*').order('nome'),
     db.from('regras').select('*').eq('manual', true).eq('ativo', true).order('ordem'),
     db.from('pesos_por_cargo').select('cargo_id, regra, peso, ativo').eq('ativo', true),
@@ -77,7 +78,11 @@ export default async function LancamentosDeCota({
     // Atendimentos de outro setor sem decisão (migração 78), de todos os meses.
     db.from('atendimentos_outro_setor').select('id, pessoa_id, setor, mes_competencia, semana')
       .eq('situacao', 'pendente').order('data'),
+    // Bypass de outubro (migração 81): os setores do mês e o volume colado.
+    db.from('vw_setores_do_mes_outro').select('setor').eq('mes_competencia', competencia),
+    db.from('volume_outro_setor').select('setor, pessoa_id, semana, resolvidos').eq('mes_competencia', competencia),
   ]);
+  const setoresBypass = [...new Set(((setoresDoMes.data ?? []) as { setor: string }[]).map((s) => s.setor))].sort();
 
   const listaVolumes = (volumes.data ?? []) as LinhaVolume[];
   const listaConferencia = (conferencia.data ?? []) as ConferenciaLancamento[];
@@ -268,7 +273,12 @@ export default async function LancamentosDeCota({
 
       <LancamentosPendentes pendentes={(pendentes.data ?? []) as Pendente[]} pessoas={recebem} />
 
-      <DemandasExtrasPendentes pendentes={(outroSetor.data ?? []) as AtendimentoOutroSetor[]}
+      <BypassOutroSetor competencia={competencia} setores={setoresBypass} pessoas={(pessoas.data ?? []) as Pessoa[]}
+                        volumes={(volumesOutro.data ?? []) as VolumeOutroSetor[]} />
+
+      {/* Os do mês do bypass saem daqui: lá eles pontuam com as regras da Expansão. */}
+      <DemandasExtrasPendentes pendentes={((outroSetor.data ?? []) as AtendimentoOutroSetor[])
+                                 .filter((a) => !(a.mes_competencia === competencia && setoresBypass.includes(a.setor)))}
                                pessoas={(pessoas.data ?? []) as Pessoa[]} regras={(regras.data ?? []) as RegraCota[]} />
 
       <SeletorDeDetalhe key={`${competencia}-${canal}`} destaques={destaques} inicial={inicial} alternar

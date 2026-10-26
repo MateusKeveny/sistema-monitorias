@@ -43,6 +43,15 @@ const reais = (v: number, casas = 2) =>
 const num = (v: number, casas = 2) => Number(v).toLocaleString('pt-BR', { maximumFractionDigits: casas });
 const um = umaCasa;
 const chaveCanal = (o: Canal | null) => o ?? 'geral';
+/**
+ * O quadro de cada linha: o canal, ou um quadro próprio para os atendimentos
+ * de outro setor (2.11.0, migração 80) — lançados no canal Expansão, ficavam
+ * misturados aos finalizados dele.
+ */
+// As métricas do setor são "outro_setor_<setor>" e "outro_setor_<setor>__<regra>"
+// (bypass de outubro, migração 81): todas no mesmo quadro.
+const quadroDa = (l: { origem: Canal | null; regra: string }) =>
+  l.regra.startsWith('outro_setor_') ? `outro:${l.regra.split('__')[0]}` : chaveCanal(l.origem);
 const nomeCurto = (nome: string) => nome.trim().split(' ').slice(0, 2).join(' ');
 
 /** Faixa em que o C-SAT caiu, pelas mesmas regras do cálculo. */
@@ -253,11 +262,26 @@ export default async function Extrato({
     media: 0, atendimento: 1, tme: 2, tme_diretores: 2, csat: 3, nota: 4, monitoria: 5,
   };
   const posicao = (grupo: string, ordem: number) => (ETAPA[grupo] ?? (ordem < 20 ? 1 : 6)) * 1000 + ordem;
-  const naOrdem = <T extends { grupo: string; ordem: number }>(ls: T[]) =>
-    [...ls].sort((a, b) => posicao(a.grupo, a.ordem) - posicao(b.grupo, b.ordem));
-  const ORDEM_CANAL = ['huggy', 'diretores', 'geral'];
-  const canaisDe = (ls: Linha[]) => [...new Set(ls.map((l) => chaveCanal(l.origem)))]
-    .sort((a, b) => ORDEM_CANAL.indexOf(a) - ORDEM_CANAL.indexOf(b));
+  // O atendimento de outro setor (bypass, migração 81) vem primeiro no quadro
+  // dele, como o finalizado no canal; as cópias de C-SAT e notas seguem a ordem.
+  const lugar = (l: { grupo: string; ordem: number; regra?: string }) =>
+    l.regra?.startsWith('outro_setor_') && !l.regra.includes('__') ? 0 : posicao(l.grupo, l.ordem);
+  const naOrdem = <T extends { grupo: string; ordem: number; regra?: string }>(ls: T[]) =>
+    [...ls].sort((a, b) => lugar(a) - lugar(b));
+  const ORDEM_CANAL = ['huggy', 'diretores', 'outro', 'geral'];
+  const ordemDo = (q: string) => ORDEM_CANAL.indexOf(q.startsWith('outro:') ? 'outro' : q);
+  const canaisDe = (ls: Linha[]) => [...new Set(ls.map(quadroDa))].sort((a, b) => ordemDo(a) - ordemDo(b));
+  // Nome do quadro: o canal, ou o setor do Hub ("Atendimento iGreen Mob" → "iGreen Mob").
+  // O nome do setor sai do rótulo de qualquer linha dele: "Atendimento iGreen Mob"
+  // ou "Nota 5 · iGreen Mob".
+  const nomeDoSetor = (base: string) => {
+    const l = linhas.find((x) => x.regra === base || x.regra.startsWith(`${base}__`));
+    if (!l) return base;
+    return l.regra === base ? l.rotulo.replace(/^Atendimento\s+/, '') : l.rotulo.split(' · ').at(-1) ?? l.rotulo;
+  };
+  const nomeDoQuadro = (q: string) => q.startsWith('outro:')
+    ? `${nomeDoSetor(q.slice(6))} · regras da Expansão`
+    : NOME_CANAL[q];
 
   const csatDe = (origem: Canal | null, semana: number | null) =>
     origem && semana ? semanal.find((c) => c.origem === origem && c.semana === semana) : undefined;
@@ -593,12 +617,12 @@ export default async function Extrato({
                 detalhe: (
                   <div className="grid items-start gap-4 xl:grid-cols-3">
                     {canais.map((canal) => {
-                      const doCanal = naOrdem(daSemana.filter((l) => chaveCanal(l.origem) === canal));
-                      const c = csatDe(canal === 'geral' ? null : canal as Canal, semana);
+                      const doCanal = naOrdem(daSemana.filter((l) => quadroDa(l) === canal));
+                      const c = csatDe(canal === 'geral' || canal.startsWith('outro:') ? null : canal as Canal, semana);
                       const somaCanal = doCanal.reduce((a, l) => a + Number(l.cota), 0);
                       const tmeFora = semanasSemTme.has(`${semana}|${canal}`);
                       return (
-                        <Quadro key={canal} titulo={`${NOME_CANAL[canal]} · ${semana}ª semana`}
+                        <Quadro key={canal} titulo={`${nomeDoQuadro(canal)} · ${semana}ª semana`}
                                 subtitulo={[c ? `C-SAT ${percentual(Number(c.csat))} · ${c.positivas} de ${c.avaliacoes}` : null,
                                   tmeFora ? 'TME não contabilizado nesta semana' : null].filter(Boolean).join(' · ') || undefined}
                                 acao={<span className={`text-sm font-semibold tabular-nums ${
@@ -692,7 +716,7 @@ export default async function Extrato({
             )}
 
             {canaisDe(linhas.filter((l) => l.regra !== 'media_da_equipe' && l.regra !== 'media_sobre_realizado')).map((canal) => {
-              const doCanal = linhas.filter((l) => chaveCanal(l.origem) === canal && l.regra !== 'media_da_equipe' && l.regra !== 'media_sobre_realizado');
+              const doCanal = linhas.filter((l) => quadroDa(l) === canal && l.regra !== 'media_da_equipe' && l.regra !== 'media_sobre_realizado');
               const soma = doCanal.reduce((a, l) => a + Number(l.cota), 0);
 
               // Cada categoria somada no mês; o C-SAT tem tratamento próprio.
@@ -714,9 +738,9 @@ export default async function Extrato({
               // Só as faixas em que a pessoa caiu em alguma semana, marcando quais.
               // Faixa vazia não aparece (08/10): para quem não tem C-SAT no canal,
               // como o Pleno, eram cinco linhas de zeros.
-              const semanasDoCanal = canal === 'geral' ? []
+              const semanasDoCanal = canal === 'geral' || canal.startsWith('outro:') ? []
                 : semanal.filter((c) => c.origem === canal as Canal);
-              const linhasFaixa = canal === 'geral' ? [] : faixas.map((f) => {
+              const linhasFaixa = canal === 'geral' || canal.startsWith('outro:') ? [] : faixas.map((f) => {
                 const atingidas = semanasDoCanal.filter((c) => faixaDo(Number(c.csat), faixas)?.chave === f.chave);
                 const doExtrato = doCanal.filter((l) => l.regra === f.chave);
                 return {
@@ -735,14 +759,14 @@ export default async function Extrato({
 
               // As faixas entram no lugar delas na sequência da planilha:
               // depois do TME e antes das notas.
-              const antes = naOrdem(categorias).filter((l) => posicao(l.grupo, l.ordem) < posicao('csat', 0));
-              const depois = naOrdem(categorias).filter((l) => posicao(l.grupo, l.ordem) >= posicao('csat', 0));
+              const antes = naOrdem(categorias).filter((l) => lugar(l) < posicao('csat', 0));
+              const depois = naOrdem(categorias).filter((l) => lugar(l) >= posicao('csat', 0));
               const monitoria = categorias.find((l) => l.grupo === 'monitoria');
 
               return (
                 <Quadro
                   key={canal}
-                  titulo={NOME_CANAL[canal]}
+                  titulo={nomeDoQuadro(canal)}
                   acao={<span className={`text-sm font-semibold tabular-nums ${
                     soma < 0 ? 'text-rose-700' : 'text-slate-900'}`}>{num(soma)} pts</span>}
                 >
