@@ -29,12 +29,11 @@ export function mesAnterior(competencia: string) {
  * No dia 26 o ciclo vira, mas o mês que acabou ainda não foi fechado e o novo
  * ainda não tem nada: abrir no mês do calendário mostrava um painel vazio
  * justo quando o gestor precisa conferir o anterior para fechar. Então, até o
- * mês anterior ser fechado ou o novo ter algum dado, a tela abre no anterior.
+ * mês anterior ser fechado, a tela abre no anterior.
  *
- * "Algum dado" é volume, avaliação, lançamento ou monitoria. O presencial fica
- * de fora de propósito: o operador registra desde o primeiro dia do ciclo, e
- * um atendimento registrado no dia 26 viraria o mês de todo mundo antes de
- * existir resultado para ver.
+ * Só o fechamento vira o mês (2.9.1, pedido do gestor): antes, o primeiro dado
+ * do mês novo (volume, avaliação, lançamento ou monitoria) também virava, e
+ * o mês em fechamento sumia das telas no meio da conferência.
  *
  * As consultas respeitam a RLS: para o operador, "fechado" e "tem dado" são
  * sobre ele mesmo, que é o que a tela dele mostra.
@@ -42,22 +41,12 @@ export function mesAnterior(competencia: string) {
 const competenciaPadrao = cache(async (): Promise<Competencia> => {
   const atual = mesDeCompetencia(hojeNoBrasil());
   const anterior = mesAnterior(atual);
-  // O ciclo da competência atual: do dia 26 do mês anterior ao dia 25.
-  const de = `${anterior.slice(0, 8)}26`;
-  const ate = `${atual.slice(0, 8)}25`;
 
   const db = await criarClienteServidor();
-  const contar = { count: 'exact', head: true } as const;
-  const [fechado, ...dados] = await Promise.all([
-    db.from('fechamentos_cota').select('id', contar).eq('mes_competencia', anterior),
-    db.from('volume_semanal').select('id', contar).eq('mes_competencia', atual),
-    db.from('avaliacoes').select('id', contar).gte('data', de).lte('data', ate),
-    db.from('lancamentos').select('id', contar).eq('mes_competencia', atual),
-    db.from('monitorias').select('id', contar).eq('mes_referencia', atual),
-  ]);
-  const existe = (r: { count: number | null }) => (r.count ?? 0) > 0;
+  const { count: fechado } = await db.from('fechamentos_cota')
+    .select('id', { count: 'exact', head: true }).eq('mes_competencia', anterior);
 
-  const emAberto = !existe(fechado) && !dados.some(existe);
+  const emAberto = (fechado ?? 0) === 0;
   return { competencia: emAberto ? anterior : atual, atual, emAberto };
 });
 

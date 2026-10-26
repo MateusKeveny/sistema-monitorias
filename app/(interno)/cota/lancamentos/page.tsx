@@ -7,8 +7,8 @@ import SeletorDeDetalhe, { type Destaque } from '@/componentes/SeletorDeDetalhe'
 import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
 import { Quadro, Tabela, Th, Td } from '@/componentes/ui';
 import Link from '@/componentes/Link';
-import { diaMes, hojeNoBrasil, mesDeCompetencia, periodoDaSemana, mesValido } from '@/lib/formatar';
-import { mesAnterior } from '@/lib/competencia';
+import { diaMes, hojeNoBrasil, periodoDaSemana } from '@/lib/formatar';
+import { mesAnterior, resolverCompetencia } from '@/lib/competencia';
 import type {
   CargoDaPessoa, ConferenciaLancamento, Lancamento, PesoCargo, Pessoa, RegraCota,
 } from '@/lib/tipos';
@@ -36,8 +36,8 @@ export default async function LancamentosDeCota({
   // Tudo o que é lançado nesta página pertence ao canal escolhido.
   const canal = canalPedido === 'diretores' ? 'diretores' : 'huggy';
 
-  const atual = mesDeCompetencia(hojeNoBrasil());
-  const competencia = mesValido(mes) ? `${mes}-01` : atual;
+  // Abre no mês que ainda está para fechar, como a tela inicial (2.9.1).
+  const { competencia, atual } = await resolverCompetencia(mes);
   const [inicio] = periodoDaSemana(competencia, 1);
   const [, fim] = periodoDaSemana(competencia, 4);
 

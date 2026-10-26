@@ -61,6 +61,17 @@ Monitorias nem o Performance.
   e cobrava o valor por ponto de mês que já tem o valor do RH; agora segue a
   do painel (2.3.1).
 
+## Performance 2.9.1
+
+Sem migração. Não muda as Monitorias nem a Agenda.
+
+- **Performance (correção): o mês só vira quando o anterior fecha.**
+  Lançamentos abria no mês do calendário — no dia 26 já pulava para o mês
+  novo, com o anterior ainda em fechamento. E as outras telas (Início,
+  Extrato, Fechamento…) também viravam assim que o mês novo ganhava o
+  primeiro dado, como um Colar do Hub. Agora todas abrem no mês que ainda
+  está para fechar até o fechamento sair; o mês novo continua pelas setas.
+
 ## Performance 2.9.0
 
 Migração 78 (banco dos painéis). Não muda as Monitorias nem a Agenda.
