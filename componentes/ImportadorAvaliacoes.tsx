@@ -8,17 +8,12 @@ import { data as formatarData, mesDeCompetencia, mesRotulo, semanaDoCiclo } from
 import { dataDoExcel, lerPlanilha, type Linha } from '@/lib/xlsx-navegador';
 import type { Pessoa } from '@/lib/tipos';
 import { mensagemDoErro } from '@/lib/erro-amigavel';
+import { CANAIS_PADRAO, mapaDoHub, type Canal } from '@/lib/setores';
 
 type Origem = 'huggy' | 'diretores';
 
-/** Setor do Hub → origem da avaliação na cota. */
-const SETORES: Record<string, Origem> = {
-  expansao: 'huggy',
-  'diretores-expansao': 'diretores',
-};
-
-/** Nome do canal como aparece no Hub. */
-const ROTULO_ORIGEM: Record<Origem, string> = { huggy: 'Expansão', diretores: 'Diretores-Expansão' };
+/** Nome do canal na tela, quando o cadastro não diz (migração 79 não rodada). */
+const ROTULO_PADRAO: Record<Origem, string> = { huggy: 'Expansão', diretores: 'Diretores-Expansão' };
 const CANAIS: Origem[] = ['huggy', 'diretores'];
 
 const normalizar = (v: unknown) => String(v ?? '').normalize('NFD')
@@ -107,11 +102,20 @@ const PAGINA = 1000;
  * com o robô é ignorada.
  */
 export default function ImportadorAvaliacoes({
-  pessoas, importadoPor,
+  pessoas, importadoPor, canais,
 }: {
   pessoas: Pessoa[];
   importadoPor: string;
+  /** Setores e canais (migração 79): qual nome do Hub vai para cada canal. */
+  canais?: Canal[];
 }) {
+  // Setor do Hub → canal da cota, pelo cadastro (2.10.0). Antes, fixo no código.
+  const cadastro = canais?.length ? canais : CANAIS_PADRAO;
+  const SETORES = useMemo(() => mapaDoHub(cadastro), [cadastro]);
+  const ROTULO_ORIGEM: Record<Origem, string> = {
+    huggy: cadastro.find((c) => c.apelido === 'huggy')?.nome ?? ROTULO_PADRAO.huggy,
+    diretores: cadastro.find((c) => c.apelido === 'diretores')?.nome ?? ROTULO_PADRAO.diretores,
+  };
   const router = useRouter();
   const [arquivos, setArquivos] = useState<AnaliseArquivo[] | null>(null);
   const [ocupado, setOcupado] = useState<string | null>(null);
@@ -385,7 +389,7 @@ export default function ImportadorAvaliacoes({
 
       <p className="mb-4 text-sm text-slate-600">
         Relatórios de atendimentos do Hub (<code>.xlsx</code>), um ou vários de uma vez. Entram só as avaliações com nota
-        de 1 a 5: os setores <strong>Expansão</strong> e <strong>Diretores-Expansão</strong> são contados separadamente.
+        de 1 a 5, cada uma no canal do seu setor (Configuração › Setores e canais).
         A mesma avaliação (data e protocolo) entra uma vez só. Nota de atendente não reconhecido fica guardada;
         conversa só com o robô é ignorada. Atendimento de <strong>outro setor</strong> vira demanda extra pendente, para
         decidir em Lançamentos.
@@ -468,7 +472,7 @@ export default function ImportadorAvaliacoes({
               <header className="border-b border-slate-100 px-4 py-2.5">
                 <h3 className="text-sm font-semibold text-slate-800">Atendimentos de outros setores</h3>
                 <p className="text-xs text-slate-500">
-                  Fora de Expansão e Diretores-Expansão. Ficam guardados como demanda extra pendente, sem pontos, para você
+                  Setores que não estão em nenhum canal (Configuração › Setores e canais). Ficam guardados como demanda extra pendente, sem pontos, para você
                   decidir em Lançamentos — lançar com a regra que escolher ou descartar. A nota deles não entra no C-SAT.
                 </p>
               </header>

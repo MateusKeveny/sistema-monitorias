@@ -7,6 +7,8 @@ import AvisosTeams, { type SituacaoAviso } from '@/componentes/AvisosTeams';
 import SubcategoriasDiario from '@/componentes/SubcategoriasDiario';
 import QuemVeODiario, { type VisibilidadeDoDiario } from '@/componentes/QuemVeODiario';
 import HistoricoDePesos, { type AlteracaoDePeso } from '@/componentes/HistoricoDePesos';
+import SetoresECanais, { type SetorDoHubVisto } from '@/componentes/SetoresECanais';
+import type { Canal, Setor } from '@/lib/setores';
 import type { Subcategoria } from '@/lib/diario';
 import { hojeNoBrasil, mesDeCompetencia } from '@/lib/formatar';
 import type { Cargo, CargoDaPessoa, PesoCargo, Pessoa, ReferenciaCargo, RegraCota } from '@/lib/tipos';
@@ -33,7 +35,7 @@ export default async function ConfiguracaoDaCota({
   const [
     { data: pessoas }, { data: cargos }, { data: regras },
     { data: pesos }, { data: referencias }, { data: historico }, { data: avisos }, { data: subcategorias }, { data: usosSub }, { data: alteracoes },
-    { data: visibilidade },
+    { data: visibilidade }, { data: setores }, { data: canais }, { data: vistos },
   ] = await Promise.all([
     db.from('pessoas').select('id, ativo, desligado_em'),
     db.from('cargos').select('*').eq('ativo', true).order('ordem'),
@@ -50,6 +52,10 @@ export default async function ConfiguracaoDaCota({
     db.from('pesos_historico').select('*').order('alterado_em', { ascending: false }).limit(300),
     // Quem vê cada tipo de registro do diário (migração 67).
     db.from('diario_visibilidade').select('*'),
+    // Setores e canais (migração 79).
+    db.from('setores').select('*').order('ordem'),
+    db.from('canais').select('*').order('ordem'),
+    db.from('vw_setores_do_hub_vistos').select('*').order('atendimentos', { ascending: false }),
   ]);
 
   const usos: Record<number, number> = {};
@@ -117,6 +123,14 @@ export default async function ConfiguracaoDaCota({
                                nomeBase={(base?.nome ?? '').replace(/^Atendente\s+/, '')} />
                 <PainelRegras regras={listaRegras} />
               </div>
+            ),
+          },
+          {
+            chave: 'setores',
+            rotulo: 'Setores e canais',
+            conteudo: (
+              <SetoresECanais setores={(setores ?? []) as Setor[]} canais={(canais ?? []) as Canal[]}
+                              vistos={(vistos ?? []) as SetorDoHubVisto[]} />
             ),
           },
           {

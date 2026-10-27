@@ -1,5 +1,6 @@
 import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
 import ImportadorAvaliacoes from '@/componentes/ImportadorAvaliacoes';
+import type { Canal } from '@/lib/setores';
 import ImportadorChamados from '@/componentes/ImportadorChamados';
 import ImportadorMesAnterior, { type ImportacaoFeita, type PessoaDoCadastro } from '@/componentes/ImportadorMesAnterior';
 import FilaDeAtrasos, { type ChamadoAtrasado } from '@/componentes/FilaDeAtrasos';
@@ -135,6 +136,9 @@ export default async function ImportarAvaliacoes({
     ...CANAIS.flatMap(([origem]) => SEMANAS.map((s) => contar(origem, s))),
   ]);
 
+  // Setores e canais (migração 79): qual nome do Hub vai para cada canal.
+  const { data: canais } = await db.from('canais').select('*').eq('ativo', true).order('ordem');
+
   // Notas de atendentes não reconhecidos, esperando atribuição (migração 45).
   const { data: guardadas } = await db.from('avaliacoes_guardadas')
     .select('nome_no_arquivo, nome_normalizado, data, nota, origem_arquivo, importado_em')
@@ -212,7 +216,7 @@ export default async function ImportarAvaliacoes({
         </p>
       </Quadro>
 
-      <ImportadorAvaliacoes pessoas={lista} importadoPor={perfil.id} />
+      <ImportadorAvaliacoes pessoas={lista} importadoPor={perfil.id} canais={(canais ?? []) as Canal[]} />
       <NotasGuardadas notas={(guardadas ?? []) as NotaGuardada[]}
                       pessoas={lista.filter((p) => p.ativo && !p.desligado_em).map((p) => ({ id: p.id, nome: p.nome }))} />
     </div>
