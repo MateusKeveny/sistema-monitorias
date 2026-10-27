@@ -15,6 +15,9 @@
 -- — o que estava fixo no código. Setor do Hub fora da árvore continua virando
 -- demanda extra pendente (migração 78).
 --
+-- A tabela é `canais_do_setor`, e não `canais`: `public.canais` já existe e é
+-- das Monitorias (o canal da monitoria, migração 01).
+--
 -- `apelido` liga o canal ao texto que o cálculo usa hoje; canal sem apelido
 -- só passa a contar quando o cálculo ler o cadastro (etapa 3).
 --
@@ -30,7 +33,7 @@ create table if not exists public.setores (
   criado_em timestamptz not null default now()
 );
 
-create table if not exists public.canais (
+create table if not exists public.canais_do_setor (
   id           smallint generated always as identity primary key,
   setor_id     smallint not null references public.setores (id) on delete restrict,
   nome         text not null,
@@ -43,24 +46,24 @@ create table if not exists public.canais (
 );
 
 alter table public.setores enable row level security;
-alter table public.canais  enable row level security;
+alter table public.canais_do_setor enable row level security;
 -- Leitura para quem está logado (a importação e as telas leem a árvore);
 -- só o gestor muda.
 drop policy if exists setores_leitura on public.setores;
 create policy setores_leitura on public.setores for select using (auth.uid() is not null);
 drop policy if exists setores_gestor on public.setores;
 create policy setores_gestor on public.setores for all using (public.eh_gestor()) with check (public.eh_gestor());
-drop policy if exists canais_leitura on public.canais;
-create policy canais_leitura on public.canais for select using (auth.uid() is not null);
-drop policy if exists canais_gestor on public.canais;
-create policy canais_gestor on public.canais for all using (public.eh_gestor()) with check (public.eh_gestor());
+drop policy if exists canais_do_setor_leitura on public.canais_do_setor;
+create policy canais_do_setor_leitura on public.canais_do_setor for select using (auth.uid() is not null);
+drop policy if exists canais_do_setor_gestor on public.canais_do_setor;
+create policy canais_do_setor_gestor on public.canais_do_setor for all using (public.eh_gestor()) with check (public.eh_gestor());
 
 -- A árvore de hoje. Pode rodar de novo: não duplica nem sobrescreve o que o
 -- gestor já mudou na tela.
 insert into public.setores (nome, ordem) values ('Conexão Expansão', 1)
 on conflict (nome) do nothing;
 
-insert into public.canais (setor_id, nome, apelido, nomes_no_hub, ordem)
+insert into public.canais_do_setor (setor_id, nome, apelido, nomes_no_hub, ordem)
 select s.id, c.nome, c.apelido, c.nomes, c.ordem
   from public.setores s,
        (values ('Expansão', 'huggy', array['Expansão'], 1),
@@ -77,4 +80,4 @@ create or replace view public.vw_setores_do_hub_vistos with (security_invoker = 
 
 -- Conferência
 select (select count(*) from public.setores) as setores,
-       (select count(*) from public.canais) as canais;
+       (select count(*) from public.canais_do_setor) as canais;

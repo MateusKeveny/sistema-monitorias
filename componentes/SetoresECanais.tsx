@@ -66,7 +66,7 @@ export default function SetoresECanais({ setores, canais, vistos }: {
       const nome = rascunho[`c${c.id}`].trim();
       const nomes = lista(rascunho[`h${c.id}`]);
       if (nome === c.nome && nomes.join('|') === c.nomes_no_hub.join('|')) continue;
-      const { error } = await db.from('canais').update({ nome, nomes_no_hub: nomes }).eq('id', c.id);
+      const { error } = await db.from('canais_do_setor').update({ nome, nomes_no_hub: nomes }).eq('id', c.id);
       if (error) { setOcupado(false); setErro(await mensagemDoErro(error)); return; }
     }
     setOcupado(false);

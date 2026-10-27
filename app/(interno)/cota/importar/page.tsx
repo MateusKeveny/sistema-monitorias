@@ -137,7 +137,7 @@ export default async function ImportarAvaliacoes({
   ]);
 
   // Setores e canais (migração 79): qual nome do Hub vai para cada canal.
-  const { data: canais } = await db.from('canais').select('*').eq('ativo', true).order('ordem');
+  const { data: canais } = await db.from('canais_do_setor').select('*').eq('ativo', true).order('ordem');
 
   // Notas de atendentes não reconhecidos, esperando atribuição (migração 45).
   const { data: guardadas } = await db.from('avaliacoes_guardadas')

@@ -54,7 +54,7 @@ export default async function ConfiguracaoDaCota({
     db.from('diario_visibilidade').select('*'),
     // Setores e canais (migração 79).
     db.from('setores').select('*').order('ordem'),
-    db.from('canais').select('*').order('ordem'),
+    db.from('canais_do_setor').select('*').order('ordem'),
     db.from('vw_setores_do_hub_vistos').select('*').order('atendimentos', { ascending: false }),
   ]);
 
