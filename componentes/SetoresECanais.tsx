@@ -74,6 +74,43 @@ export default function SetoresECanais({ setores, canais, vistos }: {
     iniciar(() => router.refresh());
   }
 
+  // Criar setor e canal (versao-3): ficam cadastrados já; um canal novo (sem
+  // apelido) só passa a pontuar quando o cálculo ler o cadastro (etapa 3).
+  const [novoSetor, setNovoSetor] = useState('');
+  const [novoCanal, setNovoCanal] = useState<Record<number, { nome: string; hub: string }>>({});
+
+  async function criarSetor() {
+    const nome = novoSetor.trim();
+    if (!nome) return;
+    setOcupado(true); setErro(null); setAviso(null);
+    const { error } = await criarClienteNavegador().from('setores')
+      .insert({ nome, ordem: Math.max(0, ...setores.map((x) => x.ordem)) + 1 });
+    setOcupado(false);
+    if (error) { setErro(/duplicate|unique/i.test(error.message) ? `Já existe o setor "${nome}".` : await mensagemDoErro(error)); return; }
+    setNovoSetor(''); setAviso(`Setor "${nome}" criado. Agora crie os canais dele.`);
+    iniciar(() => router.refresh());
+  }
+
+  async function criarCanal(setorId: number) {
+    const c = novoCanal[setorId];
+    const nome = c?.nome.trim();
+    if (!nome) return;
+    const nomes = lista(c.hub || nome);
+    const ocupados = new Set(canais.flatMap((x) => x.nomes_no_hub.map(normalizarSetor)));
+    const repetido = nomes.find((n) => ocupados.has(normalizarSetor(n)));
+    if (repetido) { setErro(`"${repetido}" já está em outro canal.`); return; }
+    setOcupado(true); setErro(null); setAviso(null);
+    const { error } = await criarClienteNavegador().from('canais_do_setor').insert({
+      setor_id: setorId, nome, nomes_no_hub: nomes,
+      ordem: Math.max(0, ...canais.filter((x) => x.setor_id === setorId).map((x) => x.ordem)) + 1,
+    });
+    setOcupado(false);
+    if (error) { setErro(/duplicate|unique/i.test(error.message) ? `Já existe o canal "${nome}" neste setor.` : await mensagemDoErro(error)); return; }
+    setNovoCanal((r) => ({ ...r, [setorId]: { nome: '', hub: '' } }));
+    setAviso(`Canal "${nome}" criado.`);
+    iniciar(() => router.refresh());
+  }
+
   function ligar(setorDoHub: string, canalId: number) {
     setRascunho((r) => {
       const atual = lista(r[`h${canalId}`]);
@@ -100,7 +137,9 @@ export default function SetoresECanais({ setores, canais, vistos }: {
                 <ul className="ml-5 mt-2 space-y-2 border-l-2 border-slate-200 pl-4">
                   {canais.filter((c) => c.setor_id === s.id).map((c) => (
                     <li key={c.id} className="grid gap-2 rounded-xl border border-slate-200 bg-superficie px-3 py-2.5 sm:grid-cols-[auto_14rem_auto_1fr] sm:items-center">
-                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Canal</span>
+                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Canal{!c.apelido && <span className="ml-1.5 rounded-full bg-amber-500/15 px-1.5 py-px text-[10px] normal-case tracking-normal text-amber-700 dark:text-amber-300" title="Passa a pontuar quando o cálculo ler o cadastro (etapa 3)">novo</span>}
+                      </span>
                       <input value={rascunho[`c${c.id}`]} disabled={ocupado} aria-label="Nome do canal"
                              onChange={(e) => setRascunho((r) => ({ ...r, [`c${c.id}`]: e.target.value }))}
                              className={`${entrada} font-medium`} />
@@ -111,14 +150,36 @@ export default function SetoresECanais({ setores, canais, vistos }: {
                              className={entrada} />
                     </li>
                   ))}
+                  <li className="flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-slate-300 px-3 py-2">
+                    <span className="text-xs font-semibold text-slate-500">+ Canal</span>
+                    <input value={novoCanal[s.id]?.nome ?? ''} disabled={ocupado} placeholder="Nome do canal" aria-label={`Nome do novo canal em ${s.nome}`}
+                           onChange={(e) => setNovoCanal((r) => ({ ...r, [s.id]: { hub: r[s.id]?.hub ?? '', nome: e.target.value } }))}
+                           className={`${entrada} w-48`} />
+                    <input value={novoCanal[s.id]?.hub ?? ''} disabled={ocupado} placeholder="Nome no Hub (se for diferente)" aria-label="Nomes no Hub do novo canal"
+                           onChange={(e) => setNovoCanal((r) => ({ ...r, [s.id]: { nome: r[s.id]?.nome ?? '', hub: e.target.value } }))}
+                           className={`${entrada} min-w-56 flex-1`} />
+                    <button type="button" onClick={() => criarCanal(s.id)} disabled={ocupado || !novoCanal[s.id]?.nome.trim()}
+                            className="rounded-lg border border-slate-300 px-3 py-1 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40">
+                      Criar canal
+                    </button>
+                  </li>
                 </ul>
               </li>
             ))}
+            <li className="flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-slate-300 px-3 py-2.5">
+              <span className="text-xs font-semibold text-slate-500">+ Novo setor</span>
+              <input value={novoSetor} disabled={ocupado} placeholder="Nome do setor (a equipe)" aria-label="Nome do novo setor"
+                     onChange={(e) => setNovoSetor(e.target.value)} className={`${entrada} w-64`} />
+              <button type="button" onClick={criarSetor} disabled={ocupado || !novoSetor.trim()}
+                      className="rounded-lg border border-slate-300 px-3 py-1 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40">
+                Criar setor
+              </button>
+            </li>
           </ul>
         )}
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-xs text-slate-500">
-            Criar setor ou canal novo chega quando o cálculo da cota passar a ler este cadastro (etapa 3 do plano).
+            Setor e canal novos ficam cadastrados já; canal marcado "novo" passa a pontuar quando o cálculo da cota ler este cadastro (etapa 3).
           </p>
           <button type="button" onClick={salvar} disabled={!mudou || ocupado || atualizando}
                   className="rounded-lg bg-marca-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-marca-700 disabled:opacity-40">
