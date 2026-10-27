@@ -27,7 +27,9 @@ export const VERSAO_MONITORIAS: string = pacote.version;
  * publicações, não entregas. Recontada pelo que foi de fato entregue desde a
  * estreia em produção (1.0.0, em 18/09/2026), a cota está em 1.4.0.
  */
-export const VERSAO_COTA = '2.11.2';
+// Ramo versao-3 (a árvore de setores, docs/PLANO-SETORES.md): só vai à cópia de
+// teste até a virada; o número final sai na publicação oficial.
+export const VERSAO_COTA = '3.0-teste';
 
 /** Agenda da Gestão (migração 59), terceiro site do mesmo código. */
 export const VERSAO_AGENDA = '1.7.0';
