@@ -6,7 +6,8 @@ lançamentos e importação).
 
 **Situação (27/10/2026):** a 3.0 é feita em paralelo, na branch `versao-3`,
 publicada só na cópia de teste (`painel-performance-teste`). Etapas 1 e 2
-prontas (migrações 79 e 82). Nas telas, "canal" passou a se chamar **fila**,
+prontas (migrações 79 e 82); etapa 3 com o cálculo já lendo a fila (83 e 84,
+zero diferença) e a fila nova recebendo dados (85). Nas telas, "canal" passou a se chamar **fila**,
 o nome que o Hub usa; no banco a tabela continua `canais_do_setor` e a coluna
 `canal_id`.
 
@@ -68,6 +69,18 @@ Setor do Hub que não está na árvore vira demanda extra pendente (2.9.0).
    regra com peso por canal. É a etapa que reescreve dados: **antes e depois,
    a cota de cada pessoa em cada mês tem de bater centavo por centavo**
    (a conferência diária e uma comparação mês a mês, guardada antes de rodar).
+   *Feito:* a 83 guardou a foto de todos os meses (`foto_da_cota`) e a função
+   `comparar_com_a_foto`; a 84 deu à fila as colunas `regra_finalizado`,
+   `grupo_tme`, `grupo_csat` e `grupo_nota` e trocou o cálculo numa transação
+   só — foto, troca e comparação; qualquer centavo de diferença desfaria tudo.
+   Deu zero. Em vez de renomear as regras, a fila aponta para elas: fila que
+   copia outra aponta para as mesmas e acompanha a original; fila com regras
+   próprias ganha regras com peso zero (`definir_regras_da_fila`, 85). A 85
+   também troca as travas "huggy ou diretores" por chave estrangeira para o
+   apelido (fila nova ganha `fila_<id>`). Telas: Configuração › Regras por
+   fila (uma coluna por fila; C-SAT e notas da equipe) e a escolha de regras ao
+   criar a fila. Os painéis (Início, Comparativo) ainda mostram só as duas
+   filas de sempre — entram com o visual novo de cada tela.
 4. **Setor na pessoa, no fechamento e no acesso** (3.1.0) — pessoas, cargos,
    meta, valor por ponto, fechamento e exportação por setor; seletor de setor
    nas telas; gestor restrito ao seu setor e o papel administrador (ver

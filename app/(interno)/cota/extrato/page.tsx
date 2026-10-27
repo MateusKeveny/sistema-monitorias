@@ -14,7 +14,8 @@ import { todas, dados } from '@/lib/consultas';
 
 export const dynamic = 'force-dynamic';
 
-type Canal = 'huggy' | 'diretores';
+/** Apelido da fila ('huggy', 'diretores', 'fila_3'…). */
+type Canal = string;
 
 type Linha = {
   semana: number | null;
@@ -81,6 +82,10 @@ export default async function Extrato({
   const veOTime = perfil.papel !== 'operador';
 
   const db = await criarClienteServidor();
+  // Fila nova (3.0) aparece pelo nome do cadastro; as de sempre, como antes.
+  const { data: nomesDasFilas } = await db.from('canais_do_setor').select('apelido, nome');
+  const nomeDaOrigem = (o: string) => NOME_CANAL[o]
+    ?? (nomesDasFilas ?? []).find((f) => f.apelido === o)?.nome ?? o;
   // O mês aberto vem do resumo quando ele está em dia (migração 58); senão,
   // das views, como antes.
   const fonte = await fonteDoMes(competencia);
@@ -281,7 +286,7 @@ export default async function Extrato({
   };
   const nomeDoQuadro = (q: string) => q.startsWith('outro:')
     ? `${nomeDoSetor(q.slice(6))} · regras da Expansão`
-    : NOME_CANAL[q];
+    : nomeDaOrigem(q);
 
   const csatDe = (origem: Canal | null, semana: number | null) =>
     origem && semana ? semanal.find((c) => c.origem === origem && c.semana === semana) : undefined;
@@ -344,7 +349,7 @@ export default async function Extrato({
     const chave = l.grupo === 'csat' ? `${l.regra}|${l.origem}` : l.regra;
     const o = porOrigem.get(chave) ?? {
       chave, grupo: l.grupo, quantidade: 0, cota: 0, vezes: 0,
-      rotulo: l.grupo === 'csat' && l.origem ? `${l.rotulo} · ${NOME_CANAL[l.origem]}` : l.rotulo,
+      rotulo: l.grupo === 'csat' && l.origem ? `${l.rotulo} · ${nomeDaOrigem(l.origem)}` : l.rotulo,
     };
     o.quantidade += Number(l.quantidade);
     o.cota += Number(l.cota);

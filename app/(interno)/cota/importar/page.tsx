@@ -130,13 +130,18 @@ export default async function ImportarAvaliacoes({
     .then(({ count }) => count ?? 0);
 
   // Setores e filas (migração 79): qual nome do Hub vai para cada fila, e as
-  // linhas da grade abaixo (etapa 2).
-  const [{ data: pessoas }, { data: canais }, ultima, ...contagens] = await Promise.all([
+  // linhas da grade abaixo — uma por fila da árvore; sem a 79, as duas de sempre.
+  const { data: canais } = await db.from('canais_do_setor').select('*').eq('ativo', true).order('ordem');
+  const filas = (canais ?? []) as Canal[];
+  const linhasDaGrade = (filas.length ? filas : CANAIS.map(([apelido, nome]) => ({ apelido, nome })))
+    .flatMap((f) => (f.apelido ? [{ origem: f.apelido as string, rotulo: f.nome as string }] : []))
+    .map((f, c) => ({ ...f, c }));
+
+  const [{ data: pessoas }, ultima, ...contagens] = await Promise.all([
     db.from('pessoas').select('*').order('nome'),
-    db.from('canais_do_setor').select('*').eq('ativo', true).order('ordem'),
     db.from('avaliacoes').select('importado_em, importado_por')
       .not('importado_em', 'is', null).order('importado_em', { ascending: false }).limit(1).maybeSingle(),
-    ...CANAIS.flatMap(([origem]) => SEMANAS.map((s) => contar(origem, s))),
+    ...linhasDaGrade.flatMap(({ origem }) => SEMANAS.map((s) => contar(origem, s))),
   ]);
 
   // Notas de atendentes não reconhecidos, esperando atribuição (migração 45).
@@ -150,11 +155,6 @@ export default async function ImportarAvaliacoes({
 
   const periodos = SEMANAS.map((s) => periodoDaSemana(competencia, s));
   const celula = (canal: number, semana: number) => contagens[canal * SEMANAS.length + semana - 1] as number;
-  // Uma linha por fila da árvore; sem a migração 79, as duas de sempre. A
-  // contagem é pelo apelido: fila nova ainda não recebe avaliação (etapa 3).
-  const filas = (canais ?? []) as Canal[];
-  const linhasDaGrade = (filas.length ? filas : CANAIS.map(([apelido, nome]) => ({ apelido, nome })))
-    .map((f) => ({ origem: f.apelido, rotulo: f.nome, c: CANAIS.findIndex(([apelido]) => apelido === f.apelido) }));
 
   return (
     <div className="space-y-6">
@@ -185,14 +185,6 @@ export default async function ImportarAvaliacoes({
               </span>
             ))}
             {linhasDaGrade.map(({ origem, rotulo, c }) => {
-              if (c < 0) {
-                return [
-                  <span key={`${rotulo}-rotulo`} className="text-slate-600">{rotulo}</span>,
-                  <span key={`${rotulo}-nova`} className="col-span-4 rounded-lg bg-slate-100 px-2.5 py-2 text-center text-xs text-slate-500">
-                    Fila nova: os atendimentos dela entram como demanda extra até o cálculo ler a árvore (etapa 3).
-                  </span>,
-                ];
-              }
               // Semana encerrada bem abaixo das outras do mesmo canal costuma
               // ser importação feita antes de a semana terminar.
               const encerradas = SEMANAS.filter((s) => hoje > periodos[s - 1][1]).map((s) => celula(c, s));

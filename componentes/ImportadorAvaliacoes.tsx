@@ -8,13 +8,10 @@ import { data as formatarData, mesDeCompetencia, mesRotulo, semanaDoCiclo } from
 import { dataDoExcel, lerPlanilha, type Linha } from '@/lib/xlsx-navegador';
 import type { Pessoa } from '@/lib/tipos';
 import { mensagemDoErro } from '@/lib/erro-amigavel';
-import { CANAIS_PADRAO, mapaDoHub, type Canal } from '@/lib/setores';
+import { CANAIS_PADRAO, mapaDoHub, nomeDaFila, type Canal } from '@/lib/setores';
 
-type Origem = 'huggy' | 'diretores';
-
-/** Nome do canal na tela, quando o cadastro não diz (migração 79 não rodada). */
-const ROTULO_PADRAO: Record<Origem, string> = { huggy: 'Expansão', diretores: 'Diretores-Expansão' };
-const CANAIS: Origem[] = ['huggy', 'diretores'];
+/** O apelido da fila ('huggy', 'diretores', 'fila_3'…), como o banco grava. */
+type Origem = string;
 
 const normalizar = (v: unknown) => String(v ?? '').normalize('NFD')
   .replace(/[̀-ͯ]/g, '').trim().toLowerCase();
@@ -112,10 +109,8 @@ export default function ImportadorAvaliacoes({
   // Setor do Hub → canal da cota, pelo cadastro (2.10.0). Antes, fixo no código.
   const cadastro = canais?.length ? canais : CANAIS_PADRAO;
   const SETORES = useMemo(() => mapaDoHub(cadastro), [cadastro]);
-  const ROTULO_ORIGEM: Record<Origem, string> = {
-    huggy: cadastro.find((c) => c.apelido === 'huggy')?.nome ?? ROTULO_PADRAO.huggy,
-    diretores: cadastro.find((c) => c.apelido === 'diretores')?.nome ?? ROTULO_PADRAO.diretores,
-  };
+  // Uma seção por fila da árvore (3.0): as de sempre e as novas.
+  const CANAIS = useMemo(() => cadastro.map((c) => c.apelido).filter((a): a is string => !!a), [cadastro]);
   const router = useRouter();
   const [arquivos, setArquivos] = useState<AnaliseArquivo[] | null>(null);
   const [ocupado, setOcupado] = useState<string | null>(null);
@@ -176,7 +171,7 @@ export default function ImportadorAvaliacoes({
       const data = lerData(l[col.data]);
       if (!data) { a.semData++; continue; }
 
-      let origem: Origem = 'huggy';
+      let origem: Origem = CANAIS[0] ?? 'huggy';
       if (col.setor) origem = SETORES[normalizar(String(l[col.setor] ?? '').trim())];
 
       const atendente = String(l[col.atendente] ?? '').trim();
@@ -346,7 +341,7 @@ export default function ImportadorAvaliacoes({
       s.set(k, (s.get(k) ?? 0) + 1);
     }
     return m;
-  }, [novas]);
+  }, [novas, CANAIS]);
 
   /** Outro setor por pessoa, setor, mês e semana — como vai aparecer em Lançamentos. */
   const outroPorGrupo = useMemo(() => {
@@ -389,7 +384,7 @@ export default function ImportadorAvaliacoes({
 
       <p className="mb-4 text-sm text-slate-600">
         Relatórios de atendimentos do Hub (<code>.xlsx</code>), um ou vários de uma vez. Entram só as avaliações com nota
-        de 1 a 5, cada uma no canal do seu setor (Configuração › Setores e canais).
+        de 1 a 5, cada uma na fila do seu setor (Configuração › Setores e filas).
         A mesma avaliação (data e protocolo) entra uma vez só. Nota de atendente não reconhecido fica guardada;
         conversa só com o robô é ignorada. Atendimento de <strong>outro setor</strong> vira demanda extra pendente, para
         decidir em Lançamentos.
@@ -472,7 +467,7 @@ export default function ImportadorAvaliacoes({
               <header className="border-b border-slate-100 px-4 py-2.5">
                 <h3 className="text-sm font-semibold text-slate-800">Atendimentos de outros setores</h3>
                 <p className="text-xs text-slate-500">
-                  Setores que não estão em nenhum canal (Configuração › Setores e canais). Ficam guardados como demanda extra pendente, sem pontos, para você
+                  Setores que não estão em nenhuma fila (Configuração › Setores e filas). Ficam guardados como demanda extra pendente, sem pontos, para você
                   decidir em Lançamentos — lançar com a regra que escolher ou descartar. A nota deles não entra no C-SAT.
                 </p>
               </header>
@@ -519,7 +514,7 @@ export default function ImportadorAvaliacoes({
               return (
                 <section key={canal} className="rounded-lg ring-1 ring-slate-200">
                   <header className="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-100 px-4 py-2.5">
-                    <h3 className="text-sm font-semibold text-slate-800">{ROTULO_ORIGEM[canal]}</h3>
+                    <h3 className="text-sm font-semibold text-slate-800">{nomeDaFila(cadastro, canal)}</h3>
                     <span className="text-sm tabular-nums text-slate-600">{total} avaliações novas</span>
                   </header>
                   {linhas.length === 0 ? (

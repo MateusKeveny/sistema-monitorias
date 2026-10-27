@@ -18,7 +18,7 @@ const numero = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits:
 
 type Props = {
   competencia: string;
-  canal: 'huggy' | 'diretores';
+  canal: string;
   pessoas: Pessoa[];
   regras: RegraCota[];
   pesos: PesoCargo[];

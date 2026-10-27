@@ -56,13 +56,15 @@ const entrada = `w-24 rounded-md border border-slate-300 px-2 py-1 text-right te
  * como referência para pegar erro de digitação.
  */
 export default function VolumeSemanal({
-  competencia, canal, semana, periodo, pessoas: todas, volumes, esperados, recebem = [],
+  competencia, canal, nomeFila, semana, periodo, pessoas: todas, volumes, esperados, recebem = [],
 }: {
   /** Para quem dá para mover o volume (⇄ mover, migração 71). */
   recebem?: { id: string; nome: string }[];
   competencia: string;
-  /** 'huggy' = Expansão · 'diretores' = Diretores-Expansão. */
-  canal: 'huggy' | 'diretores';
+  /** Apelido da fila ('huggy', 'diretores', 'fila_3'…), como o volume é gravado. */
+  canal: string;
+  /** Nome da fila na tela. */
+  nomeFila: string;
   semana: number;
   /** "03/09 a 10/09", só para o subtítulo. */
   periodo: string;
@@ -179,7 +181,7 @@ export default function VolumeSemanal({
 
   return (
     <Quadro
-      titulo={`Volume · ${semana}ª semana · ${canal === 'huggy' ? 'Expansão' : 'Diretores-Expansão'}`}
+      titulo={`Volume · ${semana}ª semana · ${nomeFila}`}
       subtitulo={`${periodo} · tempos em H:MM:SS (as horas podem passar de 24) ou MM:SS · linha em branco remove o volume da pessoa`}
       acao={
         <button
@@ -203,7 +205,7 @@ export default function VolumeSemanal({
         <div className="mb-4 rounded-xl border border-marca-600/40 bg-slate-50 px-4 py-3">
           <p className="text-sm font-semibold text-slate-900">Colar do Hub</p>
           <p className="text-xs text-slate-500">
-            No Hub, filtre o canal {canal === 'huggy' ? 'Expansão' : 'Diretores-Expansão'} e o período {periodo}, selecione a
+            No Hub, filtre a fila {nomeFila} e o período {periodo}, selecione a
             tabela de analistas e copie (Ctrl+C). Entram os <b>resolvidos</b> (como finalizados), o TMA e o <b>TME útil</b>.
           </p>
           <textarea value={colado} onChange={(e) => { setColado(e.target.value); setLidoDoHub(null); }}

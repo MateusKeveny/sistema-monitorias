@@ -8,6 +8,7 @@ import SubcategoriasDiario from '@/componentes/SubcategoriasDiario';
 import QuemVeODiario, { type VisibilidadeDoDiario } from '@/componentes/QuemVeODiario';
 import HistoricoDePesos, { type AlteracaoDePeso } from '@/componentes/HistoricoDePesos';
 import SetoresECanais, { type SetorDoHubVisto } from '@/componentes/SetoresECanais';
+import RegrasPorFila from '@/componentes/RegrasPorFila';
 import type { Canal, Setor } from '@/lib/setores';
 import type { Subcategoria } from '@/lib/diario';
 import { hojeNoBrasil, mesDeCompetencia } from '@/lib/formatar';
@@ -107,6 +108,13 @@ export default async function ConfiguracaoDaCota({
                 referencias={(referencias ?? []) as ReferenciaCargo[]}
                 pessoasPorCargo={pessoasPorCargo}
               />
+            ),
+          },
+          {
+            chave: 'filas',
+            rotulo: 'Regras por fila',
+            conteudo: (
+              <RegrasPorFila filas={(canais ?? []) as Canal[]} regras={listaRegras} pesos={listaPesos} cargos={listaCargos} />
             ),
           },
           {

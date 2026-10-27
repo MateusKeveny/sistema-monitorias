@@ -58,6 +58,10 @@ export default async function Historico({
   const veOTime = perfil.papel !== 'operador';
 
   const db = await criarClienteServidor();
+  // Fila nova (3.0) aparece pelo nome do cadastro; as de sempre, como antes.
+  const { data: nomesDasFilas } = await db.from('canais_do_setor').select('apelido, nome');
+  const nomeDaOrigem = (o: string) => NOME_CANAL[o]
+    ?? (nomesDasFilas ?? []).find((f) => f.apelido === o)?.nome ?? o;
 
   const { data: pessoas } = veOTime
     ? await conferida(db.from('pessoas').select('id, nome').order('nome'))
@@ -244,7 +248,7 @@ export default async function Historico({
                   <section key={canal}>
                     <h3 className="mb-1 flex items-baseline justify-between gap-2 rounded bg-slate-100
                                    px-2 py-1 text-xs font-semibold text-slate-600">
-                      {NOME_CANAL[canal] ?? canal}
+                      {nomeDaOrigem(canal)}
                       <span className="tabular-nums">{num(soma)} pts</span>
                     </h3>
                     <table className="w-full text-sm">

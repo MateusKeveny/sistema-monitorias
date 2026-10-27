@@ -197,8 +197,8 @@ export type Lancamento = {
   mes_competencia: string;
   /** Nulo = lançamento do mês inteiro. */
   semana: number | null;
-  /** 'huggy' = Expansão · 'diretores' = Diretores-Expansão. */
-  canal: 'huggy' | 'diretores';
+  /** Apelido da fila: 'huggy' = Expansão · 'diretores' = Diretores-Expansão · 'fila_<id>' nas novas. */
+  canal: string;
   regra: string;
   quantidade: number;
   pontos_manuais: number | null;
