@@ -268,13 +268,22 @@ export default async function LancamentosDeCota({
               {rotulo}
             </Link>
           ))}
+          {/* Bypass de outubro (2.11.1): atalho para o quadro do outro setor, logo abaixo. */}
+          {setoresBypass.map((setor) => (
+            <a key={setor} href="#outro-setor"
+               className="rounded-lg px-4 py-1.5 text-sm text-sobre-fundo-suave transition hover:text-sobre-fundo">
+              {setor}
+            </a>
+          ))}
         </div>
       </div>
 
       <LancamentosPendentes pendentes={(pendentes.data ?? []) as Pendente[]} pessoas={recebem} />
 
-      <BypassOutroSetor competencia={competencia} setores={setoresBypass} pessoas={(pessoas.data ?? []) as Pessoa[]}
-                        volumes={(volumesOutro.data ?? []) as VolumeOutroSetor[]} />
+      <div id="outro-setor" className="scroll-mt-4">
+        <BypassOutroSetor competencia={competencia} setores={setoresBypass} pessoas={(pessoas.data ?? []) as Pessoa[]}
+                          volumes={(volumesOutro.data ?? []) as VolumeOutroSetor[]} />
+      </div>
 
       {/* Os do mês do bypass saem daqui: lá eles pontuam com as regras da Expansão. */}
       <DemandasExtrasPendentes pendentes={((outroSetor.data ?? []) as AtendimentoOutroSetor[])

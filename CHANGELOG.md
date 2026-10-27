@@ -61,6 +61,15 @@ Monitorias nem o Performance.
   e cobrava o valor por ponto de mês que já tem o valor do RH; agora segue a
   do painel (2.3.1).
 
+## Performance 2.11.1
+
+Sem migração. Não muda as Monitorias nem a Agenda.
+
+- **Performance (correção): atalho "iGreen Mob" em Lançamentos.** Ao lado de
+  Expansão e Diretores-Expansão, um botão por setor do bypass (2.11.0) que
+  leva direto ao quadro dele — só no mês em que houve atendimento de outro
+  setor.
+
 ## Performance 2.11.0
 
 Migrações 80 e 81 (banco dos painéis). Não muda as Monitorias nem a Agenda.
