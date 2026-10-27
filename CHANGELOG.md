@@ -61,6 +61,17 @@ Monitorias nem o Performance.
   e cobrava o valor por ponto de mês que já tem o valor do RH; agora segue a
   do painel (2.3.1).
 
+## Performance 2.11.2
+
+Sem migração. Não muda as Monitorias nem a Agenda.
+
+- **Performance (correção): a tela do iGreen Mob igual às outras.** Em
+  Lançamentos, o iGreen Mob vira aba (ao lado de Expansão e
+  Diretores-Expansão), com os mesmos cartões por semana — resolvidos, pessoas
+  e avaliações importadas — e, ao abrir a semana, só o volume salvo e a área
+  de colar. Salvar já recalcula os pontos (sai o "Calcular pontos"
+  separado). O quadro explicativo sai das abas Expansão e Diretores.
+
 ## Performance 2.11.1
 
 Sem migração. Não muda as Monitorias nem a Agenda.

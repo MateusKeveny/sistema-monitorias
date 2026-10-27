@@ -30,10 +30,10 @@ const numero = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits:
 export default async function LancamentosDeCota({
   searchParams,
 }: {
-  searchParams: Promise<{ mes?: string; canal?: string }>;
+  searchParams: Promise<{ mes?: string; canal?: string; setor?: string }>;
 }) {
   await exigirGestor();
-  const { mes, canal: canalPedido } = await searchParams;
+  const { mes, canal: canalPedido, setor: setorPedido } = await searchParams;
   // Tudo o que é lançado nesta página pertence ao canal escolhido.
   const canal = canalPedido === 'diretores' ? 'diretores' : 'huggy';
 
@@ -59,7 +59,7 @@ export default async function LancamentosDeCota({
   ]);
   const hoje = hojeNoBrasil();
 
-  const [pessoas, regras, pesos, historico, lancamentos, conferencia, volumes, anterior, pendentes, cargos, outroSetor, setoresDoMes, volumesOutro] = await Promise.all([
+  const [pessoas, regras, pesos, historico, lancamentos, conferencia, volumes, anterior, pendentes, cargos, outroSetor, setoresDoMes, volumesOutro, notasOutro] = await Promise.all([
     db.from('pessoas').select('*').order('nome'),
     db.from('regras').select('*').eq('manual', true).eq('ativo', true).order('ordem'),
     db.from('pesos_por_cargo').select('cargo_id, regra, peso, ativo').eq('ativo', true),
@@ -81,6 +81,8 @@ export default async function LancamentosDeCota({
     // Bypass de outubro (migração 81): os setores do mês e o volume colado.
     db.from('vw_setores_do_mes_outro').select('setor').eq('mes_competencia', competencia),
     db.from('volume_outro_setor').select('setor, pessoa_id, semana, resolvidos').eq('mes_competencia', competencia),
+    // As avaliações do outro setor por semana, para o cartão da aba dele.
+    db.from('atendimentos_outro_setor').select('setor, semana').eq('mes_competencia', competencia).not('nota', 'is', null),
   ]);
   const setoresBypass = [...new Set(((setoresDoMes.data ?? []) as { setor: string }[]).map((s) => s.setor))].sort();
 
@@ -238,6 +240,36 @@ export default async function LancamentosDeCota({
     ),
   });
 
+  // Aba do outro setor (bypass de outubro, 2.11.2): os mesmos cartões de semana,
+  // com o volume colado do Hub e as avaliações importadas.
+  const setor = setorPedido && setoresBypass.includes(setorPedido) ? setorPedido : null;
+  const listaVolumesOutro = (volumesOutro.data ?? []) as VolumeOutroSetor[];
+  const notasDoSetor = ((notasOutro.data ?? []) as { setor: string; semana: number }[]).filter((n) => n.setor === setor);
+  const destaquesDoSetor: Destaque[] = !setor ? [] : SEMANAS.map((s) => {
+    const [de, ate] = periodoDaSemana(competencia, s);
+    const periodo = `${diaMes(de)} a ${diaMes(ate)}`;
+    const daSemana = listaVolumesOutro.filter((v) => v.setor === setor && v.semana === s);
+    const resolvidos = daSemana.reduce((a, v) => a + v.resolvidos, 0);
+    const avaliacoes = notasDoSetor.filter((n) => n.semana === s).length;
+    return {
+      chave: `s${s}`,
+      bloco: (
+        <>
+          <p className="text-[13px] text-slate-500">{s}ª semana · {periodo}</p>
+          <p className="text-2xl font-semibold tabular-nums text-slate-900">{daSemana.length ? numero(resolvidos) : '—'}</p>
+          <p className="mt-1 text-xs text-slate-600">
+            {daSemana.length ? `resolvidos · ${daSemana.length} pessoa${daSemana.length > 1 ? 's' : ''}` : 'nada lançado'}
+          </p>
+          <p className="mt-1 text-xs text-slate-600">{avaliacoes ? `${avaliacoes} avaliações importadas` : 'sem avaliações'}</p>
+        </>
+      ),
+      detalhe: (
+        <BypassOutroSetor key={`${competencia}-${setor}-${s}`} competencia={competencia} setor={setor} semana={s}
+                          periodo={periodo} volumes={listaVolumesOutro} pessoas={(pessoas.data ?? []) as Pessoa[]} />
+      ),
+    };
+  });
+
   // Abre a primeira semana que ainda falta; com tudo lançado, começa fechado.
   const primeiraIncompleta = SEMANAS.find((s) => { const x = situacaoDa(s); return x.q < x.total; });
   const inicial = primeiraIncompleta && competencia <= atual ? `s${primeiraIncompleta}` : null;
@@ -259,31 +291,33 @@ export default async function LancamentosDeCota({
         <div className="inline-flex rounded-xl bg-black/25 p-1" role="tablist" aria-label="Canal">
           {([['huggy', 'Expansão'], ['diretores', 'Diretores-Expansão']] as const).map(([chave, rotulo]) => (
             <Link
-              key={chave} role="tab" aria-selected={canal === chave}
+              key={chave} role="tab" aria-selected={!setor && canal === chave}
               href={`/cota/lancamentos?mes=${competencia.slice(0, 7)}&canal=${chave}`}
-              className={`rounded-lg px-4 py-1.5 text-sm transition ${canal === chave
+              className={`rounded-lg px-4 py-1.5 text-sm transition ${!setor && canal === chave
                 ? 'bg-superficie font-semibold text-slate-900 shadow-sm'
                 : 'text-sobre-fundo-suave hover:text-sobre-fundo'}`}
             >
               {rotulo}
             </Link>
           ))}
-          {/* Bypass de outubro (2.11.1): atalho para o quadro do outro setor, logo abaixo. */}
-          {setoresBypass.map((setor) => (
-            <a key={setor} href="#outro-setor"
-               className="rounded-lg px-4 py-1.5 text-sm text-sobre-fundo-suave transition hover:text-sobre-fundo">
-              {setor}
-            </a>
+          {/* Bypass de outubro: uma aba por outro setor (2.11.2). */}
+          {setoresBypass.map((nomeSetor) => (
+            <Link key={nomeSetor} role="tab" aria-selected={setor === nomeSetor}
+                  href={`/cota/lancamentos?mes=${competencia.slice(0, 7)}&setor=${encodeURIComponent(nomeSetor)}`}
+                  className={`rounded-lg px-4 py-1.5 text-sm transition ${setor === nomeSetor
+                    ? 'bg-superficie font-semibold text-slate-900 shadow-sm'
+                    : 'text-sobre-fundo-suave hover:text-sobre-fundo'}`}>
+              {nomeSetor}
+            </Link>
           ))}
         </div>
       </div>
 
+      {setor ? (
+        <SeletorDeDetalhe key={`${competencia}-${setor}`} destaques={destaquesDoSetor} inicial="s4" alternar
+                          rotulo={`Volume do ${setor}`} grade="sm:grid-cols-2 lg:grid-cols-4" />
+      ) : (<>
       <LancamentosPendentes pendentes={(pendentes.data ?? []) as Pendente[]} pessoas={recebem} />
-
-      <div id="outro-setor" className="scroll-mt-4">
-        <BypassOutroSetor competencia={competencia} setores={setoresBypass} pessoas={(pessoas.data ?? []) as Pessoa[]}
-                          volumes={(volumesOutro.data ?? []) as VolumeOutroSetor[]} />
-      </div>
 
       {/* Os do mês do bypass saem daqui: lá eles pontuam com as regras da Expansão. */}
       <DemandasExtrasPendentes pendentes={((outroSetor.data ?? []) as AtendimentoOutroSetor[])
@@ -302,6 +336,7 @@ export default async function LancamentosDeCota({
         historico={listaHistorico}
         lancamentos={(lancamentos.data ?? []) as Lancamento[]}
       />
+      </>)}
     </div>
   );
 }
