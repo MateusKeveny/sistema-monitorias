@@ -53,7 +53,7 @@ export default function AvaliacoesDeUmACinco({ avaliacoes, rotulo }: {
     <div className="grid items-start gap-4 xl:grid-cols-[1fr_1.2fr]">
       <Painel>
         <Secao titulo={`Suas avaliações de 1 a 5 · ${rotulo}`} subtitulo="Do relatório do Hub, as mesmas que entram no cálculo do C-SAT.">
-          {!total ? <Vazio>Sem avaliações neste canal no mês.</Vazio> : (
+          {!total ? <Vazio>Sem avaliações nesta fila no mês.</Vazio> : (
             <>
               <ul className="space-y-2">
                 {porNota.map(({ n, q }) => (
@@ -87,7 +87,7 @@ export default function AvaliacoesDeUmACinco({ avaliacoes, rotulo }: {
                  </span>
                ) : undefined}>
           {!lista.length ? (
-            <Vazio>{total ? 'Nenhuma avaliação abaixo de 4 no mês.' : 'Sem avaliações neste canal no mês.'}</Vazio>
+            <Vazio>{total ? 'Nenhuma avaliação abaixo de 4 no mês.' : 'Sem avaliações nesta fila no mês.'}</Vazio>
           ) : (
             <ul className="max-h-96 divide-y divide-slate-100 overflow-y-auto">
               {lista.map((a) => (

@@ -127,7 +127,7 @@ export default async function ConfiguracaoDaCota({
           },
           {
             chave: 'setores',
-            rotulo: 'Setores e canais',
+            rotulo: 'Setores e filas',
             conteudo: (
               <SetoresECanais setores={(setores ?? []) as Setor[]} canais={(canais ?? []) as Canal[]}
                               vistos={(vistos ?? []) as SetorDoHubVisto[]} />

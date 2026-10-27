@@ -382,7 +382,7 @@ export default async function PainelGestor({
         <div className="grid items-start gap-4 xl:grid-cols-[1.3fr_1fr]">
           <Painel>
             <Secao titulo="C-SAT por semana" acao={<Link href="/cota/comparativo?cat=csat" className="whitespace-nowrap rounded-full border border-slate-200 px-2.5 py-0.5 text-xs text-slate-600 hover:border-marca-600">comparar meses ›</Link>} subtitulo="Positivas sobre avaliações. Escala de 75% a 100%.">
-              {agora.csatMes == null ? <Vazio>Sem avaliações neste canal.</Vazio> : (
+              {agora.csatMes == null ? <Vazio>Sem avaliações nesta fila.</Vazio> : (
                 <>
                   <GraficoDeLinha min={0.75} max={1} formatar={percentual}
                                   referencia={{ valor: META_CSAT, rotulo: 'meta 95%' }}
@@ -400,7 +400,7 @@ export default async function PainelGestor({
           </Painel>
           <Painel>
             <Secao titulo="C-SAT por atendente" subtitulo="Semana a semana e no mês. Passe o mouse para ver a amostra.">
-              {csatPorPessoa.length === 0 ? <Vazio>Sem avaliações neste canal.</Vazio> : (
+              {csatPorPessoa.length === 0 ? <Vazio>Sem avaliações nesta fila.</Vazio> : (
                 <div className="text-sm">
                   <div className="flex items-center gap-2 pb-1 text-xs text-slate-400">
                     <span className="flex-1" />
@@ -443,7 +443,7 @@ export default async function PainelGestor({
         <div className="grid items-start gap-4 xl:grid-cols-[1.3fr_1fr]">
           <Painel>
             <Secao titulo="Volume por semana" acao={<Link href="/cota/comparativo?cat=vol" className="whitespace-nowrap rounded-full border border-slate-200 px-2.5 py-0.5 text-xs text-slate-600 hover:border-marca-600">comparar meses ›</Link>} subtitulo="Finalizados de cada semana do ciclo.">
-              {!agora.volTotal ? <Vazio>Nenhum volume lançado neste canal.</Vazio> : (
+              {!agora.volTotal ? <Vazio>Nenhum volume lançado nesta fila.</Vazio> : (
                 <GraficoDeLinha formatar={inteiro}
                                 referencia={mediaVolSemanal != null ? { valor: mediaVolSemanal, rotulo: `média ${inteiro(mediaVolSemanal)}` } : undefined}
                                 comparacao={{ pontos: antes.volSemanas, ...nomes }}
@@ -453,7 +453,7 @@ export default async function PainelGestor({
           </Painel>
           <Painel>
             <Secao titulo="Volume por atendente" subtitulo="No mês, com a média da equipe como referência.">
-              {volumePorPessoa.length === 0 ? <Vazio>Nenhum volume lançado neste canal.</Vazio> : (
+              {volumePorPessoa.length === 0 ? <Vazio>Nenhum volume lançado nesta fila.</Vazio> : (
                 <div className="space-y-3">
                   <ul className="space-y-3 text-sm">
                     {volumePorPessoa.map((p) => (
@@ -490,7 +490,7 @@ export default async function PainelGestor({
         <div className="grid items-start gap-4 xl:grid-cols-[1.3fr_1fr]">
           <Painel>
             <Secao titulo="TME por semana" acao={<Link href="/cota/comparativo?cat=tme" className="whitespace-nowrap rounded-full border border-slate-200 px-2.5 py-0.5 text-xs text-slate-600 hover:border-marca-600">comparar meses ›</Link>} subtitulo="Âmbar nas semanas acima da média da equipe.">
-              {agora.tmeEquipe == null ? <Vazio>Nenhum TME lançado neste canal.</Vazio> : (
+              {agora.tmeEquipe == null ? <Vazio>Nenhum TME lançado nesta fila.</Vazio> : (
                 <GraficoDeLinha formatar={tempo}
                                 referencia={{ valor: agora.tmeEquipe, rotulo: `média ${tempo(agora.tmeEquipe)}` }}
                                 comparacao={{ pontos: antes.tmeSemanas, ...nomes }}
@@ -501,7 +501,7 @@ export default async function PainelGestor({
           </Painel>
           <Painel>
             <Secao titulo="TME por atendente" subtitulo="Âmbar para quem está acima da média da equipe.">
-              {tmePorPessoa.length === 0 ? <Vazio>Nenhum TME lançado neste canal.</Vazio> : (
+              {tmePorPessoa.length === 0 ? <Vazio>Nenhum TME lançado nesta fila.</Vazio> : (
                 <ul className="space-y-3 text-sm">
                   {tmePorPessoa.map((p) => {
                     const acima = agora.tmeEquipe != null && p.tme > agora.tmeEquipe;

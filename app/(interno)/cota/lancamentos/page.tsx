@@ -10,6 +10,7 @@ import { Quadro, Tabela, Th, Td } from '@/componentes/ui';
 import Link from '@/componentes/Link';
 import { diaMes, hojeNoBrasil, periodoDaSemana } from '@/lib/formatar';
 import { mesAnterior, resolverCompetencia } from '@/lib/competencia';
+import { CANAIS_PADRAO, type Canal as Fila } from '@/lib/setores';
 import type {
   CargoDaPessoa, ConferenciaLancamento, Lancamento, PesoCargo, Pessoa, RegraCota,
 } from '@/lib/tipos';
@@ -30,10 +31,10 @@ const numero = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits:
 export default async function LancamentosDeCota({
   searchParams,
 }: {
-  searchParams: Promise<{ mes?: string; canal?: string; setor?: string }>;
+  searchParams: Promise<{ mes?: string; canal?: string; setor?: string; fila?: string }>;
 }) {
   await exigirGestor();
-  const { mes, canal: canalPedido, setor: setorPedido } = await searchParams;
+  const { mes, canal: canalPedido, setor: setorPedido, fila: filaPedida } = await searchParams;
   // Tudo o que é lançado nesta página pertence ao canal escolhido.
   const canal = canalPedido === 'diretores' ? 'diretores' : 'huggy';
 
@@ -59,7 +60,7 @@ export default async function LancamentosDeCota({
   ]);
   const hoje = hojeNoBrasil();
 
-  const [pessoas, regras, pesos, historico, lancamentos, conferencia, volumes, anterior, pendentes, cargos, outroSetor, setoresDoMes, volumesOutro, notasOutro] = await Promise.all([
+  const [pessoas, regras, pesos, historico, lancamentos, conferencia, volumes, anterior, pendentes, cargos, outroSetor, setoresDoMes, volumesOutro, notasOutro, filas] = await Promise.all([
     db.from('pessoas').select('*').order('nome'),
     db.from('regras').select('*').eq('manual', true).eq('ativo', true).order('ordem'),
     db.from('pesos_por_cargo').select('cargo_id, regra, peso, ativo').eq('ativo', true),
@@ -83,6 +84,8 @@ export default async function LancamentosDeCota({
     db.from('volume_outro_setor').select('setor, pessoa_id, semana, resolvidos').eq('mes_competencia', competencia),
     // As avaliações do outro setor por semana, para o cartão da aba dele.
     db.from('atendimentos_outro_setor').select('setor, semana').eq('mes_competencia', competencia).not('nota', 'is', null),
+    // As filas da árvore (migração 79): as abas da página (etapa 2).
+    db.from('canais_do_setor').select('id, nome, apelido, ordem').eq('ativo', true).order('ordem'),
   ]);
   const setoresBypass = [...new Set(((setoresDoMes.data ?? []) as { setor: string }[]).map((s) => s.setor))].sort();
 
@@ -243,6 +246,12 @@ export default async function LancamentosDeCota({
   // Aba do outro setor (bypass de outubro, 2.11.2): os mesmos cartões de semana,
   // com o volume colado do Hub e as avaliações importadas.
   const setor = setorPedido && setoresBypass.includes(setorPedido) ? setorPedido : null;
+  // Abas das filas da árvore (etapa 2). Sem a migração 79, as duas de sempre.
+  // Fila nova (sem apelido) ganha aba, mas só recebe volume e lançamento
+  // quando o cálculo ler a árvore (etapa 3).
+  const listaFilas = (filas.data ?? []) as Pick<Fila, 'id' | 'nome' | 'apelido' | 'ordem'>[];
+  const abasDeFila = listaFilas.length ? listaFilas : CANAIS_PADRAO.map((c, i) => ({ id: -1 - i, nome: c.nome, apelido: c.apelido, ordem: i }));
+  const filaNova = !setor && filaPedida ? abasDeFila.find((f) => !f.apelido && String(f.id) === filaPedida) : undefined;
   const listaVolumesOutro = (volumesOutro.data ?? []) as VolumeOutroSetor[];
   const notasDoSetor = ((notasOutro.data ?? []) as { setor: string; semana: number }[]).filter((n) => n.setor === setor);
   const destaquesDoSetor: Destaque[] = !setor ? [] : SEMANAS.map((s) => {
@@ -288,18 +297,22 @@ export default async function LancamentosDeCota({
           </p>
         </div>
 
-        <div className="inline-flex rounded-xl bg-black/25 p-1" role="tablist" aria-label="Canal">
-          {([['huggy', 'Expansão'], ['diretores', 'Diretores-Expansão']] as const).map(([chave, rotulo]) => (
-            <Link
-              key={chave} role="tab" aria-selected={!setor && canal === chave}
-              href={`/cota/lancamentos?mes=${competencia.slice(0, 7)}&canal=${chave}`}
-              className={`rounded-lg px-4 py-1.5 text-sm transition ${!setor && canal === chave
-                ? 'bg-superficie font-semibold text-slate-900 shadow-sm'
-                : 'text-sobre-fundo-suave hover:text-sobre-fundo'}`}
-            >
-              {rotulo}
-            </Link>
-          ))}
+        <div className="inline-flex rounded-xl bg-black/25 p-1" role="tablist" aria-label="Fila">
+          {abasDeFila.map((f) => {
+            const ativa = !setor && (f.apelido ? !filaNova && canal === f.apelido : filaNova?.id === f.id);
+            return (
+              <Link
+                key={f.id} role="tab" aria-selected={ativa}
+                href={`/cota/lancamentos?mes=${competencia.slice(0, 7)}&${f.apelido ? `canal=${f.apelido}` : `fila=${f.id}`}`}
+                className={`rounded-lg px-4 py-1.5 text-sm transition ${ativa
+                  ? 'bg-superficie font-semibold text-slate-900 shadow-sm'
+                  : 'text-sobre-fundo-suave hover:text-sobre-fundo'}`}
+              >
+                {f.nome}
+                {!f.apelido && <span className="ml-1.5 rounded-full bg-amber-500/20 px-1.5 py-px text-[10px] font-semibold text-amber-200">nova</span>}
+              </Link>
+            );
+          })}
           {/* Bypass de outubro: uma aba por outro setor (2.11.2). */}
           {setoresBypass.map((nomeSetor) => (
             <Link key={nomeSetor} role="tab" aria-selected={setor === nomeSetor}
@@ -316,6 +329,15 @@ export default async function LancamentosDeCota({
       {setor ? (
         <SeletorDeDetalhe key={`${competencia}-${setor}`} destaques={destaquesDoSetor} inicial="s4" alternar
                           rotulo={`Volume do ${setor}`} grade="sm:grid-cols-2 lg:grid-cols-4" />
+      ) : filaNova ? (
+        <Quadro titulo={`${filaNova.nome} · fila nova`}
+                subtitulo="Cadastrada na árvore, em Configuração › Setores e filas.">
+          <p className="text-sm text-slate-600">
+            Esta fila ainda não recebe volume nem lançamentos: isso começa quando o cálculo da cota passar a ler
+            a árvore (etapa 3 da versão 3.0). Até lá, os atendimentos dela que vierem no relatório do Hub entram
+            como demanda extra pendente.
+          </p>
+        </Quadro>
       ) : (<>
       <LancamentosPendentes pendentes={(pendentes.data ?? []) as Pendente[]} pessoas={recebem} />
 

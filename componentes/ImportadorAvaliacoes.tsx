@@ -523,7 +523,7 @@ export default function ImportadorAvaliacoes({
                     <span className="text-sm tabular-nums text-slate-600">{total} avaliações novas</span>
                   </header>
                   {linhas.length === 0 ? (
-                    <p className="px-4 py-4 text-sm text-slate-500">Nenhuma avaliação nova deste canal.</p>
+                    <p className="px-4 py-4 text-sm text-slate-500">Nenhuma avaliação nova desta fila.</p>
                   ) : (
                     <div className="px-5 py-5">
                       <Tabela>

@@ -47,10 +47,10 @@ export default function SetoresECanais({ setores, canais, vistos }: {
     for (const c of canais) {
       for (const n of lista(rascunho[`h${c.id}`])) {
         const k = normalizarSetor(n);
-        if (vistosNomes.has(k)) { setErro(`"${n}" está em dois canais (${vistosNomes.get(k)} e ${c.nome}).`); return; }
+        if (vistosNomes.has(k)) { setErro(`"${n}" está em duas filas (${vistosNomes.get(k)} e ${c.nome}).`); return; }
         vistosNomes.set(k, c.nome);
       }
-      if (!rascunho[`c${c.id}`].trim()) { setErro('Todo canal precisa de nome.'); return; }
+      if (!rascunho[`c${c.id}`].trim()) { setErro('Toda fila precisa de nome.'); return; }
     }
     if (setores.some((s) => !rascunho[`s${s.id}`].trim())) { setErro('Todo setor precisa de nome.'); return; }
 
@@ -87,7 +87,7 @@ export default function SetoresECanais({ setores, canais, vistos }: {
       .insert({ nome, ordem: Math.max(0, ...setores.map((x) => x.ordem)) + 1 });
     setOcupado(false);
     if (error) { setErro(/duplicate|unique/i.test(error.message) ? `Já existe o setor "${nome}".` : await mensagemDoErro(error)); return; }
-    setNovoSetor(''); setAviso(`Setor "${nome}" criado. Agora crie os canais dele.`);
+    setNovoSetor(''); setAviso(`Setor "${nome}" criado. Agora crie as filas dele.`);
     iniciar(() => router.refresh());
   }
 
@@ -98,16 +98,16 @@ export default function SetoresECanais({ setores, canais, vistos }: {
     const nomes = lista(c.hub || nome);
     const ocupados = new Set(canais.flatMap((x) => x.nomes_no_hub.map(normalizarSetor)));
     const repetido = nomes.find((n) => ocupados.has(normalizarSetor(n)));
-    if (repetido) { setErro(`"${repetido}" já está em outro canal.`); return; }
+    if (repetido) { setErro(`"${repetido}" já está em outra fila.`); return; }
     setOcupado(true); setErro(null); setAviso(null);
     const { error } = await criarClienteNavegador().from('canais_do_setor').insert({
       setor_id: setorId, nome, nomes_no_hub: nomes,
       ordem: Math.max(0, ...canais.filter((x) => x.setor_id === setorId).map((x) => x.ordem)) + 1,
     });
     setOcupado(false);
-    if (error) { setErro(/duplicate|unique/i.test(error.message) ? `Já existe o canal "${nome}" neste setor.` : await mensagemDoErro(error)); return; }
+    if (error) { setErro(/duplicate|unique/i.test(error.message) ? `Já existe a fila "${nome}" neste setor.` : await mensagemDoErro(error)); return; }
     setNovoCanal((r) => ({ ...r, [setorId]: { nome: '', hub: '' } }));
-    setAviso(`Canal "${nome}" criado.`);
+    setAviso(`Fila "${nome}" criada.`);
     iniciar(() => router.refresh());
   }
 
@@ -120,8 +120,8 @@ export default function SetoresECanais({ setores, canais, vistos }: {
 
   return (
     <div className="space-y-6">
-      <Quadro titulo="Setores e canais"
-              subtitulo="O setor é a equipe; os canais são como o relatório do Hub separa os atendimentos. A importação manda cada linha para o canal cujo nome no Hub bate.">
+      <Quadro titulo="Setores e filas"
+              subtitulo="O setor é a equipe; as filas são como o Hub separa os atendimentos. A importação manda cada linha do relatório para a fila cujo nome no Hub bate.">
         {erro && <p className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800 ring-1 ring-rose-600/20">{erro}</p>}
         {aviso && <p className="mb-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-emerald-600/20">{aviso}</p>}
         {setores.length === 0 ? <Vazio>Falta rodar a migração 79 no banco.</Vazio> : (
@@ -138,29 +138,29 @@ export default function SetoresECanais({ setores, canais, vistos }: {
                   {canais.filter((c) => c.setor_id === s.id).map((c) => (
                     <li key={c.id} className="grid gap-2 rounded-xl border border-slate-200 bg-superficie px-3 py-2.5 sm:grid-cols-[auto_14rem_auto_1fr] sm:items-center">
                       <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Canal{!c.apelido && <span className="ml-1.5 rounded-full bg-amber-500/15 px-1.5 py-px text-[10px] normal-case tracking-normal text-amber-700 dark:text-amber-300" title="Passa a pontuar quando o cálculo ler o cadastro (etapa 3)">novo</span>}
+                        Fila{!c.apelido && <span className="ml-1.5 rounded-full bg-amber-500/15 px-1.5 py-px text-[10px] normal-case tracking-normal text-amber-700 dark:text-amber-300" title="Passa a pontuar quando o cálculo ler o cadastro (etapa 3)">nova · ainda não pontua</span>}
                       </span>
-                      <input value={rascunho[`c${c.id}`]} disabled={ocupado} aria-label="Nome do canal"
+                      <input value={rascunho[`c${c.id}`]} disabled={ocupado} aria-label="Nome da fila"
                              onChange={(e) => setRascunho((r) => ({ ...r, [`c${c.id}`]: e.target.value }))}
                              className={`${entrada} font-medium`} />
                       <span className="text-xs text-slate-500">Nomes no Hub</span>
-                      <input value={rascunho[`h${c.id}`]} disabled={ocupado} aria-label={`Nomes no Hub do canal ${c.nome}`}
-                             placeholder="Como o setor aparece no relatório; separe por vírgula"
+                      <input value={rascunho[`h${c.id}`]} disabled={ocupado} aria-label={`Nomes no Hub da fila ${c.nome}`}
+                             placeholder="Como a fila aparece no relatório; separe por vírgula"
                              onChange={(e) => setRascunho((r) => ({ ...r, [`h${c.id}`]: e.target.value }))}
                              className={entrada} />
                     </li>
                   ))}
                   <li className="flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-slate-300 px-3 py-2">
-                    <span className="text-xs font-semibold text-slate-500">+ Canal</span>
-                    <input value={novoCanal[s.id]?.nome ?? ''} disabled={ocupado} placeholder="Nome do canal" aria-label={`Nome do novo canal em ${s.nome}`}
+                    <span className="text-xs font-semibold text-slate-500">+ Fila</span>
+                    <input value={novoCanal[s.id]?.nome ?? ''} disabled={ocupado} placeholder="Nome da fila" aria-label={`Nome da nova fila em ${s.nome}`}
                            onChange={(e) => setNovoCanal((r) => ({ ...r, [s.id]: { hub: r[s.id]?.hub ?? '', nome: e.target.value } }))}
                            className={`${entrada} w-48`} />
-                    <input value={novoCanal[s.id]?.hub ?? ''} disabled={ocupado} placeholder="Nome no Hub (se for diferente)" aria-label="Nomes no Hub do novo canal"
+                    <input value={novoCanal[s.id]?.hub ?? ''} disabled={ocupado} placeholder="Nome no Hub (se for diferente)" aria-label="Nomes no Hub da nova fila"
                            onChange={(e) => setNovoCanal((r) => ({ ...r, [s.id]: { nome: r[s.id]?.nome ?? '', hub: e.target.value } }))}
                            className={`${entrada} min-w-56 flex-1`} />
                     <button type="button" onClick={() => criarCanal(s.id)} disabled={ocupado || !novoCanal[s.id]?.nome.trim()}
                             className="rounded-lg border border-slate-300 px-3 py-1 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40">
-                      Criar canal
+                      Criar fila
                     </button>
                   </li>
                 </ul>
@@ -179,7 +179,7 @@ export default function SetoresECanais({ setores, canais, vistos }: {
         )}
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-xs text-slate-500">
-            Setor e canal novos ficam cadastrados já; canal marcado "novo" passa a pontuar quando o cálculo da cota ler este cadastro (etapa 3).
+            Setor e fila novos ficam cadastrados já; fila marcada "nova" passa a receber volume e a pontuar quando o cálculo da cota ler este cadastro (etapa 3).
           </p>
           <button type="button" onClick={salvar} disabled={!mudou || ocupado || atualizando}
                   className="rounded-lg bg-marca-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-marca-700 disabled:opacity-40">
@@ -188,9 +188,9 @@ export default function SetoresECanais({ setores, canais, vistos }: {
         </div>
       </Quadro>
 
-      <Quadro titulo={`Setores do Hub fora da árvore (${fora.length})`}
-              subtitulo="Apareceram nos relatórios e não estão em nenhum canal: viram demanda extra pendente. Ligar a um canal faz as próximas importações contarem como ele (o que já foi importado não muda).">
-        {fora.length === 0 ? <Vazio>Nenhum. Todo setor que apareceu nos relatórios está num canal.</Vazio> : (
+      <Quadro titulo={`Filas do Hub fora da árvore (${fora.length})`}
+              subtitulo="Apareceram nos relatórios e não estão em nenhuma fila da árvore: viram demanda extra pendente. Ligar a uma fila faz as próximas importações contarem como ela (o que já foi importado não muda).">
+        {fora.length === 0 ? <Vazio>Nenhuma. Toda fila que apareceu nos relatórios está na árvore.</Vazio> : (
           <Tabela noQuadro>
             <thead><tr><Th>No Hub</Th><Th className="text-right">Atendimentos</Th><Th>Visto por último</Th><Th /></tr></thead>
             <tbody>
@@ -203,7 +203,7 @@ export default function SetoresECanais({ setores, canais, vistos }: {
                     <select value="" disabled={ocupado} onChange={(e) => e.target.value && ligar(v.setor, Number(e.target.value))}
                             className="rounded-md border border-slate-300 bg-superficie px-2 py-1 text-sm">
                       <option value="">Deixar como demanda extra</option>
-                      {canais.map((c) => <option key={c.id} value={c.id}>Ligar ao canal {c.nome}</option>)}
+                      {canais.map((c) => <option key={c.id} value={c.id}>Ligar à fila {c.nome}</option>)}
                     </select>
                   </Td>
                 </tr>

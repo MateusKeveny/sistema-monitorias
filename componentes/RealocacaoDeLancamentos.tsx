@@ -159,7 +159,7 @@ export default function LancamentosPendentes({ pendentes, pessoas }: { pendentes
         </table>
       </div>
       <p className="mt-2 text-xs text-slate-500">
-        <b>Passar</b>: vai para a pessoa escolhida (volume na mesma semana e canal soma). <b>Manter sem cota</b>: continua
+        <b>Passar</b>: vai para a pessoa escolhida (volume na mesma semana e fila soma). <b>Manter sem cota</b>: continua
         como volume da equipe (aparece no Comparativo), sem pontuar, e sai da lista. Tudo fica registrado.
       </p>
     </Quadro>

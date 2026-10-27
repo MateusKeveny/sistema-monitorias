@@ -284,7 +284,7 @@ export default async function PainelAtendente({
         <div className="grid items-start gap-4 xl:grid-cols-[1.3fr_1fr]">
           <Painel>
             <Secao titulo={`Seu C-SAT por semana · ${rotulo}`} acao={<Link href="/cota/comparativo?cat=csat" className="whitespace-nowrap rounded-full border border-slate-200 px-2.5 py-0.5 text-xs text-slate-600 hover:border-marca-600">comparar meses ›</Link>} subtitulo="Positivas sobre avaliações. Escala de 75% a 100%.">
-              {csatMes == null ? <Vazio>Sem avaliações neste canal.</Vazio> : (
+              {csatMes == null ? <Vazio>Sem avaliações nesta fila.</Vazio> : (
                 <GraficoDeLinha min={0.75} max={1} formatar={percentual}
                                 referencia={{ valor: META_CSAT, rotulo: 'meta 95%' }}
                                 comparacao={{ pontos: csatSemanasAntes, ...nomes }}
@@ -322,7 +322,7 @@ export default async function PainelAtendente({
         <div className="grid items-start gap-4 xl:grid-cols-[1.3fr_1fr]">
           <Painel>
             <Secao titulo={`Seus atendimentos por semana · ${rotulo}`} acao={<Link href="/cota/comparativo?cat=vol" className="whitespace-nowrap rounded-full border border-slate-200 px-2.5 py-0.5 text-xs text-slate-600 hover:border-marca-600">comparar meses ›</Link>} subtitulo="Finalizados, com a sua média semanal como referência.">
-              {!volTotal ? <Vazio>Nenhum volume lançado neste canal.</Vazio> : (
+              {!volTotal ? <Vazio>Nenhum volume lançado nesta fila.</Vazio> : (
                 <GraficoDeLinha formatar={(v) => num(v)}
                                 referencia={volMediaSemanal != null ? { valor: volMediaSemanal, rotulo: `sua média ${num(volMediaSemanal)}` } : undefined}
                                 comparacao={{ pontos: volSemanasAntes, ...nomes }}
@@ -354,7 +354,7 @@ export default async function PainelAtendente({
         <div className="grid items-start gap-4 xl:grid-cols-[1.3fr_1fr]">
           <Painel>
             <Secao titulo={`Seu TME por semana · ${rotulo}`} acao={<Link href="/cota/comparativo?cat=tme" className="whitespace-nowrap rounded-full border border-slate-200 px-2.5 py-0.5 text-xs text-slate-600 hover:border-marca-600">comparar meses ›</Link>} subtitulo="Âmbar nas semanas acima da média da equipe.">
-              {tmeMes == null ? <Vazio>Nenhum tempo lançado neste canal.</Vazio> : (
+              {tmeMes == null ? <Vazio>Nenhum tempo lançado nesta fila.</Vazio> : (
                 <GraficoDeLinha formatar={tempo}
                                 referencia={tmeEquipeMes != null ? { valor: tmeEquipeMes, rotulo: `média da equipe ${tempo(tmeEquipeMes)}` } : undefined}
                                 comparacao={{ pontos: tmeSemanasAntes, ...nomes }}
@@ -365,7 +365,7 @@ export default async function PainelAtendente({
           </Painel>
           <Painel>
             <Secao titulo="Como o TME conta" subtitulo="A faixa vem do TME médio da equipe e vale para todos.">
-              {faixasTme.length === 0 ? <Vazio>O tempo não gera pontos neste canal.</Vazio> : (
+              {faixasTme.length === 0 ? <Vazio>O tempo não gera pontos nesta fila.</Vazio> : (
                 <ul className="divide-y divide-slate-100 text-sm">
                   {faixasTme.map((f) => {
                     const p = peso.get(f.chave) ?? 0;

@@ -251,14 +251,14 @@ export default function ImportadorMesAnterior({
           )}
           <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
             {(soVolume ? [
-              ['Atendimentos finalizados (Huggy)', fmt(totais.finalizados), 'canal Expansão'],
-              ['Diretores e Executivos', fmt(totais.diretores), 'canal Diretores-Expansão'],
+              ['Atendimentos finalizados (Huggy)', fmt(totais.finalizados), 'fila Expansão'],
+              ['Diretores e Executivos', fmt(totais.diretores), 'fila Diretores-Expansão'],
               ['Pessoas com volume', fmt(comVolume.length), `de ${lido.pessoas.length} abas`],
             ] : [
-              ['Atendimentos finalizados (Huggy)', fmt(totais.finalizados), 'canal Expansão'],
+              ['Atendimentos finalizados (Huggy)', fmt(totais.finalizados), 'fila Expansão'],
               ['Avaliações no ciclo', fmt(lido.avaliacoes.length), `${fmt(totais.validas)} com nota 1 a 5`],
               ['C-SAT da equipe', pct(totais.validas ? totais.positivas / totais.validas : null), `${fmt(totais.positivas)} positivas de ${fmt(totais.validas)} · sobre o mês inteiro`],
-              ['Diretores e Executivos', fmt(totais.diretores), 'canal Diretores-Expansão'],
+              ['Diretores e Executivos', fmt(totais.diretores), 'fila Diretores-Expansão'],
             ]).map(([r, v, s]) => (
               <div key={r} className="rounded-xl bg-slate-50 px-3 py-2.5">
                 <p className="text-xs text-slate-500">{r}</p>

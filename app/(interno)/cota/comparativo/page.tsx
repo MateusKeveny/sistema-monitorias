@@ -388,7 +388,7 @@ export default async function Comparativo({
         const med = media(semNulos(equipe));
         return (
           <Vista k="vol" formatar={inteiro} tom={() => 'neutro'} equipe={equipe}
-                 titulo="Finalizados da equipe por mês" subtitulo="Total do canal. Linha tracejada: a média do período."
+                 titulo="Finalizados da equipe por mês" subtitulo="Total da fila. Linha tracejada: a média do período."
                  referencia={med != null ? { valor: med, rotulo: `média ${inteiro(med)}` } : undefined}
                  pessoas={series(ids(todoVolume.filter((x) => x.canal === c)), (id, m) => volDe(c, id, m))} />
         );

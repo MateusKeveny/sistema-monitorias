@@ -2,7 +2,13 @@
 
 Plano aprovado em desenho pelo gestor em 26/10/2026, com a prévia das telas
 (Configuração › Setores e canais, ficha da pessoa, cargos e pesos, extrato,
-lançamentos e importação). Nada aqui foi feito ainda.
+lançamentos e importação).
+
+**Situação (27/10/2026):** a 3.0 é feita em paralelo, na branch `versao-3`,
+publicada só na cópia de teste (`painel-performance-teste`). Etapas 1 e 2
+prontas (migrações 79 e 82). Nas telas, "canal" passou a se chamar **fila**,
+o nome que o Hub usa; no banco a tabela continua `canais_do_setor` e a coluna
+`canal_id`.
 
 ## Objetivo
 
@@ -50,8 +56,13 @@ Setor do Hub que não está na árvore vira demanda extra pendente (2.9.0).
    em Configuração, e a importação do Hub e o Colar do Hub lendo os nomes do
    cadastro em vez do código. Cálculo intocado.
 2. **Canal por id, em paralelo** (2.13.0) — `canal_id` preenchido ao lado do
-   texto antigo, gravado pelas telas; as abas de Lançamentos e da importação
-   vêm do cadastro. Cálculo ainda lê o texto.
+   texto antigo; as abas de Lançamentos e da importação vêm do cadastro.
+   Cálculo ainda lê o texto. *Feito (migração 82):* um gatilho preenche o
+   `canal_id` a partir do texto em toda gravação, então as telas não mudaram
+   o que gravam; os registros antigos (inclusive `fechamento_linhas`) foram
+   preenchidos sem disparar o resumo. Fila nova (sem apelido) ganha aba em
+   Lançamentos e linha na Importar com o aviso de que só recebe dados na
+   etapa 3 — até lá, os atendimentos dela viram demanda extra pendente.
 3. **Cálculo pelo cadastro** (3.0.0) — a cadeia da cota, o resumo e a
    conferência passam a ler `canal_id`; regras e pesos de canal viram uma
    regra com peso por canal. É a etapa que reescreve dados: **antes e depois,
