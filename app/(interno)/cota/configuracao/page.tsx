@@ -114,7 +114,7 @@ export default async function ConfiguracaoDaCota({
             chave: 'filas',
             rotulo: 'Regras por fila',
             conteudo: (
-              <RegrasPorFila filas={(canais ?? []) as Canal[]} regras={listaRegras} pesos={listaPesos} cargos={listaCargos} />
+              <RegrasPorFila setores={(setores ?? []) as Setor[]} filas={(canais ?? []) as Canal[]} regras={listaRegras} pesos={listaPesos} cargos={listaCargos} />
             ),
           },
           {

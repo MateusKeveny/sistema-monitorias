@@ -6,7 +6,7 @@ import { Quadro, Tabela, Td, Th, Vazio } from '@/componentes/ui';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { mensagemDoErro } from '@/lib/erro-amigavel';
 import type { Cargo, PesoCargo, RegraCota } from '@/lib/tipos';
-import type { Canal } from '@/lib/setores';
+import type { Canal, Setor } from '@/lib/setores';
 
 const entrada = 'w-20 rounded-md border border-slate-300 bg-superficie px-2 py-1 text-right text-sm tabular-nums outline-none focus:border-marca-600';
 const num = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 4 });
@@ -21,11 +21,15 @@ const num = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 4 
  * Grava em `pesos_por_cargo`, como a Matriz de pesos, com o motivo no
  * histórico (migração 56).
  */
-export default function RegrasPorFila({ filas, regras, pesos, cargos }: {
-  filas: Canal[]; regras: RegraCota[]; pesos: PesoCargo[]; cargos: Cargo[];
+export default function RegrasPorFila({ setores, filas, regras, pesos, cargos }: {
+  setores: Setor[]; filas: Canal[]; regras: RegraCota[]; pesos: PesoCargo[]; cargos: Cargo[];
 }) {
   const router = useRouter();
-  const comRegras = filas.filter((f) => f.ativo && f.regra_finalizado);
+  // Um setor por vez. Até a etapa 4 o gestor vê todos; com mais de um, escolhe.
+  const setoresComFila = setores.filter((s) => filas.some((f) => f.setor_id === s.id && f.ativo && f.regra_finalizado));
+  const [setorId, setSetorId] = useState<number | undefined>(setoresComFila[0]?.id);
+  const setor = setoresComFila.find((s) => s.id === setorId);
+  const comRegras = filas.filter((f) => f.ativo && f.regra_finalizado && f.setor_id === setorId);
   const regraPor = useMemo(() => new Map(regras.map((r) => [r.chave, r])), [regras]);
 
   // Os cargos que pontuam finalizado em alguma fila.
@@ -104,8 +108,20 @@ export default function RegrasPorFila({ filas, regras, pesos, cargos }: {
 
   return (
     <div className="space-y-6">
-      <Quadro titulo="Regras por fila"
-              subtitulo="O que muda de uma fila para outra. Fila que copiou as métricas de outra mostra o valor da original (↺) e muda junto com ela.">
+      {setoresComFila.length > 1 && (
+        <div className="inline-flex gap-1 rounded-xl bg-black/25 p-1" role="tablist" aria-label="Setor">
+          {setoresComFila.map((s) => (
+            <button key={s.id} type="button" role="tab" aria-selected={setorId === s.id}
+                    onClick={() => { setSetorId(s.id); setRascunho({}); setErro(null); setAviso(null); }}
+                    className={`rounded-lg px-4 py-1.5 text-sm transition ${setorId === s.id
+                      ? 'bg-superficie font-semibold text-slate-900 shadow-sm' : 'text-sobre-fundo-suave hover:text-sobre-fundo'}`}>
+              {s.nome}
+            </button>
+          ))}
+        </div>
+      )}
+      <Quadro titulo={`Regras por fila · ${setor?.nome ?? ''}`}
+              subtitulo={`As filas do setor ${setor?.nome ?? ''} e o que muda de uma para outra. Fila que copiou as métricas de outra mostra o valor da original (↺) e muda junto com ela.`}>
         <div className="mb-4 inline-flex gap-1 rounded-full bg-slate-100 p-1" role="tablist" aria-label="Cargo">
           {cargosQuePontuam.map((c) => (
             <button key={c.id} type="button" role="tab" aria-selected={cargoId === c.id} onClick={() => setCargoId(c.id)}
