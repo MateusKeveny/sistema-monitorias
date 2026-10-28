@@ -613,7 +613,7 @@ function Bloco({ rotulo, valor, nota, comparacao, rodape, barras, min = 0, max }
           <div className="mt-3">
             <div className="grid h-10 grid-cols-4 items-end gap-1.5">
               {barras.map((b, i) => (
-                <span key={i} className={`crescer-y block origin-bottom rounded-[5px] ${b ? b.cor : 'bg-slate-100'} ${b && i !== ultima ? 'opacity-40' : ''}`}
+                <span key={i} className={`barra-semana crescer-y block origin-bottom rounded-[5px] ${b ? b.cor : 'bg-slate-100'} ${b && i !== ultima ? 'opacity-40' : ''}`}
                       style={{ height: `${(b ? fracao(b.v) : 0.06) * 100}%` }} />
               ))}
             </div>

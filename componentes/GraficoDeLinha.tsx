@@ -131,7 +131,7 @@ export default function GraficoDeLinha({
          className="grafico block h-auto w-full overflow-visible tabular-nums">
       <defs>
         <linearGradient id={`area${id}`} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="var(--color-marca-600)" stopOpacity={0.38} />
+          <stop offset="0%" stopColor="var(--color-marca-600)" stopOpacity={0.26} />
           <stop offset="100%" stopColor="var(--color-marca-600)" stopOpacity={0} />
         </linearGradient>
       </defs>
