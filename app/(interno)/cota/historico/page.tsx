@@ -48,6 +48,13 @@ const reais = (v: number | null | undefined) =>
  * cópia congelada no fechamento, não do cálculo de hoje — é o que foi
  * entregue.
  */
+/** Selo do quanto da meta, na escala do painel. */
+const SELO = {
+  bom: 'bg-emerald-500/10 text-marca-700 dark:text-marca-400',
+  atencao: 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
+  ruim: 'bg-rose-500/10 text-rose-700 dark:text-rose-300',
+} as const;
+
 export default async function Historico({
   searchParams,
 }: {
@@ -140,17 +147,22 @@ export default async function Historico({
       {!meses.length ? <Quadro><Vazio>Nenhuma competência fechada ainda.</Vazio></Quadro> : (
         <>
           {/* O histórico inteiro de uma olhada, antes do detalhe de cada mês. */}
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid divide-y divide-slate-200 rounded-[20px] border border-slate-200 bg-superficie shadow-sm sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-4 xl:divide-x">
             {[
               { rotulo: 'Meses fechados', valor: String(meses.length) },
               { rotulo: 'Total recebido', valor: totalPago > 0 ? reais(totalPago)! : '—', verde: totalPago > 0 },
               { rotulo: 'Na meta', valor: `${naMeta} de ${meses.length}` },
               { rotulo: 'Melhor mês', valor: melhor ? `${rotuloCurto(melhor.mes_competencia)} · ${num(Number(melhor.resultado), 0)} pts` : '—' },
             ].map((r) => (
-              <div key={r.rotulo} className="rounded-2xl bg-superficie px-5 py-4 shadow-sm">
+              <div key={r.rotulo} className="px-6 py-5">
                 <p className="text-sm text-slate-500">{r.rotulo}</p>
-                <p className={`text-2xl font-semibold tracking-tight tabular-nums ${
-                  r.verde ? 'text-marca-700 dark:text-marca-400' : 'text-slate-900'}`}>{r.valor}</p>
+                {r.verde ? (
+                  <p className="mt-1.5">
+                    <span className="inline-flex rounded-full bg-emerald-500/10 px-3 py-1 text-xl font-semibold tracking-tight tabular-nums text-marca-700 dark:text-marca-400">{r.valor}</span>
+                  </p>
+                ) : (
+                  <p className="mt-1 text-[1.65rem] font-semibold tracking-tight tabular-nums text-slate-900">{r.valor}</p>
+                )}
               </div>
             ))}
           </div>
@@ -182,11 +194,11 @@ export default async function Historico({
             acao={
               <span className="flex flex-col items-end gap-0.5 text-sm">
                 <span className="flex flex-wrap items-baseline justify-end gap-x-3">
-                  <span className="font-semibold tabular-nums text-slate-900">
+                  <span className="text-lg font-semibold tracking-tight tabular-nums text-slate-900">
                     {num(Number(m.resultado), 0)} pts
                   </span>
                   {m.meta && (
-                    <span className="text-xs text-slate-500">
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold tabular-nums ${SELO[tomDe(m)]}`}>
                       {percentual(Number(m.resultado) / Number(m.meta))} da meta
                     </span>
                   )}
@@ -194,11 +206,11 @@ export default async function Historico({
                     <span className="text-xs text-slate-500">abaixo da meta</span>
                   )}
                   {doRhNoMes != null ? (
-                    <span className="font-semibold tabular-nums text-marca-700 dark:text-marca-400">
+                    <span className="rounded-full bg-emerald-500/10 px-3 py-0.5 font-semibold tabular-nums text-marca-700 dark:text-marca-400">
                       {reais(doRhNoMes)}
                     </span>
                   ) : pago?.atingiu_meta && pago.valor != null && (
-                    <span className="font-semibold tabular-nums text-marca-700 dark:text-marca-400">
+                    <span className="rounded-full bg-emerald-500/10 px-3 py-0.5 font-semibold tabular-nums text-marca-700 dark:text-marca-400">
                       {reais(pago.valor)}
                     </span>
                   )}
@@ -224,7 +236,8 @@ export default async function Historico({
             {/* O detalhe fica recolhido: aberto, o histórico virava uma página
                 interminável. Só o mês mais recente vem aberto. */}
             <details open={indice === 0} className="group">
-              <summary className="cursor-pointer select-none text-sm font-medium text-marca-700 marker:text-slate-400 dark:text-marca-400">
+              <summary className="inline-flex cursor-pointer select-none list-none items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1 text-sm font-medium text-slate-700 transition-colors hover:border-marca-600 [&::-webkit-details-marker]:hidden">
+                <span aria-hidden className="text-slate-400 transition-transform group-open:rotate-90">›</span>
                 Detalhe do mês
               </summary>
             <div className="mt-3 space-y-4">
@@ -246,8 +259,8 @@ export default async function Historico({
 
                 return (
                   <section key={canal}>
-                    <h3 className="mb-1 flex items-baseline justify-between gap-2 rounded bg-slate-100
-                                   px-2 py-1 text-xs font-semibold text-slate-600">
+                    <h3 className="mb-1 flex items-baseline justify-between gap-2 rounded-lg bg-slate-100
+                                   px-3 py-1.5 text-xs font-semibold text-slate-600">
                       {nomeDaOrigem(canal)}
                       <span className="tabular-nums">{num(soma)} pts</span>
                     </h3>
@@ -262,10 +275,10 @@ export default async function Historico({
                       </thead>
                       <tbody>
                         {categorias.map((c) => (
-                          <tr key={c.regra} className="border-t border-slate-100">
+                          <tr key={c.regra} className="border-t border-slate-100 transition-colors hover:bg-slate-50">
                             <td className="py-1.5 pr-2 text-slate-800">{c.rotulo}</td>
                             <td className="px-2 py-1.5 text-right tabular-nums text-slate-600">
-                              {c.grupo === 'csat' || c.grupo === 'monitoria'
+                              {/^(csat|monitoria)(_s\d+)?$/.test(c.grupo)
                                 ? num(Number(c.quantidade), 4) : num(Number(c.quantidade))}
                             </td>
                             <td className="px-2 py-1.5 text-right tabular-nums text-slate-400">
