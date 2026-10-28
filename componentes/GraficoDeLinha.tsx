@@ -111,9 +111,47 @@ export default function GraficoDeLinha({
   // Grade: linhas finas em valores redondos, com o número à esquerda.
   const passoDaGrade = passoRedondo((teto - min) / 3);
   const grade: number[] = [];
-  for (let v = Math.ceil(min / passoDaGrade - 1e-9) * passoDaGrade; v <= teto + 1e-9; v += passoDaGrade) grade.push(v);
+  for (let v = Math.ceil(min / passoDaGrade - 1e-9) * passoDaGrade; v <= teto + 1e-9; v += passoDaGrade) {
+    grade.push(Math.round(v / passoDaGrade) * passoDaGrade + 0); // + 0: nada de "-0" no pé da escala
+  }
   const rotularTodos = pontos.length <= ROTULAR_TODOS;
   const ultimo = comDado.at(-1)?.i;
+
+  /** A etiqueta colorida do último ponto: largura e posição. */
+  const etiquetaDoUltimo = (i: number, valor: number) => {
+    const lg = formatar(valor).length * 8 + 18;
+    return { x: Math.max(esq, Math.min(L - dir - lg, x(i) - lg / 2)), y: y(valor) - 40, lg };
+  };
+
+  // A etiqueta da referência procura um lugar livre: à direita ou à esquerda,
+  // acima ou abaixo da linha — sem cobrir ponto, valor nem a etiqueta do último.
+  type Caixa = { x1: number; y1: number; x2: number; y2: number };
+  const ocupado: Caixa[] = [];
+  for (const p of comDado) {
+    const px = x(p.i), py = y(p.valor);
+    ocupado.push({ x1: px - 12, y1: py - 12, x2: px + 12, y2: py + 12 });
+    if (p.i === ultimo) {
+      const e = etiquetaDoUltimo(p.i, p.valor);
+      ocupado.push({ x1: e.x - 4, y1: e.y - 4, x2: e.x + e.lg + 4, y2: e.y + 28 });
+    } else if (rotularTodos) {
+      const lg = formatar(p.valor).length * 7.5;
+      ocupado.push({ x1: px - lg / 2 - 4, y1: py - 30, x2: px + lg / 2 + 4, y2: py - 6 });
+    }
+  }
+  for (const p of antes) ocupado.push({ x1: x(p.i) - 7, y1: y(p.v) - 7, x2: x(p.i) + 7, y2: y(p.v) + 7 });
+  const lugarDaReferencia = referencia && (() => {
+    const ry = y(referencia.valor);
+    const larg = referencia.rotulo.length * 6.6 + 16;
+    const opcoes = [
+      { x: L - dir - larg, y: ry - 22 }, { x: L - dir - larg, y: ry + 4 },
+      { x: esq + 4, y: ry - 22 }, { x: esq + 4, y: ry + 4 },
+      ...comDado.slice(0, -1).map((p, n) => ({ x: (x(p.i) + x(comDado[n + 1].i)) / 2 - larg / 2, y: ry - 22 })),
+      ...comDado.slice(0, -1).map((p, n) => ({ x: (x(p.i) + x(comDado[n + 1].i)) / 2 - larg / 2, y: ry + 4 })),
+    ];
+    const livre = opcoes.find((o) => !ocupado.some((c) =>
+      o.x < c.x2 && o.x + larg > c.x1 && o.y < c.y2 && o.y + 18 > c.y1));
+    return { ...(livre ?? opcoes[0]), ry, larg };
+  })();
 
   return (
     <>
@@ -156,20 +194,16 @@ export default function GraficoDeLinha({
                 stroke="var(--color-superficie)" strokeWidth={2} />
       ))}
 
-      {referencia && (() => {
-        const ry = y(referencia.valor);
-        const larg = referencia.rotulo.length * 6.6 + 16;
-        return (
-          <>
-            <line x1={esq} x2={L - dir} y1={ry} y2={ry}
-                  stroke="var(--color-slate-400)" strokeDasharray="5 5" strokeWidth={1.2} />
-            <rect x={L - dir - larg} y={ry - 22} width={larg} height={18} rx={9}
-                  fill="var(--color-superficie)" stroke="var(--color-slate-200)" />
-            <text x={L - dir - larg / 2} y={ry - 9} textAnchor="middle" fontSize={11.5} fontWeight={500}
-                  fill="var(--color-slate-500)">{referencia.rotulo}</text>
-          </>
-        );
-      })()}
+      {referencia && lugarDaReferencia && (
+        <>
+          <line x1={esq} x2={L - dir} y1={lugarDaReferencia.ry} y2={lugarDaReferencia.ry}
+                stroke="var(--color-slate-400)" strokeDasharray="5 5" strokeWidth={1.2} />
+          <rect x={lugarDaReferencia.x} y={lugarDaReferencia.y} width={lugarDaReferencia.larg} height={18} rx={9}
+                fill="var(--color-superficie)" stroke="var(--color-slate-200)" />
+          <text x={lugarDaReferencia.x + lugarDaReferencia.larg / 2} y={lugarDaReferencia.y + 13} textAnchor="middle"
+                fontSize={11.5} fontWeight={500} fill="var(--color-slate-500)">{referencia.rotulo}</text>
+        </>
+      )}
 
       {comDado.length > 1 && (
         <path className="desenhar-linha" d={trilha} fill="none" stroke="var(--color-marca-600)" strokeWidth={3}
@@ -187,12 +221,11 @@ export default function GraficoDeLinha({
                       stroke="var(--color-superficie)" strokeWidth={2.5} />
               {i === ultimo ? (() => {
                 const t = formatar(p.valor);
-                const lg = t.length * 8 + 18;
-                const ex = Math.max(esq, Math.min(L - dir - lg, x(i) - lg / 2));
+                const { x: ex, y: ey, lg } = etiquetaDoUltimo(i, p.valor);
                 return (
                   <>
-                    <rect x={ex} y={y(p.valor) - 40} width={lg} height={24} rx={12} fill={COR[p.tom ?? 'bom']} />
-                    <text x={ex + lg / 2} y={y(p.valor) - 23.5} textAnchor="middle" fontSize={13} fontWeight={700}
+                    <rect x={ex} y={ey} width={lg} height={24} rx={12} fill={COR[p.tom ?? 'bom']} />
+                    <text x={ex + lg / 2} y={ey + 16.5} textAnchor="middle" fontSize={13} fontWeight={700}
                           fill="#fff">{t}</text>
                   </>
                 );
