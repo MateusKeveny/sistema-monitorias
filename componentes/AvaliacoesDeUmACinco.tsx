@@ -10,6 +10,17 @@ export type AvaliacaoDoAtendente = { data: string; protocolo: string; nota: numb
 const COR: Record<number, string> = {
   5: 'bg-emerald-500', 4: 'bg-emerald-300', 3: 'bg-amber-400', 2: 'bg-orange-400', 1: 'bg-rose-500',
 };
+/** Selo da nota na lista (visual 3.0): fundo suave e o número na cor da nota. */
+const SELO: Record<number, string> = {
+  5: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+  4: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+  3: 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
+  2: 'bg-orange-500/15 text-orange-700 dark:text-orange-300',
+  1: 'bg-rose-500/15 text-rose-700 dark:text-rose-300',
+};
+/** O C-SAT na escala do painel: verde a partir de 90%, âmbar de 85%, rosa abaixo. */
+const tomDoCsat = (v: number) => v >= 0.9 ? 'bg-emerald-500/10 text-marca-700 dark:text-marca-400'
+  : v >= 0.85 ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300' : 'bg-rose-500/10 text-rose-700 dark:text-rose-300';
 
 /**
  * As avaliações do atendente de 1 a 5 (2.10.0), do relatório do Hub — as
@@ -55,12 +66,30 @@ export default function AvaliacoesDeUmACinco({ avaliacoes, rotulo }: {
         <Secao titulo={`Suas avaliações de 1 a 5 · ${rotulo}`} subtitulo="Do relatório do Hub, as mesmas que entram no cálculo do C-SAT.">
           {!total ? <Vazio>Sem avaliações nesta fila no mês.</Vazio> : (
             <>
-              <ul className="space-y-2">
+              {/* O C-SAT do mês em destaque e a proporção das notas numa barra só. */}
+              <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <p className="text-sm text-slate-500">C-SAT no mês</p>
+                  <p className="mt-1">
+                    <span className={`inline-flex rounded-full px-3.5 py-1 text-[1.65rem] font-bold leading-tight tracking-tight tabular-nums ${tomDoCsat(positivas / total)}`}>
+                      {pct(positivas)}
+                    </span>
+                  </p>
+                </div>
+                <p className="text-sm text-slate-500"><b className="text-slate-900">{positivas}</b> de <b className="text-slate-900">{total}</b> positivas</p>
+              </div>
+              <div className="mb-5 flex h-3 gap-[2px] overflow-hidden rounded-full" aria-hidden>
+                {porNota.filter(({ q }) => q > 0).map(({ n, q }) => (
+                  <span key={n} title={`Nota ${n}: ${q}`} className={`barra-semana crescer-x origin-left ${COR[n]}`}
+                        style={{ width: `${(q / total) * 100}%` }} />
+                ))}
+              </div>
+              <ul className="space-y-2.5">
                 {porNota.map(({ n, q }) => (
                   <li key={n} className="grid grid-cols-[3rem_1fr_6rem] items-center gap-3 text-sm">
                     <span className="font-bold text-slate-800">{n} ★</span>
-                    <span className="h-3.5 overflow-hidden rounded-full bg-slate-100">
-                      <span className={`block h-full rounded-full ${COR[n]}`} style={{ width: `${(q / total) * 100}%` }} />
+                    <span className="h-2.5 overflow-hidden rounded-full bg-slate-100">
+                      <span className={`barra-semana crescer-x block h-full origin-left rounded-full ${COR[n]}`} style={{ width: `${(q / total) * 100}%` }} />
                     </span>
                     <span className="text-right tabular-nums text-slate-600"><b className="text-slate-900">{q}</b> · {pct(q)}</span>
                   </li>
@@ -91,8 +120,8 @@ export default function AvaliacoesDeUmACinco({ avaliacoes, rotulo }: {
           ) : (
             <ul className="max-h-96 divide-y divide-slate-100 overflow-y-auto">
               {lista.map((a) => (
-                <li key={`${a.data}|${a.protocolo}`} className="flex items-center gap-3 py-2 text-sm">
-                  <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg text-xs font-bold text-white ${COR[a.nota]}`}>{a.nota}</span>
+                <li key={`${a.data}|${a.protocolo}`} className="-mx-2 flex items-center gap-3 rounded-lg px-2 py-2 text-sm transition-colors hover:bg-slate-50">
+                  <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold ${SELO[a.nota]}`}>{a.nota}</span>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-1 font-medium tabular-nums text-slate-900">
                       {a.protocolo}
