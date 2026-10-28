@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { mesRotulo } from '@/lib/formatar';
-import { NOMES_PAPEL, type Cargo, type CargoDaPessoa, type PapelUsuario, type Pessoa, type Saida } from '@/lib/tipos';
+import { NOMES_PAPEL, type Cargo, type CargoDaPessoa, type PapelUsuario, type Pessoa, type Saida, type SetorDaPessoa } from '@/lib/tipos';
+import type { Setor } from '@/lib/setores';
 import { ROTULO_TIPO, type AnotacaoGestor, type LeituraDaPessoa } from '@/lib/diario';
 import { mensagemDoErro } from '@/lib/erro-amigavel';
 
@@ -43,8 +44,11 @@ type Recorte = 'todos' | 'operadores' | 'gestao';
  * sistemas.
  */
 export default function PainelAtendentes({
-  pessoas, saidas, cargos, historico, leituras, anotacoes, competencia, inicioDoCicloAnterior,
+  pessoas, saidas, cargos, historico, setores = [], historicoSetor = [], leituras, anotacoes, competencia, inicioDoCicloAnterior,
 }: {
+  /** Setores (migração 86) e o setor de cada pessoa, com histórico. */
+  setores?: Setor[];
+  historicoSetor?: SetorDaPessoa[];
   /** Anotações do gestor feitas "Sobre" alguém (migração 43). */
   anotacoes: AnotacaoGestor[];
   pessoas: Pessoa[];
@@ -62,6 +66,15 @@ export default function PainelAtendentes({
   const linhasDe = (id: string) => historico.filter((h) => h.pessoa_id === id)
     .sort((a, b) => b.desde.localeCompare(a.desde));
   const vigente = (id: string) => linhasDe(id).find((h) => h.desde <= competencia) ?? null;
+  // O setor no mês, como o cargo; antes do primeiro registro, vale o primeiro.
+  const nomeSetor = new Map(setores.map((s) => [s.id, s.nome]));
+  const linhasSetorDe = (id: string) => historicoSetor.filter((h) => h.pessoa_id === id)
+    .sort((a, b) => b.desde.localeCompare(a.desde));
+  const setorDe = (id: string) => {
+    const l = linhasSetorDe(id);
+    return (l.find((h) => h.desde <= competencia) ?? l.at(-1))?.setor_id ?? null;
+  };
+  const variosSetores = setores.length > 1;
 
   /** O que atrapalha o cálculo da pessoa, em frases curtas. */
   const pendencias = (p: Pessoa) => {
@@ -86,12 +99,14 @@ export default function PainelAtendentes({
 
   const [filtro, setFiltro] = useState<Filtro>('operacao');
   const [recorte, setRecorte] = useState<Recorte>('todos');
+  const [filtroSetor, setFiltroSetor] = useState<number | 'todos'>('todos');
   const [selecionada, setSelecionada] = useState<string | null>(naOperacao[0]?.id ?? null);
 
   const base = filtro === 'atencao' ? atencao : filtro === 'recentes' ? recentes
     : filtro === 'desligados' ? desligados : naOperacao;
-  const lista = base.filter((p) => recorte === 'todos'
-    || (recorte === 'operadores' ? p.papel === 'operador' : p.papel !== 'operador'));
+  const lista = base.filter((p) => (recorte === 'todos'
+    || (recorte === 'operadores' ? p.papel === 'operador' : p.papel !== 'operador'))
+    && (filtroSetor === 'todos' || setorDe(p.id) === filtroSetor));
   const pessoa = pessoas.find((p) => p.id === selecionada) ?? null;
 
   const porCargo = new Map<string, number>();
@@ -142,6 +157,14 @@ export default function PainelAtendentes({
               <p className="text-sm text-slate-500">Clique numa pessoa para abrir a ficha.</p>
             </div>
             <div className="flex flex-wrap gap-1.5">
+              {variosSetores && (
+                <select value={filtroSetor} onChange={(e) => setFiltroSetor(e.target.value === 'todos' ? 'todos' : Number(e.target.value))}
+                        aria-label="Filtrar por setor"
+                        className="rounded-full border border-slate-200 bg-superficie px-3 py-0.5 text-xs text-slate-600">
+                  <option value="todos">Todos os setores</option>
+                  {setores.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
+                </select>
+              )}
               {([['todos', 'Todos'], ['operadores', 'Operadores'], ['gestao', 'Gestão e qualidade']] as const).map(([k, r]) => (
                 <button key={k} type="button" aria-pressed={recorte === k} onClick={() => setRecorte(k)}
                         className={`rounded-full border px-3 py-0.5 text-xs ${recorte === k
@@ -161,6 +184,7 @@ export default function PainelAtendentes({
                 <thead>
                   <tr className="text-left text-xs text-slate-500">
                     <th className="border-b border-slate-200 py-2 pl-6 pr-2 font-medium">Pessoa</th>
+                    <th className="border-b border-slate-200 px-2 py-2 font-medium">Setor</th>
                     <th className="border-b border-slate-200 px-2 py-2 font-medium">Cargo em {mesRotulo(competencia).split('/')[0].toLowerCase()}</th>
                     <th className="border-b border-slate-200 px-2 py-2 font-medium">Nome no Hub</th>
                     <th className="border-b border-slate-200 px-2 py-2 text-center font-medium" title="Aparece nas listas · Entra nas médias">
@@ -182,6 +206,9 @@ export default function PainelAtendentes({
                           <span className="block text-xs text-slate-500">
                             {NOMES_PAPEL[p.papel]}{p.desligado_em ? ` · saiu em ${data(p.desligado_em)}` : ''}
                           </span>
+                        </td>
+                        <td className="border-b border-slate-100 px-2 py-2.5 text-xs text-slate-600">
+                          {nomeSetor.get(setorDe(p.id) ?? -1) ?? '—'}
                         </td>
                         <td className="border-b border-slate-100 px-2 py-2.5">
                           {c ? <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{curto(nomeCargo.get(c.cargo_id) ?? '')}</span>
@@ -215,6 +242,7 @@ export default function PainelAtendentes({
 
         {pessoa ? (
           <Ficha key={pessoa.id} pessoa={pessoa} cargos={cargos} linhas={linhasDe(pessoa.id)}
+                 setores={setores} linhasSetor={linhasSetorDe(pessoa.id)} setorAtual={setorDe(pessoa.id)}
                  competencia={competencia} pendencias={pendencias(pessoa)} leitura={leituras[pessoa.id]}
                  anotacoes={anotacoes.filter((a) => a.sobre_pessoa_id === pessoa.id)}
                  autores={Object.fromEntries(pessoas.map((p) => [p.id, p.nome]))}
@@ -288,9 +316,12 @@ const Secao = ({ titulo, children }: { titulo: string; children: React.ReactNode
 );
 
 function Ficha({
-  pessoa, cargos, linhas, competencia, pendencias, saida, leitura, anotacoes, autores,
+  pessoa, cargos, linhas, setores, linhasSetor, setorAtual, competencia, pendencias, saida, leitura, anotacoes, autores,
 }: {
   pessoa: Pessoa;
+  setores: Setor[];
+  linhasSetor: SetorDaPessoa[];
+  setorAtual: number | null;
   anotacoes: AnotacaoGestor[];
   autores: Record<string, string>;
   leitura: LeituraDaPessoa | undefined;
@@ -306,6 +337,10 @@ function Ficha({
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [novoCargo, setNovoCargo] = useState({ cargo: '', mes: competencia.slice(0, 7) });
+  const [novoSetor, setNovoSetor] = useState({ setor: '', mes: competencia.slice(0, 7) });
+  const nomeSetor = new Map(setores.map((s) => [s.id, s.nome]));
+  // Os cargos oferecidos são os do setor da pessoa (cada setor com os seus).
+  const cargosDoSetor = cargos.filter((c) => setorAtual == null || (c.setor_id ?? 1) === setorAtual);
   const [hub, setHub] = useState(pessoa.nome_hub ?? '');
   const [elo, setElo] = useState(pessoa.nome_elo ?? '');
   // Criar acesso (migração 68): o e-mail do cadastro e o papel, editáveis.
@@ -375,6 +410,60 @@ function Ficha({
         <p className="mt-1 text-xs text-slate-500">Para a cota. Em branco: já estava antes do painel e conta em todos os meses.</p>
       </Secao>
 
+      {setores.length > 0 && (
+        <Secao titulo="Setor">
+          {linhasSetor.length ? (
+            <ul className="mb-3 ml-1.5 space-y-1.5 border-l-2 border-slate-200 pl-4 text-sm">
+              {linhasSetor.map((h, i) => (
+                <li key={h.desde} className="relative flex items-center gap-2">
+                  <i className={`absolute -left-[1.4rem] top-1.5 h-2.5 w-2.5 rounded-full ${i === 0 ? 'bg-marca-600' : 'bg-slate-300'}`} />
+                  <span className="text-slate-800">{nomeSetor.get(h.setor_id) ?? 'setor removido'}</span>
+                  <span className="text-xs text-slate-500">desde {mesRotulo(h.desde)}</span>
+                  {linhasSetor.length > 1 && (
+                    <button type="button" disabled={ocupado}
+                            onClick={() => {
+                              if (!confirm(`Remover "${nomeSetor.get(h.setor_id)}" de ${pessoa.nome} a partir de ${mesRotulo(h.desde)}? `
+                                + 'Os meses desse período passam a usar o setor anterior.')) return;
+                              executar(() => db().from('setores_da_pessoa').delete().eq('pessoa_id', h.pessoa_id).eq('desde', h.desde));
+                            }}
+                            className="ml-auto text-xs text-slate-400 hover:text-rose-700 hover:underline">
+                      remover
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : <p className="mb-3 text-sm text-slate-500">Sem setor.</p>}
+          {setores.length > 1 && (
+            <>
+              <div className="flex flex-wrap items-center gap-2">
+                <select value={novoSetor.setor} disabled={ocupado} aria-label="Novo setor"
+                        onChange={(e) => setNovoSetor((s) => ({ ...s, setor: e.target.value }))} className={entrada}>
+                  <option value="">Mudar de setor…</option>
+                  {setores.filter((s) => s.id !== setorAtual).map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
+                </select>
+                <span className="text-sm text-slate-500">a partir de</span>
+                <input type="month" value={novoSetor.mes} disabled={ocupado} aria-label="Competência do novo setor"
+                       onChange={(e) => setNovoSetor((s) => ({ ...s, mes: e.target.value }))} className={entrada} />
+                <button type="button" disabled={ocupado || !novoSetor.setor || !novoSetor.mes} className={botaoPrimario}
+                        onClick={async () => {
+                          const ok = await executar(() => db().from('setores_da_pessoa').upsert(
+                            { pessoa_id: pessoa.id, desde: `${novoSetor.mes}-01`, setor_id: Number(novoSetor.setor) },
+                            { onConflict: 'pessoa_id,desde' },
+                          ), 'Setor alterado. Ajuste o cargo para um cargo do setor novo.');
+                          if (ok) setNovoSetor((s) => ({ ...s, setor: '' }));
+                        }}>
+                  Aplicar
+                </button>
+              </div>
+              <p className="mt-1.5 text-xs text-slate-500">
+                Uma pessoa, um setor por mês. A troca vale do mês escolhido em diante; os meses anteriores não mudam.
+              </p>
+            </>
+          )}
+        </Secao>
+      )}
+
       <Secao titulo="Cargo">
         {linhas.length ? (
           <ul className="mb-3 ml-1.5 space-y-1.5 border-l-2 border-slate-200 pl-4 text-sm">
@@ -400,7 +489,7 @@ function Ficha({
           <select value={novoCargo.cargo} disabled={ocupado} aria-label="Novo cargo"
                   onChange={(e) => setNovoCargo((s) => ({ ...s, cargo: e.target.value }))} className={entrada}>
             <option value="">Novo cargo…</option>
-            {cargos.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+            {cargosDoSetor.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
           </select>
           <span className="text-sm text-slate-500">a partir de</span>
           <input type="month" value={novoCargo.mes} disabled={ocupado} aria-label="Competência inicial"

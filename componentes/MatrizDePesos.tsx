@@ -74,8 +74,10 @@ type Celula = { peso: number; ativo: boolean };
  * valor anterior, como no editor antigo.
  */
 export default function MatrizDePesos({
-  cargos, regras, pesos, referencias, pessoasPorCargo,
+  setorId = 1, cargos, regras, pesos, referencias, pessoasPorCargo,
 }: {
+  /** O setor da tela (etapa 4): cargo novo nasce nele. */
+  setorId?: number;
   cargos: Cargo[];
   regras: RegraCota[];
   pesos: PesoCargo[];
@@ -191,7 +193,7 @@ export default function MatrizDePesos({
         {aviso && <p className="mx-5 mt-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-emerald-600/20">{aviso}</p>}
 
         {cargoAberto === 'novo' && (
-          <NovoCargo cargos={cargos} pesos={pesos} onFechar={() => setCargoAberto(null)} />
+          <NovoCargo setorId={setorId} cargos={cargos} pesos={pesos} onFechar={() => setCargoAberto(null)} />
         )}
         {typeof cargoAberto === 'number' && base && cargoAberto !== base.id && (
           <CopiarDoCargoBase
@@ -607,7 +609,7 @@ function EditorDoCargo({
 }
 
 /** Cargo novo, nascendo com os pesos de outro para não começar do zero. */
-function NovoCargo({ cargos, pesos, onFechar }: { cargos: Cargo[]; pesos: PesoCargo[]; onFechar: () => void }) {
+function NovoCargo({ setorId, cargos, pesos, onFechar }: { setorId: number; cargos: Cargo[]; pesos: PesoCargo[]; onFechar: () => void }) {
   const router = useRouter();
   const [nome, setNome] = useState('');
   const [copiarDe, setCopiarDe] = useState(String(cargos[0]?.id ?? ''));
@@ -621,11 +623,11 @@ function NovoCargo({ cargos, pesos, onFechar }: { cargos: Cargo[]; pesos: PesoCa
     setOcupado(true); setErro(null);
     const db = criarClienteNavegador();
     const { data, error } = await db.from('cargos')
-      .insert({ nome: n, ordem: Math.max(0, ...cargos.map((c) => c.ordem)) + 1 })
+      .insert({ nome: n, ordem: Math.max(0, ...cargos.map((c) => c.ordem)) + 1, setor_id: setorId })
       .select('id').single();
     if (error || !data) {
       setOcupado(false);
-      setErro(/duplicate|unique/i.test(error?.message ?? '') ? `Já existe um cargo chamado "${n}".` : error?.message ?? 'Falha ao criar.');
+      setErro(/duplicate|unique/i.test(error?.message ?? '') ? `Já existe um cargo chamado "${n}" neste setor.` : error?.message ?? 'Falha ao criar.');
       return;
     }
     // A média não é copiada: é uma escolha própria de cada cargo.

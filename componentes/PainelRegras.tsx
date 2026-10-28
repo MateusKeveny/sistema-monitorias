@@ -80,7 +80,7 @@ type Alteracao = {
  * as duas pontas de cada corte juntas; aqui ficam o nome, o liga/desliga e a
  * criação de métrica manual.
  */
-export default function PainelRegras({ regras }: { regras: RegraCota[] }) {
+export default function PainelRegras({ regras, setorId = 1 }: { regras: RegraCota[]; setorId?: number }) {
   const router = useRouter();
 
   /** O que está gravado, no formato da tela. */
@@ -158,8 +158,10 @@ export default function PainelRegras({ regras }: { regras: RegraCota[] }) {
     const rotulo = nova.rotulo.trim();
     if (!rotulo) return;
 
-    const chave = chaveDe(rotulo);
-    if (!chave) { setErro('Dê um nome com letras ou números.'); return; }
+    const base = chaveDe(rotulo);
+    if (!base) { setErro('Dê um nome com letras ou números.'); return; }
+    // A chave é única no banco todo; a de outro setor leva o número dele.
+    const chave = setorId === 1 ? base : `${base}_s${setorId}`;
     if (regras.some((r) => r.chave === chave)) {
       setErro(`Já existe uma métrica com o nome "${rotulo}".`); return;
     }
@@ -182,6 +184,7 @@ export default function PainelRegras({ regras }: { regras: RegraCota[] }) {
       manual: true,
       valor_manual: nova.valorManual,
       ativo: true,
+      setor_id: setorId,
     });
 
     if (error) {

@@ -9,6 +9,7 @@ import QuemVeODiario, { type VisibilidadeDoDiario } from '@/componentes/QuemVeOD
 import HistoricoDePesos, { type AlteracaoDePeso } from '@/componentes/HistoricoDePesos';
 import SetoresECanais, { type SetorDoHubVisto } from '@/componentes/SetoresECanais';
 import RegrasPorFila from '@/componentes/RegrasPorFila';
+import Link from 'next/link';
 import type { Canal, Setor } from '@/lib/setores';
 import type { Subcategoria } from '@/lib/diario';
 import { hojeNoBrasil, mesDeCompetencia } from '@/lib/formatar';
@@ -27,10 +28,10 @@ export const dynamic = 'force-dynamic';
 export default async function ConfiguracaoDaCota({
   searchParams,
 }: {
-  searchParams: Promise<{ cat?: string }>;
+  searchParams: Promise<{ cat?: string; setor?: string }>;
 }) {
   await exigirGestor();
-  const { cat } = await searchParams;
+  const { cat, setor: setorPedido } = await searchParams;
   const db = await criarClienteServidor();
 
   const [
@@ -62,9 +63,14 @@ export default async function ConfiguracaoDaCota({
   const usos: Record<number, number> = {};
   for (const u of (usosSub ?? []) as { subcategoria_id: number }[]) usos[u.subcategoria_id] = (usos[u.subcategoria_id] ?? 0) + 1;
 
-  const listaCargos = (cargos ?? []) as Cargo[];
-  const listaPesos = (pesos ?? []) as PesoCargo[];
-  const listaRegras = (regras ?? []) as RegraCota[];
+  // Um setor por vez (etapa 4): cargos, pesos e métricas são do setor.
+  const listaSetores = (setores ?? []) as Setor[];
+  const setorId = listaSetores.find((s) => String(s.id) === setorPedido)?.id ?? listaSetores[0]?.id ?? 1;
+  const doSetor = (x: { setor_id?: number }) => (x.setor_id ?? 1) === setorId;
+  const listaCargos = ((cargos ?? []) as Cargo[]).filter(doSetor);
+  const idsDosCargos = new Set(listaCargos.map((c) => c.id));
+  const listaPesos = ((pesos ?? []) as PesoCargo[]).filter((p) => idsDosCargos.has(p.cargo_id));
+  const listaRegras = ((regras ?? []) as RegraCota[]).filter(doSetor);
 
   // Quantas pessoas na operação estão em cada cargo agora: é o "afeta N
   // pessoas" da barra de salvar.
@@ -92,9 +98,22 @@ export default async function ConfiguracaoDaCota({
         </p>
       </div>
 
+      {listaSetores.length > 1 && (
+        <div className="inline-flex flex-wrap gap-1 rounded-xl bg-black/25 p-1" role="tablist" aria-label="Setor">
+          {listaSetores.map((s) => (
+            <Link key={s.id} role="tab" aria-selected={s.id === setorId}
+                  href={`/cota/configuracao?setor=${s.id}${cat ? `&cat=${cat}` : ''}`}
+                  className={`rounded-lg px-4 py-1.5 text-sm transition ${s.id === setorId
+                    ? 'bg-superficie font-semibold text-slate-900 shadow-sm' : 'text-sobre-fundo-suave hover:text-sobre-fundo'}`}>
+              {s.nome}
+            </Link>
+          ))}
+        </div>
+      )}
+
       {/* `key`: o atalho "+ Métrica manual" troca só o ?cat= e precisa reabrir na aba certa. */}
       <Abas
-        key={cat ?? 'pesos'}
+        key={`${setorId}-${cat ?? 'pesos'}`}
         inicial={cat}
         itens={[
           {
@@ -102,6 +121,7 @@ export default async function ConfiguracaoDaCota({
             rotulo: 'Pesos por cargo',
             conteudo: (
               <MatrizDePesos
+                setorId={setorId}
                 cargos={listaCargos}
                 regras={listaRegras}
                 pesos={listaPesos}
@@ -114,7 +134,7 @@ export default async function ConfiguracaoDaCota({
             chave: 'filas',
             rotulo: 'Regras por fila',
             conteudo: (
-              <RegrasPorFila setores={(setores ?? []) as Setor[]} filas={(canais ?? []) as Canal[]} regras={listaRegras} pesos={listaPesos} cargos={listaCargos} />
+              <RegrasPorFila setores={listaSetores.filter((s) => s.id === setorId)} filas={(canais ?? []) as Canal[]} regras={listaRegras} pesos={listaPesos} cargos={listaCargos} />
             ),
           },
           {
@@ -129,7 +149,7 @@ export default async function ConfiguracaoDaCota({
               <div className="space-y-6">
                 <ReguasDeFaixa regras={listaRegras} pesosBase={pesosBase}
                                nomeBase={(base?.nome ?? '').replace(/^Atendente\s+/, '')} />
-                <PainelRegras regras={listaRegras} />
+                <PainelRegras regras={listaRegras} setorId={setorId} />
               </div>
             ),
           },

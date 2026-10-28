@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import type { RegraCota } from '@/lib/tipos';
@@ -16,7 +16,9 @@ const paraBanco = (t: string, u: Unidade) => {
   return u === 'min' ? Math.round(n * 60) : Math.round((n / 100) * 10000) / 10000;
 };
 
-const REGUAS: { grupo: string; titulo: string; cor: string; unidade: Unidade; maiorMelhor: boolean; texto: string }[] = [
+type Regua = { grupo: string; titulo: string; cor: string; unidade: Unidade; maiorMelhor: boolean; texto: string };
+
+const MODELOS: Regua[] = [
   { grupo: 'csat', titulo: 'C-SAT', cor: '#60a5fa', unidade: '%', maiorMelhor: true,
     texto: 'O C-SAT da semana escolhe a faixa; a faixa multiplica os finalizados. Vale para os dois canais.' },
   { grupo: 'tme', titulo: 'TME Médio Equipe · Expansão', cor: '#34d399', unidade: 'min', maiorMelhor: false,
@@ -26,6 +28,22 @@ const REGUAS: { grupo: string; titulo: string; cor: string; unidade: Unidade; ma
   { grupo: 'monitoria', titulo: 'Monitoria', cor: '#fbbf24', unidade: '%', maiorMelhor: true,
     texto: 'A média da semana só pontua acima do mínimo — o valor exato do corte não pontua.' },
 ];
+
+/** As réguas das regras recebidas (as de um setor), na ordem dos modelos. */
+function reguasDe(regras: RegraCota[]): Regua[] {
+  const grupos = [...new Set(regras.filter((r) => r.ativo).map((r) => r.grupo))];
+  const lista: Regua[] = [];
+  for (const m of MODELOS) {
+    for (const g of grupos) if (g.replace(/_s\d+$/, '') === m.grupo) lista.push({ ...m, grupo: g });
+  }
+  for (const g of grupos) {
+    if (g.startsWith('tme_') && !lista.some((x) => x.grupo === g)) {
+      lista.push({ grupo: g, titulo: `TME · ${g.slice(4)}`, cor: '#34d399', unidade: 'min', maiorMelhor: false,
+        texto: 'O TME médio da equipe na fila escolhe a faixa.' });
+    }
+  }
+  return lista;
+}
 
 const TOM = {
   v2: 'bg-marca-600/25', v1: 'bg-marca-600/13', a: 'bg-amber-500/15', r1: 'bg-rose-500/12', r2: 'bg-rose-500/22',
@@ -49,6 +67,7 @@ export default function ReguasDeFaixa({
   nomeBase: string;
 }) {
   const router = useRouter();
+  const REGUAS = useMemo(() => reguasDe(regras), [regras]);
   const inicial = (): Record<string, string[]> => Object.fromEntries(REGUAS.map((g) => {
     const faixas = ordenadas(g.grupo);
     const valores = g.grupo === 'monitoria'

@@ -164,11 +164,15 @@ export type LinhaFeedback = {
 // ---------------------------------------------------------------------------
 
 /** recebe_cota (migração 71): desligado, quem está no cargo não tem extrato nem resultado. */
-export type Cargo = { id: number; nome: string; ordem: number; ativo: boolean; recebe_cota?: boolean };
+export type Cargo = { id: number; nome: string; ordem: number; ativo: boolean; recebe_cota?: boolean;
+  /** Cada setor com os seus cargos (migração 86). */
+  setor_id?: number };
 
 /** Catálogo: o que pontua. Quanto vale fica em `PesoCargo`. */
 export type RegraCota = {
   chave: string;
+  /** De qual setor é a definição (migração 86). */
+  setor_id?: number;
   grupo: string;
   rotulo: string;
   /** Valor sugerido ao criar cargo; o que vale é o peso do cargo. */
@@ -190,6 +194,9 @@ export type ReferenciaCargo = { cargo_id: number; referencia_id: number };
 
 /** Cargo da pessoa a partir de uma competência (`desde`, sempre dia 1). */
 export type CargoDaPessoa = { pessoa_id: string; desde: string; cargo_id: number };
+
+/** Setor da pessoa a partir de uma competência (migração 86), como o cargo. */
+export type SetorDaPessoa = { pessoa_id: string; desde: string; setor_id: number };
 
 export type Lancamento = {
   id: number;

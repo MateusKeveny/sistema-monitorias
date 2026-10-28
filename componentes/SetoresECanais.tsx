@@ -80,6 +80,8 @@ export default function SetoresECanais({ setores, canais, vistos }: {
 
   // Criar setor e fila (versao-3). A fila nasce com as regras escolhidas aqui.
   const [novoSetor, setNovoSetor] = useState('');
+  const [setorOrigem, setSetorOrigem] = useState(setores[0] ? String(setores[0].id) : '');
+  const [monitoriasNoSetor, setMonitoriasNoSetor] = useState(false);
   const [novoCanal, setNovoCanal] = useState<Record<number, { nome: string; hub: string }>>({});
   const comRegras = canais.filter((c) => c.regra_finalizado);
   const regrasPadrao = (): Regras => ({ copiar: comRegras[0] ? String(comRegras[0].id) : '', tme: true });
@@ -109,11 +111,15 @@ export default function SetoresECanais({ setores, canais, vistos }: {
     const nome = novoSetor.trim();
     if (!nome) return;
     setOcupado(true); setErro(null); setAviso(null);
-    const { error } = await criarClienteNavegador().from('setores')
-      .insert({ nome, ordem: Math.max(0, ...setores.map((x) => x.ordem)) + 1 });
+    // Copiando outro setor (migrações 86 e 87): cargos com pesos e meta, faixas
+    // e nomes das métricas e a régua da monitoria, em cópias independentes.
+    const { error } = await criarClienteNavegador().rpc('clonar_setor', {
+      p_nome: nome, p_origem: setorOrigem ? Number(setorOrigem) : null, p_monitorias: monitoriasNoSetor,
+    });
     setOcupado(false);
     if (error) { setErro(/duplicate|unique/i.test(error.message) ? `Já existe o setor "${nome}".` : await mensagemDoErro(error)); return; }
-    setNovoSetor(''); setAviso(`Setor "${nome}" criado. Agora crie as filas dele.`);
+    setNovoSetor('');
+    setAviso(`Setor "${nome}" criado${setorOrigem ? ' com os cargos e as métricas copiados' : ''}. Agora crie as filas dele.`);
     iniciar(() => router.refresh());
   }
 
@@ -226,10 +232,25 @@ export default function SetoresECanais({ setores, canais, vistos }: {
               <span className="text-xs font-semibold text-slate-500">+ Novo setor</span>
               <input value={novoSetor} disabled={ocupado} placeholder="Nome do setor (a equipe)" aria-label="Nome do novo setor"
                      onChange={(e) => setNovoSetor(e.target.value)} className={`${entrada} w-64`} />
+              <select value={setorOrigem} disabled={ocupado} onChange={(e) => setSetorOrigem(e.target.value)}
+                      aria-label="De onde vêm os cargos e as métricas" className={entrada}>
+                {setores.map((s) => <option key={s.id} value={s.id}>Cargos e métricas copiados de {s.nome}</option>)}
+                <option value="">Do zero</option>
+              </select>
+              <label className="flex items-center gap-1.5 text-sm text-slate-700">
+                <input type="checkbox" checked={monitoriasNoSetor} disabled={ocupado}
+                       onChange={(e) => setMonitoriasNoSetor(e.target.checked)} className="h-4 w-4 accent-marca-600" />
+                Monitorias neste setor
+              </label>
               <button type="button" onClick={criarSetor} disabled={ocupado || !novoSetor.trim()}
                       className="rounded-lg border border-slate-300 px-3 py-1 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40">
                 Criar setor
               </button>
+              <p className="w-full text-xs text-slate-500">
+                Copiar leva os cargos (com pesos e meta), as faixas e os nomes das métricas e a régua da monitoria — e depois
+                cada setor é independente. Sem monitorias, o setor não aparece no Monitorias e a monitoria não pontua; dá para
+                ligar depois.
+              </p>
             </li>
           </ul>
         )}

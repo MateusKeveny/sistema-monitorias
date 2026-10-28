@@ -2,7 +2,8 @@ import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
 import PainelAtendentes from '@/componentes/PainelAtendentes';
 import { mesAnterior } from '@/lib/competencia';
 import { hojeNoBrasil, mesDeCompetencia, periodoDaSemana } from '@/lib/formatar';
-import type { Cargo, CargoDaPessoa, Pessoa, Saida } from '@/lib/tipos';
+import type { Cargo, CargoDaPessoa, Pessoa, Saida, SetorDaPessoa } from '@/lib/tipos';
+import type { Setor } from '@/lib/setores';
 import type { AnotacaoGestor, LeituraDaPessoa, LeituraDiario } from '@/lib/diario';
 
 export const dynamic = 'force-dynamic';
@@ -20,7 +21,7 @@ export default async function Atendentes() {
   const db = await criarClienteServidor();
 
   const [{ data: pessoas }, { data: saidas }, { data: cargos }, { data: historico }, { data: leituras },
-    { data: registros }, { data: confirmacoes }, { data: anotacoes }] = await Promise.all([
+    { data: registros }, { data: confirmacoes }, { data: anotacoes }, { data: setores }, { data: setoresDaPessoa }] = await Promise.all([
     db.from('pessoas').select('*').order('nome'),
     db.from('saidas').select('*').order('data', { ascending: false }),
     db.from('cargos').select('*').eq('ativo', true).order('ordem'),
@@ -32,6 +33,9 @@ export default async function Atendentes() {
     // Anotações do gestor sobre cada pessoa (migração 43; só gestor lê).
     db.from('diario_anotacoes').select('*').not('sobre_pessoa_id', 'is', null)
       .order('data', { ascending: false }).order('criado_em', { ascending: false }),
+    // Setor da pessoa, com histórico (migração 86).
+    db.from('setores').select('*').eq('ativo', true).order('ordem'),
+    db.from('setores_da_pessoa').select('*'),
   ]);
 
   const registro = new Map((registros ?? []).map((r) => [r.id as string, r]));
@@ -54,7 +58,7 @@ export default async function Atendentes() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">Atendentes</h1>
         <p className="mt-1 text-sm text-sobre-fundo-suave">
-          Entrada, cargo, vínculo com o Hub, tela inicial e saída — tudo de uma pessoa num lugar só.
+          Entrada, setor, cargo, vínculo com o Hub, tela inicial e saída — tudo de uma pessoa num lugar só.
           Vale para os dois sistemas.
         </p>
       </div>
@@ -64,6 +68,8 @@ export default async function Atendentes() {
         saidas={(saidas ?? []) as Saida[]}
         cargos={(cargos ?? []) as Cargo[]}
         historico={(historico ?? []) as CargoDaPessoa[]}
+        setores={(setores ?? []) as Setor[]}
+        historicoSetor={(setoresDaPessoa ?? []) as SetorDaPessoa[]}
         leituras={leituraDe}
         anotacoes={(anotacoes ?? []) as AnotacaoGestor[]}
         competencia={competencia}
