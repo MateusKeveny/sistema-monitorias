@@ -115,7 +115,7 @@ export default async function MonitoriasDoAtendente({
         <Painel><Secao><Vazio>Nenhuma monitoria registrada.</Vazio></Secao></Painel>
       ) : (
         <>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid divide-y divide-slate-200 rounded-[20px] border border-slate-200 bg-superficie shadow-sm sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-4 xl:divide-x">
             <Resumo rotulo={`Nota média em ${rotuloMes(ultimo)}`} valor={notaUltimo != null ? percentual(notaUltimo) : '—'}
                     tom={notaUltimo != null && tomDaNota(notaUltimo) !== 'bom' ? 'atencao' : undefined} />
             <Resumo rotulo={penultimo ? `Contra ${rotuloMes(penultimo)}` : 'Contra o mês anterior'}
@@ -271,7 +271,7 @@ async function Equipe({ lista, mesPedido }: { lista: { id: string; nome: string 
     <div className="space-y-6">
       {cabecalho(mes)}
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid divide-y divide-slate-200 rounded-[20px] border border-slate-200 bg-superficie shadow-sm sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-4 xl:divide-x">
         <Resumo rotulo="Nota média do mês" valor={nota != null ? percentual(nota) : '—'}
                 tom={nota != null && tomDaNota(nota) !== 'bom' ? 'atencao' : undefined}
                 detalhe={`${total} monitoria${total === 1 ? '' : 's'} avaliada${total === 1 ? '' : 's'}`} />
@@ -311,8 +311,11 @@ async function Equipe({ lista, mesPedido }: { lista: { id: string; nome: string 
               </thead>
               <tbody>
                 {linhas.map((l, i) => (
-                  <tr key={l.operador_id} className="hover:bg-slate-50">
-                    <Td className="tabular-nums text-slate-400">{i + 1}</Td>
+                  <tr key={l.operador_id} className="transition-colors hover:bg-slate-50">
+                    <Td className="tabular-nums text-slate-400">
+                      <span className={`inline-grid h-6 w-6 place-items-center rounded-full text-xs ${
+                        i < 3 ? 'bg-emerald-500/10 font-semibold text-marca-700 dark:text-marca-400' : ''}`}>{i + 1}</span>
+                    </Td>
                     <Td className="font-medium text-slate-900">
                       {naLista.has(l.operador_id) ? (
                         <Link href={`/cota/monitorias?pessoa=${l.operador_id}`}
@@ -343,8 +346,8 @@ async function Equipe({ lista, mesPedido }: { lista: { id: string; nome: string 
                     <span className="text-sm font-medium text-slate-800">{c.criterio}</span>
                     <span className="shrink-0 text-xs tabular-nums text-slate-500">{c.reprovacoes}/{c.avaliacoes}</span>
                   </div>
-                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                    <div className="h-full rounded-full bg-rose-500"
+                  <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100">
+                    <div className="barra-semana h-full rounded-full bg-rose-500"
                          style={{ width: `${Math.max(3, Number(c.taxa_reprovacao) * 100)}%` }} />
                   </div>
                   <p className="mt-0.5 text-xs text-slate-500">
@@ -367,13 +370,23 @@ async function Equipe({ lista, mesPedido }: { lista: { id: string; nome: string 
 function Resumo({ rotulo, valor, tom, detalhe, pequeno = false }: {
   rotulo: string; valor: string; tom?: 'melhor' | 'pior' | 'atencao'; detalhe?: string; pequeno?: boolean;
 }) {
-  const cor = tom === 'melhor' ? 'text-marca-700 dark:text-marca-400' : tom === 'pior' ? 'text-rose-700'
-    : tom === 'atencao' ? 'text-amber-700' : 'text-slate-900';
+  // Visual 3.0: uma célula da faixa de números; a cor de tom vai num selo suave.
+  const selo = tom === 'melhor' ? 'bg-emerald-500/10 text-marca-700 dark:text-marca-400'
+    : tom === 'pior' ? 'bg-rose-500/10 text-rose-700 dark:text-rose-300'
+      : tom === 'atencao' ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300' : null;
   return (
-    <div className="rounded-2xl bg-superficie px-5 py-4 shadow-sm">
+    <div className="px-6 py-5">
       <p className="text-sm text-slate-500">{rotulo}</p>
-      <p className={`${pequeno ? 'text-base leading-snug' : 'text-2xl tracking-tight'} font-semibold tabular-nums ${cor}`}>{valor}</p>
-      {detalhe && <p className="text-xs text-slate-500">{detalhe}</p>}
+      {pequeno ? (
+        <p className="mt-1 text-base font-semibold leading-snug text-slate-900">{valor}</p>
+      ) : selo ? (
+        <p className="mt-1.5">
+          <span className={`inline-flex rounded-full px-3 py-1 text-xl font-semibold tracking-tight tabular-nums ${selo}`}>{valor}</span>
+        </p>
+      ) : (
+        <p className="mt-1 text-[1.65rem] font-semibold tracking-tight tabular-nums text-slate-900">{valor}</p>
+      )}
+      {detalhe && <p className="mt-1 text-xs text-slate-500">{detalhe}</p>}
     </div>
   );
 }
