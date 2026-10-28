@@ -161,7 +161,7 @@ export default function GraficoDeLinha({
           <span aria-hidden className="inline-block w-4 rounded-full border-t-[2.5px] border-marca-600" />{comparacao.rotuloAtual}
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span aria-hidden className="inline-block w-4 rounded-full border-t-2 border-dashed border-slate-400" />{comparacao.rotulo}
+          <span aria-hidden className="inline-block w-4 rounded-full border-t-2 border-slate-400 opacity-50" />{comparacao.rotulo}
         </span>
       </p>
     )}
@@ -186,18 +186,18 @@ export default function GraficoDeLinha({
 
       {area && <path d={area} fill={`url(#area${id})`} />}
       {antes.length > 1 && (
-        <path d={trilhaAntes} fill="none" stroke="var(--color-slate-400)" strokeWidth={2} strokeDasharray="4 4"
-              strokeLinejoin="round" strokeLinecap="round" opacity={0.8} />
+        <path d={trilhaAntes} fill="none" stroke="var(--color-slate-400)" strokeWidth={1.75}
+              strokeLinejoin="round" strokeLinecap="round" opacity={0.45} />
       )}
       {antes.map((p) => (
-        <circle key={`a${p.i}`} cx={x(p.i)} cy={y(p.v)} r={3} fill="var(--color-slate-400)"
+        <circle key={`a${p.i}`} cx={x(p.i)} cy={y(p.v)} r={2.75} fill="var(--color-slate-400)" opacity={0.6}
                 stroke="var(--color-superficie)" strokeWidth={2} />
       ))}
 
       {referencia && lugarDaReferencia && (
         <>
           <line x1={esq} x2={L - dir} y1={lugarDaReferencia.ry} y2={lugarDaReferencia.ry}
-                stroke="var(--color-slate-400)" strokeDasharray="5 5" strokeWidth={1.2} />
+                stroke="var(--color-slate-400)" strokeDasharray="1 4" strokeWidth={1.5} strokeLinecap="round" />
           <rect x={lugarDaReferencia.x} y={lugarDaReferencia.y} width={lugarDaReferencia.larg} height={18} rx={9}
                 fill="var(--color-superficie)" stroke="var(--color-slate-200)" />
           <text x={lugarDaReferencia.x + lugarDaReferencia.larg / 2} y={lugarDaReferencia.y + 13} textAnchor="middle"
