@@ -312,6 +312,8 @@ textarea {
 .grafico-ponto:hover .grafico-guia { opacity: 1; }
 .grafico-ponto:hover .grafico-dica { opacity: 1; filter: drop-shadow(0 6px 14px rgb(0 0 0 / 0.12)); }
 .grafico-ponto:hover circle.grafico-guia { opacity: 0.18; }
+@keyframes grafico-pulso { 0%, 100% { opacity: 0.22; } 50% { opacity: 0.06; } }
+.grafico-pulso { animation: grafico-pulso 2.4s ease-in-out infinite; }
 
 /* O detalhe de um destaque aparece sem salto (SeletorDeDetalhe). */
 @keyframes surgir { from { opacity: 0; transform: translateY(-4px); } }
@@ -324,7 +326,7 @@ textarea {
 .girar { animation: girar 1s linear infinite; }
 
 @media (prefers-reduced-motion: reduce) {
-  .crescer-y, .crescer-x, .desenhar-linha, .surgir, .realce-resumo, .girar { animation: none; }
+  .crescer-y, .crescer-x, .desenhar-linha, .grafico-pulso, .surgir, .realce-resumo, .girar { animation: none; }
 }
 
 /* A folha de feedback sai sempre em papel branco, independente do tema. */

@@ -60,6 +60,13 @@ function curva(p: XY[]): string {
   return s;
 }
 
+/** Passo "redondo" da escala (1, 2, 2,5 ou 5 vezes uma potência de 10). */
+function passoRedondo(bruto: number): number {
+  const p = 10 ** Math.floor(Math.log10(bruto));
+  const n = bruto / p;
+  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * p;
+}
+
 export default function GraficoDeLinha({
   pontos, formatar, referencia, min = 0, max, rotulos, largura = 640, comparacao,
 }: {
@@ -78,7 +85,7 @@ export default function GraficoDeLinha({
   largura?: number;
 }) {
   const id = useId().replace(/[^a-zA-Z0-9]/g, '');
-  const L = largura, A = 230, esq = 24, dir = 24, topo = 40, base = 32;
+  const L = largura, A = largura > 900 ? 300 : 250, esq = 64, dir = 28, topo = 44, base = 34;
   const chao = A - base;
   const valores = [
     ...pontos.filter((p): p is NonNullable<PontoDaLinha> => p != null).map((p) => p.valor),
@@ -101,8 +108,10 @@ export default function GraficoDeLinha({
     .filter((p): p is { v: number; i: number } => p != null);
   const trilhaAntes = curva(antes.map((p) => ({ x: x(p.i), y: y(p.v) })));
 
-  // Grade: quatro linhas finas, do piso ao teto da escala.
-  const grade = [0, 1 / 3, 2 / 3, 1].map((t) => topo + t * (chao - topo));
+  // Grade: linhas finas em valores redondos, com o número à esquerda.
+  const passoDaGrade = passoRedondo((teto - min) / 3);
+  const grade: number[] = [];
+  for (let v = Math.ceil(min / passoDaGrade - 1e-9) * passoDaGrade; v <= teto + 1e-9; v += passoDaGrade) grade.push(v);
   const rotularTodos = pontos.length <= ROTULAR_TODOS;
   const ultimo = comDado.at(-1)?.i;
 
@@ -122,14 +131,19 @@ export default function GraficoDeLinha({
          className="grafico block h-auto w-full overflow-visible tabular-nums">
       <defs>
         <linearGradient id={`area${id}`} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="var(--color-marca-600)" stopOpacity={0.22} />
+          <stop offset="0%" stopColor="var(--color-marca-600)" stopOpacity={0.38} />
           <stop offset="100%" stopColor="var(--color-marca-600)" stopOpacity={0} />
         </linearGradient>
       </defs>
 
-      {grade.map((gy, n) => (
-        <line key={n} x1={esq} x2={L - dir} y1={gy} y2={gy} stroke="var(--color-slate-200)" strokeWidth={1}
-              opacity={n === grade.length - 1 ? 1 : 0.7} />
+      <line x1={esq} x2={L - dir} y1={chao} y2={chao} stroke="var(--color-slate-300)" strokeWidth={1} />
+      {grade.map((v) => (
+        <g key={v}>
+          {Math.abs(y(v) - chao) > 1 && (
+            <line x1={esq} x2={L - dir} y1={y(v)} y2={y(v)} stroke="var(--color-slate-200)" strokeWidth={1} />
+          )}
+          <text x={esq - 12} y={y(v) + 4} textAnchor="end" fontSize={11.5} fill="var(--color-slate-400)">{formatar(v)}</text>
+        </g>
       ))}
 
       {area && <path d={area} fill={`url(#area${id})`} />}
@@ -158,7 +172,7 @@ export default function GraficoDeLinha({
       })()}
 
       {comDado.length > 1 && (
-        <path className="desenhar-linha" d={trilha} fill="none" stroke="var(--color-marca-600)" strokeWidth={2.5}
+        <path className="desenhar-linha" d={trilha} fill="none" stroke="var(--color-marca-600)" strokeWidth={3}
               strokeLinejoin="round" strokeLinecap="round" pathLength={1} />
       )}
 
@@ -166,11 +180,25 @@ export default function GraficoDeLinha({
         <g key={i}>
           {p ? (
             <>
-              <circle cx={x(i)} cy={y(p.valor)} r={5} fill={COR[p.tom ?? 'bom']}
+              {i === ultimo && (
+                <circle className="grafico-pulso" cx={x(i)} cy={y(p.valor)} r={11} fill={COR[p.tom ?? 'bom']} opacity={0.2} />
+              )}
+              <circle cx={x(i)} cy={y(p.valor)} r={i === ultimo ? 6.5 : 5} fill={COR[p.tom ?? 'bom']}
                       stroke="var(--color-superficie)" strokeWidth={2.5} />
-              {(rotularTodos || i === ultimo) && (
-                <text x={x(i)} y={y(p.valor) - 13} textAnchor="middle" fontSize={13} fontWeight={600}
-                      fill="var(--color-slate-800)">{formatar(p.valor)}</text>
+              {i === ultimo ? (() => {
+                const t = formatar(p.valor);
+                const lg = t.length * 8 + 18;
+                const ex = Math.max(esq, Math.min(L - dir - lg, x(i) - lg / 2));
+                return (
+                  <>
+                    <rect x={ex} y={y(p.valor) - 40} width={lg} height={24} rx={12} fill={COR[p.tom ?? 'bom']} />
+                    <text x={ex + lg / 2} y={y(p.valor) - 23.5} textAnchor="middle" fontSize={13} fontWeight={700}
+                          fill="#fff">{t}</text>
+                  </>
+                );
+              })() : rotularTodos && (
+                <text x={x(i)} y={y(p.valor) - 14} textAnchor="middle" fontSize={13} fontWeight={600}
+                      fill="var(--color-slate-700)">{formatar(p.valor)}</text>
               )}
             </>
           ) : (

@@ -310,14 +310,23 @@ export default async function PainelGestor({
           {valor}{nota && <span className="ml-1.5 text-xs font-normal tracking-normal text-slate-500">{nota}</span>}
         </p>
         {comparacao}
-        {barras && (
-          <div className="mt-2.5 grid h-8 grid-cols-4 items-end gap-1.5">
-            {barras.map((b, i) => (
-              <span key={i} className={`crescer-y block h-full origin-bottom rounded-t ${b ? b.cor : 'bg-slate-100'}`}
-                    style={{ transform: `scaleY(${b ? fracao(b.v) : 0.04})` }} />
-            ))}
-          </div>
-        )}
+        {barras && (() => {
+          // A semana mais recente em cor cheia; as anteriores mais suaves (visual 3.0).
+          const ultima = barras.reduce((u, b, i) => (b ? i : u), -1);
+          return (
+            <div className="mt-3">
+              <div className="grid h-10 grid-cols-4 items-end gap-1.5">
+                {barras.map((b, i) => (
+                  <span key={i} className={`crescer-y block origin-bottom rounded-[5px] ${b ? b.cor : 'bg-slate-100'} ${b && i !== ultima ? 'opacity-40' : ''}`}
+                        style={{ height: `${(b ? fracao(b.v) : 0.06) * 100}%` }} />
+                ))}
+              </div>
+              <div className="mt-1 grid grid-cols-4 gap-1.5 text-center text-[10px] text-slate-400">
+                {barras.map((_, i) => <span key={i} className={i === ultima ? 'font-semibold text-slate-600' : ''}>{i + 1}ª sem</span>)}
+              </div>
+            </div>
+          );
+        })()}
       </>
     );
   };
