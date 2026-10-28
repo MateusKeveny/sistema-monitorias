@@ -785,23 +785,56 @@ export default async function Extrato({
               const antes = naOrdem(categorias).filter((l) => lugar(l) < posicao('csat', 0));
               const depois = naOrdem(categorias).filter((l) => lugar(l) >= posicao('csat', 0));
               const monitoria = categorias.find((l) => l.grupo === 'monitoria');
-              // Outro setor: o C-SAT do mês sai das notas do próprio extrato.
-              const csatDoSetor = canal.startsWith('outro:') ? csatDoOutro(canal.slice(6), null) : undefined;
+              // Outro setor: o C-SAT do mês sai das notas do próprio extrato, e
+              // cada faixa marca as semanas que caíram nela — como nos canais.
+              const base = canal.startsWith('outro:') ? canal.slice(6) : null;
+              const csatDoSetor = base ? csatDoOutro(base, null) : undefined;
+              const semanasDaFaixa = (regra: string) => !base ? [] : [...new Set(doCanal.map((l) => l.semana))]
+                .filter((s): s is number => s != null)
+                .filter((s) => {
+                  const c = csatDoOutro(base, s);
+                  const f = c && faixaDo(c.csat, faixas);
+                  return f != null && regra.endsWith(`__${f.chave}`);
+                })
+                .sort();
+              const ehCsatDoSetor = (l: { regra: string }) => base != null && /__csat_/.test(l.regra);
+              const ehNotaDoSetor = (l: { regra: string }) => base != null && /__nota_[1-5]$/.test(l.regra);
 
               return (
                 <Quadro
                   key={canal}
                   titulo={nomeDoQuadro(canal)}
-                  subtitulo={csatDoSetor
-                    ? `C-SAT no mês ${percentual(csatDoSetor.csat)} · ${csatDoSetor.positivas} de ${csatDoSetor.avaliacoes}`
-                    : undefined}
                   acao={<span className={`text-sm font-semibold tabular-nums ${
                     soma < 0 ? 'text-rose-700' : 'text-slate-900'}`}>{num(soma)} pts</span>}
                 >
                   <table className="w-full text-sm">
                     <Cabecalho />
                     <tbody>
-                      {antes.map((l) => <Linha key={l.regra} l={l} />)}
+                      {antes.filter((l) => !ehCsatDoSetor(l) && !ehNotaDoSetor(l)).map((l) => <Linha key={l.regra} l={l} />)}
+
+                      {csatDoSetor && (
+                        <>
+                          <tr className="border-t border-slate-200">
+                            <td colSpan={4} className="pb-1 pt-3">
+                              <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+                                C-SAT no mês
+                              </span>
+                              <span className="ml-2 text-xs font-semibold text-marca-700 dark:text-marca-400">
+                                {percentual(csatDoSetor.csat)}
+                              </span>
+                              <span className="ml-1.5 text-xs text-slate-500">
+                                {csatDoSetor.positivas} de {csatDoSetor.avaliacoes}
+                              </span>
+                            </td>
+                          </tr>
+                          {naOrdem(categorias).filter(ehCsatDoSetor).map((l) => (
+                            <Linha key={l.regra} l={l}
+                                   detalhe={semanasDaFaixa(l.regra).map((s) => `${s}ª`).join(', ') || undefined} />
+                          ))}
+                          <tr><td colSpan={4} className="pt-2" /></tr>
+                        </>
+                      )}
+                      {base && naOrdem(categorias).filter(ehNotaDoSetor).map((l) => <Linha key={l.regra} l={l} />)}
 
                       {linhasFaixa.length > 0 && (
                         <tr className="border-t border-slate-200">
@@ -841,7 +874,7 @@ export default async function Extrato({
                         <tr><td colSpan={4} className="pt-2" /></tr>
                       )}
 
-                      {depois.map((l) => <Linha key={l.regra} l={l} />)}
+                      {depois.filter((l) => !ehCsatDoSetor(l) && !ehNotaDoSetor(l)).map((l) => <Linha key={l.regra} l={l} />)}
                     </tbody>
                   </table>
                   {monitoria && (
