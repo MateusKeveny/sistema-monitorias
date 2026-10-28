@@ -41,11 +41,32 @@ const num = (v: number) => Number(v).toLocaleString('pt-BR', { maximumFractionDi
 export default async function Fechamento({
   searchParams,
 }: {
-  searchParams: Promise<{ mes?: string; conferir?: string }>;
+  searchParams: Promise<{ mes?: string; conferir?: string; setor?: string }>;
 }) {
-  const { mes, conferir: pediuConferir } = await searchParams;
+  const { mes, conferir: pediuConferir, setor: setorPedido } = await searchParams;
   const { competencia, atual } = await resolverCompetencia(mes);
   const db = await criarClienteServidor();
+
+  // Um setor por vez (etapa 4, migração 88): cada setor tem o seu valor por
+  // ponto, o seu bônus e fecha o seu mês. Com um setor só, é a tela de antes.
+  const [{ data: setores }, { data: setoresDaPessoa }, { data: filasDoSetor }] = await Promise.all([
+    db.from('setores').select('id, nome, monitorias').eq('ativo', true).order('ordem'),
+    db.from('setores_da_pessoa').select('pessoa_id, desde, setor_id'),
+    db.from('canais_do_setor').select('setor_id, apelido, ordem').eq('ativo', true).order('ordem'),
+  ]);
+  const listaSetores = (setores ?? []) as { id: number; nome: string; monitorias: boolean }[];
+  const setor = listaSetores.find((s) => String(s.id) === setorPedido) ?? listaSetores[0];
+  const setorId = setor?.id ?? 1;
+  const historicoSetor = (setoresDaPessoa ?? []) as { pessoa_id: string; desde: string; setor_id: number }[];
+  /** O setor da pessoa na competência; antes do primeiro registro, vale o primeiro. */
+  const setorDe = (id: string) => {
+    const l = historicoSetor.filter((h) => h.pessoa_id === id).sort((a, b) => b.desde.localeCompare(a.desde));
+    return (l.find((h) => h.desde <= competencia) ?? l.at(-1))?.setor_id ?? 1;
+  };
+  const doSetor = (id: string) => setorDe(id) === setorId;
+  // A fila principal do setor: a que conta para "semana sem volume".
+  const filaPrincipal = ((filasDoSetor ?? []) as { setor_id: number; apelido: string | null }[])
+    .find((f) => f.setor_id === setorId && f.apelido)?.apelido ?? 'huggy';
 
   // Tudo o que não depende de nada sai junto, já com a conferência do gestor
   // (2.8.2): antes eram quatro esperas em fila. Sem ser gestor, exigirGestor
@@ -54,16 +75,16 @@ export default async function Fechamento({
     exigirGestor(),
     db.from('fechamentos_cota')
       .select('id, pessoa_id, pessoa_nome, cargo, resultado, meta, fechado_por_nome, fechado_em')
-      .eq('mes_competencia', competencia).order('resultado', { ascending: false }),
+      .eq('mes_competencia', competencia).eq('setor_id', setorId).order('resultado', { ascending: false }),
     db.from('vw_lancamentos_a_conferir').select('bloco').eq('mes_competencia', competencia),
     db.from('fechamento_alteracoes')
       .select('id, pessoa_nome, campo, valor_anterior, valor_novo, motivo, autor_nome, criado_em')
       .eq('mes_competencia', competencia).order('criado_em', { ascending: false }),
-    db.from('valores_da_cota').select('*').eq('mes_competencia', competencia).maybeSingle(),
+    db.from('valores_da_cota').select('*').eq('mes_competencia', competencia).eq('setor_id', setorId).maybeSingle(),
     db.from('vw_pagamento_mensal').select('*')
-      .eq('mes_competencia', competencia).order('valor', { ascending: false, nullsFirst: false }),
+      .eq('mes_competencia', competencia).eq('setor_id', setorId).order('valor', { ascending: false, nullsFirst: false }),
     db.from('valores_alteracoes').select('*')
-      .eq('mes_competencia', competencia).order('alterado_em', { ascending: false }),
+      .eq('mes_competencia', competencia).eq('setor_id', setorId).order('alterado_em', { ascending: false }),
     // Para "Antes de fechar": semanas com volume e a cobertura das monitorias.
     db.from('volume_semanal').select('semana, canal').eq('mes_competencia', competencia),
     db.from('vw_monitorias').select('operador_id, semana_mes').eq('mes_referencia', competencia),
@@ -85,7 +106,7 @@ export default async function Fechamento({
   // fora vira um botão.
   const [fonte, { count: jaFechou }] = await Promise.all([
     fonteDoMes(competencia),
-    db.from('fechamentos_cota').select('id', { count: 'exact', head: true }).eq('mes_competencia', competencia),
+    db.from('fechamentos_cota').select('id', { count: 'exact', head: true }).eq('mes_competencia', competencia).eq('setor_id', setorId),
   ]);
   const semCalculo = fonte.resumo == null && (jaFechou ?? 0) > 0 && pediuConferir !== '1';
   const vazio = Promise.resolve({ data: [] as never[], error: null });
@@ -100,7 +121,7 @@ export default async function Fechamento({
   ]);
 
   const outroPendentes = ((await outroSetor).data ?? []) as unknown as { pessoa_id: string; pessoas: { nome: string } | null }[];
-  const lista = (abertos.data ?? []) as Aberto[];
+  const lista = ((abertos.data ?? []) as Aberto[]).filter((p) => doSetor(p.pessoa_id));
   const congelados = (fechados.data ?? []) as Fechado[];
   const jaFechados = new Set(congelados.map((f) => f.pessoa_id));
   const pendentes = lista.filter((p) => !jaFechados.has(p.pessoa_id));
@@ -128,7 +149,7 @@ export default async function Fechamento({
   // andamento, semana que ainda não aconteceu não é pendência.
   const semanasEncerradas = competencia < atual ? 4 : Math.max(0, semanaDoCiclo(hojeNoBrasil()) - 1);
   const comVolume = new Set(((volumes.data ?? []) as { semana: number; canal: string }[])
-    .filter((v) => v.canal === 'huggy').map((v) => v.semana));
+    .filter((v) => v.canal === filaPrincipal).map((v) => v.semana));
   const semVolume = [1, 2, 3, 4].slice(0, semanasEncerradas).filter((s) => !comVolume.has(s));
   const POR_SEMANA = 4;
   const esperadas = POR_SEMANA * semanasEncerradas;
@@ -136,7 +157,9 @@ export default async function Fechamento({
   for (const m of (monitorias.data ?? []) as { operador_id: string; semana_mes: number }[]) {
     if (m.semana_mes <= semanasEncerradas) feitasPor.set(m.operador_id, (feitasPor.get(m.operador_id) ?? 0) + 1);
   }
-  const monitoriasIncompletas = esperadas === 0 ? [] : ((avaliados.data ?? []) as { id: string; nome: string }[])
+  // Setor sem monitorias (etapa 4): não há cobertura a cobrar.
+  const monitoriasIncompletas = esperadas === 0 || setor?.monitorias === false ? []
+    : ((avaliados.data ?? []) as { id: string; nome: string }[]).filter((p) => doSetor(p.id))
     .map((p) => ({ ...p, feitas: feitasPor.get(p.id) ?? 0 }))
     .filter((p) => p.feitas < esperadas);
   const mesCurto = competencia.slice(0, 7);
@@ -178,9 +201,24 @@ export default async function Fechamento({
       {/* Topo no padrão das telas novas (1.18.0): o mês com setas e a situação dele. */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">Fechamento</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">
+            Fechamento{listaSetores.length > 1 && setor ? ` · ${setor.nome}` : ''}
+          </h1>
+          {listaSetores.length > 1 && (
+            <div className="mt-2 inline-flex flex-wrap gap-1 rounded-xl bg-black/25 p-1" role="tablist" aria-label="Setor">
+              {listaSetores.map((s) => (
+                <Link key={s.id} role="tab" aria-selected={s.id === setorId}
+                      href={`/cota/fechamento?mes=${competencia.slice(0, 7)}&setor=${s.id}`}
+                      className={`rounded-lg px-4 py-1.5 text-sm transition ${s.id === setorId
+                        ? 'bg-superficie font-semibold text-slate-900 shadow-sm' : 'text-sobre-fundo-suave hover:text-sobre-fundo'}`}>
+                  {s.nome}
+                </Link>
+              ))}
+            </div>
+          )}
           <div className="mt-1.5">
-            <SetasDeCompetencia competencia={competencia} atual={atual} caminho="/cota/fechamento" compacto />
+            <SetasDeCompetencia competencia={competencia} atual={atual} caminho="/cota/fechamento" compacto
+                                manter={listaSetores.length > 1 ? { setor: String(setorId) } : undefined} />
           </div>
           <p className="mt-2 text-xs text-sobre-fundo-suave">
             {congelados.length
@@ -284,8 +322,9 @@ export default async function Fechamento({
           {/* key: trocar de mês recomeça os campos (2.8.1). Sem ela, o que estava
               digitado num mês continuava na tela do outro, e salvava lá. */}
           <ValorDaCota
-            key={`valor-${competencia}`}
+            key={`valor-${setorId}-${competencia}`}
             competencia={competencia}
+            setorId={setorId}
             valor={(valor.data ?? null) as ValorDaCotaTipo | null}
             alteracoes={(correcoes.data ?? []) as AlteracaoDeValor[]}
           />
@@ -349,7 +388,7 @@ export default async function Fechamento({
             </Tabela>
 
             <div className="border-t border-slate-100 pt-5">
-              <BotaoFecharCiclo competencia={competencia} pessoas={pendentes.length} avisos={avisos} />
+              <BotaoFecharCiclo competencia={competencia} setorId={setorId} pessoas={pendentes.length} avisos={avisos} />
             </div>
           </div>
         )}

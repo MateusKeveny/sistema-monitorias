@@ -85,6 +85,23 @@ Setor do Hub que não está na árvore vira demanda extra pendente (2.9.0).
    meta, valor por ponto, fechamento e exportação por setor; seletor de setor
    nas telas; gestor restrito ao seu setor e o papel administrador (ver
    "Acesso por setor").
+   *Parte 1 feita (86 e 87):* setor na pessoa com histórico (`setores_da_pessoa`),
+   cargos e métricas por setor, valor por ponto e fechamento marcados com o
+   setor, monitorias liga/desliga por setor com régua própria
+   (`setores.regra_monitoria`) e `clonar_setor` (cópias independentes das
+   definições + cargos com pesos e meta). Setor 1 é o padrão, para o site
+   oficial seguir gravando sem saber de setor. *Parte 2 (88 e telas):* valor
+   por ponto, bônus e pagamento por setor (as funções antigas valem para o
+   setor 1), fechar o mês de um setor, ligar monitorias; telas: setor em
+   Atendentes, Configuração por setor, criar setor copiando outro, Fechamento
+   por setor, Monitorias sem quem é de setor com monitorias desligadas e
+   cadastro de pessoas em lote. *Parte 3 (acesso) adiada* até existir um
+   segundo gestor — e ensaiada antes num banco local.
+   *Pendente antes de um 2º setor fechar mês:* as travas de "mês fechado"
+   (mover volume/lançamento, realocação) ainda olham o mês, não o setor; a
+   exportação e os relatórios do Monitorias ainda não filtram por setor.
+   *Planejado (quando o próximo setor definir):* ciclo de medição por setor
+   (hoje 26 a 25, semanas fixas).
 5. **Limpeza** (3.1.x) — sai o texto `huggy`/`diretores` e as travas antigas.
 
 Meses fechados não mudam em nenhuma etapa: o fechamento guarda as linhas

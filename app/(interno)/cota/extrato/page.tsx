@@ -584,7 +584,8 @@ export default async function Extrato({
               // C-SAT e Monitoria só para quem é medido por eles; para os demais
               // (Pleno, Analista, Gestor), o que a semana teve (08/10).
               const temCsat = semanal.some((c) => c.semana === semana);
-              const medeMonitoria = (pesoDaFaixa.get('monitoria') ?? 0) !== 0;
+              // A régua de monitoria do setor: 'monitoria' ou a cópia dela (monitoria_s5).
+              const medeMonitoria = [...pesoDaFaixa].some(([regra, peso]) => /^monitoria(_sd+)?$/.test(regra) && peso !== 0);
               const doQue = [...new Map(daSemana.filter((l) => Math.abs(Number(l.cota)) >= 0.005)
                 .map((l) => [l.regra, l])).values()]
                 .map((l) => ({ rotulo: l.rotulo, vezes: daSemana.filter((x) => x.regra === l.regra)

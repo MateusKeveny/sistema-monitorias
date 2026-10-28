@@ -11,9 +11,11 @@ import { mensagemDoErro } from '@/lib/erro-amigavel';
  * e nunca sobrescreve fechamento existente — número já entregue não se refaz.
  */
 export default function BotaoFecharCiclo({
-  competencia, pessoas, avisos,
+  competencia, setorId = 1, pessoas, avisos,
 }: {
   competencia: string;
+  /** Fecha só as pessoas deste setor (migração 88). */
+  setorId?: number;
   /** Quantas pessoas entram no fechamento. */
   pessoas: number;
   /** Pendências que valem confirmar antes de congelar. */
@@ -31,7 +33,7 @@ export default function BotaoFecharCiclo({
       + 'e não existe caminho para desfazer.')) return;
 
     setOcupado(true); setErro(null); setAviso(null);
-    const { data, error } = await criarClienteNavegador().rpc('fechar_ciclo', { p_mes: competencia });
+    const { data, error } = await criarClienteNavegador().rpc('fechar_ciclo', { p_mes: competencia, p_setor: setorId });
     setOcupado(false);
 
     if (error) { setErro(await mensagemDoErro(error)); return; }

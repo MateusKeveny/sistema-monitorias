@@ -40,10 +40,13 @@ const GRUPOS = [
 ] as const;
 
 function grupoDa(r: RegraCota): string {
-  if (r.chave === 'huggy_atendimento' || r.chave === 'transferencias' || r.grupo === 'tme') return 'expansao';
-  if (r.grupo === 'csat') return 'csat';
-  if (r.grupo === 'nota') return 'notas';
-  if (r.chave === 'diretores_atendimento' || r.grupo === 'tme_diretores') return 'diretores';
+  // Cópia de outro setor (etapa 4): a chave e o grupo levam o sufixo do setor.
+  const chave = r.chave.replace(/_sd+$/, '');
+  const grupo = r.grupo.replace(/_sd+$/, '');
+  if (chave === 'huggy_atendimento' || chave === 'transferencias' || grupo === 'tme') return 'expansao';
+  if (grupo === 'csat') return 'csat';
+  if (grupo === 'nota') return 'notas';
+  if (chave === 'diretores_atendimento' || grupo === 'tme_diretores') return 'diretores';
   if (r.grupo === 'monitoria') return 'monitoria';
   if (r.chave.startsWith('chamados_')) return 'chamados';
   return 'extra';

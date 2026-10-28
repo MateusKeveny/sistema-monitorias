@@ -29,9 +29,11 @@ const reais = (v: number) =>
  * por ponto pode sair, e a remoção entra no histórico.
  */
 export default function ValorDaCota({
-  competencia, valor, alteracoes,
+  competencia, setorId = 1, valor, alteracoes,
 }: {
   competencia: string;
+  /** O valor por ponto é do mês e do setor (migração 88). */
+  setorId?: number;
   valor: Valor | null;
   alteracoes: AlteracaoDeValor[];
 }) {
@@ -67,6 +69,8 @@ export default function ValorDaCota({
       p_valor: v,
       p_percentual: p / 100,
       p_motivo: motivo.trim() || null,
+      p_observacao: null,
+      p_setor: setorId,
     });
     setOcupado(false);
     if (error) { setErro(await mensagemDoErro(error)); return; }
@@ -78,7 +82,7 @@ export default function ValorDaCota({
   async function remover() {
     if (!motivo.trim()) { setErro('Remover o valor por ponto exige motivo.'); return; }
     setOcupado(true); setErro(null); setAviso(null);
-    const { error } = await criarClienteNavegador().rpc('remover_valor_da_cota', { p_mes: competencia, p_motivo: motivo.trim() });
+    const { error } = await criarClienteNavegador().rpc('remover_valor_da_cota', { p_mes: competencia, p_motivo: motivo.trim(), p_setor: setorId });
     setOcupado(false);
     if (error) { setErro(await mensagemDoErro(error)); return; }
     setMotivo(''); setPorPonto('');

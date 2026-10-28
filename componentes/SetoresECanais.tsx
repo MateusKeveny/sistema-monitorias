@@ -107,6 +107,20 @@ export default function SetoresECanais({ setores, canais, vistos }: {
     iniciar(() => router.refresh());
   }
 
+  /** Liga/desliga as monitorias do setor (migração 88). Ligar dá aos cargos
+   *  que pontuam finalizado o peso padrão da régua de monitoria do setor. */
+  async function ligarMonitorias(s: Setor, ligar: boolean) {
+    if (!confirm(ligar
+      ? `Ligar as monitorias de "${s.nome}"? A monitoria passa a pontuar no setor a partir dos meses em aberto, e as pessoas dele aparecem no Monitorias.`
+      : `Desligar as monitorias de "${s.nome}"? A monitoria deixa de pontuar nos meses em aberto do setor e ele sai do Monitorias. Meses fechados não mudam.`)) return;
+    setOcupado(true); setErro(null); setAviso(null);
+    const { error } = await criarClienteNavegador().rpc('ligar_monitorias', { p_setor: s.id, p_ligar: ligar });
+    setOcupado(false);
+    if (error) { setErro(await mensagemDoErro(error)); return; }
+    setAviso(`Monitorias ${ligar ? 'ligadas' : 'desligadas'} em "${s.nome}".`);
+    iniciar(() => router.refresh());
+  }
+
   async function criarSetor() {
     const nome = novoSetor.trim();
     if (!nome) return;
@@ -182,6 +196,12 @@ export default function SetoresECanais({ setores, canais, vistos }: {
                   <input value={rascunho[`s${s.id}`]} disabled={ocupado} aria-label="Nome do setor"
                          onChange={(e) => setRascunho((r) => ({ ...r, [`s${s.id}`]: e.target.value }))}
                          className={`${entrada} w-64 font-semibold`} />
+                  <label className="ml-auto flex items-center gap-1.5 text-sm text-slate-700"
+                         title="Desligadas: a monitoria não pontua neste setor e ele some do Monitorias">
+                    <input type="checkbox" checked={s.monitorias !== false} disabled={ocupado}
+                           onChange={(e) => ligarMonitorias(s, e.target.checked)} className="h-4 w-4 accent-marca-600" />
+                    Monitorias neste setor
+                  </label>
                 </div>
                 <ul className="ml-5 mt-2 space-y-2 border-l-2 border-slate-200 pl-4">
                   {canais.filter((c) => c.setor_id === s.id).map((c) => (

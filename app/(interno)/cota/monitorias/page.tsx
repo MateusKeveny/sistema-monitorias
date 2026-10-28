@@ -7,6 +7,7 @@ import { EtiquetaNota, Painel, Quadro, Secao, Tabela, Td, Th, Vazio } from '@/co
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { hojeNoBrasil, mesRotulo, percentual } from '@/lib/formatar';
 import { ateOMesAberto, mesAbertoDasMonitorias } from '@/lib/mes-aberto';
+import { foraDasMonitorias } from '@/lib/monitorados';
 import { janelaDe, monitoriasPorMes, ocorrenciasDaPessoa, repeticoes, repeticoesDaEquipe } from '@/lib/repeticoes';
 import type { LinhaCriterio, LinhaRanking } from '@/lib/tipos';
 
@@ -52,7 +53,9 @@ export default async function MonitoriasDoAtendente({
   const { data: pessoas } = veOTime
     ? await db.from('pessoas').select('id, nome').eq('avaliado', true).eq('ativo', true).order('nome')
     : { data: [{ id: perfil.id, nome: perfil.nome }] };
-  const lista = (pessoas ?? []) as { id: string; nome: string }[];
+  // Setor com monitorias desligadas não entra na visão da equipe (etapa 4).
+  const fora = veOTime ? await foraDasMonitorias(db) : new Set<string>();
+  const lista = ((pessoas ?? []) as { id: string; nome: string }[]).filter((p) => !fora.has(p.id));
   if (veOTime && !(pedida && lista.some((p) => p.id === pedida))) return <Equipe lista={lista} mesPedido={mesPedido} />;
   const pessoaId = veOTime ? pedida! : perfil.id;
   const nome = lista.find((p) => p.id === pessoaId)?.nome ?? perfil.nome;

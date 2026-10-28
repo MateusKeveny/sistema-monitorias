@@ -5,6 +5,7 @@ import { data as formatarData, mesRotulo, codigoMonitoria } from '@/lib/formatar
 import type { Monitoria, Operador } from '@/lib/tipos';
 import { ateOMesAberto, mesAbertoDasMonitorias } from '@/lib/mes-aberto';
 import MonitoriasPorAtendente from '@/componentes/MonitoriasPorAtendente';
+import { foraDasMonitorias } from '@/lib/monitorados';
 
 export const dynamic = 'force-dynamic';
 
@@ -98,11 +99,14 @@ export default async function ListaMonitorias({
     consulta = consulta.or(alternativas.join(','));
   }
 
-  const [{ data: lista, count }, { data: operadores }, { data: meses }] = await Promise.all([
+  const [{ data: lista, count }, { data: todosOperadores }, { data: meses }, fora] = await Promise.all([
     consulta,
     db.from('pessoas').select('id, nome').eq('avaliado', true).eq('ativo', true).order('nome'),
     db.from('vw_monitorias').select('mes_referencia').order('mes_referencia', { ascending: false }),
+    foraDasMonitorias(db),
   ]);
+  // Setor com monitorias desligadas não entra na lista (etapa 4).
+  const operadores = (todosOperadores ?? []).filter((p) => !fora.has(p.id as string));
 
   const monitorias = (lista ?? []) as Monitoria[];
   const total = count ?? monitorias.length;

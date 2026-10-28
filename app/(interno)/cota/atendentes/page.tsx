@@ -1,5 +1,6 @@
 import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
 import PainelAtendentes from '@/componentes/PainelAtendentes';
+import CadastroEmLote from '@/componentes/CadastroEmLote';
 import { mesAnterior } from '@/lib/competencia';
 import { hojeNoBrasil, mesDeCompetencia, periodoDaSemana } from '@/lib/formatar';
 import type { Cargo, CargoDaPessoa, Pessoa, Saida, SetorDaPessoa } from '@/lib/tipos';
@@ -62,6 +63,8 @@ export default async function Atendentes() {
           Vale para os dois sistemas.
         </p>
       </div>
+
+      <CadastroEmLote pessoas={(pessoas ?? []) as Pessoa[]} setores={(setores ?? []) as Setor[]} cargos={(cargos ?? []) as Cargo[]} />
 
       <PainelAtendentes
         pessoas={(pessoas ?? []) as Pessoa[]}

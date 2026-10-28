@@ -7,7 +7,11 @@
  * a etapa 3 (84) o cálculo lê as regras da própria fila.
  */
 
-export type Setor = { id: number; nome: string; ativo: boolean; ordem: number };
+export type Setor = {
+  id: number; nome: string; ativo: boolean; ordem: number;
+  /** Monitorias ligadas no setor e a régua dele (migrações 86 e 87). */
+  monitorias?: boolean; regra_monitoria?: string | null;
+};
 export type Canal = {
   id: number; setor_id: number; nome: string; apelido: string | null;
   nomes_no_hub: string[]; ativo: boolean; ordem: number;

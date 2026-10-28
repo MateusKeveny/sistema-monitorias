@@ -138,11 +138,12 @@ export async function GET(requisicao: NextRequest) {
       resultado: Number(p.resultado),
       csat_huggy: csatDe(p.pessoa_id, 'huggy'),
       csat_diretores: csatDe(p.pessoa_id, 'diretores'),
-      monitoria_pontos: soma('monitoria', undefined, 'cota'),
+      // A régua de monitoria do setor (87): pelo grupo, não pela chave.
+      monitoria_pontos: suas.filter((l) => l.grupo === 'monitoria').reduce((a, l) => a + Number(l.cota), 0),
     };
     for (const s of [1, 2, 3, 4]) {
       registro[`monitoria_${s}`] = suas
-        .filter((l) => l.regra === 'monitoria' && l.semana === s)
+        .filter((l) => l.grupo === 'monitoria' && l.semana === s)
         .reduce((a, l) => a + Number(l.cota), 0);
     }
     for (const c of COLUNAS_RESUMO) {
