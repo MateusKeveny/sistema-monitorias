@@ -99,7 +99,7 @@ export default async function ConfiguracaoDaCota({
       </div>
 
       {listaSetores.length > 1 && (
-        <div className="inline-flex flex-wrap gap-1 rounded-xl bg-black/25 p-1" role="tablist" aria-label="Setor">
+        <div className="inline-flex flex-wrap gap-1 rounded-xl bg-pilula p-1" role="tablist" aria-label="Setor">
           {listaSetores.map((s) => (
             <Link key={s.id} role="tab" aria-selected={s.id === setorId}
                   href={`/cota/configuracao?setor=${s.id}${cat ? `&cat=${cat}` : ''}`}

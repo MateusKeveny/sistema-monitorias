@@ -205,7 +205,7 @@ export default async function Fechamento({
             Fechamento{listaSetores.length > 1 && setor ? ` · ${setor.nome}` : ''}
           </h1>
           {listaSetores.length > 1 && (
-            <div className="mt-2 inline-flex flex-wrap gap-1 rounded-xl bg-black/25 p-1" role="tablist" aria-label="Setor">
+            <div className="mt-2 inline-flex flex-wrap gap-1 rounded-xl bg-pilula p-1" role="tablist" aria-label="Setor">
               {listaSetores.map((s) => (
                 <Link key={s.id} role="tab" aria-selected={s.id === setorId}
                       href={`/cota/fechamento?mes=${competencia.slice(0, 7)}&setor=${s.id}`}
@@ -222,11 +222,11 @@ export default async function Fechamento({
           </div>
           <p className="mt-2 text-xs text-sobre-fundo-suave">
             {congelados.length
-              ? <span className="font-semibold text-emerald-200">
+              ? <span className="font-semibold text-sobre-fundo-bom">
                   {congelados.length} pessoa(s) fechadas por {congelados[0].fechado_por_nome ?? '—'}
                   {quando ? ` em ${dataHora(quando)}` : ''}
                 </span>
-              : <span className="font-semibold text-amber-200">Ainda aberto</span>}
+              : <span className="font-semibold text-sobre-fundo-atencao">Ainda aberto</span>}
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-2">

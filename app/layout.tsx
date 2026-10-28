@@ -46,9 +46,12 @@ const APLICAR_TEMA = `
 })();
 `;
 
-export default function LayoutRaiz({ children }: { children: React.ReactNode }) {
+export default async function LayoutRaiz({ children }: { children: React.ReactNode }) {
+  // O visual da 3.0 (globals.css, data-visual="3") é do Performance; Monitorias
+  // e Agenda seguem no visual de antes.
+  const sistema = await sistemaAtual();
   return (
-    <html lang="pt-BR" suppressHydrationWarning>
+    <html lang="pt-BR" suppressHydrationWarning data-visual={sistema === 'cota' ? '3' : undefined}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: APLICAR_TEMA }} />
       </head>

@@ -53,7 +53,7 @@ export default function SetasDeCompetencia({
   const anterior = disponiveis ? disponiveis[naLista + 1] : andar(competencia, -1);
   const seguinte = disponiveis ? disponiveis[naLista - 1] : andar(competencia, 1);
   const botao = `grid ${compacto ? 'h-7 w-7 text-sm' : 'h-9 w-9 text-lg'} shrink-0 place-items-center rounded-full
-                 border border-white/35 bg-black/15 leading-none text-sobre-fundo transition hover:bg-black/30`;
+                 border border-sobre-fundo/35 bg-pilula leading-none text-sobre-fundo transition hover:bg-sobre-fundo/15`;
   const Titulo = compacto ? 'h2' : 'h1';
 
   return (

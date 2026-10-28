@@ -29,6 +29,11 @@
      então esse texto é claro em ambos. Dentro dos cartões vale a escala normal. */
   --color-sobre-fundo: #ffffff;
   --color-sobre-fundo-suave: #d8ead9;
+  /* Também sobre a arte: a pílula translúcida das abas e os selos de situação.
+     Viraram token para o visual da 3.0 (fundo liso) poder trocá-los. */
+  --color-pilula: rgb(0 0 0 / 0.25);
+  --color-sobre-fundo-bom: #a7f3d0;
+  --color-sobre-fundo-atencao: #fde68a;
 }
 
 /* ---------------------------------------------------------------------------
@@ -119,6 +124,144 @@ body {
 
 .dark body {
   background-image: url('/fundo-escuro.webp');
+}
+
+/* ---------------------------------------------------------------------------
+   Visual da 3.0 (aprovado em 27/10/2026, cor "Marca"), só no Performance:
+   o <html> ganha data-visual="3" (app/layout.tsx). Monitorias e Agenda seguem
+   no visual de antes.
+
+   A estrutura das telas não muda: a base troca os tokens — fundo liso no lugar
+   da arte, superfícies e cinzas grafite-esverdeados, verde só no destaque — e
+   o texto que ficava sobre a arte (claro nos dois temas) passa a seguir o fundo.
+--------------------------------------------------------------------------- */
+html[data-visual='3'] {
+  --color-pagina: #eef1f3;
+  --color-superficie: #ffffff;
+  --color-sobre-fundo: #0b1513;
+  --color-sobre-fundo-suave: #4b5a56;
+  --color-pilula: rgb(5 150 105 / 0.10);
+  --color-sobre-fundo-bom: #047857;
+  --color-sobre-fundo-atencao: #b45309;
+
+  --color-slate-50:  #f4f7f6;
+  --color-slate-100: #eaf0ed;
+  --color-slate-200: #dce3e0;
+  --color-slate-300: #c6d1cc;
+  --color-slate-400: #87958f;
+  --color-slate-500: #66756f;
+  --color-slate-600: #4b5a56;
+  --color-slate-700: #33413c;
+  --color-slate-800: #1b2622;
+  --color-slate-900: #0b1513;
+
+  --sombra-3: 0 1px 2px rgb(15 23 42 / 0.06), 0 6px 18px rgb(15 23 42 / 0.06);
+}
+
+html[data-visual='3'].dark {
+  --color-pagina: #0a0d0c;
+  --color-superficie: #131816;
+  --color-sobre-fundo: #f2f6f4;
+  --color-sobre-fundo-suave: #a2b2ab;
+  --color-pilula: rgb(16 185 129 / 0.15);
+  --color-sobre-fundo-bom: #6ee7b7;
+  --color-sobre-fundo-atencao: #fcd34d;
+
+  --color-slate-50:  #18201d;
+  --color-slate-100: #1d2622;
+  --color-slate-200: #24302b;
+  --color-slate-300: #34423c;
+  --color-slate-400: #6a7a73;
+  --color-slate-500: #87968f;
+  --color-slate-600: #a2b2ab;
+  --color-slate-700: #c7d3ce;
+  --color-slate-800: #e2eae6;
+  --color-slate-900: #f2f6f4;
+
+  --sombra-3: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 8px 28px rgb(0 0 0 / 0.45);
+}
+
+/* Fundo liso nos dois temas: sem a arte (ela volta só na faixa do Início). */
+html[data-visual='3'] body,
+html[data-visual='3'].dark body {
+  background-image: none;
+}
+
+/* Cartões: borda fina, sombra suave e cantos mais arredondados, como no protótipo. */
+html[data-visual='3'] .bg-superficie.rounded-2xl {
+  border: 1px solid var(--color-slate-200);
+  border-radius: 20px;
+}
+html[data-visual='3'] .bg-superficie.rounded-2xl.shadow-sm {
+  box-shadow: var(--sombra-3);
+}
+
+/* Títulos de página mais firmes. */
+html[data-visual='3'] main h1 {
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+/* Menu lateral: item atual em verde cheio, ícones em verde (protótipo). */
+html[data-visual='3'] aside nav a svg {
+  color: var(--color-marca-600);
+  opacity: 1;
+}
+html[data-visual='3'] aside nav a[aria-current='page'] {
+  background: var(--color-marca-600);
+  color: #fff;
+}
+html[data-visual='3'] aside nav a[aria-current='page'] svg {
+  color: #fff;
+}
+html[data-visual='3'] aside nav a[aria-current='page'] > span[aria-hidden]:first-child {
+  display: none;
+}
+html[data-visual='3'].dark aside nav a svg {
+  color: var(--color-marca-400);
+}
+html[data-visual='3'].dark aside nav a[aria-current='page'] {
+  background: var(--color-marca-500);
+  color: #04120d;
+}
+html[data-visual='3'].dark aside nav a[aria-current='page'] svg {
+  color: #04120d;
+}
+
+/* Cartões de destaque (SeletorDeDetalhe): sobem um pouco ao passar o mouse; o
+   escolhido fica com o contorno verde, os outros com a borda fina. */
+html[data-visual='3'] .destaque {
+  border-radius: 20px;
+  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.2s;
+}
+html[data-visual='3'] .destaque[aria-selected='false'] {
+  border-color: var(--color-slate-200);
+  border-width: 1px;
+  margin: 1px;
+}
+html[data-visual='3'] .destaque:hover {
+  transform: translateY(-2px);
+}
+
+/* Faixa do Início (3.0): a arte de fundo volta só aqui, com um véu escuro à
+   esquerda para a saudação. Dentro dela, o texto "sobre a arte" volta a ser
+   claro, como era no visual antigo. */
+.faixa-inicio {
+  background: url('/fundo-claro.webp') right 42% / cover no-repeat;
+  box-shadow: var(--sombra-3, 0 1px 2px rgb(0 0 0 / 0.08));
+}
+.faixa-inicio::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgb(4 10 8 / 0.62) 0%, rgb(4 10 8 / 0.2) 50%, rgb(4 10 8 / 0) 75%);
+}
+.sobre-arte {
+  --color-sobre-fundo: #ffffff;
+  --color-sobre-fundo-suave: #d8ead9;
+  --color-pilula: rgb(0 0 0 / 0.25);
+  --color-sobre-fundo-bom: #a7f3d0;
+  --color-sobre-fundo-atencao: #fde68a;
 }
 
 /* Campos de formulário precisam de fundo próprio. Sem isso ficam transparentes

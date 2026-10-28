@@ -39,7 +39,7 @@ export function AbasDeCanal({ naSuperficie = false }: { naSuperficie?: boolean }
   const [canal, escolher] = useContext(Contexto);
   return (
     <div role="tablist" aria-label="Canal"
-         className={`inline-flex gap-1 rounded-full p-1 ${naSuperficie ? 'bg-slate-100' : 'bg-black/25'}`}>
+         className={`inline-flex gap-1 rounded-full p-1 ${naSuperficie ? 'bg-slate-100' : 'bg-pilula'}`}>
       {CANAIS.map(([chave, rotulo]) => (
         <button key={chave} type="button" role="tab" aria-selected={canal === chave}
                 onClick={() => escolher(chave)}

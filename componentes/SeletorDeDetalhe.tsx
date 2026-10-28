@@ -48,7 +48,7 @@ export default function SeletorDeDetalhe({
             <button key={d.chave} type="button" role="tab" aria-selected={ativo}
                     aria-controls={`detalhe-${d.chave}`}
                     onClick={() => setAberto(alternar && ativo ? null : d.chave)}
-                    className={`relative rounded-2xl border-2 px-5 py-4 text-left shadow-sm transition-colors ${
+                    className={`destaque relative rounded-2xl border-2 px-5 py-4 text-left shadow-sm transition-colors ${
                       d.tom === 'atencao' ? 'bg-amber-50' : 'bg-superficie'} ${
                       ativo ? 'border-marca-600' : 'border-transparent hover:border-slate-200'}`}>
               {d.bloco}

@@ -713,7 +713,7 @@ export default async function PainelGestor({
           <span className="mr-1 text-sm font-semibold text-sobre-fundo">Precisa de você</span>
           {pendencias.map((p) => (
             <Link key={p.texto} href={p.href}
-                  className="inline-flex items-center gap-2 rounded-xl bg-superficie py-1.5 pl-3 pr-1.5 text-sm text-slate-800
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-superficie py-1.5 pl-3 pr-1.5 text-sm text-slate-800
                              shadow-sm transition hover:ring-2 hover:ring-marca-600/40">
               <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${p.grave ? 'bg-rose-500' : 'bg-amber-500'}`} />
               {p.texto}

@@ -49,7 +49,7 @@ export default function LeituraObrigatoria({
       <div className="mx-auto flex max-w-3xl items-center justify-between">
         <span className="text-sm font-bold tracking-tight text-sobre-fundo">Painel de Performance</span>
         <button type="button" onClick={sair}
-                className="rounded-lg border border-white/30 px-3 py-1.5 text-sm font-medium text-sobre-fundo hover:bg-white/10">
+                className="rounded-lg border border-sobre-fundo/30 px-3 py-1.5 text-sm font-medium text-sobre-fundo hover:bg-sobre-fundo/10">
           Sair
         </button>
       </div>
@@ -62,7 +62,7 @@ export default function LeituraObrigatoria({
 
         <div className="mt-4 flex items-center gap-3 text-sm text-sobre-fundo-suave">
           <span className="tabular-nums">{feitos} de {total} confirmado{total > 1 ? 's' : ''}</span>
-          <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/20" role="progressbar"
+          <div className="h-2 flex-1 overflow-hidden rounded-full bg-sobre-fundo/20" role="progressbar"
                aria-valuemin={0} aria-valuemax={total} aria-valuenow={feitos}>
             <div className="h-full rounded-full bg-emerald-400 transition-[width] duration-300"
                  style={{ width: `${total ? (feitos / total) * 100 : 100}%` }} />

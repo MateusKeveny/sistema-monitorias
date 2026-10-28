@@ -12,8 +12,8 @@ export default function Carregando() {
   return (
     <div className="space-y-6" aria-busy="true" aria-label="Carregando">
       <div className="space-y-2">
-        <div className="h-8 w-72 animate-pulse rounded bg-white/15 motion-reduce:animate-none" />
-        <div className="h-4 w-56 animate-pulse rounded bg-white/10 motion-reduce:animate-none" />
+        <div className="h-8 w-72 animate-pulse rounded bg-sobre-fundo/15 motion-reduce:animate-none" />
+        <div className="h-4 w-56 animate-pulse rounded bg-sobre-fundo/10 motion-reduce:animate-none" />
       </div>
 
       <div className="divide-y divide-slate-200 rounded-2xl bg-superficie shadow-sm">

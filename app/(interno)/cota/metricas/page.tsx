@@ -107,7 +107,7 @@ export default async function MetricasDaSemana({
           O TME conta pela equipe: a faixa sai do TME médio do canal na semana e vale para os atendimentos de
           todos. Numa semana atípica, desligue a chave — a faixa deixa de entrar no extrato da equipe toda do
           canal. O motivo fica registrado e só a gestão vê.
-          {(fechado.count ?? 0) > 0 && <strong className="ml-1 text-amber-200">Este mês já foi fechado: só consulta.</strong>}
+          {(fechado.count ?? 0) > 0 && <strong className="ml-1 text-sobre-fundo-atencao">Este mês já foi fechado: só consulta.</strong>}
         </p>
       </div>
       <PainelMetricasDaSemana competencia={competencia} canais={canais} registros={registros}

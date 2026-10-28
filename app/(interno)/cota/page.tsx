@@ -28,11 +28,11 @@ function saudacao() {
 /** Selo da situação do mês, sobre a arte de fundo — legível no verde e no preto. */
 function Selo({ tom, children }: { tom: 'bom' | 'atencao' | 'neutro'; children: React.ReactNode }) {
   const cores = {
-    bom: 'border-emerald-400/40 bg-emerald-500/20 text-emerald-200',
-    atencao: 'border-amber-400/40 bg-amber-500/20 text-amber-200',
-    neutro: 'border-white/25 bg-white/10 text-sobre-fundo-suave',
+    bom: 'border-emerald-400/40 bg-emerald-500/20 text-sobre-fundo-bom',
+    atencao: 'border-amber-400/40 bg-amber-500/20 text-sobre-fundo-atencao',
+    neutro: 'border-sobre-fundo/25 bg-sobre-fundo/10 text-sobre-fundo-suave',
   };
-  const ponto = { bom: 'bg-emerald-400', atencao: 'bg-amber-400', neutro: 'bg-white/60' };
+  const ponto = { bom: 'bg-emerald-400', atencao: 'bg-amber-400', neutro: 'bg-sobre-fundo/60' };
   return (
     <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${cores[tom]}`}>
       <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${ponto[tom]}`} />
@@ -109,10 +109,13 @@ export default async function InicioCota({
    *
    * O selo fala do fechamento, que é trabalho do gestor: só ele vê.
    */
+  // Na 3.0 o topo vira a faixa verde do protótipo: a arte de fundo só aqui,
+  // com o texto claro por cima (globals.css, .faixa-inicio e .sobre-arte).
   const Topo = ({ selo, direita }: { selo?: React.ReactNode; direita?: React.ReactNode }) => (
-    <div className="flex flex-wrap items-end justify-between gap-4">
+    <div className="faixa-inicio sobre-arte relative overflow-hidden rounded-[22px] px-8 py-7">
+    <div className="relative flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">
+        <h1 className="text-[1.9rem] font-bold tracking-tight text-sobre-fundo">
           {saudacao()}, {nomeCurto(perfil.nome).split(' ')[0]}
         </h1>
         <div className="mt-1.5">
@@ -135,6 +138,7 @@ export default async function InicioCota({
         )}
       </div>
       {direita}
+    </div>
     </div>
   );
 
@@ -243,7 +247,7 @@ export default async function InicioCota({
               <span className="mr-1 text-sm font-semibold text-sobre-fundo">Precisa de você</span>
               {pendenciasDoDiario.map((p) => (
                 <Link key={p.href} href={p.href}
-                      className="inline-flex items-center gap-2 rounded-xl bg-superficie py-1.5 pl-3 pr-1.5 text-sm text-slate-800
+                      className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-superficie py-1.5 pl-3 pr-1.5 text-sm text-slate-800
                                  shadow-sm transition hover:ring-2 hover:ring-marca-600/40">
                   <span aria-hidden className="h-2 w-2 shrink-0 rounded-full bg-amber-500" />
                   {p.texto}

@@ -437,7 +437,7 @@ export default async function Comparativo({
             </p>
           </div>
           {/* Período: navegação, porque muda o que se consulta. */}
-          <div className="inline-flex gap-1 rounded-full bg-black/25 p-1">
+          <div className="inline-flex gap-1 rounded-full bg-pilula p-1">
             {PERIODOS.map((p) => (
               <Link key={p} href={`/cota/comparativo?n=${p}${cat ? `&cat=${cat}` : ''}`}
                     aria-current={p === periodo ? 'true' : undefined}

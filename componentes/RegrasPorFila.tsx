@@ -109,7 +109,7 @@ export default function RegrasPorFila({ setores, filas, regras, pesos, cargos }:
   return (
     <div className="space-y-6">
       {setoresComFila.length > 1 && (
-        <div className="inline-flex gap-1 rounded-xl bg-black/25 p-1" role="tablist" aria-label="Setor">
+        <div className="inline-flex gap-1 rounded-xl bg-pilula p-1" role="tablist" aria-label="Setor">
           {setoresComFila.map((s) => (
             <button key={s.id} type="button" role="tab" aria-selected={setorId === s.id}
                     onClick={() => { setSetorId(s.id); setRascunho({}); setErro(null); setAviso(null); }}

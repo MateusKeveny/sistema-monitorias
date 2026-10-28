@@ -301,7 +301,7 @@ export default async function LancamentosDeCota({
           </p>
         </div>
 
-        <div className="inline-flex rounded-xl bg-black/25 p-1" role="tablist" aria-label="Fila">
+        <div className="inline-flex rounded-xl bg-pilula p-1" role="tablist" aria-label="Fila">
           {abasDeFila.map((f) => {
             const ativa = !setor && canal === f.apelido;
             return (
@@ -313,7 +313,7 @@ export default async function LancamentosDeCota({
                   : 'text-sobre-fundo-suave hover:text-sobre-fundo'}`}
               >
                 {f.nome}
-                {!f.regra_finalizado && <span className="ml-1.5 rounded-full bg-amber-500/20 px-1.5 py-px text-[10px] font-semibold text-amber-200">sem regras</span>}
+                {!f.regra_finalizado && <span className="ml-1.5 rounded-full bg-amber-500/20 px-1.5 py-px text-[10px] font-semibold text-sobre-fundo-atencao">sem regras</span>}
               </Link>
             );
           })}

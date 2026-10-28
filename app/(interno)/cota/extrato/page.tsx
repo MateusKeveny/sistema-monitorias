@@ -393,7 +393,7 @@ export default async function Extrato({
           </div>
           <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-sobre-fundo-suave">
             {(congelado?.cargo ?? cota.data?.cargo) && <span>{congelado?.cargo ?? cota.data?.cargo}</span>}
-            {congelado && <span className="font-semibold text-emerald-200">Competência fechada · valores congelados no fechamento</span>}
+            {congelado && <span className="font-semibold text-sobre-fundo-bom">Competência fechada · valores congelados no fechamento</span>}
             {emAberto && <span className="opacity-75">{mesRotulo(atual)} ainda sem lançamentos</span>}
             {!congelado && fonte.resumo && (
               <CarimboDoResumo competencia={competencia} atualizadoEm={fonte.resumo.atualizadoEm}
