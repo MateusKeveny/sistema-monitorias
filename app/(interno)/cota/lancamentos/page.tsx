@@ -59,7 +59,7 @@ export default async function LancamentosDeCota({
   ]);
   const hoje = hojeNoBrasil();
 
-  const [pessoas, regras, pesos, historico, lancamentos, conferencia, volumes, anterior, pendentes, cargos, outroSetor, setoresDoMes, volumesOutro, notasOutro] = await Promise.all([
+  const [pessoas, regras, pesos, historico, lancamentos, conferencia, volumes, anterior, pendentes, cargos, outroSetor, setoresDoMes, volumesOutro, notasOutro, nomesDasRegras] = await Promise.all([
     db.from('pessoas').select('*').order('nome'),
     db.from('regras').select('*').eq('manual', true).eq('ativo', true).order('ordem'),
     db.from('pesos_por_cargo').select('cargo_id, regra, peso, ativo').eq('ativo', true),
@@ -83,6 +83,9 @@ export default async function LancamentosDeCota({
     db.from('volume_outro_setor').select('setor, pessoa_id, semana, resolvidos').eq('mes_competencia', competencia),
     // As avaliações do outro setor por semana, para o cartão da aba dele.
     db.from('atendimentos_outro_setor').select('setor, semana').eq('mes_competencia', competencia).not('nota', 'is', null),
+    // O nome de toda regra, para a lista: as cópias de C-SAT e notas do outro
+    // setor não são manuais e apareciam com a chave.
+    db.from('regras').select('chave, rotulo'),
   ]);
   const setoresBypass = [...new Set(((setoresDoMes.data ?? []) as { setor: string }[]).map((s) => s.setor))].sort();
 
@@ -332,6 +335,7 @@ export default async function LancamentosDeCota({
         competencia={competencia}
         pessoas={(pessoas.data ?? []) as Pessoa[]}
         regras={(regras.data ?? []) as RegraCota[]}
+        rotulos={Object.fromEntries(((nomesDasRegras.data ?? []) as { chave: string; rotulo: string }[]).map((r) => [r.chave, r.rotulo]))}
         pesos={(pesos.data ?? []) as PesoCargo[]}
         historico={listaHistorico}
         lancamentos={(lancamentos.data ?? []) as Lancamento[]}

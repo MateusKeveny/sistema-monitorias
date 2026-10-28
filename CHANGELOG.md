@@ -35,6 +35,15 @@ para o Performance.
 
 ---
 
+## Performance 2.11.4
+
+Sem migração. Não muda as Monitorias nem a Agenda.
+
+- **Performance (correção): nome das regras do iGreen Mob na lista de
+  lançamentos.** Em Lançamentos, as linhas de C-SAT e de notas do iGreen Mob
+  apareciam com a chave interna (`outro_setor_igreen_mob__nota_5`); agora
+  aparecem com o nome ("Nota 5 · iGreen Mob").
+
 ## Performance 2.11.3
 
 Sem migração. Não muda as Monitorias nem a Agenda.
