@@ -41,8 +41,8 @@ const GRUPOS = [
 
 function grupoDa(r: RegraCota): string {
   // Cópia de outro setor (etapa 4): a chave e o grupo levam o sufixo do setor.
-  const chave = r.chave.replace(/_sd+$/, '');
-  const grupo = r.grupo.replace(/_sd+$/, '');
+  const chave = r.chave.replace(/_s\d+$/, '');
+  const grupo = r.grupo.replace(/_s\d+$/, '');
   if (chave === 'huggy_atendimento' || chave === 'transferencias' || grupo === 'tme') return 'expansao';
   if (grupo === 'csat') return 'csat';
   if (grupo === 'nota') return 'notas';

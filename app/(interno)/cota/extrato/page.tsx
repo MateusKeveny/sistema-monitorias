@@ -293,18 +293,18 @@ export default async function Extrato({
 
   // Mesma escala de cor do painel: verde na meta, âmbar atenção, rosa ruim.
   const tomCsat = (v: number) => v >= 0.9
-    ? 'bg-marca-600/15 text-marca-700 dark:text-marca-400'
-    : v >= 0.85 ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
-      : 'bg-rose-500/15 text-rose-700 dark:text-rose-300';
+    ? 'bg-marca-600/10 text-marca-700 dark:text-marca-400'
+    : v >= 0.85 ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300'
+      : 'bg-rose-500/10 text-rose-700 dark:text-rose-300';
   const tomMonitoria = (v: number) => v > 0.85
-    ? 'bg-marca-600/15 text-marca-700 dark:text-marca-400'
-    : 'bg-amber-500/15 text-amber-700 dark:text-amber-300';
+    ? 'bg-marca-600/10 text-marca-700 dark:text-marca-400'
+    : 'bg-amber-500/10 text-amber-700 dark:text-amber-300';
 
   /** O C-SAT de um canal no cartão da semana, na cor da escala. */
   const etiquetaCsat = (canal: Canal, semana: number) => {
     const c = csatDe(canal, semana);
     return c ? (
-      <span className={`rounded-md px-1.5 py-px font-semibold ${tomCsat(Number(c.csat))}`}>
+      <span className={`rounded-full px-2 py-px font-semibold ${tomCsat(Number(c.csat))}`}>
         {canal === 'huggy' ? 'Exp' : 'Dir'} {percentual(Number(c.csat))}
       </span>
     ) : null;
@@ -317,7 +317,7 @@ export default async function Extrato({
 
   /** Uma linha da tabela: rótulo, quantidade, peso e pontos. */
   const Linha = ({ l, detalhe }: { l: Linha; detalhe?: string }) => (
-    <tr className="border-t border-slate-100">
+    <tr className="border-t border-slate-100 transition-colors hover:bg-slate-50">
       <td className="py-1.5 pr-2 text-slate-800">
         {l.rotulo}
         {detalhe && <span className="ml-2 text-xs font-semibold text-marca-700 dark:text-marca-400">{detalhe}</span>}
@@ -428,8 +428,8 @@ export default async function Extrato({
           <div className="grid items-center gap-x-10 gap-y-4 md:grid-cols-[auto_1fr_auto]">
             <div>
               <p className="text-sm text-slate-500">Resultado da competência</p>
-              <p className="text-3xl font-semibold tabular-nums text-slate-900">
-                {num(resultado, 0)} <span className="text-base font-normal text-slate-500">pts</span>
+              <p className="mt-0.5 text-[2.4rem] font-bold leading-none tracking-tight tabular-nums text-slate-900">
+                {num(resultado, 0)} <span className="text-base font-normal tracking-normal text-slate-500">pts</span>
               </p>
             </div>
 
@@ -448,7 +448,7 @@ export default async function Extrato({
             {valorRh != null ? (
               // Valor do RH (2.2.2): é o que a pessoa recebe, com ou sem valor por ponto.
               <div className="md:text-right">
-                <p className="text-2xl font-semibold tabular-nums text-marca-700 dark:text-marca-400">{reais(valorRh)}</p>
+                <p className="inline-block rounded-full bg-emerald-500/10 px-4 py-1 text-2xl font-semibold tabular-nums text-marca-700 dark:text-marca-400">{reais(valorRh)}</p>
                 <p className="mt-0.5 text-xs text-slate-500">valor encaminhado pelo RH</p>
               </div>
             ) : pagamento ? (
@@ -458,7 +458,7 @@ export default async function Extrato({
                     <p className="text-sm text-slate-600">Valor por ponto ainda não informado.</p>
                   ) : (
                     <>
-                      <p className="text-2xl font-semibold tabular-nums text-marca-700 dark:text-marca-400">
+                      <p className="inline-block rounded-full bg-emerald-500/10 px-4 py-1 text-2xl font-semibold tabular-nums text-marca-700 dark:text-marca-400">
                         {reais(pagamento.valor)}
                       </p>
                       <p className="mt-0.5 text-xs text-slate-500">
@@ -486,7 +486,7 @@ export default async function Extrato({
       )}
 
       {temChamados && (
-        <div role="tablist" className="inline-flex rounded-xl bg-superficie p-1 shadow-sm">
+        <div role="tablist" className="inline-flex gap-1 rounded-full border border-slate-200 bg-superficie p-1 shadow-sm">
           {([['pontos', 'Pontos'], ['chamados', 'Chamados']] as const).map(([chave, rotulo]) => {
             const ativa = (chave === 'chamados') === abaChamados;
             const q = new URLSearchParams({ mes: competencia.slice(0, 7), ...(veOTime ? { pessoa: pessoaId } : {}),
@@ -495,7 +495,7 @@ export default async function Extrato({
               // <a> e não Link: carrega a página inteira. Pelo Link, a troca de aba
             // não completava no navegador do Analista (1.38.1); o endereço direto abria.
             <a key={chave} role="tab" aria-selected={ativa} href={`/cota/extrato?${q}`}
-                    className={`rounded-lg px-4 py-1.5 text-sm font-medium ${ativa
+                    className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${ativa
                       ? 'bg-marca-600 font-semibold text-white' : 'text-slate-600 hover:text-slate-900'}`}>
                 {rotulo}
               </a>
@@ -546,8 +546,8 @@ export default async function Extrato({
                             i.cota < 0 ? 'text-rose-700 dark:text-rose-300' : 'text-marca-700 dark:text-marca-400'}`}>
                             {linhaMedia && i.cota > 0 ? um(i.cota) : <>{i.cota < 0 ? '−' : '+'}{num(Math.abs(i.cota), 1)}</>}
                           </span>
-                          <span className="col-span-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                            <span className={`crescer-x block h-full origin-left rounded-full ${
+                          <span className="col-span-2 h-2 overflow-hidden rounded-full bg-slate-100">
+                            <span className={`barra-semana crescer-x block h-full origin-left rounded-full ${
                               i.cota < 0 ? 'bg-rose-500' : 'bg-marca-600'}`}
                                   style={{ transform: `scaleX(${Math.max(0.02, Math.abs(i.cota) / maiorOrigem)})` }} />
                           </span>
@@ -585,7 +585,7 @@ export default async function Extrato({
               // (Pleno, Analista, Gestor), o que a semana teve (08/10).
               const temCsat = semanal.some((c) => c.semana === semana);
               // A régua de monitoria do setor: 'monitoria' ou a cópia dela (monitoria_s5).
-              const medeMonitoria = [...pesoDaFaixa].some(([regra, peso]) => /^monitoria(_sd+)?$/.test(regra) && peso !== 0);
+              const medeMonitoria = [...pesoDaFaixa].some(([regra, peso]) => /^monitoria(_s\d+)?$/.test(regra) && peso !== 0);
               const doQue = [...new Map(daSemana.filter((l) => Math.abs(Number(l.cota)) >= 0.005)
                 .map((l) => [l.regra, l])).values()]
                 .map((l) => ({ rotulo: l.rotulo, vezes: daSemana.filter((x) => x.regra === l.regra)
@@ -597,7 +597,7 @@ export default async function Extrato({
                 bloco: (
                   <>
                     <p className="tabular-nums text-[13px] text-slate-500">{semana}ª semana{linhaMedia ? ' · demanda' : ''}</p>
-                    <p className={`tabular-nums text-2xl font-semibold ${soma < 0 ? 'text-rose-700' : 'text-slate-900'}`}>
+                    <p className={`tabular-nums text-[1.65rem] font-semibold tracking-tight ${soma < 0 ? 'text-rose-700' : 'text-slate-900'}`}>
                       {num(soma, 0)} pts
                     </p>
                     {temCsat && (
@@ -613,7 +613,7 @@ export default async function Extrato({
                     {medeMonitoria && <p className="tabular-nums mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
                       Monitoria
                       {monitoria ? (
-                        <span className={`rounded-md px-1.5 py-px font-semibold ${tomMonitoria(Number(monitoria.quantidade))}`}>
+                        <span className={`rounded-full px-2 py-px font-semibold ${tomMonitoria(Number(monitoria.quantidade))}`}>
                           {percentual(Number(monitoria.quantidade))}
                         </span>
                       ) : <span className="text-slate-400">—</span>}
@@ -671,8 +671,8 @@ export default async function Extrato({
                     <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                       {composicao.map((c) => (
                         <li key={c.pessoa}
-                            className="flex items-baseline justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2
-                                       ring-1 ring-slate-200">
+                            className="flex items-baseline justify-between gap-2 rounded-xl bg-slate-50 px-3.5 py-2.5
+                                       ring-1 ring-slate-200 transition-colors hover:ring-slate-300">
                           <span className="min-w-0">
                             <span className="block truncate text-sm text-slate-700">{nomeCurto(c.pessoa)}</span>
                             <span className="block text-[10px] text-slate-400">
@@ -798,7 +798,7 @@ export default async function Extrato({
                       )}
                       {linhasFaixa.map((f) => (
                         <tr key={f.faixa.chave}
-                            className={`border-t border-slate-100 ${f.semanas.length ? '' : 'text-slate-400'}`}>
+                            className={`border-t border-slate-100 transition-colors hover:bg-slate-50 ${f.semanas.length ? '' : 'text-slate-400'}`}>
                           <td className="py-1.5 pr-2">
                             {f.faixa.rotulo}
                             {f.semanas.length > 0 && (
