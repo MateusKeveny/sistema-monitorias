@@ -286,6 +286,21 @@ export default async function Extrato({
   const csatDe = (origem: Canal | null, semana: number | null) =>
     origem && semana ? semanal.find((c) => c.origem === origem && c.semana === semana) : undefined;
 
+  // C-SAT de outro setor (bypass, migração 81; 2.11.3): as avaliações do setor
+  // são só da gestão, mas as notas de 1 a 5 estão no próprio extrato — 4 e 5
+  // sobre o total é a mesma conta do cálculo. Sem semana, o mês inteiro.
+  const csatDoOutro = (base: string, semana: number | null) => {
+    const notas = linhas.filter((l) => /__nota_[1-5]$/.test(l.regra) && l.regra.startsWith(`${base}__`)
+      && (semana == null || l.semana === semana));
+    const avaliacoes = notas.reduce((a, l) => a + Number(l.quantidade), 0);
+    const positivas = notas.filter((l) => /__nota_[45]$/.test(l.regra)).reduce((a, l) => a + Number(l.quantidade), 0);
+    return avaliacoes ? { csat: positivas / avaliacoes, positivas, avaliacoes } : undefined;
+  };
+  /** O C-SAT do quadro: do canal, ou do outro setor. */
+  const csatDoQuadro = (quadro: string, semana: number | null) => quadro.startsWith('outro:')
+    ? csatDoOutro(quadro.slice(6), semana)
+    : quadro === 'geral' ? undefined : csatDe(quadro as Canal, semana);
+
   // Mesma escala de cor do painel: verde na meta, âmbar atenção, rosa ruim.
   const tomCsat = (v: number) => v >= 0.9
     ? 'bg-marca-600/15 text-marca-700 dark:text-marca-400'
@@ -296,11 +311,13 @@ export default async function Extrato({
     : 'bg-amber-500/15 text-amber-700 dark:text-amber-300';
 
   /** O C-SAT de um canal no cartão da semana, na cor da escala. */
-  const etiquetaCsat = (canal: Canal, semana: number) => {
-    const c = csatDe(canal, semana);
+  const etiquetaCsat = (quadro: string, semana: number) => {
+    const c = csatDoQuadro(quadro, semana);
+    const rotulo = quadro === 'huggy' ? 'Exp' : quadro === 'diretores' ? 'Dir'
+      : nomeDoSetor(quadro.slice(6)).replace(/^iGreen\s+/, '');
     return c ? (
-      <span className={`rounded-md px-1.5 py-px font-semibold ${tomCsat(Number(c.csat))}`}>
-        {canal === 'huggy' ? 'Exp' : 'Dir'} {percentual(Number(c.csat))}
+      <span key={quadro} className={`rounded-md px-1.5 py-px font-semibold ${tomCsat(Number(c.csat))}`}>
+        {rotulo} {percentual(Number(c.csat))}
       </span>
     ) : null;
   };
@@ -578,7 +595,8 @@ export default async function Extrato({
               const canais = canaisDe(daSemana);
               // C-SAT e Monitoria só para quem é medido por eles; para os demais
               // (Pleno, Analista, Gestor), o que a semana teve (08/10).
-              const temCsat = semanal.some((c) => c.semana === semana);
+              const comCsat = [...new Set(['huggy', 'diretores', ...canais])].filter((q) => csatDoQuadro(q, semana));
+              const temCsat = comCsat.length > 0;
               const medeMonitoria = (pesoDaFaixa.get('monitoria') ?? 0) !== 0;
               const doQue = [...new Map(daSemana.filter((l) => Math.abs(Number(l.cota)) >= 0.005)
                 .map((l) => [l.regra, l])).values()]
@@ -597,8 +615,7 @@ export default async function Extrato({
                     {temCsat && (
                       <p className="tabular-nums mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
                         C-SAT
-                        {etiquetaCsat('huggy', semana)}
-                        {etiquetaCsat('diretores', semana)}
+                        {comCsat.map((q) => etiquetaCsat(q, semana))}
                       </p>
                     )}
                     {!temCsat && !medeMonitoria && doQue.map((d) => (
@@ -618,7 +635,7 @@ export default async function Extrato({
                   <div className="grid items-start gap-4 xl:grid-cols-3">
                     {canais.map((canal) => {
                       const doCanal = naOrdem(daSemana.filter((l) => quadroDa(l) === canal));
-                      const c = csatDe(canal === 'geral' || canal.startsWith('outro:') ? null : canal as Canal, semana);
+                      const c = csatDoQuadro(canal, semana);
                       const somaCanal = doCanal.reduce((a, l) => a + Number(l.cota), 0);
                       const tmeFora = semanasSemTme.has(`${semana}|${canal}`);
                       return (
@@ -632,7 +649,7 @@ export default async function Extrato({
                             <tbody>
                               {doCanal.map((l) => (
                                 <Linha key={`${l.regra}-${l.origem ?? 'sem'}`} l={l}
-                                       detalhe={l.grupo === 'csat' && c ? percentual(Number(c.csat)) : undefined} />
+                                       detalhe={(l.grupo === 'csat' || /__csat_/.test(l.regra)) && c ? percentual(Number(c.csat)) : undefined} />
                               ))}
                             </tbody>
                           </table>
@@ -762,6 +779,20 @@ export default async function Extrato({
               const antes = naOrdem(categorias).filter((l) => lugar(l) < posicao('csat', 0));
               const depois = naOrdem(categorias).filter((l) => lugar(l) >= posicao('csat', 0));
               const monitoria = categorias.find((l) => l.grupo === 'monitoria');
+              // Outro setor (2.11.3): o C-SAT do mês sai das notas do próprio
+              // extrato, e cada faixa marca as semanas que caíram nela.
+              const base = canal.startsWith('outro:') ? canal.slice(6) : null;
+              const csatDoSetor = base ? csatDoOutro(base, null) : undefined;
+              const semanasDaFaixa = (regra: string) => !base ? [] : [...new Set(doCanal.map((l) => l.semana))]
+                .filter((s): s is number => s != null)
+                .filter((s) => {
+                  const c = csatDoOutro(base, s);
+                  const f = c && faixaDo(c.csat, faixas);
+                  return f != null && regra.endsWith(`__${f.chave}`);
+                })
+                .sort();
+              const ehCsatDoSetor = (l: { regra: string }) => base != null && /__csat_/.test(l.regra);
+              const ehNotaDoSetor = (l: { regra: string }) => base != null && /__nota_[1-5]$/.test(l.regra);
 
               return (
                 <Quadro
@@ -773,7 +804,31 @@ export default async function Extrato({
                   <table className="w-full text-sm">
                     <Cabecalho />
                     <tbody>
-                      {antes.map((l) => <Linha key={l.regra} l={l} />)}
+                      {antes.filter((l) => !ehCsatDoSetor(l) && !ehNotaDoSetor(l)).map((l) => <Linha key={l.regra} l={l} />)}
+
+                      {csatDoSetor && (
+                        <>
+                          <tr className="border-t border-slate-200">
+                            <td colSpan={4} className="pb-1 pt-3">
+                              <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+                                C-SAT no mês
+                              </span>
+                              <span className="ml-2 text-xs font-semibold text-marca-700 dark:text-marca-400">
+                                {percentual(csatDoSetor.csat)}
+                              </span>
+                              <span className="ml-1.5 text-xs text-slate-500">
+                                {csatDoSetor.positivas} de {csatDoSetor.avaliacoes}
+                              </span>
+                            </td>
+                          </tr>
+                          {naOrdem(categorias).filter(ehCsatDoSetor).map((l) => (
+                            <Linha key={l.regra} l={l}
+                                   detalhe={semanasDaFaixa(l.regra).map((s) => `${s}ª`).join(', ') || undefined} />
+                          ))}
+                          <tr><td colSpan={4} className="pt-2" /></tr>
+                        </>
+                      )}
+                      {base && naOrdem(categorias).filter(ehNotaDoSetor).map((l) => <Linha key={l.regra} l={l} />)}
 
                       {linhasFaixa.length > 0 && (
                         <tr className="border-t border-slate-200">
@@ -813,7 +868,7 @@ export default async function Extrato({
                         <tr><td colSpan={4} className="pt-2" /></tr>
                       )}
 
-                      {depois.map((l) => <Linha key={l.regra} l={l} />)}
+                      {depois.filter((l) => !ehCsatDoSetor(l) && !ehNotaDoSetor(l)).map((l) => <Linha key={l.regra} l={l} />)}
                     </tbody>
                   </table>
                   {monitoria && (

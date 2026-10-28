@@ -35,6 +35,17 @@ para o Performance.
 
 ---
 
+## Performance 2.11.3
+
+Sem migração. Não muda as Monitorias nem a Agenda.
+
+- **Performance (correção): o C-SAT do iGreen Mob no extrato.** O quadro do
+  iGreen Mob não mostrava o percentual de C-SAT. Agora aparece no cartão da
+  semana (ao lado de Exp e Dir), no detalhe da semana e no resumo do mês, com
+  a linha "C-SAT no mês" e as semanas marcadas em cada faixa, como nos
+  canais. O percentual sai das notas de 1 a 5 do próprio extrato (4 e 5 sobre
+  o total), a mesma conta do cálculo.
+
 ## Agenda da Gestão 1.7.0
 
 `supabase/agenda/06-itens-do-resumo.sql` (banco da agenda). Não muda as
