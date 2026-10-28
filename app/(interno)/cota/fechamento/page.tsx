@@ -205,11 +205,11 @@ export default async function Fechamento({
             Fechamento{listaSetores.length > 1 && setor ? ` · ${setor.nome}` : ''}
           </h1>
           {listaSetores.length > 1 && (
-            <div className="mt-2 inline-flex flex-wrap gap-1 rounded-xl bg-pilula p-1" role="tablist" aria-label="Setor">
+            <div className="mt-2 inline-flex flex-wrap gap-1 rounded-full bg-pilula p-1" role="tablist" aria-label="Setor">
               {listaSetores.map((s) => (
                 <Link key={s.id} role="tab" aria-selected={s.id === setorId}
                       href={`/cota/fechamento?mes=${competencia.slice(0, 7)}&setor=${s.id}`}
-                      className={`rounded-lg px-4 py-1.5 text-sm transition ${s.id === setorId
+                      className={`rounded-full px-4 py-1.5 text-sm transition ${s.id === setorId
                         ? 'bg-superficie font-semibold text-slate-900 shadow-sm' : 'text-sobre-fundo-suave hover:text-sobre-fundo'}`}>
                   {s.nome}
                 </Link>
@@ -254,12 +254,12 @@ export default async function Fechamento({
           ) : (
             <ul className="divide-y divide-slate-100 text-sm">
               {antesDeFechar.map((p, i) => (
-                <li key={i} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5">
+                <li key={i} className="-mx-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg px-2 py-2.5 transition-colors hover:bg-slate-50">
                   <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${p.grave ? 'bg-rose-500' : 'bg-amber-500'}`} />
                   <span className="flex-1 text-slate-700">{p.texto}</span>
                   {p.acao && (
                     <Link href={p.acao.href}
-                          className="rounded-md bg-marca-50 px-2 py-0.5 text-xs font-semibold text-marca-700 dark:text-marca-400">
+                          className="rounded-full bg-marca-600/10 px-2.5 py-0.5 text-xs font-semibold text-marca-700 transition-colors hover:bg-marca-600/20 dark:text-marca-400">
                       {p.acao.rotulo} ›
                     </Link>
                   )}
@@ -288,7 +288,7 @@ export default async function Fechamento({
             </thead>
             <tbody>
               {congelados.map((f) => (
-                <tr key={f.pessoa_id}>
+                <tr key={f.pessoa_id} className="transition-colors hover:bg-slate-50">
                   <Td className="font-medium text-slate-800">{f.pessoa_nome}</Td>
                   <Td className="text-xs text-slate-500">{f.cargo ?? '—'}</Td>
                   <Td className="text-right font-semibold tabular-nums">{num(f.resultado)}</Td>
@@ -368,7 +368,7 @@ export default async function Fechamento({
               </thead>
               <tbody>
                 {pendentes.map((p) => (
-                  <tr key={p.pessoa_id}>
+                  <tr key={p.pessoa_id} className="transition-colors hover:bg-slate-50">
                     <Td className="font-medium text-slate-800">{p.pessoa}</Td>
                     <Td className="text-xs text-slate-500">{p.cargo ?? '—'}</Td>
                     <Td className="text-right font-semibold tabular-nums">{num(p.resultado)}</Td>
