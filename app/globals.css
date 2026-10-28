@@ -307,6 +307,11 @@ textarea {
 /* A linha do GraficoDeLinha se desenha uma vez (pathLength = 1). */
 @keyframes desenhar-linha { from { stroke-dashoffset: 1; } }
 .desenhar-linha { stroke-dasharray: 1; animation: desenhar-linha 700ms cubic-bezier(.2, .8, .2, 1); }
+/* Caixinha do GraficoDeLinha: a guia e o valor aparecem ao passar o mouse na coluna do ponto. */
+.grafico-ponto .grafico-guia, .grafico-ponto .grafico-dica { opacity: 0; transition: opacity 120ms ease-out; pointer-events: none; }
+.grafico-ponto:hover .grafico-guia { opacity: 1; }
+.grafico-ponto:hover .grafico-dica { opacity: 1; filter: drop-shadow(0 6px 14px rgb(0 0 0 / 0.12)); }
+.grafico-ponto:hover circle.grafico-guia { opacity: 0.18; }
 
 /* O detalhe de um destaque aparece sem salto (SeletorDeDetalhe). */
 @keyframes surgir { from { opacity: 0; transform: translateY(-4px); } }

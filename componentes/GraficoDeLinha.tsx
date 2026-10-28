@@ -1,23 +1,64 @@
+import { useId } from 'react';
+
 /**
  * Uma série em linha — as quatro semanas do ciclo (1.15.0) ou os meses do
  * Comparativo (1.17.0) —, com a referência tracejada.
  *
  * Substitui as colunas nos detalhes: a linha mostra a tendência — melhorou,
  * piorou — de uma vez, que é o que quem acompanha quer saber. Cada ponto tem
- * a cor da escala única do painel (verde bom, âmbar atenção, rosa ruim) e o
- * valor escrito em cima. A linha se desenha uma vez ao aparecer (desenhar-linha,
- * em globals.css); quem desativa animações vê pronta.
+ * a cor da escala única do painel (verde bom, âmbar atenção, rosa ruim). A
+ * linha se desenha uma vez ao aparecer (desenhar-linha, em globals.css); quem
+ * desativa animações vê pronta.
  *
  * Com `comparacao` (1.41.0), o mês anterior aparece atrás, semana a semana:
- * linha cinza fina, sem valores escritos (o número aparece ao passar o
- * mouse), e uma legenda pequena em cima. Só para comparar — a cor e os
- * valores continuam sendo os do mês da tela.
+ * linha cinza fina e uma legenda pequena em cima. Só para comparar — a cor e
+ * os valores continuam sendo os do mês da tela.
  *
- * SVG montado no servidor, sem biblioteca de gráfico no navegador.
+ * Visual 3.0: a linha é curva (sem passar do valor real entre dois pontos), a
+ * área tem um degradê leve, a grade é de linhas finas e, ao passar o mouse em
+ * qualquer ponto da coluna, aparece a caixinha com o valor (e o do mês
+ * anterior, quando há). Com muitos pontos (os meses), só o último leva o
+ * valor escrito; o resto fica na caixinha.
+ *
+ * SVG montado no servidor, sem biblioteca de gráfico no navegador: a caixinha
+ * aparece só com CSS (.grafico-ponto, em globals.css).
  */
 export type PontoDaLinha = { valor: number; tom?: 'bom' | 'atencao' | 'ruim' } | null;
 
 const COR = { bom: 'var(--color-marca-600)', atencao: 'var(--color-amber-500)', ruim: 'var(--color-rose-500)' };
+
+/** Até quantos pontos todos levam o valor escrito. */
+const ROTULAR_TODOS = 6;
+
+type XY = { x: number; y: number };
+
+/**
+ * Curva monótona (Fritsch–Carlson): suave, mas sem ondular acima ou abaixo
+ * dos pontos — a curva nunca inventa um valor que não existe.
+ */
+function curva(p: XY[]): string {
+  if (p.length < 2) return '';
+  const n = p.length;
+  const d = p.slice(0, -1).map((a, i) => (p[i + 1].y - a.y) / (p[i + 1].x - a.x));
+  const m = p.map((_, i) => {
+    if (i === 0) return d[0];
+    if (i === n - 1) return d[n - 2];
+    return d[i - 1] * d[i] <= 0 ? 0 : (d[i - 1] + d[i]) / 2;
+  });
+  for (let i = 0; i < n - 1; i++) {
+    if (d[i] === 0) { m[i] = 0; m[i + 1] = 0; continue; }
+    const a = m[i] / d[i], b = m[i + 1] / d[i];
+    const h = a * a + b * b;
+    if (h > 9) { const t = 3 / Math.sqrt(h); m[i] = t * a * d[i]; m[i + 1] = t * b * d[i]; }
+  }
+  const f = (v: number) => v.toFixed(1);
+  let s = `M${f(p[0].x)},${f(p[0].y)}`;
+  for (let i = 0; i < n - 1; i++) {
+    const dx = (p[i + 1].x - p[i].x) / 3;
+    s += ` C${f(p[i].x + dx)},${f(p[i].y + m[i] * dx)} ${f(p[i + 1].x - dx)},${f(p[i + 1].y - m[i + 1] * dx)} ${f(p[i + 1].x)},${f(p[i + 1].y)}`;
+  }
+  return s;
+}
 
 export default function GraficoDeLinha({
   pontos, formatar, referencia, min = 0, max, rotulos, largura = 640, comparacao,
@@ -36,79 +77,147 @@ export default function GraficoDeLinha({
   /** Largura do desenho: mais pontos pedem mais espaço entre eles. */
   largura?: number;
 }) {
-  const L = largura, A = 220, esq = 18, dir = 18, topo = 36, base = 30;
+  const id = useId().replace(/[^a-zA-Z0-9]/g, '');
+  const L = largura, A = 230, esq = 24, dir = 24, topo = 40, base = 32;
+  const chao = A - base;
   const valores = [
     ...pontos.filter((p): p is NonNullable<PontoDaLinha> => p != null).map((p) => p.valor),
     ...(comparacao?.pontos ?? []).filter((v): v is number => v != null),
   ];
   const teto = max ?? Math.max(1, ...valores, referencia?.valor ?? 0) * 1.15;
-  const x = (i: number) => esq + (i * (L - esq - dir)) / Math.max(1, pontos.length - 1);
-  const y = (v: number) => topo + (1 - Math.max(0, Math.min(1, (v - min) / (teto - min)))) * (A - topo - base);
+  const passo = (L - esq - dir) / Math.max(1, pontos.length - 1);
+  const x = (i: number) => (pontos.length === 1 ? L / 2 : esq + i * passo);
+  const y = (v: number) => topo + (1 - Math.max(0, Math.min(1, (v - min) / (teto - min)))) * (chao - topo);
+  const rotuloDe = (i: number) => rotulos?.[i] ?? `${i + 1}ª semana`;
 
-  // A linha liga só as semanas com dado; semana vazia fica como marca no eixo.
+  // A linha liga só os pontos com dado; ponto vazio fica como marca no eixo.
   const comDado = pontos.map((p, i) => (p ? { ...p, i } : null)).filter((p): p is NonNullable<typeof p> => p != null);
-  const trilha = comDado.map((p, n) => `${n ? 'L' : 'M'}${x(p.i).toFixed(1)},${y(p.valor).toFixed(1)}`).join(' ');
+  const trilha = curva(comDado.map((p) => ({ x: x(p.i), y: y(p.valor) })));
   const area = comDado.length > 1
-    ? `${trilha} L${x(comDado.at(-1)!.i)},${A - base} L${x(comDado[0].i)},${A - base} Z` : '';
+    ? `${trilha} L${x(comDado.at(-1)!.i).toFixed(1)},${chao} L${x(comDado[0].i).toFixed(1)},${chao} Z` : '';
 
-  // O mês anterior: só as semanas com dado, ligadas na ordem.
+  // O mês anterior: só os pontos com dado, ligados na ordem.
   const antes = (comparacao?.pontos ?? []).map((v, i) => (v != null ? { v, i } : null))
     .filter((p): p is { v: number; i: number } => p != null);
-  const trilhaAntes = antes.map((p, n) => `${n ? 'L' : 'M'}${x(p.i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ');
+  const trilhaAntes = curva(antes.map((p) => ({ x: x(p.i), y: y(p.v) })));
+
+  // Grade: quatro linhas finas, do piso ao teto da escala.
+  const grade = [0, 1 / 3, 2 / 3, 1].map((t) => topo + t * (chao - topo));
+  const rotularTodos = pontos.length <= ROTULAR_TODOS;
+  const ultimo = comDado.at(-1)?.i;
 
   return (
     <>
     {comparacao && antes.length > 0 && (
       <p className="mb-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
         <span className="inline-flex items-center gap-1.5">
-          <span aria-hidden className="inline-block w-4 border-t-[2.5px] border-marca-600" />{comparacao.rotuloAtual}
+          <span aria-hidden className="inline-block w-4 rounded-full border-t-[2.5px] border-marca-600" />{comparacao.rotuloAtual}
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span aria-hidden className="inline-block w-4 border-t-2 border-slate-400" />{comparacao.rotulo}
+          <span aria-hidden className="inline-block w-4 rounded-full border-t-2 border-dashed border-slate-400" />{comparacao.rotulo}
         </span>
       </p>
     )}
     <svg viewBox={`0 0 ${L} ${A}`} role="img" aria-label={rotulos ? 'Evolução por mês' : 'Evolução por semana'}
-         className="block h-auto w-full overflow-visible tabular-nums">
-      {area && <path d={area} fill="var(--color-marca-600)" opacity={0.08} />}
+         className="grafico block h-auto w-full overflow-visible tabular-nums">
+      <defs>
+        <linearGradient id={`area${id}`} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor="var(--color-marca-600)" stopOpacity={0.22} />
+          <stop offset="100%" stopColor="var(--color-marca-600)" stopOpacity={0} />
+        </linearGradient>
+      </defs>
+
+      {grade.map((gy, n) => (
+        <line key={n} x1={esq} x2={L - dir} y1={gy} y2={gy} stroke="var(--color-slate-200)" strokeWidth={1}
+              opacity={n === grade.length - 1 ? 1 : 0.7} />
+      ))}
+
+      {area && <path d={area} fill={`url(#area${id})`} />}
       {antes.length > 1 && (
-        <path d={trilhaAntes} fill="none" stroke="var(--color-slate-400)" strokeWidth={2}
-              strokeLinejoin="round" strokeLinecap="round" opacity={0.75} />
+        <path d={trilhaAntes} fill="none" stroke="var(--color-slate-400)" strokeWidth={2} strokeDasharray="4 4"
+              strokeLinejoin="round" strokeLinecap="round" opacity={0.8} />
       )}
       {antes.map((p) => (
-        <circle key={`a${p.i}`} cx={x(p.i)} cy={y(p.v)} r={3.5} fill="var(--color-superficie)"
-                stroke="var(--color-slate-400)" strokeWidth={2}>
-          <title>{`${comparacao!.rotulo}, ${p.i + 1}ª semana: ${formatar(p.v)}`}</title>
-        </circle>
+        <circle key={`a${p.i}`} cx={x(p.i)} cy={y(p.v)} r={3} fill="var(--color-slate-400)"
+                stroke="var(--color-superficie)" strokeWidth={2} />
       ))}
-      {referencia && (
-        <>
-          <line x1={esq} x2={L - dir} y1={y(referencia.valor)} y2={y(referencia.valor)}
-                stroke="var(--color-slate-400)" strokeDasharray="5 5" strokeWidth={1.2} />
-          <text x={L - dir} y={y(referencia.valor) - 6} textAnchor="end" fontSize={12}
-                fill="var(--color-slate-500)">{referencia.rotulo}</text>
-        </>
-      )}
+
+      {referencia && (() => {
+        const ry = y(referencia.valor);
+        const larg = referencia.rotulo.length * 6.6 + 16;
+        return (
+          <>
+            <line x1={esq} x2={L - dir} y1={ry} y2={ry}
+                  stroke="var(--color-slate-400)" strokeDasharray="5 5" strokeWidth={1.2} />
+            <rect x={L - dir - larg} y={ry - 22} width={larg} height={18} rx={9}
+                  fill="var(--color-superficie)" stroke="var(--color-slate-200)" />
+            <text x={L - dir - larg / 2} y={ry - 9} textAnchor="middle" fontSize={11.5} fontWeight={500}
+                  fill="var(--color-slate-500)">{referencia.rotulo}</text>
+          </>
+        );
+      })()}
+
       {comDado.length > 1 && (
         <path className="desenhar-linha" d={trilha} fill="none" stroke="var(--color-marca-600)" strokeWidth={2.5}
               strokeLinejoin="round" strokeLinecap="round" pathLength={1} />
       )}
+
       {pontos.map((p, i) => (
         <g key={i}>
           {p ? (
             <>
-              <circle cx={x(i)} cy={y(p.valor)} r={6} fill="var(--color-superficie)"
-                      stroke={COR[p.tom ?? 'bom']} strokeWidth={3} />
-              <text x={x(i)} y={y(p.valor) - 13} textAnchor="middle" fontSize={13} fontWeight={600}
-                    fill="var(--color-slate-800)">{formatar(p.valor)}</text>
+              <circle cx={x(i)} cy={y(p.valor)} r={5} fill={COR[p.tom ?? 'bom']}
+                      stroke="var(--color-superficie)" strokeWidth={2.5} />
+              {(rotularTodos || i === ultimo) && (
+                <text x={x(i)} y={y(p.valor) - 13} textAnchor="middle" fontSize={13} fontWeight={600}
+                      fill="var(--color-slate-800)">{formatar(p.valor)}</text>
+              )}
             </>
           ) : (
-            <text x={x(i)} y={A - base - 6} textAnchor="middle" fontSize={12} fill="var(--color-slate-400)">sem dado</text>
+            <text x={x(i)} y={chao - 8} textAnchor="middle" fontSize={12} fill="var(--color-slate-400)">sem dado</text>
           )}
-          <text x={x(i)} y={A - 8} textAnchor="middle" fontSize={12} fill="var(--color-slate-500)"
-                fontWeight={rotulos && i === pontos.length - 1 ? 700 : 400}>{rotulos?.[i] ?? `${i + 1}ª semana`}</text>
+          <text x={x(i)} y={A - 9} textAnchor="middle" fontSize={12} fill="var(--color-slate-500)"
+                fontWeight={rotulos && i === pontos.length - 1 ? 700 : 400}>{rotuloDe(i)}</text>
         </g>
       ))}
+
+      {/* Por último, para ficar por cima: a coluna de cada ponto, que mostra
+          a guia vertical e a caixinha ao passar o mouse. */}
+      {pontos.map((p, i) => {
+        const anterior = comparacao?.pontos[i];
+        const linhas: { t: string; forte?: boolean; cor?: string }[] = [
+          { t: rotuloDe(i) },
+          { t: p ? formatar(p.valor) : 'sem dado', forte: true, cor: p ? COR[p.tom ?? 'bom'] : undefined },
+          ...(comparacao && anterior != null ? [{ t: `${comparacao.rotulo}: ${formatar(anterior)}` }] : []),
+        ];
+        const larg = Math.max(...linhas.map((l) => l.t.length * (l.forte ? 8.4 : 6.8))) + 28;
+        const alt = 14 + linhas.length * 18;
+        const cx = x(i);
+        const alvo = p ? y(p.valor) : chao;
+        const bx = Math.max(2, Math.min(L - larg - 2, cx - larg / 2));
+        const by = alvo - alt - 16 >= 0 ? alvo - alt - 16 : alvo + 16;
+        const meia = pontos.length === 1 ? (L - esq - dir) / 2 : passo / 2;
+        return (
+          <g key={`h${i}`} className="grafico-ponto">
+            <rect x={cx - meia} y={0} width={meia * 2} height={A} fill="transparent" />
+            <line className="grafico-guia" x1={cx} x2={cx} y1={topo - 8} y2={chao}
+                  stroke="var(--color-slate-300)" strokeWidth={1} />
+            {p && (
+              <circle className="grafico-guia" cx={cx} cy={alvo} r={8} fill={COR[p.tom ?? 'bom']} opacity={0.18} />
+            )}
+            <g className="grafico-dica">
+              <rect x={bx} y={by} width={larg} height={alt} rx={10}
+                    fill="var(--color-superficie)" stroke="var(--color-slate-200)" />
+              {linhas.map((l, n) => (
+                <text key={n} x={bx + 14} y={by + 22 + n * 18} fontSize={l.forte ? 14 : 12}
+                      fontWeight={l.forte ? 700 : 400} fill={l.forte ? 'var(--color-slate-900)' : 'var(--color-slate-500)'}>
+                  {l.cor && <tspan fill={l.cor}>● </tspan>}{l.t}
+                </text>
+              ))}
+            </g>
+          </g>
+        );
+      })}
     </svg>
     </>
   );
