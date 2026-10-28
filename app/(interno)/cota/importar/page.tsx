@@ -38,7 +38,7 @@ export default async function ImportarAvaliacoes({
   // Abas internas (migração 53): cada relatório na sua. Chamados do ELO não
   // dependem das contagens do Hub, então a aba deles sai antes delas.
   const abas = (
-    <div role="tablist" className="inline-flex rounded-xl bg-superficie p-1 shadow-sm">
+    <div role="tablist" className="inline-flex gap-1 rounded-full border border-slate-200 bg-superficie p-1 shadow-sm">
       {([['hub', 'Avaliações (Hub)'], ['chamados', 'Chamados (ELO)'], ['mes-anterior', 'Mês anterior (planilha)']] as const).map(([chave, rotulo]) => {
         const ativa = chave === 'hub' ? aba !== 'chamados' && aba !== 'mes-anterior' : aba === chave;
         return (
@@ -46,7 +46,7 @@ export default async function ImportarAvaliacoes({
             // não completava no navegador do Analista (1.38.1); o endereço direto abria.
             <a key={chave} role="tab" aria-selected={ativa}
                 href={chave === 'hub' ? '/cota/importar' : `/cota/importar?aba=${chave}`}
-                className={`rounded-lg px-4 py-1.5 text-sm font-medium ${ativa
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${ativa
                   ? 'bg-marca-600 font-semibold text-white' : 'text-slate-600 hover:text-slate-900'}`}>
             {rotulo}
           </a>
@@ -201,12 +201,12 @@ export default async function ImportarAvaliacoes({
                   const importadaAntes = !!ultimaImportacao && ultimaImportacao.importado_em.slice(0, 10) <= ate;
                   const parcial = !futura && !correndo && q > 0 && (importadaAntes || q < referencia * 0.5);
                   const [classe, texto] = futura ? ['bg-slate-100 text-slate-400 font-medium', '—']
-                    : q === 0 ? [correndo ? 'bg-slate-100 text-slate-500 font-medium' : 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
+                    : q === 0 ? [correndo ? 'bg-slate-100 text-slate-500 font-medium' : 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
                       correndo ? 'em andamento' : 'nada ainda']
-                      : parcial ? ['bg-amber-500/15 text-amber-700 dark:text-amber-300', `${q} · parcial?`]
-                        : ['bg-marca-600/15 text-marca-700 dark:text-marca-400', correndo ? `${q} · em andamento` : String(q)];
+                      : parcial ? ['bg-amber-500/10 text-amber-700 dark:text-amber-300', `${q} · parcial?`]
+                        : ['bg-marca-600/10 text-marca-700 dark:text-marca-400', correndo ? `${q} · em andamento` : String(q)];
                   return (
-                    <span key={`${origem}-${s}`} className={`rounded-lg px-2.5 py-2 text-center font-semibold ${classe}`}>
+                    <span key={`${origem}-${s}`} className={`rounded-xl px-2.5 py-2 text-center font-semibold ${classe}`}>
                       {texto}
                     </span>
                   );
