@@ -27,12 +27,12 @@ export default function Abas({ itens, inicial }: {
 
   return (
     <div className="space-y-4">
-      <div role="tablist" className="flex gap-1 overflow-x-auto rounded-2xl bg-superficie p-1.5 shadow-sm">
+      <div role="tablist" className="inline-flex max-w-full gap-1 overflow-x-auto rounded-full border border-slate-200 bg-superficie p-1 shadow-sm">
         {itens.map((i) => (
           <button key={i.chave} type="button" role="tab" aria-selected={i.chave === aberta}
                   onClick={() => escolher(i.chave)}
-                  className={`whitespace-nowrap rounded-xl px-4 py-2 text-sm transition-colors ${
-                    i.chave === aberta ? 'bg-marca-50 font-semibold text-slate-900' : 'font-medium text-slate-600 hover:text-slate-900'}`}>
+                  className={`whitespace-nowrap rounded-full px-4 py-1.5 text-sm transition-colors ${
+                    i.chave === aberta ? 'bg-marca-600 font-semibold text-white' : 'font-medium text-slate-600 hover:text-slate-900'}`}>
             {i.rotulo}
           </button>
         ))}

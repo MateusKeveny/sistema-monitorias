@@ -85,7 +85,7 @@ export default async function AtendimentoPresencial({
           </p>
           <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
             {pontos != null && lista.length > 0 && (
-              <span className="rounded-md bg-marca-600/15 px-1.5 py-px font-semibold text-marca-700 dark:text-marca-400">
+              <span className="rounded-full bg-marca-600/10 px-1.5 py-px font-semibold text-marca-700 dark:text-marca-400">
                 +{(lista.length * pontos).toLocaleString('pt-BR')} pts
               </span>
             )}
@@ -105,7 +105,7 @@ export default async function AtendimentoPresencial({
                 <p className="text-2xl font-semibold tabular-nums text-slate-900">{s.quantidade}</p>
                 {s.situacao === 'andamento' ? (
                   <p className="mt-1 text-xs">
-                    <span className="rounded-md bg-slate-100 px-1.5 py-px font-semibold text-slate-600">em andamento</span>
+                    <span className="rounded-full bg-slate-100 px-1.5 py-px font-semibold text-slate-600">em andamento</span>
                   </p>
                 ) : (
                   <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-slate-100">

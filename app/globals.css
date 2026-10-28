@@ -316,6 +316,9 @@ textarea {
 .grafico-pulso { animation: grafico-pulso 2.4s ease-in-out infinite; }
 /* Visual 3.0: cores dos gráficos um pouco menos saturadas (pedido do gestor). */
 html[data-visual='3'] svg.grafico, html[data-visual='3'] .barra-semana { filter: saturate(0.7); }
+/* Visual 3.0: toda linha de tabela acende ao passar o mouse (ajuda a seguir a pessoa até o fim da linha). */
+html[data-visual='3'] main tbody tr { transition: background-color 120ms ease-out; }
+html[data-visual='3'] main tbody tr:hover { background-color: var(--color-slate-50); }
 
 /* O detalhe de um destaque aparece sem salto (SeletorDeDetalhe). */
 @keyframes surgir { from { opacity: 0; transform: translateY(-4px); } }

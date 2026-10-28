@@ -297,7 +297,7 @@ export default function VolumeSemanal({
                     {!p.ativo && <span className="ml-2 text-xs text-slate-500">· desligado</span>}
                     {fora && <span className="ml-2 text-xs font-normal text-slate-400">· não atendeu na última semana</span>}
                     {falta && (
-                      <span className="ml-2 rounded-md bg-amber-500/15 px-1.5 py-px text-xs font-semibold
+                      <span className="ml-2 rounded-full bg-amber-500/10 px-1.5 py-px text-xs font-semibold
                                        text-amber-700 dark:text-amber-300">falta</span>
                     )}
                   </Td>

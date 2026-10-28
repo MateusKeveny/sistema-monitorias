@@ -120,11 +120,11 @@ export default function PainelAtendentes({
     chave: Filtro; titulo: string; valor: string; detalhe: React.ReactNode; alerta?: boolean;
   }) => (
     <button type="button" aria-pressed={filtro === chave} onClick={() => setFiltro(chave)}
-            className={`rounded-2xl border-2 px-5 py-4 text-left shadow-sm transition-colors ${
+            className={`rounded-[20px] border-2 px-5 py-4 text-left shadow-sm transition-[border-color,transform] hover:-translate-y-0.5 ${
               alerta ? 'bg-amber-50' : 'bg-superficie'} ${
-              filtro === chave ? 'border-marca-600' : 'border-transparent hover:border-slate-200'}`}>
+              filtro === chave ? 'border-marca-600' : 'border-slate-200 hover:border-slate-300'}`}>
       <p className="text-[13px] text-slate-500">{titulo}</p>
-      <p className={`text-2xl font-semibold tabular-nums ${alerta ? 'text-amber-700 dark:text-amber-300' : 'text-slate-900'}`}>{valor}</p>
+      <p className={`text-[1.65rem] font-semibold tracking-tight tabular-nums ${alerta ? 'text-amber-700 dark:text-amber-300' : 'text-slate-900'}`}>{valor}</p>
       <div className="mt-1 text-xs leading-relaxed text-slate-600">{detalhe}</div>
     </button>
   );
@@ -211,12 +211,12 @@ export default function PainelAtendentes({
                           {nomeSetor.get(setorDe(p.id) ?? -1) ?? '—'}
                         </td>
                         <td className="border-b border-slate-100 px-2 py-2.5">
-                          {c ? <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{curto(nomeCargo.get(c.cargo_id) ?? '')}</span>
-                            : <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-300">sem cargo</span>}
+                          {c ? <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">{curto(nomeCargo.get(c.cargo_id) ?? '')}</span>
+                            : <span className="rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-300">sem cargo</span>}
                         </td>
                         <td className="border-b border-slate-100 px-2 py-2.5 text-slate-600">
                           {p.nome_hub ?? (pend.some((x) => x.startsWith('sem Nome no Hub'))
-                            ? <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-300">sem vínculo</span>
+                            ? <span className="rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-300">sem vínculo</span>
                             : <span className="text-slate-400">—</span>)}
                         </td>
                         <td className="border-b border-slate-100 px-2 py-2.5 text-center text-xs">
@@ -224,8 +224,8 @@ export default function PainelAtendentes({
                         </td>
                         <td className="border-b border-slate-100 py-2.5 pl-2 pr-6 text-center">
                           {p.ativo
-                            ? <span className="rounded-md bg-marca-600/15 px-2 py-0.5 text-xs font-semibold text-marca-700 dark:text-marca-400">tem login</span>
-                            : <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500">sem login</span>}
+                            ? <span className="rounded-full bg-marca-600/10 px-2.5 py-0.5 text-xs font-semibold text-marca-700 dark:text-marca-400">tem login</span>
+                            : <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-500">sem login</span>}
                         </td>
                       </tr>
                     );
@@ -374,11 +374,11 @@ function Ficha({
           </p>
         </div>
         {pessoa.desligado_em
-          ? <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500">desligado</span>
-          : <span className="rounded-md bg-marca-600/15 px-2 py-0.5 text-xs font-semibold text-marca-700 dark:text-marca-400">na operação</span>}
+          ? <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-500">desligado</span>
+          : <span className="rounded-full bg-marca-600/10 px-2.5 py-0.5 text-xs font-semibold text-marca-700 dark:text-marca-400">na operação</span>}
       </div>
       {pendencias.map((x) => (
-        <p key={x} className="mb-1 inline-block rounded-md bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-300">{x}</p>
+        <p key={x} className="mb-1 inline-block rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-300">{x}</p>
       ))}
       {erro && <p className="my-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800 ring-1 ring-rose-600/20">{erro}</p>}
       {aviso && <p className="my-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-emerald-600/20">{aviso}</p>}

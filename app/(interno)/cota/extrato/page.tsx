@@ -816,7 +816,7 @@ export default async function Extrato({
                         <>
                           <tr className="border-t border-slate-200">
                             <td colSpan={4} className="pb-1 pt-3">
-                              <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+                              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
                                 C-SAT no mês
                               </span>
                               <span className="ml-2 text-xs font-semibold text-marca-700 dark:text-marca-400">
@@ -839,7 +839,7 @@ export default async function Extrato({
                       {linhasFaixa.length > 0 && (
                         <tr className="border-t border-slate-200">
                           <td colSpan={4} className="pb-1 pt-3">
-                            <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold
                                              text-slate-600">
                               C-SAT no mês
                             </span>

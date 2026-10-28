@@ -218,7 +218,7 @@ export default async function PainelPleno({
                       <td className="border-b border-slate-100 py-2">
                         {d.rotulo}
                         {d.semanas.length > 0 && (
-                          <span className="ml-2 rounded-md bg-slate-100 px-1.5 py-px text-xs text-slate-600">
+                          <span className="ml-2 rounded-full bg-slate-100 px-1.5 py-px text-xs text-slate-600">
                             {d.semanas.map((s) => `${s}ª`).join(' e ')} semana
                           </span>
                         )}

@@ -114,11 +114,11 @@ export default async function Acessos({
           </p>
         </div>
         {/* Os dois sistemas, cada um com a sua lista. */}
-        <div role="tablist" className="inline-flex rounded-xl bg-superficie p-1 shadow-sm">
+        <div role="tablist" className="inline-flex gap-1 rounded-full border border-slate-200 bg-superficie p-1 shadow-sm">
           {(['cota', 'monitorias'] as const).map((s) => (
             <Link key={s} href={s === 'cota' ? '/cota/acessos' : '/cota/acessos?sistema=monitorias'}
                   role="tab" aria-selected={s === sistema}
-                  className={`rounded-lg px-4 py-1.5 text-sm font-medium ${s === sistema
+                  className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${s === sistema
                     ? 'bg-marca-600 font-semibold text-white'
                     : 'text-slate-600 hover:text-slate-900'}`}>
               {s === 'cota' ? 'Performance' : 'Monitorias'}

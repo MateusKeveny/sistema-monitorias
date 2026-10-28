@@ -109,11 +109,11 @@ export default function RegrasPorFila({ setores, filas, regras, pesos, cargos }:
   return (
     <div className="space-y-6">
       {setoresComFila.length > 1 && (
-        <div className="inline-flex gap-1 rounded-xl bg-pilula p-1" role="tablist" aria-label="Setor">
+        <div className="inline-flex gap-1 rounded-full bg-pilula p-1" role="tablist" aria-label="Setor">
           {setoresComFila.map((s) => (
             <button key={s.id} type="button" role="tab" aria-selected={setorId === s.id}
                     onClick={() => { setSetorId(s.id); setRascunho({}); setErro(null); setAviso(null); }}
-                    className={`rounded-lg px-4 py-1.5 text-sm transition ${setorId === s.id
+                    className={`rounded-full px-4 py-1.5 text-sm transition ${setorId === s.id
                       ? 'bg-superficie font-semibold text-slate-900 shadow-sm' : 'text-sobre-fundo-suave hover:text-sobre-fundo'}`}>
               {s.nome}
             </button>

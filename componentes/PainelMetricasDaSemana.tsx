@@ -106,7 +106,7 @@ export default function PainelMetricasDaSemana({
                       {s.tmeSeg == null ? <span className="text-slate-400">sem dado ainda</span> : (
                         <>
                           TME {duracao(s.tmeSeg)}
-                          {s.faixa && <span className="ml-2 rounded-md bg-slate-100 px-1.5 py-px text-xs text-slate-600">{s.faixa}</span>}
+                          {s.faixa && <span className="ml-2 rounded-full bg-slate-100 px-1.5 py-px text-xs text-slate-600">{s.faixa}</span>}
                           <span className="block text-xs text-slate-500">
                             {s.finalizados.toLocaleString('pt-BR')} atendimentos na equipe
                             {ligada && s.pontos !== 0 && ` · faixa ${s.pontos > 0 ? 'soma' : 'tira'} ${pontos(Math.abs(s.pontos))} pts`}
