@@ -49,9 +49,9 @@ function mesesAte(fim: string, n: number) {
 }
 
 const COR_CELULA: Record<Tom, string> = {
-  bom: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
-  atencao: 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
-  ruim: 'bg-rose-500/15 text-rose-700 dark:text-rose-300',
+  bom: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300/90',
+  atencao: 'bg-amber-500/10 text-amber-700 dark:text-amber-300/90',
+  ruim: 'bg-rose-500/10 text-rose-700 dark:text-rose-300/90',
   neutro: 'text-slate-700',
 };
 
@@ -253,13 +253,19 @@ export default async function Comparativo({
 
     return (
       <div className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {/* Os números do período numa faixa só, dividida por linhas finas (visual 3.0). */}
+        <div className="grid divide-y divide-slate-200 rounded-[20px] border border-slate-200 bg-superficie shadow-sm sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-4 xl:divide-x">
           {resumo.map((r) => (
-            <div key={r.rotulo} className="rounded-2xl bg-superficie px-5 py-4 shadow-sm">
+            <div key={r.rotulo} className="px-6 py-5">
               <p className="text-sm text-slate-500">{r.rotulo}</p>
-              <p className={`text-2xl font-semibold tracking-tight tabular-nums ${
-                'tom' in r && r.tom === 'melhor' ? 'text-marca-700 dark:text-marca-400'
-                  : 'tom' in r && r.tom === 'pior' ? 'text-rose-700' : 'text-slate-900'}`}>{r.valor}</p>
+              {'tom' in r && r.tom ? (
+                <p className="mt-1.5">
+                  <span className={`inline-flex items-center rounded-full px-3 py-1 text-xl font-semibold tracking-tight tabular-nums ${
+                    r.tom === 'melhor' ? 'bg-emerald-500/10 text-marca-700 dark:text-marca-400' : 'bg-rose-500/10 text-rose-700 dark:text-rose-300'}`}>{r.valor}</span>
+                </p>
+              ) : (
+                <p className="mt-1 text-[1.65rem] font-semibold tracking-tight tabular-nums text-slate-900">{r.valor}</p>
+              )}
             </div>
           ))}
         </div>
@@ -286,7 +292,9 @@ export default async function Comparativo({
                     <thead>
                       <tr className="text-xs text-slate-500">
                         <th className="py-2.5 pl-6 pr-3 text-left font-medium sm:pl-7">Pessoa</th>
-                        {meses.map((m) => <th key={m} className="px-2 py-2.5 text-right font-medium">{rotuloMes(m)}</th>)}
+                        {meses.map((m, i) => (
+                          <th key={m} className={`px-2 py-2.5 text-right ${i === meses.length - 1 ? 'font-semibold text-slate-800' : 'font-medium'}`}>{rotuloMes(m)}</th>
+                        ))}
                         <th className="px-3 py-2.5 text-right font-medium">Variação</th>
                         <th className="py-2.5 pl-3 pr-6 sm:pr-7"><span className="sr-only">Histórico</span></th>
                       </tr>
@@ -295,12 +303,13 @@ export default async function Comparativo({
                       {lista.map((p) => {
                         const vp = variacao(k, p.valores.at(-1) ?? null, p.valores.at(-2) ?? null);
                         return (
-                          <tr key={p.id} className="border-t border-slate-100">
+                          <tr key={p.id} className="border-t border-slate-100 transition-colors hover:bg-slate-50">
                             <td className="whitespace-nowrap py-2 pl-6 pr-3 font-medium text-slate-800 sm:pl-7">{p.nome}</td>
                             {p.valores.map((x, i) => (
                               <td key={i} className="px-2 py-2 text-right">
                                 {x == null ? <span className="text-slate-300">—</span> : (
-                                  <span className={`inline-block min-w-16 rounded-md px-2 py-0.5 ${COR_CELULA[tom(x, i, p.id)]}`}>{formatar(x)}</span>
+                                  <span className={`inline-block min-w-16 rounded-full px-2.5 py-0.5 ${COR_CELULA[tom(x, i, p.id)]} ${
+                                    i === p.valores.length - 1 ? 'font-semibold' : ''}`}>{formatar(x)}</span>
                                 )}
                               </td>
                             ))}
