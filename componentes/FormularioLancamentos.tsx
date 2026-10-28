@@ -21,6 +21,8 @@ type Props = {
   canal: string;
   pessoas: Pessoa[];
   regras: RegraCota[];
+  /** O nome de toda regra (não só as manuais), para a lista do mês. */
+  rotulos?: Record<string, string>;
   pesos: PesoCargo[];
   historico: CargoDaPessoa[];
   lancamentos: Lancamento[];
@@ -47,7 +49,7 @@ export default function FormularioLancamentos(props: Props) {
 }
 
 function NovoLancamento({
-  competencia, canal, pessoas, regras, pesos, lancamentos, cargoDe,
+  competencia, canal, pessoas, regras, rotulos, pesos, lancamentos, cargoDe,
 }: Props & { cargoDe: (id: string) => number | null }) {
   const router = useRouter();
   const vazio = { pessoa: '', semana: '', regra: '', quantidade: '', pontos: '', observacao: '' };
@@ -64,7 +66,7 @@ function NovoLancamento({
   const disponiveis = regras.filter((r) => pesoNoCargo.has(r.chave) && r.chave !== 'presencial');
   const regra = regras.find((r) => r.chave === f.regra) ?? null;
   const nomePessoa = new Map(pessoas.map((p) => [p.id, p.nome]));
-  const rotuloRegra = new Map(regras.map((r) => [r.chave, r.rotulo]));
+  const rotuloRegra = new Map([...Object.entries(rotulos ?? {}), ...regras.map((r) => [r.chave, r.rotulo] as const)]);
 
   // O efeito no extrato antes de lançar: quantidade × peso do cargo, ou o
   // valor digitado nas regras de valor manual.

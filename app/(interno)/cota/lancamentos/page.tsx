@@ -70,7 +70,7 @@ export default async function LancamentosDeCota({
   ]);
   const hoje = hojeNoBrasil();
 
-  const [pessoas, regras, pesos, historico, lancamentos, conferencia, volumes, anterior, pendentes, cargos, outroSetor, setoresDoMes, volumesOutro, notasOutro] = await Promise.all([
+  const [pessoas, regras, pesos, historico, lancamentos, conferencia, volumes, anterior, pendentes, cargos, outroSetor, setoresDoMes, volumesOutro, notasOutro, nomesDasRegras] = await Promise.all([
     db.from('pessoas').select('*').order('nome'),
     db.from('regras').select('*').eq('manual', true).eq('ativo', true).order('ordem'),
     db.from('pesos_por_cargo').select('cargo_id, regra, peso, ativo').eq('ativo', true),
@@ -94,6 +94,9 @@ export default async function LancamentosDeCota({
     db.from('volume_outro_setor').select('setor, pessoa_id, semana, resolvidos').eq('mes_competencia', competencia),
     // As avaliações do outro setor por semana, para o cartão da aba dele.
     db.from('atendimentos_outro_setor').select('setor, semana').eq('mes_competencia', competencia).not('nota', 'is', null),
+    // O nome de toda regra, para a lista: as cópias de C-SAT e notas do outro
+    // setor não são manuais e apareciam com a chave.
+    db.from('regras').select('chave, rotulo'),
   ]);
   const setoresBypass = [...new Set(((setoresDoMes.data ?? []) as { setor: string }[]).map((s) => s.setor))].sort();
 
@@ -166,17 +169,17 @@ export default async function LancamentosDeCota({
         : av === 0 ? ['atencao', 'nada importado']
           : ultimaImportacao && ultimaImportacao <= ate ? ['atencao', `${av} · parcial`]
             : ['bom', `✓ ${av}`];
-    const etiqueta = (tom: string) => `rounded-md px-1.5 py-px font-semibold ${tom === 'bom'
-      ? 'bg-marca-600/15 text-marca-700 dark:text-marca-400'
+    const etiqueta = (tom: string) => `rounded-full px-2 py-px font-semibold ${tom === 'bom'
+      ? 'bg-marca-600/10 text-marca-700 dark:text-marca-400'
       : tom === 'neutro' ? 'bg-slate-100 text-slate-600'
-        : 'bg-amber-500/15 text-amber-700 dark:text-amber-300'}`;
+        : 'bg-amber-500/10 text-amber-700 dark:text-amber-300'}`;
 
     return {
       chave: `s${s}`,
       bloco: (
         <>
           <p className="text-[13px] text-slate-500">{s}ª semana · {periodo}</p>
-          <p className="text-2xl font-semibold tabular-nums text-slate-900">{q} de {total}</p>
+          <p className="text-[1.65rem] font-semibold tracking-tight tabular-nums text-slate-900">{q} de {total}</p>
           <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
             <span className={etiqueta(completo ? 'bom' : q === 0 ? 'neutro' : 'atencao')}>
               {completo ? '✓ completo' : q === 0 ? 'nada lançado' : `faltam ${total - q}`}
@@ -187,8 +190,8 @@ export default async function LancamentosDeCota({
             <span className={etiqueta(tomAv)}>{textoAv}</span>
             avaliações importadas
           </p>
-          <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-slate-100">
-            <span className="crescer-x block h-full origin-left rounded-full bg-marca-600"
+          <span className="mt-2.5 block h-2 overflow-hidden rounded-full bg-slate-100">
+            <span className="barra-semana crescer-x block h-full origin-left rounded-full bg-marca-600"
                   style={{ transform: `scaleX(${total ? q / total : 0})` }} />
           </span>
         </>
@@ -210,7 +213,7 @@ export default async function LancamentosDeCota({
     bloco: (
       <>
         <p className="text-[13px] text-slate-500">A conferir</p>
-        <p className={`text-2xl font-semibold tabular-nums ${aConferir
+        <p className={`text-[1.65rem] font-semibold tracking-tight tabular-nums ${aConferir
           ? 'text-amber-700 dark:text-amber-300' : 'text-marca-700 dark:text-marca-400'}`}>
           {aConferir || '✓'}
         </p>
@@ -269,7 +272,7 @@ export default async function LancamentosDeCota({
       bloco: (
         <>
           <p className="text-[13px] text-slate-500">{s}ª semana · {periodo}</p>
-          <p className="text-2xl font-semibold tabular-nums text-slate-900">{daSemana.length ? numero(resolvidos) : '—'}</p>
+          <p className="text-[1.65rem] font-semibold tracking-tight tabular-nums text-slate-900">{daSemana.length ? numero(resolvidos) : '—'}</p>
           <p className="mt-1 text-xs text-slate-600">
             {daSemana.length ? `resolvidos · ${daSemana.length} pessoa${daSemana.length > 1 ? 's' : ''}` : 'nada lançado'}
           </p>
@@ -301,14 +304,14 @@ export default async function LancamentosDeCota({
           </p>
         </div>
 
-        <div className="inline-flex rounded-xl bg-pilula p-1" role="tablist" aria-label="Fila">
+        <div className="inline-flex gap-1 rounded-full bg-pilula p-1" role="tablist" aria-label="Fila">
           {abasDeFila.map((f) => {
             const ativa = !setor && canal === f.apelido;
             return (
               <Link
                 key={f.id} role="tab" aria-selected={ativa}
                 href={`/cota/lancamentos?mes=${competencia.slice(0, 7)}&canal=${f.apelido}`}
-                className={`rounded-lg px-4 py-1.5 text-sm transition ${ativa
+                className={`rounded-full px-4 py-1.5 text-sm transition ${ativa
                   ? 'bg-superficie font-semibold text-slate-900 shadow-sm'
                   : 'text-sobre-fundo-suave hover:text-sobre-fundo'}`}
               >
@@ -321,7 +324,7 @@ export default async function LancamentosDeCota({
           {setoresBypass.map((nomeSetor) => (
             <Link key={nomeSetor} role="tab" aria-selected={setor === nomeSetor}
                   href={`/cota/lancamentos?mes=${competencia.slice(0, 7)}&setor=${encodeURIComponent(nomeSetor)}`}
-                  className={`rounded-lg px-4 py-1.5 text-sm transition ${setor === nomeSetor
+                  className={`rounded-full px-4 py-1.5 text-sm transition ${setor === nomeSetor
                     ? 'bg-superficie font-semibold text-slate-900 shadow-sm'
                     : 'text-sobre-fundo-suave hover:text-sobre-fundo'}`}>
               {nomeSetor}
@@ -357,6 +360,7 @@ export default async function LancamentosDeCota({
         competencia={competencia}
         pessoas={(pessoas.data ?? []) as Pessoa[]}
         regras={(regras.data ?? []) as RegraCota[]}
+        rotulos={Object.fromEntries(((nomesDasRegras.data ?? []) as { chave: string; rotulo: string }[]).map((r) => [r.chave, r.rotulo]))}
         pesos={(pesos.data ?? []) as PesoCargo[]}
         historico={listaHistorico}
         lancamentos={(lancamentos.data ?? []) as Lancamento[]}
