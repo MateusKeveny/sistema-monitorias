@@ -50,11 +50,11 @@ export default async function Fechamento({
   // Um setor por vez (etapa 4, migração 88): cada setor tem o seu valor por
   // ponto, o seu bônus e fecha o seu mês. Com um setor só, é a tela de antes.
   const [{ data: setores }, { data: setoresDaPessoa }, { data: filasDoSetor }] = await Promise.all([
-    db.from('setores').select('id, nome, monitorias').eq('ativo', true).order('ordem'),
+    db.from('setores').select('*').eq('ativo', true).order('ordem'),
     db.from('setores_da_pessoa').select('pessoa_id, desde, setor_id'),
     db.from('canais_do_setor').select('setor_id, apelido, ordem').eq('ativo', true).order('ordem'),
   ]);
-  const listaSetores = (setores ?? []) as { id: number; nome: string; monitorias: boolean }[];
+  const listaSetores = (setores ?? []) as { id: number; nome: string; monitorias: boolean; monitorias_por_semana?: number }[];
   const setor = listaSetores.find((s) => String(s.id) === setorPedido) ?? listaSetores[0];
   const setorId = setor?.id ?? 1;
   const historicoSetor = (setoresDaPessoa ?? []) as { pessoa_id: string; desde: string; setor_id: number }[];
@@ -151,7 +151,8 @@ export default async function Fechamento({
   const comVolume = new Set(((volumes.data ?? []) as { semana: number; canal: string }[])
     .filter((v) => v.canal === filaPrincipal).map((v) => v.semana));
   const semVolume = [1, 2, 3, 4].slice(0, semanasEncerradas).filter((s) => !comVolume.has(s));
-  const POR_SEMANA = 4;
+  // Quantas por semana: a do setor (Monitorias 6.0); a Conexão Expansão: 4.
+  const POR_SEMANA = setor?.monitorias_por_semana ?? 4;
   const esperadas = POR_SEMANA * semanasEncerradas;
   const feitasPor = new Map<string, number>();
   for (const m of (monitorias.data ?? []) as { operador_id: string; semana_mes: number }[]) {

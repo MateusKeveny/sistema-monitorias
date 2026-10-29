@@ -98,14 +98,16 @@ async function paginado<T>(consulta: (de: number, ate: number) => PromiseLike<{ 
  * As ocorrências da equipe toda na janela, e quantas pessoas foram
  * monitoradas no mês mais recente (o "de N" do quadro).
  */
-export async function repeticoesDaEquipe(db: Db, janela: string[]) {
+export async function repeticoesDaEquipe(db: Db, janela: string[], setor?: number) {
   const [monitorias, itens] = await Promise.all([
     paginado<{ operador_id: string; mes_referencia: string; data_atendimento: string; zerado: boolean; motivo_zeramento: string | null }>(
-      (de, ate) => db.from('vw_monitorias').select('operador_id, mes_referencia, data_atendimento, zerado, motivo_zeramento')
-        .in('mes_referencia', janela).order('id').range(de, ate)),
+      // Com setor (Monitorias 6.0), só as monitorias dele.
+      (de, ate) => { const q = db.from('vw_monitorias').select('operador_id, mes_referencia, data_atendimento, zerado, motivo_zeramento')
+        .in('mes_referencia', janela); return (setor ? q.eq('setor_id', setor) : q).order('id').range(de, ate); }),
     paginado<{ operador_id: string; mes_referencia: string; data_atendimento: string; criterio: string; observacao: string | null }>(
-      (de, ate) => db.from('vw_feedback_individual').select('operador_id, mes_referencia, data_atendimento, criterio, observacao')
-        .in('mes_referencia', janela).eq('conforme', false).order('monitoria_id').order('criterio_ordem').range(de, ate)),
+      (de, ate) => { const q = db.from('vw_feedback_individual').select('operador_id, mes_referencia, data_atendimento, criterio, observacao')
+        .in('mes_referencia', janela).eq('conforme', false);
+        return (setor ? q.eq('setor_id', setor) : q).order('monitoria_id').order('criterio_ordem').range(de, ate); }),
   ]);
   const ocorrencias: Ocorrencia[] = [
     ...monitorias.filter((m) => m.zerado).map((m) => ({

@@ -91,6 +91,8 @@ export type Criterio = {
   nome: string;
   peso: number;
   ativo: boolean;
+  /** Setor dono do critério (Monitorias 6.0, migração 89). */
+  setor_id?: number;
 };
 
 export type Monitoria = {

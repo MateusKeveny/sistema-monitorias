@@ -1,5 +1,7 @@
 import Link from '@/componentes/Link';
 import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
+import AbasDeSetor from '@/componentes/AbasDeSetor';
+import { setorDaTela } from '@/lib/monitoriasDoSetor';
 import { criarClienteServidor, exigirVisaoDoTime } from '@/lib/supabase/servidor';
 import { Quadro, Tabela, Th, Td, Vazio, Indicador } from '@/componentes/ui';
 import { mesRotulo, percentual, nota } from '@/lib/formatar';
@@ -12,16 +14,20 @@ export const dynamic = 'force-dynamic';
 export default async function RelatorioCriterios({
   searchParams,
 }: {
-  searchParams: Promise<{ mes?: string }>;
+  searchParams: Promise<{ mes?: string; setor?: string }>;
 }) {
   await exigirVisaoDoTime();
   // As setas mandam "2026-09"; a lista de meses guarda "2026-09-01" (5.2.0).
-  const mesEscolhido = mesCompleto((await searchParams).mes);
+  const pedido = await searchParams;
+  const mesEscolhido = mesCompleto(pedido.mes);
   const db = await criarClienteServidor();
+  // Monitorias 6.0: um setor por vez (abas com 2 ou mais).
+  const { setores, setorId } = await setorDaTela(db, pedido.setor);
 
   const { data } = await conferida(db
     .from('vw_criterios_reprovados')
     .select('*')
+    .eq('setor_id', setorId)
     .order('mes_referencia', { ascending: false }));
 
   const todas = (data ?? []) as LinhaCriterio[];
@@ -78,8 +84,9 @@ export default async function RelatorioCriterios({
             não cabe numa seta, então fica no link ao lado. */}
         <div className="flex items-center gap-3">
           {mes !== 'todos' && (
-            <SetasDeCompetencia competencia={mes} atual={meses[0]} caminho="/relatorios/criterios"
-                                disponiveis={meses} compacto />
+            <><AbasDeSetor setores={setores} atual={setorId} caminho="/relatorios/criterios" outros={{ mes: pedido.mes }} />
+            <SetasDeCompetencia competencia={mes} atual={meses[0]} caminho="/relatorios/criterios" manter={{ setor: setores.length > 1 ? String(setorId) : undefined }}
+                                disponiveis={meses} compacto /></>
           )}
           <Link href={mes === 'todos' ? `/relatorios/criterios?mes=${meses[0]}` : '/relatorios/criterios?mes=todos'}
             className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm

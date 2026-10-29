@@ -11,6 +11,8 @@ export type Setor = {
   id: number; nome: string; ativo: boolean; ordem: number;
   /** Monitorias ligadas no setor e a régua dele (migrações 86 e 87). */
   monitorias?: boolean; regra_monitoria?: string | null;
+  /** Quantas monitorias por semana (Monitorias 6.0, migração 89). */
+  monitorias_por_semana?: number;
 };
 export type Canal = {
   id: number; setor_id: number; nome: string; apelido: string | null;

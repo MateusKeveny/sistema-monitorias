@@ -3,6 +3,7 @@ import OQueMaisSeRepete from '@/componentes/OQueMaisSeRepete';
 import { Quadro, Vazio } from '@/componentes/ui';
 import { criarClienteServidor } from '@/lib/supabase/servidor';
 import { conferida } from '@/lib/consultas';
+import { MONITORIAS_PADRAO, monitoriasPorSetor, setorDasPessoas } from '@/lib/monitoriasDoSetor';
 import { mesRotulo, percentual } from '@/lib/formatar';
 import { janelaDe, monitoriasPorMes, ocorrenciasDaPessoa, repeticoes } from '@/lib/repeticoes';
 
@@ -24,6 +25,9 @@ export default async function MonitoriasPorAtendente({ operadorId, mes, soZerada
 }) {
   const db = await criarClienteServidor();
   const ultimo = mes ?? aberto;
+  // O piso do setor da pessoa (Monitorias 6.0; a Expansão: 85%).
+  const [porSetorMon, setorNoMes] = await Promise.all([monitoriasPorSetor(db), setorDasPessoas(db, ultimo)]);
+  const piso = porSetorMon.get(setorNoMes.get(operadorId) ?? 1)?.piso ?? MONITORIAS_PADRAO.piso;
   const { data } = await conferida(db.from('vw_monitorias')
     .select('id, codigo, protocolo, data_atendimento, mes_referencia, semana_mes, nota_final, zerado, motivo_zeramento, parecer, canal, monitor')
     .eq('operador_id', operadorId).lte('mes_referencia', ultimo)
@@ -55,7 +59,7 @@ export default async function MonitoriasPorAtendente({ operadorId, mes, soZerada
         return (
           <Quadro key={m} titulo={mesRotulo(m)}
                   subtitulo={`${doMes.length} monitoria${doMes.length === 1 ? '' : 's'} · nota média ${percentual(nota)}`}>
-            <ListaDeMonitorias comLink monitorias={doMes.map((x) => ({
+            <ListaDeMonitorias comLink piso={piso} monitorias={doMes.map((x) => ({
               ...x, nota_final: Number(x.nota_final),
               reprovados: (falhas.get(x.id) ?? []).map(({ criterio, observacao }) => ({ criterio, observacao })),
             }))} />

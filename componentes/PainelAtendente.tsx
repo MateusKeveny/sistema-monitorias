@@ -10,6 +10,7 @@ import { fonteDoMes } from '@/lib/resumo';
 import ProjecaoDaCota from '@/componentes/ProjecaoDaCota';
 import ListaDeMonitorias from '@/componentes/ListaDeMonitorias';
 import { todas, conferida } from '@/lib/consultas';
+import { MONITORIAS_PADRAO, monitoriasPorSetor, setorDasPessoas, textoDoPiso } from '@/lib/monitoriasDoSetor';
 
 const CANAIS: { chave: Canal; rotulo: string }[] = [
   { chave: 'huggy', rotulo: 'Expansão' },
@@ -57,7 +58,8 @@ const nomeDoMes = (c: string) =>
 const nomeDoMesMaiusculo = (c: string) => nomeDoMes(c).replace(/^./, (l) => l.toUpperCase());
 
 const tomDoCsat = (v: number): 'bom' | 'atencao' | 'ruim' => (v >= 0.90 ? 'bom' : v >= 0.85 ? 'atencao' : 'ruim');
-const tomDaNota = (v: number): 'bom' | 'atencao' | 'ruim' => (v >= 0.85 ? 'bom' : v >= 0.70 ? 'atencao' : 'ruim');
+/** A nota de monitoria na escala do painel: verde a partir do piso do setor (a Expansão: 85%). */
+const tomDaNotaCom = (v: number, piso: number): 'bom' | 'atencao' | 'ruim' => (v >= piso ? 'bom' : v >= 0.70 ? 'atencao' : 'ruim');
 const BARRA = { bom: 'bg-marca-600', atencao: 'bg-amber-500', ruim: 'bg-rose-500' };
 
 /**
@@ -86,6 +88,10 @@ export default async function PainelAtendente({
   const anterior = mesAnterior(competencia);
   const meses = [competencia, anterior];
   const db = await criarClienteServidor();
+  // O piso da monitoria: o do setor da pessoa no mês (Monitorias 6.0).
+  const [porSetorMon, setorNoMes] = await Promise.all([monitoriasPorSetor(db), setorDasPessoas(db, competencia)]);
+  const piso = porSetorMon.get(setorNoMes.get(pessoaId) ?? 1)?.piso ?? MONITORIAS_PADRAO.piso;
+  const tomDaNota = (v: number) => tomDaNotaCom(v, piso);
   // O mês aberto e o anterior vêm do resumo quando ele está em dia (migração 58).
   const [fonte, fonteAntes] = await todas([fonteDoMes(competencia), fonteDoMes(anterior)]);
 
@@ -523,7 +529,7 @@ export default async function PainelAtendente({
           <Painel>
             <Secao titulo="Suas monitorias" acao={<Link href="/cota/monitorias" className="whitespace-nowrap rounded-full border border-slate-200 px-2.5 py-0.5 text-xs text-slate-600 hover:border-marca-600">ver todas ›</Link>} subtitulo="As mais recentes primeiro, com os critérios a melhorar.">
               {lista.length === 0 ? <Vazio>Nenhuma monitoria registrada.</Vazio> : (
-                <ListaDeMonitorias monitorias={lista.slice(0, 8).map((m) => ({
+                <ListaDeMonitorias piso={piso} monitorias={lista.slice(0, 8).map((m) => ({
                   ...m, nota_final: Number(m.nota_final),
                   reprovados: (apontamentos.get(m.id) ?? []).map(({ criterio, observacao }) => ({ criterio, observacao })),
                 }))} />
@@ -544,7 +550,7 @@ export default async function PainelAtendente({
               )}
               {notaMes != null && (
                 <p className={`mt-3 text-xs ${tomDaNota(notaMes) === 'bom' ? 'text-slate-500' : 'text-amber-700'}`}>
-                  A monitoria só pontua com média a partir de 85%.
+                  A monitoria só pontua com média a partir de {textoDoPiso(piso)}.
                 </p>
               )}
             </Secao>

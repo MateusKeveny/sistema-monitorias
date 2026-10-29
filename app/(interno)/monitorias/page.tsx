@@ -6,12 +6,16 @@ import type { Monitoria, Operador } from '@/lib/tipos';
 import { ateOMesAberto, mesAbertoDasMonitorias } from '@/lib/mes-aberto';
 import MonitoriasPorAtendente from '@/componentes/MonitoriasPorAtendente';
 import { foraDasMonitorias } from '@/lib/monitorados';
+import AbasDeSetor from '@/componentes/AbasDeSetor';
+import { setorDaTela } from '@/lib/monitoriasDoSetor';
 
 export const dynamic = 'force-dynamic';
 
 type Busca = {
   operador?: string; mes?: string; zeradas?: string; pagina?: string;
   ordenar?: string; direcao?: string; busca?: string;
+  /** Setor da lista (Monitorias 6.0), com 2 ou mais setores. */
+  setor?: string;
   /** 'tabela' volta à tabela com um atendente escolhido (5.7.0). */
   ver?: string;
 };
@@ -76,6 +80,10 @@ export default async function ListaMonitorias({
   // fica guardada, fora da lista, até a cota do aberto ser fechada.
   const aberto = await mesAbertoDasMonitorias();
   consulta = consulta.lte('mes_referencia', aberto);
+  // Monitorias 6.0: com dois ou mais setores, a lista é a de um por vez.
+  const { setores, setorId } = await setorDaTela(db, filtros.setor);
+  const porSetor = perfil.papel !== 'operador' && setores.length > 1;
+  if (porSetor) consulta = consulta.eq('setor_id', setorId);
   if (filtros.operador) consulta = consulta.eq('operador_id', filtros.operador);
   if (filtros.mes) consulta = consulta.eq('mes_referencia', filtros.mes);
   if (filtros.zeradas === 'sim') consulta = consulta.eq('zerado', true);
@@ -156,6 +164,9 @@ export default async function ListaMonitorias({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">Monitorias</h1>
+          {porSetor && (
+            <div className="my-2"><AbasDeSetor setores={setores} atual={setorId} caminho="/monitorias" /></div>
+          )}
           <p className="text-sm text-sobre-fundo-suave">
             {total} registro{total === 1 ? '' : 's'}
             {ultimaPagina > 1 && ` · página ${pagina} de ${ultimaPagina}`}
@@ -190,6 +201,7 @@ export default async function ListaMonitorias({
         <input type="hidden" name="ordenar" value={ordenar} />
         <input type="hidden" name="direcao" value={crescente ? 'asc' : 'desc'} />
         {filtros.ver && <input type="hidden" name="ver" value={filtros.ver} />}
+        {porSetor && <input type="hidden" name="setor" value={setorId} />}
 
         {/* Vem primeiro porque é o caminho mais curto até um registro: quem
             sabe o número não precisa de filtro nenhum. */}

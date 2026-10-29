@@ -11,6 +11,7 @@ import SetoresECanais, { type SetorDoHubVisto } from '@/componentes/SetoresECana
 import RegrasPorFila from '@/componentes/RegrasPorFila';
 import Link from 'next/link';
 import type { Canal, Setor } from '@/lib/setores';
+import { MONITORIAS_PADRAO } from '@/lib/monitoriasDoSetor';
 import type { Subcategoria } from '@/lib/diario';
 import { hojeNoBrasil, mesDeCompetencia } from '@/lib/formatar';
 import type { Cargo, CargoDaPessoa, PesoCargo, Pessoa, ReferenciaCargo, RegraCota } from '@/lib/tipos';
@@ -71,6 +72,14 @@ export default async function ConfiguracaoDaCota({
   const idsDosCargos = new Set(listaCargos.map((c) => c.id));
   const listaPesos = ((pesos ?? []) as PesoCargo[]).filter((p) => idsDosCargos.has(p.cargo_id));
   const listaRegras = ((regras ?? []) as RegraCota[]).filter(doSetor);
+  // Monitorias de cada setor (Monitorias 6.0): quantas por semana e o piso, o faixa_min da régua dele.
+  const monitoriasDosSetores = Object.fromEntries(listaSetores.map((s) => {
+    const regua = ((regras ?? []) as RegraCota[]).find((r) => r.chave === s.regra_monitoria);
+    return [s.id, {
+      porSemana: s.monitorias_por_semana ?? MONITORIAS_PADRAO.porSemana,
+      piso: regua?.faixa_min != null ? Number(regua.faixa_min) : MONITORIAS_PADRAO.piso,
+    }];
+  }));
 
   // Quantas pessoas na operação estão em cada cargo agora: é o "afeta N
   // pessoas" da barra de salvar.
@@ -158,7 +167,7 @@ export default async function ConfiguracaoDaCota({
             rotulo: 'Setores e filas',
             conteudo: (
               <SetoresECanais setores={(setores ?? []) as Setor[]} canais={(canais ?? []) as Canal[]}
-                              vistos={(vistos ?? []) as SetorDoHubVisto[]} />
+                              vistos={(vistos ?? []) as SetorDoHubVisto[]} monitorias={monitoriasDosSetores} />
             ),
           },
           {

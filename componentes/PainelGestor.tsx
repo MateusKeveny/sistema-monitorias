@@ -10,6 +10,7 @@ import { fonteDoMes } from '@/lib/resumo';
 import ProjecaoDaCota from '@/componentes/ProjecaoDaCota';
 import { limiteDeRenovacao, pessoasComLeituraPendente, type LeituraDiario } from '@/lib/diario';
 import { todas } from '@/lib/consultas';
+import { MONITORIAS_PADRAO, monitoriasPorSetor, setorDaTela, textoDoPiso } from '@/lib/monitoriasDoSetor';
 
 const CANAIS: Canal[] = ['huggy', 'diretores'];
 const META_CSAT = 0.95;
@@ -43,8 +44,8 @@ const nomeDoMes = (c: string) =>
   new Date(`${c}T12:00:00Z`).toLocaleDateString('pt-BR', { month: 'long', timeZone: 'UTC' });
 const maiusculo = (t: string) => t.replace(/^./, (l) => l.toUpperCase());
 
-/** Escala única do painel para a nota de monitoria: 85% é o piso para pontuar. */
-const tomDaNota = (v: number): 'bom' | 'atencao' | 'ruim' => (v >= 0.85 ? 'bom' : v >= 0.70 ? 'atencao' : 'ruim');
+/** Escala única do painel para a nota de monitoria: verde a partir do piso do setor (a Expansão: 85%). */
+const tomDaNotaCom = (v: number, piso: number): 'bom' | 'atencao' | 'ruim' => (v >= piso ? 'bom' : v >= 0.70 ? 'atencao' : 'ruim');
 const tomDoCsat = (v: number): 'bom' | 'atencao' | 'ruim' => (v >= 0.90 ? 'bom' : v >= 0.85 ? 'atencao' : 'ruim');
 
 /** Tons das 4 semanas no volume por atendente, do mais claro ao mais escuro. */
@@ -77,6 +78,10 @@ export default async function PainelGestor({
   const anterior = mesAnterior(competencia);
   const meses = [competencia, anterior];
   const db = await criarClienteServidor();
+  // O piso da monitoria: o do setor da equipe (Monitorias 6.0).
+  const [porSetorMon, { setorId: setorDaEquipe }] = await Promise.all([monitoriasPorSetor(db), setorDaTela(db)]);
+  const piso = porSetorMon.get(setorDaEquipe)?.piso ?? MONITORIAS_PADRAO.piso;
+  const tomDaNota = (v: number) => tomDaNotaCom(v, piso);
   // O resultado de todos no mês: do resumo (migração 58), que era ~2 s ao vivo.
   const fonte = await fonteDoMes(competencia);
 
@@ -686,7 +691,7 @@ export default async function PainelGestor({
             </Secao>
           </Painel>
           <Painel>
-            <Secao titulo="Nota média por atendente" subtitulo="Monitorias do mês. Verde a partir de 85%, o piso para pontuar.">
+            <Secao titulo="Nota média por atendente" subtitulo={`Monitorias do mês. Verde a partir de ${textoDoPiso(piso)}, o piso para pontuar.`}>
               {notaPorPessoa.length === 0 ? <Vazio>Nenhuma monitoria nesta competência.</Vazio> : (
                 <ul className="space-y-3 text-sm">
                   {notaPorPessoa.map((p) => {

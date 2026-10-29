@@ -8,6 +8,7 @@ import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { hojeNoBrasil, mesRotulo, percentual } from '@/lib/formatar';
 import { ateOMesAberto, mesAbertoDasMonitorias } from '@/lib/mes-aberto';
 import { foraDasMonitorias } from '@/lib/monitorados';
+import { MONITORIAS_PADRAO, monitoriasPorSetor, setorDasPessoas, setorDaTela, textoDoPiso } from '@/lib/monitoriasDoSetor';
 import { janelaDe, monitoriasPorMes, ocorrenciasDaPessoa, repeticoes, repeticoesDaEquipe } from '@/lib/repeticoes';
 import type { LinhaCriterio, LinhaRanking } from '@/lib/tipos';
 
@@ -23,8 +24,8 @@ type Apontamento = { monitoria_id: string; criterio: string; observacao: string 
 const NOMES_MES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 const rotuloMes = (c: string) => `${NOMES_MES[Number(c.slice(5, 7)) - 1]}/${c.slice(2, 4)}`;
 const media = (l: number[]) => (l.length ? l.reduce((a, b) => a + b, 0) / l.length : null);
-/** Escala única do painel para a nota: 85% é o piso para a monitoria pontuar. */
-const tomDaNota = (v: number): 'bom' | 'atencao' | 'ruim' => (v >= 0.85 ? 'bom' : v >= 0.70 ? 'atencao' : 'ruim');
+/** Escala única do painel para a nota: o piso do setor (a Expansão: 85%) é onde a monitoria pontua. */
+const tomDaNotaCom = (v: number, piso: number): 'bom' | 'atencao' | 'ruim' => (v >= piso ? 'bom' : v >= 0.70 ? 'atencao' : 'ruim');
 
 /**
  * Monitorias do atendente, dentro do Performance (1.17.0).
@@ -61,6 +62,10 @@ export default async function MonitoriasDoAtendente({
   const nome = lista.find((p) => p.id === pessoaId)?.nome ?? perfil.nome;
 
   const aberto = await mesAbertoDasMonitorias();
+  // O piso da monitoria: o do setor da pessoa (Monitorias 6.0; a Expansão: 85%).
+  const [porSetorMon, setorNoMes] = await Promise.all([monitoriasPorSetor(db), setorDasPessoas(db, aberto)]);
+  const piso = porSetorMon.get(setorNoMes.get(pessoaId) ?? 1)?.piso ?? MONITORIAS_PADRAO.piso;
+  const tomDaNota = (v: number) => tomDaNotaCom(v, piso);
   const { data } = await db.from('vw_monitorias')
     .select('id, codigo, protocolo, data_atendimento, mes_referencia, semana_mes, nota_final, zerado, motivo_zeramento, parecer, canal, monitor')
     .eq('operador_id', pessoaId).lte('mes_referencia', aberto)
@@ -128,10 +133,10 @@ export default async function MonitoriasDoAtendente({
 
           {serie.length > 1 && (
             <Painel>
-              <Secao titulo="Nota média por mês" subtitulo="Linha tracejada: 85%, o piso para a monitoria pontuar.">
+              <Secao titulo="Nota média por mês" subtitulo={`Linha tracejada: ${textoDoPiso(piso)}, o piso para a monitoria pontuar.`}>
                 <GraficoDeLinha largura={Math.max(1400, serie.length * 120)} rotulos={serie.map(rotuloMes)}
                                 formatar={percentual} min={0.7} max={1}
-                                referencia={{ valor: 0.85, rotulo: 'piso 85%' }}
+                                referencia={{ valor: piso, rotulo: `piso ${textoDoPiso(piso)}` }}
                                 pontos={serie.map((m): PontoDaLinha => {
                                   const v = notaDoMes(m); return v == null ? null : { valor: v, tom: tomDaNota(v) };
                                 })} />
@@ -147,7 +152,7 @@ export default async function MonitoriasDoAtendente({
               <Painel key={m}>
                 <Secao titulo={mesRotulo(m)}
                        subtitulo={`${doMes(m).length} monitoria${doMes(m).length === 1 ? '' : 's'}${nota != null ? ` · nota média ${percentual(nota)}` : ''}`}>
-                  <ListaDeMonitorias monitorias={doMes(m).map((x) => ({
+                  <ListaDeMonitorias piso={piso} monitorias={doMes(m).map((x) => ({
                     ...x, nota_final: Number(x.nota_final),
                     reprovados: (falhas.get(x.id) ?? []).map(({ criterio, observacao }) => ({ criterio, observacao })),
                   }))} />
@@ -203,6 +208,11 @@ function SeletorDePessoa({ lista, pessoaId = '', meses, mes }: {
 async function Equipe({ lista, mesPedido }: { lista: { id: string; nome: string }[]; mesPedido?: string }) {
   const db = await criarClienteServidor();
   const aberto = await mesAbertoDasMonitorias();
+  // O piso e a quantidade por semana: os do setor (Monitorias 6.0; a Expansão: 85% e 4).
+  const [porSetorMon, { setorId: setorDaEquipe }] = await Promise.all([monitoriasPorSetor(db), setorDaTela(db)]);
+  const doSetor = porSetorMon.get(setorDaEquipe) ?? MONITORIAS_PADRAO;
+  const piso = doSetor.piso;
+  const tomDaNota = (v: number) => tomDaNotaCom(v, piso);
 
   // O ranking é pequeno — uma linha por pessoa por mês — e dá de uma vez os
   // meses do seletor, os números do mês e a série da linha.
@@ -249,7 +259,7 @@ async function Equipe({ lista, mesPedido }: { lista: { id: string; nome: string 
   const notaAnterior = anterior ? mediaDoMes(anterior) : null;
   const d = nota != null && notaAnterior != null ? (nota - notaAnterior) * 100 : null;
   const zeradas = linhas.reduce((s, l) => s + l.zeradas, 0);
-  const abaixo = linhas.filter((l) => Number(l.nota_media) < 0.85).length;
+  const abaixo = linhas.filter((l) => Number(l.nota_media) < piso).length;
   const piores = (criterios ?? []) as LinhaCriterio[];
   const serie = meses.filter((m) => m <= mes).slice(0, 12).reverse();
   const naLista = new Set(lista.map((p) => p.id));
@@ -281,15 +291,15 @@ async function Equipe({ lista, mesPedido }: { lista: { id: string; nome: string 
                 detalhe={anterior && notaAnterior != null ? `${rotuloMes(anterior)} fechou em ${percentual(notaAnterior)}` : undefined} />
         <Resumo rotulo="Falhas críticas" valor={String(zeradas)} tom={zeradas > 0 ? 'pior' : undefined}
                 detalhe={total ? `${percentual(zeradas / total)} do total` : undefined} />
-        <Resumo rotulo="Atendentes abaixo de 85%" valor={String(abaixo)} tom={abaixo > 0 ? 'atencao' : undefined}
+        <Resumo rotulo={`Atendentes abaixo de ${textoDoPiso(piso)}`} valor={String(abaixo)} tom={abaixo > 0 ? 'atencao' : undefined}
                 detalhe={`de ${linhas.length} com monitoria no mês`} />
       </div>
 
       {serie.length > 1 && (
-        <Quadro titulo="Nota média da equipe por mês" subtitulo="Linha tracejada: 85%, o piso para a monitoria pontuar.">
+        <Quadro titulo="Nota média da equipe por mês" subtitulo={`Linha tracejada: ${textoDoPiso(piso)}, o piso para a monitoria pontuar.`}>
           <GraficoDeLinha largura={Math.max(1400, serie.length * 120)} rotulos={serie.map(rotuloMes)}
                           formatar={percentual} min={0.7} max={1}
-                          referencia={{ valor: 0.85, rotulo: 'piso 85%' }}
+                          referencia={{ valor: piso, rotulo: `piso ${textoDoPiso(piso)}` }}
                           pontos={serie.map((m): PontoDaLinha => {
                             const v = mediaDoMes(m); return v == null ? null : { valor: v, tom: tomDaNota(v) };
                           })} />
@@ -362,7 +372,7 @@ async function Equipe({ lista, mesPedido }: { lista: { id: string; nome: string 
 
       <OQueMaisSeRepete linhas={repetidos.linhas} janela={janelaDe(mes)} equipe={{ monitoradas: repetidos.monitoradas }} />
 
-      <CoberturaDoCiclo linhas={cobertura} semanasEncerradas={semanasEncerradas} competencia={mes} />
+      <CoberturaDoCiclo linhas={cobertura} semanasEncerradas={semanasEncerradas} competencia={mes} porSemana={doSetor.porSemana} />
     </div>
   );
 }

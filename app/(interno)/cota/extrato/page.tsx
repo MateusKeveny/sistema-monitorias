@@ -11,6 +11,7 @@ import { ajustesDaMedia, aplicarNaMedia, equipeCongelada } from '@/lib/resultado
 import ChamadosDaPessoa from '@/componentes/ChamadosDaPessoa';
 import type { Pessoa } from '@/lib/tipos';
 import { todas, dados } from '@/lib/consultas';
+import { MONITORIAS_PADRAO, monitoriasPorSetor, setorDasPessoas, textoDoPiso } from '@/lib/monitoriasDoSetor';
 
 export const dynamic = 'force-dynamic';
 
@@ -307,11 +308,14 @@ export default async function Extrato({
     : quadro === 'geral' ? undefined : csatDe(quadro as Canal, semana);
 
   // Mesma escala de cor do painel: verde na meta, âmbar atenção, rosa ruim.
+  // O piso da monitoria: o do setor da pessoa no mês (Monitorias 6.0; a Expansão: 85%).
+  const [porSetorMon, setorNoMes] = await Promise.all([monitoriasPorSetor(db), setorDasPessoas(db, competencia)]);
+  const pisoMon = porSetorMon.get(setorNoMes.get(pessoaId) ?? 1)?.piso ?? MONITORIAS_PADRAO.piso;
   const tomCsat = (v: number) => v >= 0.9
     ? 'bg-marca-600/10 text-marca-700 dark:text-marca-400'
     : v >= 0.85 ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300'
       : 'bg-rose-500/10 text-rose-700 dark:text-rose-300';
-  const tomMonitoria = (v: number) => v > 0.85
+  const tomMonitoria = (v: number) => v >= pisoMon
     ? 'bg-marca-600/10 text-marca-700 dark:text-marca-400'
     : 'bg-amber-500/10 text-amber-700 dark:text-amber-300';
 
@@ -893,7 +897,7 @@ export default async function Extrato({
       {!abaChamados && <p className="text-xs leading-relaxed text-sobre-fundo-suave">
         Cada linha é <strong>quantidade × peso</strong>, com o peso do cargo vigente na competência.
         No C-SAT, o percentual da semana define a faixa, e a faixa multiplica os atendimentos
-        finalizados. A monitoria só pontua com média acima de 85%, e as regras de valor digitado
+        finalizados. A monitoria só pontua com média a partir de {textoDoPiso(pisoMon)}, e as regras de valor digitado
         usam o valor informado pelo gestor.
       </p>}
     </div>

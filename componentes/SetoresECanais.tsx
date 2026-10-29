@@ -7,6 +7,7 @@ import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { data as formatarData } from '@/lib/formatar';
 import { mensagemDoErro } from '@/lib/erro-amigavel';
 import { normalizarSetor, type Canal, type Setor } from '@/lib/setores';
+import { MONITORIAS_PADRAO, type MonitoriasDoSetor } from '@/lib/monitoriasDoSetor';
 
 export type SetorDoHubVisto = { setor: string; atendimentos: number; ultima_vez: string };
 
@@ -23,8 +24,10 @@ type Regras = { copiar: string; tme: boolean };
  * fila diz como pontua: copiando as métricas de outra (e acompanhando as
  * mudanças dela) ou com regras próprias, com peso zero até o gestor preencher.
  */
-export default function SetoresECanais({ setores, canais, vistos }: {
+export default function SetoresECanais({ setores, canais, vistos, monitorias = {} }: {
   setores: Setor[]; canais: Canal[]; vistos: SetorDoHubVisto[];
+  /** Quantas por semana e o piso de cada setor (Monitorias 6.0, migração 89). */
+  monitorias?: Record<number, MonitoriasDoSetor>;
 }) {
   const router = useRouter();
   const [rascunho, setRascunho] = useState<Record<string, string>>(() => Object.fromEntries([
@@ -82,6 +85,23 @@ export default function SetoresECanais({ setores, canais, vistos }: {
   const [novoSetor, setNovoSetor] = useState('');
   const [setorOrigem, setSetorOrigem] = useState(setores[0] ? String(setores[0].id) : '');
   const [monitoriasNoSetor, setMonitoriasNoSetor] = useState(false);
+  // Monitorias 6.0: quantas por semana e o piso (em %), na criação, ao ligar
+  // depois e na edição de cada setor. Texto, para o campo aceitar "85,5".
+  const camposDe = (id?: number): CamposMonitoria => {
+    const m = (id != null && monitorias[id]) || MONITORIAS_PADRAO;
+    return { qtd: String(m.porSemana), piso: String(Math.round(m.piso * 1000) / 10).replace('.', ','), de: id != null ? String(id) : undefined };
+  };
+  const [novasMonitorias, setNovasMonitorias] = useState<CamposMonitoria>(() => camposDe(setores[0]?.id));
+  const [ligando, setLigando] = useState<Record<number, CamposMonitoria>>({});
+  const [editando, setEditando] = useState<Record<number, CamposMonitoria>>({});
+  /** Lê os campos: [quantidade, piso de 0 a 1] ou a mensagem do que está errado. */
+  const lerCampos = (c: CamposMonitoria): [number, number] | string => {
+    const qtd = Number(c.qtd);
+    const piso = Number(c.piso.replace(',', '.')) / 100;
+    if (!Number.isInteger(qtd) || qtd < 1 || qtd > 10) return 'Monitorias por semana: de 1 a 10.';
+    if (!(piso > 0 && piso <= 1)) return 'O piso é um percentual entre 1% e 100%.';
+    return [qtd, piso];
+  };
   const [novoCanal, setNovoCanal] = useState<Record<number, { nome: string; hub: string }>>({});
   const comRegras = canais.filter((c) => c.regra_finalizado);
   const regrasPadrao = (): Regras => ({ copiar: comRegras[0] ? String(comRegras[0].id) : '', tme: true });
@@ -109,25 +129,57 @@ export default function SetoresECanais({ setores, canais, vistos }: {
 
   /** Liga/desliga as monitorias do setor (migração 88). Ligar dá aos cargos
    *  que pontuam finalizado o peso padrão da régua de monitoria do setor. */
-  async function ligarMonitorias(s: Setor, ligar: boolean) {
+  async function ligarMonitorias(s: Setor, ligar: boolean, campos?: CamposMonitoria) {
+    if (ligar && !campos) {
+      // Ligar pergunta antes quantas por semana, o piso e de onde vêm os critérios.
+      setLigando((l) => ({ ...l, [s.id]: camposDe(setores.find((x) => x.id !== s.id && x.monitorias !== false)?.id ?? 1) }));
+      return;
+    }
+    const lidos = campos ? lerCampos(campos) : null;
+    if (typeof lidos === 'string') { setErro(lidos); return; }
     if (!confirm(ligar
       ? `Ligar as monitorias de "${s.nome}"? A monitoria passa a pontuar no setor a partir dos meses em aberto, e as pessoas dele aparecem no Monitorias.`
       : `Desligar as monitorias de "${s.nome}"? A monitoria deixa de pontuar nos meses em aberto do setor e ele sai do Monitorias. Meses fechados não mudam.`)) return;
     setOcupado(true); setErro(null); setAviso(null);
-    const { error } = await criarClienteNavegador().rpc('ligar_monitorias', { p_setor: s.id, p_ligar: ligar });
+    const { error } = await criarClienteNavegador().rpc('ligar_monitorias', ligar && lidos
+      ? { p_setor: s.id, p_ligar: true, p_por_semana: lidos[0], p_piso: lidos[1], p_copiar_de: Number(campos!.de ?? 1) }
+      : { p_setor: s.id, p_ligar: ligar });
     setOcupado(false);
     if (error) { setErro(await mensagemDoErro(error)); return; }
+    setLigando((l) => { const n = { ...l }; delete n[s.id]; return n; });
     setAviso(`Monitorias ${ligar ? 'ligadas' : 'desligadas'} em "${s.nome}".`);
+    iniciar(() => router.refresh());
+  }
+
+  /** Quantas por semana e o piso de um setor (Configuração; valem nos meses em aberto). */
+  async function salvarMonitorias(s: Setor) {
+    const lidos = lerCampos(editando[s.id]);
+    if (typeof lidos === 'string') { setErro(lidos); return; }
+    setOcupado(true); setErro(null); setAviso(null);
+    const { error } = await criarClienteNavegador().rpc('definir_monitorias_do_setor', {
+      p_setor: s.id, p_por_semana: lidos[0], p_piso: lidos[1],
+    });
+    setOcupado(false);
+    if (error) { setErro(await mensagemDoErro(error)); return; }
+    setAviso(`Monitorias de "${s.nome}": ${lidos[0]} por semana, pontuando a partir de ${editando[s.id].piso}%.`);
+    setEditando((e) => { const n = { ...e }; delete n[s.id]; return n; });
     iniciar(() => router.refresh());
   }
 
   async function criarSetor() {
     const nome = novoSetor.trim();
     if (!nome) return;
+    const lidos = monitoriasNoSetor ? lerCampos(novasMonitorias) : null;
+    if (typeof lidos === 'string') { setErro(lidos); return; }
     setOcupado(true); setErro(null); setAviso(null);
     // Copiando outro setor (migrações 86 e 87): cargos com pesos e meta, faixas
     // e nomes das métricas e a régua da monitoria, em cópias independentes.
-    const { error } = await criarClienteNavegador().rpc('clonar_setor', {
+    // Com monitorias (migração 89): quantas por semana, o piso e os critérios
+    // do setor de origem.
+    const { error } = await criarClienteNavegador().rpc('clonar_setor', lidos ? {
+      p_nome: nome, p_origem: setorOrigem ? Number(setorOrigem) : null, p_monitorias: true,
+      p_por_semana: lidos[0], p_piso: lidos[1],
+    } : {
       p_nome: nome, p_origem: setorOrigem ? Number(setorOrigem) : null, p_monitorias: monitoriasNoSetor,
     });
     setOcupado(false);
@@ -203,6 +255,49 @@ export default function SetoresECanais({ setores, canais, vistos }: {
                     Monitorias neste setor
                   </label>
                 </div>
+                {s.monitorias !== false && (
+                  <div className="ml-5 mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                    {editando[s.id] ? (
+                      <>
+                        <CamposDeMonitoria c={editando[s.id]} mudar={(c) => setEditando((e) => ({ ...e, [s.id]: c }))} ocupado={ocupado} />
+                        <button type="button" onClick={() => salvarMonitorias(s)} disabled={ocupado}
+                                className="rounded-lg bg-marca-600 px-3 py-1 text-sm font-semibold text-white hover:bg-marca-700 disabled:opacity-40">
+                          Salvar
+                        </button>
+                        <button type="button" onClick={() => setEditando((e) => { const n = { ...e }; delete n[s.id]; return n; })}
+                                className="text-xs text-slate-500 hover:underline">cancelar</button>
+                        <span className="w-full text-xs text-slate-500">Vale para os meses em aberto; mês fechado não muda.</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
+                          {(monitorias[s.id] ?? MONITORIAS_PADRAO).porSemana} monitorias por semana
+                        </span>
+                        <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
+                          pontua com média a partir de {camposDe(s.id).piso}%
+                        </span>
+                        <button type="button" onClick={() => setEditando((e) => ({ ...e, [s.id]: camposDe(s.id) }))} disabled={ocupado}
+                                className="text-xs text-marca-700 hover:underline dark:text-marca-400">alterar</button>
+                      </>
+                    )}
+                  </div>
+                )}
+                {ligando[s.id] && (
+                  <div className="ml-5 mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-marca-600/40 bg-slate-50 px-3 py-2.5 text-sm text-slate-600">
+                    <span className="font-semibold text-slate-800">Ligar as monitorias:</span>
+                    <CamposDeMonitoria c={ligando[s.id]} mudar={(c) => setLigando((l) => ({ ...l, [s.id]: c }))} ocupado={ocupado} />
+                    <select value={ligando[s.id].de} disabled={ocupado} aria-label="De onde vêm os critérios"
+                            onChange={(e) => setLigando((l) => ({ ...l, [s.id]: { ...l[s.id], de: e.target.value } }))} className={entrada}>
+                      {setores.filter((x) => x.id !== s.id).map((x) => <option key={x.id} value={x.id}>Critérios copiados de {x.nome}</option>)}
+                    </select>
+                    <button type="button" onClick={() => ligarMonitorias(s, true, ligando[s.id])} disabled={ocupado}
+                            className="rounded-lg bg-marca-600 px-3 py-1 text-sm font-semibold text-white hover:bg-marca-700 disabled:opacity-40">
+                      Ligar
+                    </button>
+                    <button type="button" onClick={() => setLigando((l) => { const n = { ...l }; delete n[s.id]; return n; })}
+                            className="text-xs text-slate-500 hover:underline">cancelar</button>
+                  </div>
+                )}
                 <ul className="ml-5 mt-2 space-y-2 border-l-2 border-slate-200 pl-4">
                   {canais.filter((c) => c.setor_id === s.id).map((c) => (
                     <li key={c.id} className="grid gap-2 rounded-xl border border-slate-200 bg-superficie px-3 py-2.5 sm:grid-cols-[auto_14rem_auto_1fr] sm:items-center">
@@ -252,7 +347,8 @@ export default function SetoresECanais({ setores, canais, vistos }: {
               <span className="text-xs font-semibold text-slate-500">+ Novo setor</span>
               <input value={novoSetor} disabled={ocupado} placeholder="Nome do setor (a equipe)" aria-label="Nome do novo setor"
                      onChange={(e) => setNovoSetor(e.target.value)} className={`${entrada} w-64`} />
-              <select value={setorOrigem} disabled={ocupado} onChange={(e) => setSetorOrigem(e.target.value)}
+              <select value={setorOrigem} disabled={ocupado}
+                      onChange={(e) => { setSetorOrigem(e.target.value); setNovasMonitorias(camposDe(e.target.value ? Number(e.target.value) : undefined)); }}
                       aria-label="De onde vêm os cargos e as métricas" className={entrada}>
                 {setores.map((s) => <option key={s.id} value={s.id}>Cargos e métricas copiados de {s.nome}</option>)}
                 <option value="">Do zero</option>
@@ -262,13 +358,16 @@ export default function SetoresECanais({ setores, canais, vistos }: {
                        onChange={(e) => setMonitoriasNoSetor(e.target.checked)} className="h-4 w-4 accent-marca-600" />
                 Monitorias neste setor
               </label>
+              {monitoriasNoSetor && (
+                <CamposDeMonitoria c={novasMonitorias} mudar={setNovasMonitorias} ocupado={ocupado} />
+              )}
               <button type="button" onClick={criarSetor} disabled={ocupado || !novoSetor.trim()}
                       className="rounded-lg border border-slate-300 px-3 py-1 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40">
                 Criar setor
               </button>
               <p className="w-full text-xs text-slate-500">
-                Copiar leva os cargos (com pesos e meta), as faixas e os nomes das métricas e a régua da monitoria — e depois
-                cada setor é independente. Sem monitorias, o setor não aparece no Monitorias e a monitoria não pontua; dá para
+                Copiar leva os cargos (com pesos e meta), as faixas e os nomes das métricas e a régua da monitoria — e, com
+                monitorias, também os critérios do formulário de monitoria. Depois cada setor é independente. Sem monitorias, o setor não aparece no Monitorias e a monitoria não pontua; dá para
                 ligar depois.
               </p>
             </li>
@@ -314,6 +413,25 @@ export default function SetoresECanais({ setores, canais, vistos }: {
 }
 
 /** Copiar de uma fila (acompanha a original) ou regras próprias; pontuar TME ou não. */
+/** Os campos da monitoria do setor, em texto (o piso em %, aceitando "85,5"). */
+type CamposMonitoria = { qtd: string; piso: string; de?: string };
+
+/** Quantas monitorias por semana e o piso da média que pontua (Monitorias 6.0). */
+function CamposDeMonitoria({ c, mudar, ocupado }: {
+  c: CamposMonitoria; mudar: (c: CamposMonitoria) => void; ocupado: boolean;
+}) {
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1.5 text-sm text-slate-600">
+      <input value={c.qtd} disabled={ocupado} inputMode="numeric" aria-label="Monitorias por semana"
+             onChange={(e) => mudar({ ...c, qtd: e.target.value.replace(/\D/g, '') })} className={`${entrada} w-12 text-right`} />
+      monitorias por semana · pontua com média a partir de
+      <input value={c.piso} disabled={ocupado} inputMode="decimal" aria-label="Piso da média, em %"
+             onChange={(e) => mudar({ ...c, piso: e.target.value.replace(/[^\d,]/g, '') })} className={`${entrada} w-14 text-right`} />
+      %
+    </span>
+  );
+}
+
 function EscolhaDeRegras({ r, mudar, filas, ocupado }: {
   r: Regras; mudar: (r: Partial<Regras>) => void; filas: Canal[]; ocupado: boolean;
 }) {

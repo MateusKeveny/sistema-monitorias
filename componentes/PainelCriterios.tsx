@@ -18,7 +18,11 @@ type Rascunho = { nome: string; peso: number };
  * bloqueia o salvamento fora disso e avisa quando adicionar ou desativar um
  * critério desequilibra a conta.
  */
-export default function PainelCriterios({ criterios }: { criterios: Criterio[] }) {
+export default function PainelCriterios({ criterios, setorId = 1 }: {
+  criterios: Criterio[];
+  /** O setor dono destes critérios (Monitorias 6.0): o critério novo nasce nele. */
+  setorId?: number;
+}) {
   const router = useRouter();
 
   const ativos = criterios.filter((c) => c.ativo);
@@ -106,7 +110,7 @@ export default function PainelCriterios({ criterios }: { criterios: Criterio[] }
     const proximaOrdem = Math.max(0, ...criterios.map((c) => c.ordem)) + 1;
 
     const { error } = await db.from('criterios')
-      .insert({ nome, peso: Number(peso.toFixed(4)), ordem: proximaOrdem, ativo: true });
+      .insert({ nome, peso: Number(peso.toFixed(4)), ordem: proximaOrdem, ativo: true, setor_id: setorId });
 
     setOcupado(false);
     if (error) { setErro(traduzir(error.message, nome)); return; }

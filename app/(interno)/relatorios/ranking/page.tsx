@@ -1,5 +1,7 @@
 import Link from '@/componentes/Link';
 import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
+import AbasDeSetor from '@/componentes/AbasDeSetor';
+import { setorDaTela } from '@/lib/monitoriasDoSetor';
 import { criarClienteServidor, exigirVisaoDoTime } from '@/lib/supabase/servidor';
 import { Quadro, EtiquetaNota, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import { mesRotulo, mesCurto, nota, percentual } from '@/lib/formatar';
@@ -12,16 +14,20 @@ export const dynamic = 'force-dynamic';
 export default async function RelatorioRanking({
   searchParams,
 }: {
-  searchParams: Promise<{ mes?: string }>;
+  searchParams: Promise<{ mes?: string; setor?: string }>;
 }) {
   await exigirVisaoDoTime();
   // As setas mandam "2026-09"; a lista de meses guarda "2026-09-01" (5.2.0).
-  const mesEscolhido = mesCompleto((await searchParams).mes);
+  const pedido = await searchParams;
+  const mesEscolhido = mesCompleto(pedido.mes);
   const db = await criarClienteServidor();
+  // Monitorias 6.0: um setor por vez (abas com 2 ou mais).
+  const { setores, setorId } = await setorDaTela(db, pedido.setor);
 
   const { data: tudo } = await conferida(db
     .from('vw_ranking_mensal')
     .select('*')
+    .eq('setor_id', setorId)
     .order('mes_referencia', { ascending: false })
     .order('nota_media', { ascending: false }));
 
@@ -61,7 +67,8 @@ export default async function RelatorioRanking({
 
         <div className="flex items-center gap-3">
           {/* O mês pelas setas, como no Performance (5.2.0). */}
-          <SetasDeCompetencia competencia={mes} atual={meses[0]} caminho="/relatorios/ranking"
+          <AbasDeSetor setores={setores} atual={setorId} caminho="/relatorios/ranking" outros={{ mes: pedido.mes }} />
+          <SetasDeCompetencia competencia={mes} atual={meses[0]} caminho="/relatorios/ranking" manter={{ setor: setores.length > 1 ? String(setorId) : undefined }}
                               disponiveis={meses} compacto />
           <Link href={`/api/exportar?formato=csv&relatorio=ranking&mes=${mes}`}
             className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm

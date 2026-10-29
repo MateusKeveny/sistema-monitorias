@@ -13,15 +13,15 @@ export type MonitoriaDaLista = {
 
 type Filtro = 'todas' | 'melhorar' | 'critica';
 
-// Mesma escala do painel: 85% é o piso para a monitoria pontuar.
+// Mesma escala do painel: o piso do setor (a Expansão: 85%) é onde a monitoria pontua.
 const TOM = {
   bom: { borda: 'border-l-marca-600', nota: 'text-marca-700 dark:text-marca-400', fundo: 'bg-slate-50' },
   atencao: { borda: 'border-l-amber-500', nota: 'text-amber-700', fundo: 'bg-slate-50' },
   ruim: { borda: 'border-l-rose-600', nota: 'text-rose-700', fundo: 'bg-slate-50' },
   critica: { borda: 'border-l-rose-600', nota: 'text-rose-700', fundo: 'bg-rose-50' },
 };
-const tomDe = (m: MonitoriaDaLista) =>
-  m.zerado ? TOM.critica : m.nota_final >= 0.85 ? TOM.bom : m.nota_final >= 0.70 ? TOM.atencao : TOM.ruim;
+const tomDe = (m: MonitoriaDaLista, piso: number) =>
+  m.zerado ? TOM.critica : m.nota_final >= piso ? TOM.bom : m.nota_final >= 0.70 ? TOM.atencao : TOM.ruim;
 
 /**
  * As monitorias de um mês, uma por bloco (2.5.0): a nota em destaque à
@@ -30,8 +30,10 @@ const tomDe = (m: MonitoriaDaLista) =>
  * por falha crítica aparecia como "Todos os critérios atendidos", porque o
  * motivo do zeramento não é um critério reprovado.
  */
-export default function ListaDeMonitorias({ monitorias, comLink = false }: {
+export default function ListaDeMonitorias({ monitorias, comLink = false, piso = 0.85 }: {
   monitorias: MonitoriaDaLista[];
+  /** O piso do setor (Monitorias 6.0); sem ele, os 85% da Conexão Expansão. */
+  piso?: number;
   /** No site de Monitorias o código abre a monitoria (editar, excluir, reportar ficam lá). */
   comLink?: boolean;
 }) {
@@ -59,7 +61,7 @@ export default function ListaDeMonitorias({ monitorias, comLink = false }: {
       )}
       <ul className="grid gap-2.5">
         {visiveis.map((m) => {
-          const tom = tomDe(m);
+          const tom = tomDe(m, piso);
           return (
             <li key={m.id} className={`grid grid-cols-[5.5rem_1fr] gap-4 rounded-xl border border-l-4 border-slate-200 px-4 py-3.5 ${tom.borda} ${tom.fundo}`}>
               <div className="pt-0.5 text-center">

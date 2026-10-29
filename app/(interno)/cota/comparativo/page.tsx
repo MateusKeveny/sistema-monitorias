@@ -8,6 +8,7 @@ import { percentual } from '@/lib/formatar';
 import { resolverCompetencia } from '@/lib/competencia';
 import { fonteDoMes, situacaoDoResumo } from '@/lib/resumo';
 import { todas } from '@/lib/consultas';
+import { MONITORIAS_PADRAO, monitoriasPorSetor, setorDasPessoas, textoDoPiso } from '@/lib/monitoriasDoSetor';
 
 export const dynamic = 'force-dynamic';
 
@@ -87,6 +88,10 @@ export default async function Comparativo({
   const inicio = importado && importado < PRIMEIRO_MES ? importado : PRIMEIRO_MES;
   const periodo = PERIODOS.includes(Number(n)) ? Number(n) : 6;
   const veOTime = perfil.papel !== 'operador';
+  // O piso da monitoria: o do setor de quem vê (Monitorias 6.0; a Expansão: 85%).
+  const dbMon = await criarClienteServidor();
+  const [porSetorMon, setorNoMes] = await Promise.all([monitoriasPorSetor(dbMon), setorDasPessoas(dbMon, fim)]);
+  const pisoMon = porSetorMon.get(setorNoMes.get(perfil.id) ?? 1)?.piso ?? MONITORIAS_PADRAO.piso;
   // Só a partir de agosto/2026, o primeiro mês com dados do sistema (decisão
   // do gestor, 14/10/2026): os meses antes disso apareciam como "sem dado" e
   // custavam ~1 s de cálculo ao vivo.
@@ -209,7 +214,7 @@ export default async function Comparativo({
 
   // ------------------------------------------------------------- montagem
   const tomDoCsat = (v: number): Tom => (v >= 0.90 ? 'bom' : v >= 0.85 ? 'atencao' : 'ruim');
-  const tomDaNota = (v: number): Tom => (v >= 0.85 ? 'bom' : v >= 0.70 ? 'atencao' : 'ruim');
+  const tomDaNota = (v: number): Tom => (v >= pisoMon ? 'bom' : v >= 0.70 ? 'atencao' : 'ruim');
   const TOM_LINHA = { bom: 'bom', atencao: 'atencao', ruim: 'ruim', neutro: 'bom' } as const;
 
   /** Variação do último mês contra o anterior, no formato de cada categoria. */
@@ -426,8 +431,8 @@ export default async function Comparativo({
       chave: 'mon', rotulo: 'Monitoria',
       conteudo: (
         <Vista k="mon" formatar={percentual} min={0.7} max={1} tom={(v) => tomDaNota(v)}
-               titulo="Nota média de monitoria da equipe por mês" subtitulo="Linha tracejada: 85%, o piso para a monitoria pontuar."
-               referencia={{ valor: 0.85, rotulo: 'piso 85%' }}
+               titulo="Nota média de monitoria da equipe por mês" subtitulo={`Linha tracejada: ${textoDoPiso(pisoMon)}, o piso para a monitoria pontuar.`}
+               referencia={{ valor: pisoMon, rotulo: `piso ${textoDoPiso(pisoMon)}` }}
                equipe={meses.map((m) => notaDe(EQUIPE, m))}
                pessoas={series(todasNotas.map((x) => x.operador_id), (id, m) => notaDe(id, m))} />
       ),

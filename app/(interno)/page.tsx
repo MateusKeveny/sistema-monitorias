@@ -3,6 +3,8 @@ import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { Quadro, Indicador, EtiquetaNota, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import EvolucaoMensal from '@/componentes/GraficoEvolucao';
 import CoberturaDoCiclo from '@/componentes/CoberturaDoCiclo';
+import AbasDeSetor from '@/componentes/AbasDeSetor';
+import { MONITORIAS_PADRAO, monitoriasPorSetor, setorDasPessoas, textoDoPiso } from '@/lib/monitoriasDoSetor';
 import OQueMaisSeRepete from '@/componentes/OQueMaisSeRepete';
 import { janelaDe, repeticoesDaEquipe } from '@/lib/repeticoes';
 import SolicitacoesDeExclusao, { type Solicitacao } from '@/componentes/SolicitacoesDeExclusao';
@@ -16,19 +18,34 @@ export const dynamic = 'force-dynamic';
 export default async function Painel({
   searchParams,
 }: {
-  searchParams: Promise<{ mes?: string }>;
+  searchParams: Promise<{ mes?: string; setor?: string }>;
 }) {
   const perfil = await exigirPerfil();
+  const pedido = await searchParams;
   // As setas mandam "2026-09"; a lista de meses guarda "2026-09-01" (5.2.0).
-  const escolhido = mesCompleto((await searchParams).mes);
+  const escolhido = mesCompleto(pedido.mes);
   const db = await criarClienteServidor();
+
+  // Monitorias 6.0: a equipe é a de um setor por vez (abas com 2 ou mais
+  // setores). O operador vê as dele, no setor dele.
+  const [{ data: setoresDb }, porSetor, setorDe] = await Promise.all([
+    db.from('setores').select('id, nome, monitorias').eq('ativo', true).order('ordem'),
+    monitoriasPorSetor(db),
+    setorDasPessoas(db, mesDeCompetencia(hojeNoBrasil())),
+  ]);
+  const comMonitorias = ((setoresDb ?? []) as { id: number; nome: string; monitorias: boolean | null }[])
+    .filter((s) => s.monitorias !== false);
+  const setorId = perfil.papel === 'operador' ? (setorDe.get(perfil.id) ?? 1)
+    : comMonitorias.find((s) => String(s.id) === pedido.setor)?.id ?? comMonitorias[0]?.id ?? 1;
+  const doSetor = porSetor.get(setorId) ?? MONITORIAS_PADRAO;
 
   // O ranking completo é pequeno — uma linha por operador por mês — e resolve
   // três coisas de uma vez: a lista de meses do seletor, os números do mês
   // escolhido e a série do gráfico. Evita uma consulta só para descobrir qual
   // é o último mês com dados.
   const { data: todoRanking } = await db.from('vw_ranking_mensal').select('*');
-  const ranking = (todoRanking ?? []) as LinhaRanking[];
+  const ranking = ((todoRanking ?? []) as (LinhaRanking & { setor_id?: number })[])
+    .filter((l) => perfil.papel === 'operador' || (l.setor_id ?? 1) === setorId);
 
   // Só até o mês aberto: o seguinte aparece quando a cota do aberto for
   // fechada (migração 30). Monitoria lançada antes da trava num mês ainda
@@ -69,7 +86,7 @@ export default async function Painel({
     await Promise.all([
       // A view respeita a RLS: para um operador estes já são os critérios que
       // ele próprio reprovou, não os do time.
-      db.from('vw_criterios_reprovados').select('*').eq('mes_referencia', mes)
+      db.from('vw_criterios_reprovados').select('*').eq('mes_referencia', mes).eq('setor_id', setorId)
         .gt('reprovacoes', 0)
         .order('pontos_perdidos', { ascending: false })
         .limit(ehOperador ? 3 : 6),
@@ -80,7 +97,7 @@ export default async function Painel({
       // Cobertura do ciclo: só faz sentido para quem enxerga o time inteiro.
       ehOperador
         ? Promise.resolve({ data: null })
-        : db.from('vw_monitorias').select('operador_id, semana_mes').eq('mes_referencia', mes),
+        : db.from('vw_monitorias').select('operador_id, semana_mes').eq('mes_referencia', mes).eq('setor_id', setorId),
       ehOperador
         ? Promise.resolve({ data: null })
         : db.from('pessoas').select('id, nome').eq('avaliado', true).eq('ativo', true).order('nome'),
@@ -97,7 +114,7 @@ export default async function Painel({
             .order('solicitada_em')
         : Promise.resolve({ data: null, error: null }),
       // O que mais se repete na equipe (5.7.0): só para quem enxerga o time.
-      ehOperador ? Promise.resolve(null) : repeticoesDaEquipe(db, janelaDe(mes)),
+      ehOperador ? Promise.resolve(null) : repeticoesDaEquipe(db, janelaDe(mes), setorId),
     ]);
 
   const linhas = ranking
@@ -109,13 +126,16 @@ export default async function Painel({
   // Grade operador × semana. Parte da lista de operadores ativos, não das
   // monitorias: quem não foi monitorado nenhuma vez precisa aparecer com zero,
   // e é justamente esse o caso que passava despercebido.
+  // Só quem está no setor da tela no mês (Monitorias 6.0).
+  const setorNoMes = await setorDasPessoas(db, mes);
+  const avaliados = ((ativos ?? []) as { id: string; nome: string }[]).filter((o) => (setorNoMes.get(o.id) ?? 1) === setorId);
   const contagem = new Map<string, number[]>();
-  for (const o of (ativos ?? []) as { id: string }[]) contagem.set(o.id, [0, 0, 0, 0]);
+  for (const o of avaliados) contagem.set(o.id, [0, 0, 0, 0]);
   for (const m of (porSemana ?? []) as { operador_id: string; semana_mes: number }[]) {
     const linha = contagem.get(m.operador_id);
     if (linha && m.semana_mes >= 1 && m.semana_mes <= 4) linha[m.semana_mes - 1]++;
   }
-  const cobertura = ((ativos ?? []) as { id: string; nome: string }[]).map((o) => ({
+  const cobertura = avaliados.map((o) => ({
     operador_id: o.id,
     operador: o.nome,
     semanas: contagem.get(o.id) ?? [0, 0, 0, 0],
@@ -168,7 +188,7 @@ export default async function Painel({
     : null;
   const zeradas = linhas.reduce((s, l) => s + l.zeradas, 0);
   const impecaveis = linhas.reduce((s, l) => s + l.impecaveis, 0);
-  const abaixo = linhas.filter((l) => Number(l.nota_media) < 0.85).length;
+  const abaixo = linhas.filter((l) => Number(l.nota_media) < doSetor.piso).length;
 
   // Série mensal consolidada para o gráfico — sempre todo o período, mesmo
   // quando o resto da tela está filtrado por um mês.
@@ -215,8 +235,10 @@ export default async function Painel({
               quase sempre o que se quer. Continua sendo navegação, então o
               endereço reflete o que está na tela e pode ser compartilhado. */}
           {meses.length > 1 && (
-            <SetasDeCompetencia competencia={mes} atual={meses[0]} caminho="/" disponiveis={meses} compacto />
+            <SetasDeCompetencia competencia={mes} atual={meses[0]} caminho="/" disponiveis={meses} compacto
+                                manter={{ setor: !ehOperador && comMonitorias.length > 1 ? String(setorId) : undefined }} />
           )}
+          {!ehOperador && <AbasDeSetor setores={comMonitorias} atual={setorId} caminho="/" outros={{ mes: pedido.mes }} />}
 
           <Link
             href={ehOperador ? '/monitorias' : '/relatorios'}
@@ -243,7 +265,7 @@ export default async function Painel({
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Indicador
           rotulo="Nota média do mês" valor={nota(media)}
-          tom={media == null ? 'neutro' : media >= 0.95 ? 'bom' : media >= 0.85 ? 'alerta' : 'ruim'}
+          tom={media == null ? 'neutro' : media >= 0.95 ? 'bom' : media >= doSetor.piso ? 'alerta' : 'ruim'}
           detalhe={`${total} monitoria${total === 1 ? '' : 's'} avaliada${total === 1 ? '' : 's'}`}
         />
         <Indicador
@@ -260,12 +282,12 @@ export default async function Painel({
           <Indicador
             rotulo="Menor nota do mês"
             valor={nota(linhas.length ? Number(linhas[0].nota_minima) : null)}
-            tom={linhas.length && Number(linhas[0].nota_minima) < 0.85 ? 'alerta' : 'neutro'}
+            tom={linhas.length && Number(linhas[0].nota_minima) < doSetor.piso ? 'alerta' : 'neutro'}
             detalhe="a avaliação mais baixa do período"
           />
         ) : (
           <Indicador
-            rotulo="Operadores abaixo de 85%"
+            rotulo={`Operadores abaixo de ${textoDoPiso(doSetor.piso)}`}
             valor={String(abaixo)}
             tom={abaixo > 0 ? 'alerta' : 'neutro'}
             detalhe={`de ${linhas.length} com monitoria no mês`}
@@ -420,7 +442,7 @@ export default async function Painel({
       )}
 
       {!ehOperador && (
-        <CoberturaDoCiclo linhas={cobertura} semanasEncerradas={semanasEncerradas} competencia={mes} comLink />
+        <CoberturaDoCiclo linhas={cobertura} semanasEncerradas={semanasEncerradas} competencia={mes} comLink porSemana={doSetor.porSemana} />
       )}
     </div>
   );

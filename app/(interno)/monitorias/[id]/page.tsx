@@ -6,6 +6,7 @@ import BotaoExcluirMonitoria from '@/componentes/BotaoExcluirMonitoria';
 import PedidosDeExclusao, { type PedidoDeExclusao } from '@/componentes/PedidosDeExclusao';
 import { data as formatarData, dataHora, duracao, percentual, nota, codigoMonitoria } from '@/lib/formatar';
 import type { Monitoria } from '@/lib/tipos';
+import { MONITORIAS_PADRAO, monitoriasPorSetor, textoDoPiso } from '@/lib/monitoriasDoSetor';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,7 +34,7 @@ export default async function DetalheMonitoria({
   const { id } = await params;
   const db = await criarClienteServidor();
 
-  const [{ data: monitoria }, { data: itens }, { data: historico }, { data: pedidos }] =
+  const [{ data: monitoria }, { data: itens }, { data: historico }, { data: pedidos }, porSetorMon] =
     await Promise.all([
       db.from('vw_monitorias').select('*').eq('id', id).maybeSingle(),
       db.from('monitoria_itens')
@@ -49,10 +50,13 @@ export default async function DetalheMonitoria({
           + ' decidida_por_nome, decidida_em, observacao_decisao')
         .eq('monitoria_id', id)
         .order('solicitada_em', { ascending: false }),
+      // O piso do setor da monitoria (Monitorias 6.0; a Expansão: 85%).
+      monitoriasPorSetor(db),
     ]);
 
   if (!monitoria) notFound();
   const m = monitoria as Monitoria;
+  const piso = porSetorMon.get((monitoria as { setor_id?: number }).setor_id ?? 1)?.piso ?? MONITORIAS_PADRAO.piso;
 
   const alteracoes = (historico ?? []) as Alteracao[];
   const pedidosDeExclusao = (pedidos ?? []) as unknown as PedidoDeExclusao[];
@@ -93,8 +97,8 @@ export default async function DetalheMonitoria({
       <div className="grid gap-3 sm:grid-cols-3">
         <Indicador
           rotulo="Nota final" valor={nota(Number(m.nota_final))}
-          tom={m.zerado || Number(m.nota_final) < 0.85 ? 'ruim' : Number(m.nota_final) < 0.95 ? 'alerta' : 'bom'}
-          detalhe={m.zerado ? 'nota zero por falha crítica' : Number(m.nota_final) < 0.85 ? 'abaixo do piso de 85%' : undefined}
+          tom={m.zerado || Number(m.nota_final) < piso ? 'ruim' : Number(m.nota_final) < 0.95 ? 'alerta' : 'bom'}
+          detalhe={m.zerado ? 'nota zero por falha crítica' : Number(m.nota_final) < piso ? `abaixo do piso de ${textoDoPiso(piso)}` : undefined}
         />
         <Indicador rotulo="Operador(a)" valor={m.operador} detalhe={m.monitor ? `avaliado por ${m.monitor}` : undefined} />
         <Indicador

@@ -19,7 +19,8 @@ type Resposta = { conforme: boolean | null; observacao: string };
 /** Um atendimento já importado do Hub, candidato ao sorteio (5.1.0). */
 type Atendimento = { protocolo: string; data: string; tabulacao: string | null };
 
-const POR_SEMANA = 4;
+/** Semanas do ciclo. Quantas monitorias cabem em cada uma é do setor (Monitorias 6.0). */
+const SEMANAS = 4;
 
 const rotuloCampo = 'mb-1 block text-sm font-medium text-slate-700';
 const campo = `w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none
@@ -41,10 +42,15 @@ export type MonitoriaEmEdicao = {
 };
 
 export default function FormularioMonitoria({
-  perfilId, criterios, operadores, canais, emEdicao, mesAberto, operadorInicial,
+  perfilId, criterios: todosOsCriterios, operadores, canais, emEdicao, mesAberto, operadorInicial,
+  setorDe = {}, porSemanaDe = {},
 }: {
   perfilId: string;
+  /** Os critérios de todos os setores; o formulário mostra os do setor do avaliado. */
   criterios: Criterio[];
+  /** O setor de cada avaliado no mês aberto e quantas monitorias por semana cada setor tem (Monitorias 6.0). */
+  setorDe?: Record<string, number>;
+  porSemanaDe?: Record<number, number>;
   operadores: Operador[];
   canais: Canal[];
   /** Ausente = lançamento novo. Presente = edição da monitoria indicada. */
@@ -69,6 +75,12 @@ export default function FormularioMonitoria({
   // mês errado. O analista informa a data do atendimento que está avaliando.
   const [dataAtendimento, setDataAtendimento] = useState(emEdicao?.data_atendimento ?? '');
   const [operadorId, setOperadorId] = useState(emEdicao?.operador_id ?? operadorInicial ?? '');
+  // O formulário é o do setor da pessoa avaliada (Monitorias 6.0): os
+  // critérios dele e quantas monitorias cabem na semana.
+  const setorDoAvaliado = setorDe[operadorId] ?? null;
+  const criterios = setorDoAvaliado == null ? todosOsCriterios
+    : todosOsCriterios.filter((c) => (c.setor_id ?? 1) === setorDoAvaliado);
+  const POR_SEMANA = porSemanaDe[setorDoAvaliado ?? 1] ?? 4;
   const [canalId, setCanalId] = useState(emEdicao?.canal_id ?? canais[0]?.id ?? '');
   const [tempo, setTempo] = useState(
     emEdicao?.tempo_atendimento_seg ? String(Math.round(emEdicao.tempo_atendimento_seg / 60)) : '');
@@ -121,7 +133,7 @@ export default function FormularioMonitoria({
 
   const livres = ocupados === null
     ? []
-    : [1, 2, 3, 4].filter((n) => !ocupados.includes(n));
+    : Array.from({ length: POR_SEMANA }, (_, i) => i + 1).filter((n) => !ocupados.includes(n));
   const semanaCheia = ocupados !== null && livres.length === 0;
 
   // ------------------------------------------------------------ o sorteio
@@ -149,7 +161,7 @@ export default function FormularioMonitoria({
     (async () => {
       const db = criarClienteNavegador();
       const [inicio] = periodoDaSemana(competenciaAberta, 1);
-      const [, fim] = periodoDaSemana(competenciaAberta, POR_SEMANA);
+      const [, fim] = periodoDaSemana(competenciaAberta, SEMANAS);
       const [{ data: avaliacoes }, { data: monitorias }] = await Promise.all([
         db.from('avaliacoes').select('protocolo, data, tabulacao')
           .eq('pessoa_id', operadorId).gte('data', inicio).lte('data', fim)
@@ -161,7 +173,7 @@ export default function FormularioMonitoria({
 
       const feitasPorSemana = [0, 0, 0, 0];
       for (const m of (monitorias ?? []) as { semana_mes: number }[]) {
-        if (m.semana_mes >= 1 && m.semana_mes <= POR_SEMANA) feitasPorSemana[m.semana_mes - 1]++;
+        if (m.semana_mes >= 1 && m.semana_mes <= SEMANAS) feitasPorSemana[m.semana_mes - 1]++;
       }
       setDoCiclo({
         avaliacoes: (avaliacoes ?? []) as Atendimento[],
@@ -229,7 +241,7 @@ export default function FormularioMonitoria({
   // critério vem como está gravado — e um critério criado depois da monitoria
   // aparece sem resposta, para ser respondido em vez de assumir conformidade.
   const [respostas, setRespostas] = useState<Record<string, Resposta>>(() =>
-    Object.fromEntries(criterios.map((c) => [
+    Object.fromEntries(todosOsCriterios.map((c) => [
       c.id,
       emEdicao
         ? emEdicao.respostas[c.id] ?? { conforme: null, observacao: '' }
@@ -310,7 +322,7 @@ export default function FormularioMonitoria({
     if (!operadorId) return falha('Selecione o operador avaliado.');
     if (!protocolo.trim()) return falha('Sorteie um atendimento ou informe o protocolo.');
     if (!temData) return falha('Informe a data do atendimento.');
-    if (semanaCheia) return falha('Esta semana já tem as 4 monitorias do operador. Escolha outra data ou outro operador.');
+    if (semanaCheia) return falha(`Esta semana já tem as ${POR_SEMANA} monitorias do operador. Escolha outra data ou outro operador.`);
     if (semResposta > 0) return falha(`Faltam ${semResposta} critério(s) sem resposta.`);
     if (faltaEvidencia > 0)
       return falha(`Faltam ${faltaEvidencia} critério(s) reprovados sem a evidência do que aconteceu.`);
@@ -791,7 +803,7 @@ export default function FormularioMonitoria({
               ) : ocupados === null ? (
                 <span className="text-slate-400">verificando…</span>
               ) : semanaCheia ? (
-                <span className="font-medium">Semana concluída · 4 de 4</span>
+                <span className="font-medium">Semana concluída · {POR_SEMANA} de {POR_SEMANA}</span>
               ) : (
                 <>
                   {numero}ª Monitoria

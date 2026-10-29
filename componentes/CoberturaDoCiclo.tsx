@@ -9,7 +9,6 @@ export type LinhaCobertura = {
   semanas: number[];
 };
 
-const POR_SEMANA = 4;
 
 /**
  * Quem está com semanas incompletas no ciclo.
@@ -23,11 +22,13 @@ const POR_SEMANA = 4;
  * ("2 de 4"), sem entrar na cobrança (5.3.0).
  */
 export default function CoberturaDoCiclo({
-  linhas, semanasEncerradas, competencia, comLink = false,
+  linhas, semanasEncerradas, competencia, comLink = false, porSemana: POR_SEMANA = 4,
 }: {
   linhas: LinhaCobertura[];
   /** Quantas semanas do ciclo já terminaram (0 a 4). */
   semanasEncerradas: number;
+  /** Quantas monitorias por semana o setor tem (Monitorias 6.0); a Conexão Expansão: 4. */
+  porSemana?: number;
   /** Mês de competência exibido ('2026-10-01'), para as datas de cada semana. */
   competencia: string;
   /**
