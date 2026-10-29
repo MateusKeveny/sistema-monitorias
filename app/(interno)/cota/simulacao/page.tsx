@@ -34,7 +34,7 @@ export default async function Simulacao() {
     }
   }
 
-  const [extrato, mensal, faixas, pesos, referencias, tme, desligadas, volume, csat, fechado, cargos] = await todas([
+  const [extrato, mensal, faixas, pesos, referencias, tme, desligadas, volume, csat, fechado, cargos, filas] = await todas([
     linhas(),
     db.from(fonte.mensal).select('pessoa_id, pessoa, cargo, resultado, meta, compoe_media').eq('mes_competencia', competencia),
     db.from('regras').select('chave, rotulo, grupo, faixa_min, faixa_max, ordem').eq('ativo', true),
@@ -42,10 +42,12 @@ export default async function Simulacao() {
     db.from('cargos_referencia').select('cargo_id, referencia_id'),
     db.from('vw_tme_equipe').select('semana, canal, tme_seg').eq('mes_competencia', competencia),
     db.rpc('semanas_sem_tme', { p_mes: competencia }),
-    db.from('volume_semanal').select('pessoa_id, semana, canal, finalizados').eq('mes_competencia', competencia),
+    db.from('volume_semanal').select('pessoa_id, semana, canal, finalizados, tme_seg').eq('mes_competencia', competencia),
     db.from('vw_csat_semanal').select('pessoa_id, origem, semana, csat').eq('mes_competencia', competencia),
     db.from('fechamentos_cota').select('id', { count: 'exact', head: true }).eq('mes_competencia', competencia),
     db.from('cargos').select('id, nome'),
+    // TME por pessoa (migração 90): as filas e desde quando.
+    db.from('canais_do_setor').select('*'),
   ]);
 
   const num = <T extends object>(l: T[], campos: (keyof T)[]) =>
@@ -59,7 +61,9 @@ export default async function Simulacao() {
     referencias: (referencias.data ?? []) as Base['referencias'],
     tme: num((tme.data ?? []) as Base['tme'], ['tme_seg']) as Base['tme'],
     tmeDesligado: ((desligadas.data ?? []) as { semana: number; canal: string }[]).map((d) => `${d.semana}|${d.canal}`),
-    volume: num((volume.data ?? []) as Base['volume'], ['finalizados']) as Base['volume'],
+    volume: num((volume.data ?? []) as Base['volume'], ['finalizados', 'tme_seg']) as Base['volume'],
+    tmePorPessoa: ((filas.data ?? []) as { apelido: string | null; tme_por_pessoa_desde?: string | null }[])
+      .filter((f) => f.apelido && f.tme_por_pessoa_desde && f.tme_por_pessoa_desde <= competencia).map((f) => f.apelido!),
     csat: num((csat.data ?? []) as Base['csat'], ['csat']) as Base['csat'],
   };
 

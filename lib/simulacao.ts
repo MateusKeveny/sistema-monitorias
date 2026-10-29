@@ -34,7 +34,9 @@ export type PessoaDoMes = { pessoa_id: string; pessoa: string; cargo: string | n
 export type Faixa = { chave: string; rotulo: string; grupo: string; faixa_min: number | null; faixa_max: number | null; ordem: number };
 export type Peso = { cargo_id: number; regra: string; peso: number };
 export type TmeDaSemana = { semana: number; canal: string; tme_seg: number | null };
-export type VolumeDaSemana = { pessoa_id: string; semana: number; canal: string; finalizados: number };
+export type VolumeDaSemana = { pessoa_id: string; semana: number; canal: string; finalizados: number;
+  /** TME da pessoa na semana (migração 90), para a fila que avalia o TME por pessoa. */
+  tme_seg?: number | null };
 export type CsatDaSemana = { pessoa_id: string; origem: string; semana: number; csat: number };
 
 export type Base = {
@@ -48,6 +50,9 @@ export type Base = {
   tmeDesligado: string[];
   volume: VolumeDaSemana[];
   csat: CsatDaSemana[];
+  /** Filas que, neste mês, avaliam o TME por pessoa (migração 90): a faixa
+   *  sai do TME de cada um, e quem não tem TME fica na melhor faixa. */
+  tmePorPessoa?: string[];
   /** Semanas já lançadas, quando quem chama sabe melhor (a tela do atendente só
    *  enxerga o próprio volume; ali vem do TME da equipe). */
   semanasLancadas?: number[];
@@ -146,9 +151,13 @@ export function simular(base: Base, cen: Cenario): Resultado[] {
       const k = `${semana}|${canal}`;
       const conta = desligado.has(k) ? invertido.has(k) : !invertido.has(k);
       const t = base.tme.find((x) => x.semana === semana && x.canal === canal)?.tme_seg;
-      const f = conta && t ? faixaDe(faixas, grupo, t) : undefined;
-      if (!f) continue;
+      const porPessoa = base.tmePorPessoa?.includes(canal) ?? false;
+      const daEquipe = conta && t ? faixaDe(faixas, grupo, t) : undefined;
+      if (!conta || (!porPessoa && !daEquipe)) continue;
       for (const v of base.volume.filter((x) => x.semana === semana && x.canal === canal)) {
+        // Por pessoa (90): a faixa do TME dela; sem TME, a melhor faixa.
+        const f = porPessoa ? faixaDe(faixas, grupo, Number(v.tme_seg ?? 0)) : daEquipe;
+        if (!f) continue;
         const ref = cargoDe.get(v.pessoa_id);
         if (!ref || fora.has(`${v.pessoa_id}|${semana}`) || !peso.has(`${ref.cargo_id}|${f.chave}`)) continue;
         linhas.push({ ...ref, semana, origem: canal, regra: f.chave, rotulo: f.rotulo, grupo: f.grupo, ordem: f.ordem,

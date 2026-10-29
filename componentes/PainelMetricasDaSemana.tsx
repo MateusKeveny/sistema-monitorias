@@ -92,7 +92,7 @@ export default function PainelMetricasDaSemana({
         {canais.map((c) => (
           <section key={c.chave} className="rounded-[20px] bg-superficie px-5 py-4 shadow-sm">
             <h2 className="text-base font-semibold text-slate-900">TME · {c.nome}</h2>
-            <p className="mt-0.5 text-xs text-slate-500">TME médio da equipe na semana e a faixa que ele deu. Chave ligada: contabiliza.</p>
+            <p className="mt-0.5 text-xs text-slate-500">TME médio da equipe na semana e a faixa que ele deu (na fila que avalia por pessoa, cada um cai na faixa do próprio TME). Chave ligada: contabiliza.</p>
             <ul className="mt-2">
               {c.semanas.map((s) => {
                 const ligada = !s.desligada;

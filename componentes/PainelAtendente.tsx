@@ -89,7 +89,14 @@ export default async function PainelAtendente({
   const meses = [competencia, anterior];
   const db = await criarClienteServidor();
   // O piso da monitoria: o do setor da pessoa no mês (Monitorias 6.0).
-  const [porSetorMon, setorNoMes] = await Promise.all([monitoriasPorSetor(db), setorDasPessoas(db, competencia)]);
+  const [porSetorMon, setorNoMes, { data: filasDoSetor }] = await Promise.all([
+    monitoriasPorSetor(db), setorDasPessoas(db, competencia),
+    // TME por pessoa (migração 90): as filas e desde quando.
+    db.from('canais_do_setor').select('*'),
+  ]);
+  /** A fila avalia o TME de cada um neste mês (e não a média da equipe)? */
+  const tmePorPessoa = (fila: string) => ((filasDoSetor ?? []) as { apelido: string | null; tme_por_pessoa_desde?: string | null }[])
+    .some((f) => f.apelido === fila && !!f.tme_por_pessoa_desde && f.tme_por_pessoa_desde <= competencia);
   const piso = porSetorMon.get(setorNoMes.get(pessoaId) ?? 1)?.piso ?? MONITORIAS_PADRAO.piso;
   const tomDaNota = (v: number) => tomDaNotaCom(v, piso);
   // O mês aberto e o anterior vêm do resumo quando ele está em dia (migração 58).
@@ -370,7 +377,9 @@ export default async function PainelAtendente({
             </Secao>
           </Painel>
           <Painel>
-            <Secao titulo="Como o TME conta" subtitulo="A faixa vem do TME médio da equipe e vale para todos.">
+            <Secao titulo="Como o TME conta" subtitulo={tmePorPessoa(c)
+              ? 'A faixa vem do seu TME na semana. Semana sem TME conta na melhor faixa.'
+              : 'A faixa vem do TME médio da equipe e vale para todos.'}>
               {faixasTme.length === 0 ? <Vazio>O tempo não gera pontos nesta fila.</Vazio> : (
                 <ul className="divide-y divide-slate-100 text-sm">
                   {faixasTme.map((f) => {

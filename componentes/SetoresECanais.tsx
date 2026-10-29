@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Quadro, Tabela, Td, Th, Vazio } from '@/componentes/ui';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
-import { data as formatarData } from '@/lib/formatar';
+import { data as formatarData, hojeNoBrasil, mesDeCompetencia, mesRotulo } from '@/lib/formatar';
 import { mensagemDoErro } from '@/lib/erro-amigavel';
 import { normalizarSetor, type Canal, type Setor } from '@/lib/setores';
 import { MONITORIAS_PADRAO, type MonitoriasDoSetor } from '@/lib/monitoriasDoSetor';
@@ -216,6 +216,24 @@ export default function SetoresECanais({ setores, canais, vistos, monitorias = {
   }
 
   /** Uma linha dizendo de onde vêm as regras da fila. */
+  /**
+   * TME por pessoa (migração 90): a partir de qual competência a fila avalia
+   * o TME de cada um. Só muda o que ainda não fechou — a data não pode voltar
+   * para antes do mês aberto, nem sair de um mês que já está valendo para trás.
+   */
+  const mesAberto = mesDeCompetencia(hojeNoBrasil());
+  async function definirTmePorPessoa(c: Canal, desde: string | null) {
+    if (!confirm(desde
+      ? `TME por pessoa na fila "${c.nome}" a partir de ${mesRotulo(desde)}: a faixa passa a sair do TME de cada um (sem TME na semana = melhor faixa). Meses anteriores não mudam.`
+      : `Voltar a fila "${c.nome}" para o TME da equipe? Vale para os meses ainda abertos.`)) return;
+    setOcupado(true); setErro(null); setAviso(null);
+    const { error } = await criarClienteNavegador().from('canais_do_setor').update({ tme_por_pessoa_desde: desde }).eq('id', c.id);
+    setOcupado(false);
+    if (error) { setErro(await mensagemDoErro(error)); return; }
+    setAviso(desde ? `"${c.nome}": TME por pessoa a partir de ${mesRotulo(desde)}.` : `"${c.nome}": TME da equipe.`);
+    iniciar(() => router.refresh());
+  }
+
   function comoPontua(c: Canal): string {
     if (!c.regra_finalizado) return 'Ainda não pontua: escolha como.';
     const tme = c.grupo_tme ? 'com TME' : 'sem TME';
@@ -313,6 +331,29 @@ export default function SetoresECanais({ setores, canais, vistos, monitorias = {
                              onChange={(e) => setRascunho((r) => ({ ...r, [`h${c.id}`]: e.target.value }))}
                              className={entrada} />
                       <p className="text-xs text-slate-500 sm:col-span-4">{comoPontua(c)}</p>
+                      {c.grupo_tme && c.regra_finalizado && (
+                        <p className="flex flex-wrap items-center gap-2 text-xs text-slate-600 sm:col-span-4">
+                          <span className="rounded-full bg-slate-100 px-2.5 py-0.5 font-semibold">
+                            {c.tme_por_pessoa_desde ? `TME de cada pessoa desde ${mesRotulo(c.tme_por_pessoa_desde)}` : 'TME da equipe (média da fila)'}
+                          </span>
+                          {/* Só o que ainda não fechou: o mês aberto em diante. */}
+                          {(!c.tme_por_pessoa_desde || c.tme_por_pessoa_desde >= mesAberto) && (
+                            <>
+                              <label className="flex items-center gap-1.5">
+                                por pessoa a partir de
+                                <input type="month" disabled={ocupado} min={mesAberto.slice(0, 7)}
+                                       defaultValue={(c.tme_por_pessoa_desde ?? mesAberto).slice(0, 7)}
+                                       onChange={(e) => e.target.value && definirTmePorPessoa(c, `${e.target.value}-01`)}
+                                       aria-label={`TME por pessoa a partir de, na fila ${c.nome}`} className={entrada} />
+                              </label>
+                              {c.tme_por_pessoa_desde && (
+                                <button type="button" onClick={() => definirTmePorPessoa(c, null)} disabled={ocupado}
+                                        className="text-marca-700 hover:underline dark:text-marca-400">voltar ao TME da equipe</button>
+                              )}
+                            </>
+                          )}
+                        </p>
+                      )}
                       {!c.regra_finalizado && (
                         <div className="flex flex-wrap items-center gap-2 sm:col-span-4">
                           <EscolhaDeRegras r={regrasDa(`f${c.id}`)} mudar={(r) => mudarRegras(`f${c.id}`, r)}

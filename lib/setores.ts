@@ -19,6 +19,8 @@ export type Canal = {
   nomes_no_hub: string[]; ativo: boolean; ordem: number;
   /** Regras da fila (migração 84). Sem regra de finalizado = fila ainda sem regras. */
   regra_finalizado?: string | null; grupo_tme?: string | null;
+  /** A partir de qual competência a fila avalia o TME de cada pessoa (migração 90); nulo = o da equipe. */
+  tme_por_pessoa_desde?: string | null;
   grupo_csat?: string; grupo_nota?: string;
   /** Copiou as métricas desta fila e acompanha as mudanças dela (85). */
   copia_de?: number | null;

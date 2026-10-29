@@ -22,7 +22,7 @@ const MODELOS: Regua[] = [
   { grupo: 'csat', titulo: 'C-SAT', cor: '#60a5fa', unidade: '%', maiorMelhor: true,
     texto: 'O C-SAT da semana escolhe a faixa; a faixa multiplica os finalizados. Vale para os dois canais.' },
   { grupo: 'tme', titulo: 'TME Médio Equipe · Expansão', cor: '#34d399', unidade: 'min', maiorMelhor: false,
-    texto: 'O TME médio da equipe na semana escolhe a faixa.' },
+    texto: 'O TME da semana escolhe a faixa: o médio da equipe ou, na fila que avalia por pessoa, o de cada um.' },
   { grupo: 'tme_diretores', titulo: 'TME · Diretores-Expansão', cor: '#2dd4bf', unidade: 'min', maiorMelhor: false,
     texto: 'O TME da pessoa na semana escolhe a faixa.' },
   { grupo: 'monitoria', titulo: 'Monitoria', cor: '#fbbf24', unidade: '%', maiorMelhor: true,
@@ -39,7 +39,7 @@ function reguasDe(regras: RegraCota[]): Regua[] {
   for (const g of grupos) {
     if (g.startsWith('tme_') && !lista.some((x) => x.grupo === g)) {
       lista.push({ grupo: g, titulo: `TME · ${g.slice(4)}`, cor: '#34d399', unidade: 'min', maiorMelhor: false,
-        texto: 'O TME médio da equipe na fila escolhe a faixa.' });
+        texto: 'O TME da semana escolhe a faixa: o médio da equipe ou, na fila que avalia por pessoa, o de cada um.' });
     }
   }
   return lista;
