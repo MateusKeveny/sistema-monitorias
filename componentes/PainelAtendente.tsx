@@ -7,7 +7,9 @@ import { criarClienteServidor } from '@/lib/supabase/servidor';
 import { percentual } from '@/lib/formatar';
 import { mesAnterior } from '@/lib/competencia';
 import { fonteDoMes } from '@/lib/resumo';
-import ProjecaoDaCota from '@/componentes/ProjecaoDaCota';
+import ParaBaterAMeta, { type DadosDoQuadro } from '@/componentes/ParaBaterAMeta';
+import { diasDeEscala } from '@/lib/diasDeEscala';
+import { hojeNoBrasil, periodoDaSemana } from '@/lib/formatar';
 import ListaDeMonitorias from '@/componentes/ListaDeMonitorias';
 import { todas, conferida } from '@/lib/consultas';
 import { MONITORIAS_PADRAO, monitoriasPorSetor, setorDasPessoas, textoDoPiso } from '@/lib/monitoriasDoSetor';
@@ -197,6 +199,53 @@ export default async function PainelAtendente({
   const ganhoDoDegrau = csatPrincipal != null && proximoDegrau != null
     ? ((peso.get(faixaDe(proximoDegrau)) ?? 0) - (peso.get(faixaDe(csatPrincipal)) ?? 0)) * finalizadosPrincipal
     : null;
+
+  // -------------------------------------------- "Para bater a meta" (3.0)
+  // Só no mês aberto. A escala da pessoa (migração 93) e as férias dizem
+  // quantos dias de atendimento cada semana teve e quantos faltam.
+  let dadosDoQuadro: DadosDoQuadro | null = null;
+  if (competencia === atual) {
+    const [{ data: aPessoa }, { data: feriasDb }] = await Promise.all([
+      db.from('pessoas').select('*').eq('id', pessoaId).maybeSingle(),
+      db.from('ferias').select('inicio, fim, situacao').eq('pessoa_id', pessoaId),
+    ]);
+    const escala = (aPessoa as { dias_de_trabalho?: number[] } | null)?.dias_de_trabalho;
+    const ferias = ((feriasDb ?? []) as { inicio: string; fim: string; situacao: string | null }[])
+      .filter((f) => f.situacao !== 'cancelada');
+    const [, fimDoCiclo] = periodoDaSemana(competencia, 4);
+    const hoje = hojeNoBrasil();
+    const csatDaSemana = (s: number) => {
+      const l = semanasCsat.find((x) => x.origem === canalPrincipal && x.semana === s);
+      return l && l.avaliacoes ? l.positivas / l.avaliacoes : null;
+    };
+    const semanasDoQuadro = [1, 2, 3, 4].map((s) => {
+      const [ini, fim] = periodoDaSemana(competencia, s);
+      const v = volumes.find((x) => x.canal === canalPrincipal && x.semana === s);
+      return { semana: s, finalizados: v ? Number(v.finalizados) : null, dias: diasDeEscala(ini, fim, escala, ferias),
+               csat: csatDaSemana(s), tme: v && (v.tme_seg ?? 0) > 0 ? Number(v.tme_seg) : null };
+    });
+    const ultimaCsat = [...semanasDoQuadro].reverse().find((s) => s.csat != null)?.csat ?? csatPrincipal;
+    // TME da própria pessoa: só quando a fila avalia por pessoa (migração 90).
+    const faixasTmeDoCanal = todasRegras.filter((r) => r.grupo === (canalPrincipal === 'huggy' ? 'tme' : 'tme_diretores'))
+      .sort((x, y) => Number(x.faixa_min ?? 0) - Number(y.faixa_min ?? 0));
+    const ultimoTme = [...semanasDoQuadro].reverse().find((s) => s.tme != null)?.tme ?? null;
+    const faixaTmeAtual = ultimoTme == null ? null : [...faixasTmeDoCanal].reverse().find((f) => Number(f.faixa_min ?? 0) <= ultimoTme) ?? null;
+    const regraMonitoria = [...peso.keys()].find((k) => /^monitoria(_s\d+)?$/.test(k));
+    dadosDoQuadro = {
+      fila: CANAIS.find((c) => c.chave === canalPrincipal)!.rotulo,
+      semanas: semanasDoQuadro,
+      pesoAtendimento: pesoDoAtendimento,
+      csat: ultimaCsat != null ? { pesoAtual: peso.get(faixaDe(ultimaCsat)) ?? 0, pesoTopo: peso.get('csat_95') ?? 0, rotuloTopo: 'a partir de 95%' } : null,
+      tme: tmePorPessoa(canalPrincipal) && faixaTmeAtual && faixasTmeDoCanal[0] ? {
+        pesoAtual: peso.get(faixaTmeAtual.chave) ?? 0,
+        pesoMelhor: peso.get(faixasTmeDoCanal[0].chave) ?? 0,
+        rotuloMelhor: faixasTmeDoCanal[0].rotulo.replace(/^TME[^-–]*[-–]\s*/, ''),
+      } : null,
+      monitoria: regraMonitoria ? { media: notaMes, piso, peso: peso.get(regraMonitoria) ?? 0 } : null,
+      diasRestantes: diasDeEscala(hoje > fimDoCiclo ? fimDoCiclo : hoje, fimDoCiclo, escala, ferias),
+      fimDoCiclo: fimDoCiclo.split('-').reverse().slice(0, 2).join('/'),
+    };
+  }
 
   // Projeção pessoal: só com o ciclo correndo, pelo ritmo das semanas com
   // volume lançado — a mesma conta da tela do gestor.
@@ -588,10 +637,11 @@ export default async function PainelAtendente({
               ))}
             </div>
           )}
-          {/* Seu ritmo (2.1.0): onde fecha o mês, com a mesma conta da Simulação. */}
-          {competencia === atual && (
-            <ProjecaoDaCota competencia={competencia} fonte={{ extrato: fonte.extrato, mensal: fonte.mensal }}
-                            modo="pessoa" pessoaId={pessoaId} />
+          {/* Para bater a meta (3.0): no lugar do "Seu ritmo" — a situação, o que
+              mudou entre as semanas e os caminhos, com a mesma conta da Simulação. */}
+          {dadosDoQuadro && (
+            <ParaBaterAMeta competencia={competencia} fonte={{ extrato: fonte.extrato, mensal: fonte.mensal }}
+                            pessoaId={pessoaId} dados={dadosDoQuadro} />
           )}
           <SeletorDeDetalhe destaques={destaques} />
         </div>
