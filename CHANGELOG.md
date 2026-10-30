@@ -35,6 +35,22 @@ para o Performance.
 
 ---
 
+## Agenda da Gestão 1.8.0
+
+`supabase/agenda/07-reagendar-pelo-telegram.sql` (banco da agenda). Não muda
+as Monitorias nem o Performance.
+
+- **Agenda (atualização): reagendar pelo Telegram.** Os avisos ganham
+  **🗓 Reagendar** (o bot pergunta para quando); responder a um aviso com a
+  nova data ("amanhã 10h", "sexta das 14h às 15h") também reagenda; e
+  `/reagendar <nome> para <quando>` acha o lembrete pelo nome — com vários,
+  mostra botões para escolher. Sem hora na frase, mantém a hora; com duração,
+  o fim anda junto. No que se repete, muda só esta vez.
+- **Agenda (atualização): Reagendar na notificação do computador.** Os botões
+  passam a ser **Concluir** e **Reagendar** (o navegador do computador mostra
+  só dois); Reagendar abre a agenda com o lembrete no formulário. Onde cabem
+  três (Android), vai também o Adiar 15 min.
+
 ## Performance 2.11.4
 
 Sem migração. Não muda as Monitorias nem a Agenda.

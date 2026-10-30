@@ -19,10 +19,12 @@ self.addEventListener('push', (evento) => {
     icon: '/agenda-192.png',
     badge: '/agenda-selo.png',
     data: { url: d.url || '/agenda', item: d.item || null, selo: d.selo || null },
-    actions: doItem ? [
-      { action: 'concluir', title: 'Concluir' },
-      { action: 'adiar', title: 'Adiar 15 min' },
-    ] : [],
+    // Onde cabem 3 botões (Android), vão os três. No computador o navegador
+    // mostra só 2: Concluir e Reagendar — o Adiar fica no menu ⋯ da linha.
+    actions: !doItem ? [] : (self.Notification && Notification.maxActions >= 3)
+      ? [{ action: 'concluir', title: 'Concluir' }, { action: 'adiar', title: 'Adiar 15 min' },
+         { action: 'reagendar', title: 'Reagendar' }]
+      : [{ action: 'concluir', title: 'Concluir' }, { action: 'reagendar', title: 'Reagendar' }],
     requireInteraction: doItem,
   }));
 });
@@ -50,9 +52,11 @@ self.addEventListener('notificationclick', (evento) => {
     return;
   }
 
-  // Toque na notificação: traz a agenda para a frente (ou abre).
+  // Toque na notificação: traz a agenda para a frente (ou abre). "Reagendar"
+  // abre a agenda com o lembrete aberto para escolher a nova data.
   evento.waitUntil((async () => {
-    const destino = new URL(url || '/agenda', self.location.origin).href;
+    const caminho = evento.action === 'reagendar' && item ? `/agenda?reagendar=${encodeURIComponent(item)}` : (url || '/agenda');
+    const destino = new URL(caminho, self.location.origin).href;
     const abertas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     for (const c of abertas) {
       if (new URL(c.url).origin === self.location.origin && 'focus' in c) {

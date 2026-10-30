@@ -1,30 +1,61 @@
 import { dbSemSessao, segredoDaAgenda } from '@/lib/agenda/envio';
 import { ENDERECO_AGENDA, chamarTelegram, escaparHtml, seloDoWebhook, tokenDoTelegram } from '@/lib/agenda/telegram';
+import { acharItens, agoraNoBrasil, lerComando, novaData, type ItemDoBot } from '@/lib/agenda/reagendar';
 import { iguais } from '@/lib/agenda/webpush';
 import { sistemaDoHost } from '@/lib/sistema';
 
 export const dynamic = 'force-dynamic';
 
+type Mensagem = {
+  message_id: number;
+  chat: { id: number; type: string };
+  from?: { first_name?: string };
+  text?: string;
+  entities?: { type: string; url?: string }[];
+  reply_markup?: { inline_keyboard?: { callback_data?: string }[][] };
+  reply_to_message?: Mensagem;
+};
 type Atualizacao = {
-  message?: { chat: { id: number; type: string }; from?: { first_name?: string }; text?: string };
-  callback_query?: {
-    id: string; data?: string;
-    message?: { message_id: number; chat: { id: number } };
-  };
+  message?: Mensagem;
+  callback_query?: { id: string; data?: string; message?: { message_id: number; chat: { id: number } } };
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const EXEMPLOS = 'amanhã 10h · sexta das 14h às 15h · 05/11 9h';
+
+const AJUDA = 'Eu entrego os avisos da Agenda da Gestão e reagendo lembretes:\n'
+  + '• toque em <b>🗓 Reagendar</b> num aviso, ou <b>responda</b> o aviso com a nova data;\n'
+  + '• ou escreva <code>/reagendar reunião diretoria para sexta 15h</code>.\n\n'
+  + `Para criar ou mudar o resto, use a agenda: ${ENDERECO_AGENDA}/agenda`;
+
+/** O lembrete de que uma mensagem do bot trata: pelo botão (c:/a:/r:<id>) ou pelo link escondido do pedido. */
+function itemDaMensagem(m?: Mensagem): string | null {
+  if (!m) return null;
+  for (const linha of m.reply_markup?.inline_keyboard ?? []) {
+    for (const b of linha) {
+      const id = b.callback_data?.split(':')[1];
+      if (id && UUID.test(id)) return id;
+    }
+  }
+  for (const e of m.entities ?? []) {
+    const id = e.url && /#item-([0-9a-f-]{36})$/.exec(e.url)?.[1];
+    if (id && UUID.test(id)) return id;
+  }
+  return null;
+}
 
 /**
- * Webhook do bot da agenda (supabase/agenda/02-telegram.sql). O Telegram chama
- * aqui a cada mensagem enviada ao bot e a cada toque num botão.
+ * Webhook do bot da agenda (supabase/agenda/02-telegram.sql e 07). O Telegram
+ * chama aqui a cada mensagem enviada ao bot e a cada toque num botão.
  *
  * Sem sessão: a prova é a senha que o Telegram manda no cabeçalho, registrada
  * por `node scripts/chaves-da-agenda.js telegram`. Responde sempre 200 depois
  * de conferida — com erro, o Telegram repete a mesma atualização por horas.
  *
- *   "/start <código>" ou o código sozinho  liga a conversa ao usuário que pediu em Ajustes.
- *   "c:<item>"         botão Concluir; "a:<item>" botão Adiar 15 min.
+ *   "/start <código>" ou o código sozinho   liga a conversa ao usuário que pediu em Ajustes.
+ *   "c:<item>" Concluir · "a:<item>" Adiar 15 min · "r:<item>" Reagendar (pergunta para quando).
+ *   Resposta a um aviso ou ao "Para quando?"  reagenda aquele lembrete.
+ *   "/reagendar <nome> para <quando>"        acha pelo nome; com vários, botões "e:<item>".
  */
 export async function POST(requisicao: Request) {
   if (sistemaDoHost(requisicao.headers.get('host')) !== 'agenda' && process.env.NODE_ENV === 'production') {
@@ -39,12 +70,38 @@ export async function POST(requisicao: Request) {
   const a = await requisicao.json().catch(() => ({})) as Atualizacao;
   const db = dbSemSessao();
 
+  const enviar = (chat: number, texto: string, extra: object = {}) => chamarTelegram(token, 'sendMessage', {
+    chat_id: chat, text: texto, parse_mode: 'HTML', link_preview_options: { is_disabled: true }, ...extra,
+  });
+  const itensDe = async (chat: number) =>
+    ((await db.rpc('agenda_telegram_itens', { p_segredo: segredo, p_chat: chat })).data ?? []) as ItemDoBot[];
+
+  /** "Para quando?" com o lembrete num link escondido — a resposta volta com ele. */
+  const perguntar = (chat: number, item: ItemDoBot) => enviar(chat,
+    `🗓 Reagendar <a href="${ENDERECO_AGENDA}/agenda#item-${item.id}">${escaparHtml(item.titulo)}</a>\n`
+    + `Para quando? Responda esta mensagem. Ex.: ${EXEMPLOS}`,
+    { reply_markup: { force_reply: true, input_field_placeholder: 'amanhã 10h' } });
+
+  /** Lê a frase e grava. Devolve a resposta para o usuário. */
+  const reagendar = async (chat: number, item: ItemDoBot, frase: string) => {
+    const nova = novaData(frase, item, agoraNoBrasil());
+    if (!nova) return `Não entendi a data em "${escaparHtml(frase)}". Tente assim: ${EXEMPLOS}`;
+    const { data: titulo, error } = await db.rpc('agenda_telegram_reagendar', {
+      p_segredo: segredo, p_chat: chat, p_item: item.id,
+      p_quando: nova.quando, p_dia_inteiro: nova.diaInteiro, p_hora_fim: nova.horaFim,
+    });
+    if (error || !titulo) return 'Este lembrete já foi concluído ou excluído.';
+    return `✅ Reagendado: <b>${escaparHtml(String(titulo))}</b> → ${nova.rotulo}`
+      + (item.regra ? '\n(Só esta vez — a repetição segue igual.)' : '');
+  };
+
   try {
     if (a.callback_query) {
       const q = a.callback_query;
-      const [acao, item] = (q.data ?? '').split(':');
+      const [acao, item, quando] = (q.data ?? '').split(':');
       const chat = q.message?.chat.id;
       let aviso = 'Este lembrete já foi resolvido.';
+
       if ((acao === 'c' || acao === 'a') && item && UUID.test(item) && chat) {
         const { data: titulo } = await db.rpc('agenda_telegram_acao', {
           p_segredo: segredo, p_chat: chat, p_item: item, p_acao: acao === 'c' ? 'concluir' : 'adiar',
@@ -56,6 +113,16 @@ export async function POST(requisicao: Request) {
             reply_markup: { inline_keyboard: [[{ text: acao === 'c' ? '✓ Concluído' : 'Adiado 15 min', callback_data: 'x' }]] },
           });
         }
+      } else if ((acao === 'r' || acao === 'e') && item && UUID.test(item) && chat) {
+        const alvo = (await itensDe(chat)).find((i) => i.id === item);
+        if (alvo && acao === 'r') {
+          aviso = 'Para quando?';
+          await perguntar(chat, alvo);
+        } else if (alvo && acao === 'e' && quando) {
+          // Escolhido entre vários no /reagendar: a frase vai codificada no botão.
+          aviso = 'Pronto.';
+          await enviar(chat, await reagendar(chat, alvo, decodeURIComponent(quando)));
+        }
       }
       await chamarTelegram(token, 'answerCallbackQuery', { callback_query_id: q.id, text: aviso });
       return new Response(null, { status: 200 });
@@ -63,13 +130,12 @@ export async function POST(requisicao: Request) {
 
     const m = a.message;
     if (!m || m.chat.type !== 'private') return new Response(null, { status: 200 });
-    const responder = (texto: string) => chamarTelegram(token, 'sendMessage', {
-      chat_id: m.chat.id, text: texto, parse_mode: 'HTML', link_preview_options: { is_disabled: true },
-    });
+    const texto = m.text?.trim() ?? '';
+    const responder = (t: string, extra: object = {}) => enviar(m.chat.id, t, extra);
 
     // "/start <código>" vem do link; o código sozinho, de quem copiou dos
     // Ajustes — o Telegram não manda o código quando a conversa já existe.
-    const codigo = /^(?:\/start\s+)?([0-9a-f]{32})$/i.exec(m.text?.trim() ?? '')?.[1]?.toLowerCase();
+    const codigo = /^(?:\/start\s+)?([0-9a-f]{32})$/i.exec(texto)?.[1]?.toLowerCase();
     if (codigo) {
       const { data: nome } = await db.rpc('agenda_telegram_vincular', {
         p_segredo: segredo, p_codigo: codigo, p_chat: m.chat.id, p_nome: m.from?.first_name ?? null,
@@ -80,9 +146,46 @@ export async function POST(requisicao: Request) {
       return new Response(null, { status: 200 });
     }
 
-    await responder('Eu só entrego os avisos da Agenda da Gestão. Para criar ou mudar lembretes, use a agenda:\n'
-      + `${ENDERECO_AGENDA}/agenda\n\n`
-      + 'Para ligar esta conversa, toque em <b>Conectar Telegram</b> em Ajustes e cole aqui o código que aparecer.');
+    // Resposta a um aviso (ou ao "Para quando?"): reagenda aquele lembrete.
+    const respondido = itemDaMensagem(m.reply_to_message);
+    if (respondido && texto && !texto.startsWith('/')) {
+      const alvo = (await itensDe(m.chat.id)).find((i) => i.id === respondido);
+      await responder(alvo ? await reagendar(m.chat.id, alvo, texto) : 'Este lembrete já foi concluído ou excluído.');
+      return new Response(null, { status: 200 });
+    }
+
+    // "/reagendar <nome> para <quando>".
+    const pedido = lerComando(texto);
+    if (pedido) {
+      if (!pedido.termo) {
+        await responder(`Diga qual e para quando: <code>/reagendar reunião diretoria para sexta 15h</code>`);
+        return new Response(null, { status: 200 });
+      }
+      const achados = acharItens(await itensDe(m.chat.id), pedido.termo);
+      if (!achados.length) {
+        await responder(`Não achei lembrete em aberto com "${escaparHtml(pedido.termo)}".`);
+      } else if (achados.length === 1 && pedido.quando) {
+        await responder(await reagendar(m.chat.id, achados[0], pedido.quando));
+      } else if (achados.length === 1) {
+        await perguntar(m.chat.id, achados[0]);
+      } else {
+        // Vários: um botão por lembrete. Com a data no pedido, ela vai no
+        // botão (cabe até ~20 letras); sem, o toque pergunta para quando.
+        const quando = pedido.quando ? encodeURIComponent(pedido.quando) : '';
+        const cabe = quando && `e:${achados[0].id}:${quando}`.length <= 64;
+        await responder(`Achei ${achados.length} lembretes com "${escaparHtml(pedido.termo)}". Qual?`, {
+          reply_markup: {
+            inline_keyboard: achados.slice(0, 8).map((i) => [{
+              text: i.titulo.slice(0, 60),
+              callback_data: cabe ? `e:${i.id}:${quando}` : `r:${i.id}`,
+            }]),
+          },
+        });
+      }
+      return new Response(null, { status: 200 });
+    }
+
+    await responder(AJUDA);
   } catch (erro) {
     console.warn('agenda: falha no webhook do telegram', String(erro));
   }
