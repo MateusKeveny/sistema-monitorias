@@ -7,6 +7,7 @@ import { Quadro, Tabela, Td, Th } from '@/componentes/ui';
 import { dataDoExcel, lerPlanilha, type Linha } from '@/lib/xlsx-navegador';
 import { hojeNoBrasil, mesDeCompetencia, mesRotulo } from '@/lib/formatar';
 import { mensagemDoErro } from '@/lib/erro-amigavel';
+import { emailDoLogin } from '@/lib/usuario';
 import type { Cargo, PapelUsuario, Pessoa } from '@/lib/tipos';
 import type { Setor } from '@/lib/setores';
 
@@ -93,7 +94,9 @@ export default function CadastroEmLote({ pessoas, setores, cargos }: {
       const nome = String(l[col.nome!] ?? '').trim();
       if (!nome) return;
       const problemas: string[] = [];
-      const email = col.email ? String(l[col.email] ?? '').trim().toLowerCase() || null : null;
+      // E-mail ou nome de usuário ("admin" vira o endereço interno, 3.0).
+      const textoEmail = col.email ? String(l[col.email] ?? '').trim() : '';
+      const email = textoEmail ? emailDoLogin(textoEmail) : null;
       if (email) {
         if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) problemas.push('e-mail inválido');
         else if (emails.has(email)) problemas.push('e-mail já é de alguém do cadastro');
@@ -112,7 +115,8 @@ export default function CadastroEmLote({ pessoas, setores, cargos }: {
       const textoCargo = col.cargo ? normalizar(l[col.cargo]) : '';
       const cargo = textoCargo && setor
         ? cargos.find((c) => (c.setor_id ?? 1) === setor.id && normalizar(c.nome) === textoCargo) ?? null : null;
-      if (textoCargo && setor && !cargo) problemas.push(`cargo "${String(l[col.cargo!])}" não existe em ${setor.nome}`);
+      if (textoCargo && papel && papel !== 'operador') problemas.push('gestão e qualidade não têm cargo (deixe a coluna Cargo em branco)');
+      else if (textoCargo && setor && !cargo) problemas.push(`cargo "${String(l[col.cargo!])}" não existe em ${setor.nome}`);
 
       const hub = col.hub ? String(l[col.hub] ?? '').trim() || null : null;
       if (hub) {
@@ -143,7 +147,10 @@ export default function CadastroEmLote({ pessoas, setores, cargos }: {
       setOcupado(`Cadastrando ${i + 1} de ${prontas.length}: ${p.nome}…`);
       const { data: criada, error } = await db.from('pessoas').insert({
         nome: p.nome, email: p.email, papel: p.papel, nome_hub: p.hub, admitido_em: p.entrada,
-        avaliado: p.papel === 'operador', ativo: true,
+        // Pelo papel (3.0, como no "+ Novo usuário"): só o atendente entra nas
+        // listas, nas médias e nas monitorias.
+        avaliado: p.papel === 'operador', exibir_no_painel: p.papel === 'operador',
+        conta_nas_medias: p.papel === 'operador', ativo: true,
       }).select('id').single();
       if (error || !criada) { feitos.push({ nome: p.nome, email: p.email, senha: null, erro: await mensagemDoErro(error!) }); continue; }
 
@@ -153,7 +160,7 @@ export default function CadastroEmLote({ pessoas, setores, cargos }: {
       const passos = [
         () => db.from('setores_da_pessoa').delete().eq('pessoa_id', criada.id),
         () => db.from('setores_da_pessoa').insert({ pessoa_id: criada.id, desde, setor_id: p.setor!.id }),
-        ...(p.cargo ? [() => db.from('cargos_da_pessoa').insert({ pessoa_id: criada.id, desde, cargo_id: p.cargo!.id })] : []),
+        ...(p.cargo && p.papel === 'operador' ? [() => db.from('cargos_da_pessoa').insert({ pessoa_id: criada.id, desde, cargo_id: p.cargo!.id })] : []),
       ];
       let falha: string | null = null;
       for (const passo of passos) {
@@ -197,7 +204,8 @@ export default function CadastroEmLote({ pessoas, setores, cargos }: {
         Colunas pelo nome do cabeçalho, em qualquer ordem: <b>Nome</b> (obrigatória), <b>E-mail</b> (com e-mail, o acesso é
         criado), <b>Setor</b>{setores.length === 1 ? ` (em branco: ${setores[0].nome})` : ''}, <b>Cargo</b>, <b>Nome no Hub</b>,{' '}
         <b>Entrada</b> (dd/mm/aaaa; setor e cargo valem desse mês) e <b>Papel</b> (Atendente, Qualidade ou Gestor; em branco:
-        Atendente).
+        Atendente). Gestão e qualidade entram sem cargo e fora das listas, das médias e das monitorias. Na coluna E-mail
+        vale também um nome de usuário, como &ldquo;admin&rdquo;.
       </p>
       <label className="flex cursor-pointer items-center gap-2 rounded-xl border-2 border-dashed border-slate-300 px-4 py-4 text-sm text-slate-600 hover:border-marca-600">
         <input type="file" accept=".xlsx" className="sr-only" disabled={!!ocupado}
