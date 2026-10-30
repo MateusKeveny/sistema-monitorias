@@ -9,6 +9,7 @@ import { ITENS, rotuloDo, type Item } from '@/componentes/Navegacao';
 import { NOME_SISTEMA, type SistemaDoPainel as Sistema } from '@/lib/sistema';
 import SinoDeAvisos from '@/componentes/SinoDeAvisos';
 import SeletorDeSetor from '@/componentes/SeletorDeSetor';
+import Novidades from '@/componentes/Novidades';
 import { Suspense } from 'react';
 import { NOMES_PAPEL, type Perfil } from '@/lib/tipos';
 
@@ -157,6 +158,8 @@ export default function MenuLateral({ perfil, versao, sistema, avisosReporte = 0
           </button>
         </div>
         {/* Apagada de propósito: serve para quem reporta um problema dizer em qual versão viu. */}
+        {/* Novidades da 3.0: abre sozinha no primeiro acesso; aqui, para rever. */}
+        {sistema === 'cota' && <div className="mt-3"><Novidades gestao={perfil.papel !== 'operador'} /></div>}
         <p aria-label={`Versão ${versao}`} className="mt-3 select-none text-[10px] tabular-nums text-slate-400/60">
           v{versao}
         </p>
