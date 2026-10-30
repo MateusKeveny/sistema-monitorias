@@ -35,6 +35,19 @@ para o Performance.
 
 ---
 
+## Agenda da Gestão 1.8.1
+
+Sem migração. Não muda as Monitorias nem o Performance.
+
+- **Agenda (correção): /reagendar mais tolerante.** "/reagendar escola de
+  líderes de ontem para hoje 15h" não achava o lembrete por causa de "de
+  ontem"; palavras como ontem, hoje, evento e lembrete ficam fora da busca.
+  Sem "para" ("/reagendar escola de líderes amanhã 14h"), o bot separa o nome
+  da data sozinho. Sem achar nada, lista os lembretes em aberto.
+- **Agenda (correção): repetição reagendada só nesta vez** não mostra mais
+  "16:00–16:00": o fim é da série, e a ocorrência movida fica com o novo
+  início.
+
 ## Agenda da Gestão 1.8.0
 
 `supabase/agenda/07-reagendar-pelo-telegram.sql` (banco da agenda). Não muda

@@ -40,7 +40,7 @@ export function textoDoResumo({ itens, pendencias, ferias }: {
 
   const linhas = [
     ...bloco('📅 Hoje', hoje.map((i) => (i.hora
-      ? `${i.hora}${i.hora_fim ? `–${i.hora_fim}` : ''} ${alta(i)}${i.titulo}${repete(i)}`
+      ? `${i.hora}${i.hora_fim && i.hora_fim > i.hora ? `–${i.hora_fim}` : ''} ${alta(i)}${i.titulo}${repete(i)}`
       : `${alta(i)}${i.titulo} (dia inteiro)${repete(i)}`))),
     ...bloco('⏰ Atrasados', atrasados.map((i) => `${alta(i)}${i.titulo} (desde ${ddmm(i.dia)}${i.hora ? ` ${i.hora}` : ''})`)),
     ...bloco('📌 Do sistema', pendencias.map((p) => p.texto)),

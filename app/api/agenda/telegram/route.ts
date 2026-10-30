@@ -1,6 +1,6 @@
 import { dbSemSessao, segredoDaAgenda } from '@/lib/agenda/envio';
 import { ENDERECO_AGENDA, chamarTelegram, escaparHtml, seloDoWebhook, tokenDoTelegram } from '@/lib/agenda/telegram';
-import { acharItens, agoraNoBrasil, lerComando, novaData, type ItemDoBot } from '@/lib/agenda/reagendar';
+import { acharItens, agoraNoBrasil, lerComando, novaData, separarPedido, type ItemDoBot } from '@/lib/agenda/reagendar';
 import { iguais } from '@/lib/agenda/webpush';
 import { sistemaDoHost } from '@/lib/sistema';
 
@@ -84,7 +84,8 @@ export async function POST(requisicao: Request) {
 
   /** Lê a frase e grava. Devolve a resposta para o usuário. */
   const reagendar = async (chat: number, item: ItemDoBot, frase: string) => {
-    const nova = novaData(frase, item, agoraNoBrasil());
+    // No recorrente o fim é da série: a ocorrência movida fica só com o novo início.
+    const nova = novaData(frase, item.regra ? { ...item, hora_fim: null } : item, agoraNoBrasil());
     if (!nova) return `Não entendi a data em "${escaparHtml(frase)}". Tente assim: ${EXEMPLOS}`;
     const { data: titulo, error } = await db.rpc('agenda_telegram_reagendar', {
       p_segredo: segredo, p_chat: chat, p_item: item.id,
@@ -161,9 +162,22 @@ export async function POST(requisicao: Request) {
         await responder(`Diga qual e para quando: <code>/reagendar reunião diretoria para sexta 15h</code>`);
         return new Response(null, { status: 200 });
       }
-      const achados = acharItens(await itensDe(m.chat.id), pedido.termo);
+      const itens = await itensDe(m.chat.id);
+      let achados = acharItens(itens, pedido.termo);
+      // Sem "para" ("/reagendar escola de líderes amanhã 14h"): separa o nome da data.
+      if (!pedido.quando) {
+        const separado = separarPedido(itens, pedido.termo, agoraNoBrasil());
+        if (separado.achados.length) {
+          achados = separado.achados;
+          pedido.termo = separado.termo;
+          pedido.quando = separado.quando;
+        }
+      }
       if (!achados.length) {
-        await responder(`Não achei lembrete em aberto com "${escaparHtml(pedido.termo)}".`);
+        const abertos = itens.slice(0, 8).map((i) => `• ${escaparHtml(i.titulo)}`).join('\n');
+        await responder(`Não achei lembrete em aberto com "${escaparHtml(pedido.termo)}".`
+          + (abertos ? `\n\nEm aberto agora:\n${abertos}` : '')
+          + '\n\nEx.: <code>/reagendar escola de líderes para amanhã 14h</code>');
       } else if (achados.length === 1 && pedido.quando) {
         await responder(await reagendar(m.chat.id, achados[0], pedido.quando));
       } else if (achados.length === 1) {

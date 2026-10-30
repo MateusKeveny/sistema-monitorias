@@ -30,15 +30,46 @@ export function lerComando(texto: string): { termo: string; quando: string | nul
   return i < 0 ? { termo: resto, quando: null } : { termo: resto.slice(0, i).trim(), quando: resto.slice(i + 6).trim() };
 }
 
+// Palavras que aparecem no pedido mas não no nome do lembrete ("o evento de
+// ontem"): ficam de fora da busca. Sem elas o termo não casava com nada.
+const SOLTAS = new Set(['o', 'a', 'os', 'as', 'de', 'da', 'do', 'das', 'dos', 'e', 'em', 'no', 'na', 'que',
+  'ontem', 'anteontem', 'hoje', 'evento', 'eventos', 'lembrete', 'lembretes', 'compromisso', 'item',
+  'marcado', 'marcada', 'passado', 'passada', 'atrasado', 'atrasada']);
+
 /** Itens cujo título tem todas as palavras do termo (sem acento), o mais parecido primeiro. */
 export function acharItens(itens: ItemDoBot[], termo: string): ItemDoBot[] {
-  const palavras = semAcento(termo).split(/\s+/).filter((p) => p.length > 1);
+  const todas = semAcento(termo).split(/\s+/).filter((p) => p.length > 1);
+  const uteis = todas.filter((p) => !SOLTAS.has(p));
+  const palavras = uteis.length ? uteis : todas;
   if (!palavras.length) return [];
   const t = semAcento(termo).trim();
   return itens
     .filter((i) => palavras.every((p) => semAcento(i.titulo).includes(p)))
     .sort((a, b) => Number(semAcento(b.titulo).includes(t)) - Number(semAcento(a.titulo).includes(t))
       || a.titulo.length - b.titulo.length);
+}
+
+/**
+ * Pedido sem "para" ("/reagendar escola de líderes amanhã 14h"): o começo que
+ * casa com algum lembrete é o nome, e o resto, a data — desde que o resto seja
+ * uma data que o intérprete entenda. Tenta do nome mais longo para o mais curto.
+ */
+export function separarPedido(itens: ItemDoBot[], texto: string, agora: { dia: string; hora: string }):
+  { termo: string; quando: string | null; achados: ItemDoBot[] } {
+  const palavras = texto.trim().split(/\s+/);
+  // Primeiro, nome + data ("escola de líderes hoje" = "escola de líderes" para
+  // "hoje" — "hoje" sozinho também casaria, por ser palavra solta).
+  for (let k = palavras.length - 1; k >= 1; k--) {
+    const termo = palavras.slice(0, k).join(' ');
+    const quando = palavras.slice(k).join(' ');
+    const achados = acharItens(itens, termo);
+    if (!achados.length) continue;
+    const lido = interpretar(quando, agora);
+    if (lido.dia || lido.hora) return { termo, quando, achados };
+  }
+  // Só o nome: o bot pergunta para quando.
+  const achados = acharItens(itens, texto);
+  return { termo: texto, quando: null, achados };
 }
 
 /** "sexta, 06/11 às 15:00", "amanhã das 14:00 às 15:00", "segunda, 09/11 (dia inteiro)". */
