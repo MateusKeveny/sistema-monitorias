@@ -1,4 +1,5 @@
 import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
+import { setorDoCookie } from '@/lib/setorEscolhido';
 import FormularioLancamentos from '@/componentes/FormularioLancamentos';
 import VolumeSemanal, { type LinhaVolume } from '@/componentes/VolumeSemanal';
 import LancamentosPendentes, { type Pendente } from '@/componentes/RealocacaoDeLancamentos';
@@ -47,9 +48,14 @@ export default async function LancamentosDeCota({
   // pertence à fila escolhida, gravada pelo apelido; sem a migração 79, as
   // duas de sempre.
   const { data: filasDoBanco } = await db.from('canais_do_setor')
-    .select('id, nome, apelido, ordem, regra_finalizado').eq('ativo', true).order('ordem');
+    .select('id, nome, apelido, ordem, regra_finalizado, setor_id').eq('ativo', true).order('ordem');
+  // Cada um lança e importa só o seu (3.0): as filas do setor do seletor do menu.
+  const { data: setoresDb } = await db.from('setores').select('id').eq('ativo', true).order('ordem');
+  const setorEscolhido = await setorDoCookie();
+  const setorId = ((setoresDb ?? []) as { id: number }[]).find((x) => String(x.id) === setorEscolhido)?.id
+    ?? (setoresDb?.[0] as { id: number } | undefined)?.id ?? 1;
   type Aba = Pick<Fila, 'id' | 'nome' | 'apelido' | 'ordem' | 'regra_finalizado'>;
-  const abasDeFila: Aba[] = (filasDoBanco ?? []).length ? (filasDoBanco as Aba[]).filter((f) => f.apelido)
+  const abasDeFila: Aba[] = (filasDoBanco ?? []).length ? (filasDoBanco as (Aba & { setor_id?: number })[]).filter((f) => f.apelido && (f.setor_id ?? 1) === setorId)
     : CANAIS_PADRAO.map((c, i) => ({ id: -1 - i, nome: c.nome, apelido: c.apelido, ordem: i,
       regra_finalizado: c.apelido === 'huggy' ? 'huggy_atendimento' : 'diretores_atendimento' }));
   const fila = abasDeFila.find((f) => f.apelido === canalPedido) ?? abasDeFila[0];

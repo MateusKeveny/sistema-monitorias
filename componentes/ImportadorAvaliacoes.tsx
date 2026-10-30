@@ -84,6 +84,8 @@ type AnaliseArquivo = {
   /** Atendimentos de outro setor de atendente não reconhecido: ficam de fora. */
   outroSetorSemPessoa: number;
   outroSetorJa: number;
+  /** Linhas de outra equipe da plataforma (fila ou pessoa de outro setor): ficam de fora (3.0). */
+  deOutraEquipe: number;
   periodo: [string, string] | null;
 };
 
@@ -99,18 +101,32 @@ const PAGINA = 1000;
  * com o robô é ignorada.
  */
 export default function ImportadorAvaliacoes({
-  pessoas, importadoPor, canais,
+  pessoas, importadoPor, canais, setorId, setorDe = {},
 }: {
   pessoas: Pessoa[];
   importadoPor: string;
   /** Setores e canais (migração 79): qual nome do Hub vai para cada canal. */
   canais?: Canal[];
+  /**
+   * Cada um importa só o seu (3.0): o setor de quem importa e o setor de cada
+   * pessoa. Linha de fila ou de pessoa de outro setor da plataforma fica de
+   * fora — não vira nota guardada, que é para quem não tem cadastro.
+   */
+  setorId?: number;
+  setorDe?: Record<string, number>;
 }) {
   // Setor do Hub → canal da cota, pelo cadastro (2.10.0). Antes, fixo no código.
   const cadastro = canais?.length ? canais : CANAIS_PADRAO;
   const SETORES = useMemo(() => mapaDoHub(cadastro), [cadastro]);
-  // Uma seção por fila da árvore (3.0): as de sempre e as novas.
-  const CANAIS = useMemo(() => cadastro.map((c) => c.apelido).filter((a): a is string => !!a), [cadastro]);
+  /** A fila é de outro setor da plataforma? */
+  const filaDeFora = useMemo(() => {
+    const deFora = new Set(cadastro.filter((c) => setorId != null && ((c as Partial<Canal>).setor_id ?? 1) !== setorId).map((c) => c.apelido));
+    return (apelido: string | null | undefined) => !!apelido && deFora.has(apelido);
+  }, [cadastro, setorId]);
+  const pessoaDeFora = (id: string) => setorId != null && (setorDe[id] ?? 1) !== setorId;
+  // Uma seção por fila da árvore (3.0): as do setor de quem importa.
+  const CANAIS = useMemo(() => cadastro.filter((c) => setorId == null || ((c as Partial<Canal>).setor_id ?? 1) === setorId)
+    .map((c) => c.apelido).filter((a): a is string => !!a), [cadastro, setorId]);
   const router = useRouter();
   const [arquivos, setArquivos] = useState<AnaliseArquivo[] | null>(null);
   const [ocupado, setOcupado] = useState<string | null>(null);
@@ -133,7 +149,7 @@ export default function ImportadorAvaliacoes({
   async function lerArquivo(f: File, vistas: Set<string>): Promise<AnaliseArquivo> {
     const a: AnaliseArquivo = {
       nome: f.name, aba: null, formato: null, erro: null, lidas: 0, semNota: 0, semData: 0, robo: 0,
-      repetidasNoLote: 0, jaImportadas: 0, novas: [], guardar: [], outroSetor: [], outroSetorSemPessoa: 0, outroSetorJa: 0, periodo: null,
+      repetidasNoLote: 0, jaImportadas: 0, novas: [], guardar: [], outroSetor: [], outroSetorSemPessoa: 0, outroSetorJa: 0, deOutraEquipe: 0, periodo: null,
     };
     let abas: Map<string, Linha[]>;
     try { abas = await lerPlanilha(f); } catch (e) {
@@ -159,6 +175,7 @@ export default function ImportadorAvaliacoes({
           vistas.add(`${data}|${protocolo}`);
           const pessoa = porNomeHub.get(normalizar(atendente));
           if (!pessoa) { a.outroSetorSemPessoa++; continue; }
+          if (pessoaDeFora(pessoa.id)) { a.deOutraEquipe++; continue; }
           const nota = Number(l[col.nota]);
           a.outroSetor.push({ pessoa_id: pessoa.id, data, protocolo, setor, nota: nota >= 1 && nota <= 5 ? nota : null,
             mes_competencia: mesDeCompetencia(data), semana: semanaDoCiclo(data), origem_arquivo: f.name });
@@ -173,6 +190,8 @@ export default function ImportadorAvaliacoes({
 
       let origem: Origem = CANAIS[0] ?? 'huggy';
       if (col.setor) origem = SETORES[normalizar(String(l[col.setor] ?? '').trim())];
+      // Fila de outro setor da plataforma: é da outra equipe, fica de fora.
+      if (filaDeFora(origem)) { a.deOutraEquipe++; continue; }
 
       const atendente = String(l[col.atendente] ?? '').trim();
       if (ehRobo(atendente)) { a.robo++; continue; }
@@ -184,7 +203,9 @@ export default function ImportadorAvaliacoes({
 
       const tabulacao = col.tabulacao && l[col.tabulacao] != null ? String(l[col.tabulacao]) : null;
       const pessoa = a.formato === 'hub' ? porNomeHub.get(normalizar(atendente)) : porEmail.get(normalizar(atendente));
-      if (pessoa) {
+      if (pessoa && pessoaDeFora(pessoa.id)) {
+        a.deOutraEquipe++;
+      } else if (pessoa) {
         a.novas.push({ pessoa_id: pessoa.id, origem, data, protocolo, nota, tabulacao, origem_arquivo: f.name });
       } else {
         a.guardar.push({ nome_no_arquivo: atendente, origem, data, protocolo, nota, tabulacao, origem_arquivo: f.name });
@@ -448,6 +469,13 @@ export default function ImportadorAvaliacoes({
           <p className="text-xs text-slate-500">
             <b>Repetidas</b>: a mesma avaliação em mais de um arquivo — entra uma vez. <b>Robô</b>: conversas sem atendente, ignoradas.
           </p>
+
+          {soma((a) => a.deOutraEquipe) > 0 && (
+            <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600 ring-1 ring-slate-200">
+              {soma((a) => a.deOutraEquipe)} linha{soma((a) => a.deOutraEquipe) > 1 ? 's' : ''} de outras equipes da plataforma
+              (filas ou atendentes de outro setor) {soma((a) => a.deOutraEquipe) > 1 ? 'ficaram' : 'ficou'} de fora: cada setor importa só o seu.
+            </p>
+          )}
 
           {guardarPorNome.length > 0 && (
             <div className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-600/20">

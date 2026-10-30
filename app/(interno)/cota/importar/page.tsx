@@ -1,4 +1,6 @@
 import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
+import { setorDoCookie } from '@/lib/setorEscolhido';
+import { setorDasPessoas } from '@/lib/monitoriasDoSetor';
 import ImportadorAvaliacoes from '@/componentes/ImportadorAvaliacoes';
 import type { Canal } from '@/lib/setores';
 import ImportadorChamados from '@/componentes/ImportadorChamados';
@@ -132,7 +134,14 @@ export default async function ImportarAvaliacoes({
   // Setores e filas (migração 79): qual nome do Hub vai para cada fila, e as
   // linhas da grade abaixo — uma por fila da árvore; sem a 79, as duas de sempre.
   const { data: canais } = await db.from('canais_do_setor').select('*').eq('ativo', true).order('ordem');
-  const filas = (canais ?? []) as Canal[];
+  // Cada um importa só o seu (3.0): o setor do seletor do menu — a grade, as
+  // notas guardadas e a leitura do arquivo ficam nas filas e pessoas dele.
+  const { data: setoresDb } = await db.from('setores').select('id').eq('ativo', true).order('ordem');
+  const escolhido = await setorDoCookie();
+  const setorId = ((setoresDb ?? []) as { id: number }[]).find((s) => String(s.id) === escolhido)?.id
+    ?? (setoresDb?.[0] as { id: number } | undefined)?.id ?? 1;
+  const setorDe = await setorDasPessoas(db, competencia);
+  const filas = ((canais ?? []) as Canal[]).filter((f) => (f.setor_id ?? 1) === setorId);
   const linhasDaGrade = (filas.length ? filas : CANAIS.map(([apelido, nome]) => ({ apelido, nome })))
     .flatMap((f) => (f.apelido ? [{ origem: f.apelido as string, rotulo: f.nome as string }] : []))
     .map((f, c) => ({ ...f, c }));
@@ -221,9 +230,11 @@ export default async function ImportarAvaliacoes({
         </p>
       </Quadro>
 
-      <ImportadorAvaliacoes pessoas={lista} importadoPor={perfil.id} canais={(canais ?? []) as Canal[]} />
+      <ImportadorAvaliacoes pessoas={lista} importadoPor={perfil.id} canais={(canais ?? []) as Canal[]}
+                            setorId={setorId} setorDe={Object.fromEntries(setorDe)} />
       <NotasGuardadas notas={(guardadas ?? []) as NotaGuardada[]}
-                      pessoas={lista.filter((p) => p.ativo && !p.desligado_em).map((p) => ({ id: p.id, nome: p.nome }))} />
+                      pessoas={lista.filter((p) => p.ativo && !p.desligado_em && (setorDe.get(p.id) ?? 1) === setorId)
+                        .map((p) => ({ id: p.id, nome: p.nome }))} />
     </div>
   );
 }
