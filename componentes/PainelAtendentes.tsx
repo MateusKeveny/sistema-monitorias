@@ -515,6 +515,32 @@ function Ficha({
         <p className="mt-1 text-xs text-slate-500">Para a cota. Em branco: já estava antes do painel e conta em todos os meses.</p>
       </Secao>
 
+      {/* Escala (migração 93): os dias em que a pessoa atende. O quadro "Para
+          bater a meta" conta o "por dia" só nesses dias (e desconta as férias). */}
+      {pessoa.papel === 'operador' && (
+        <Secao titulo="Escala">
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label={`Dias de atendimento de ${pessoa.nome}`}>
+            {(['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'] as const).map((dia, i) => {
+              const n = i + 1;
+              const dias = pessoa.dias_de_trabalho ?? [1, 2, 3, 4, 5];
+              const marcado = dias.includes(n);
+              return (
+                <button key={dia} type="button" aria-pressed={marcado} disabled={ocupado || (marcado && dias.length === 1)}
+                        onClick={() => {
+                          const novos = (marcado ? dias.filter((d) => d !== n) : [...dias, n]).sort((a, b) => a - b);
+                          executar(() => db().from('pessoas').update({ dias_de_trabalho: novos }).eq('id', pessoa.id));
+                        }}
+                        className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${marcado
+                          ? 'bg-marca-600 text-white' : 'border border-slate-200 text-slate-500 hover:border-slate-300'}`}>
+                  {dia}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-1.5 text-xs text-slate-500">Os dias em que atende. Sem mexer, vale segunda a sexta.</p>
+        </Secao>
+      )}
+
       {setores.length > 0 && (
         <Secao titulo="Setor">
           {linhasSetor.length ? (

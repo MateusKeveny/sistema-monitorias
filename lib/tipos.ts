@@ -32,6 +32,8 @@ export type Pessoa = {
   admitido_em?: string | null;
   /** Admissão na empresa, só para as férias (migração 63). Nulo = usa admitido_em. */
   admitido_na_empresa?: string | null;
+  /** Escala (migração 93): os dias em que atende, 1 = segunda … 7 = domingo. */
+  dias_de_trabalho?: number[];
   /** Saída da operação. Nulo = continua na equipe. */
   desligado_em?: string | null;
   /** Aparece nas listas da tela inicial do gestor. Não afeta cálculo. */
