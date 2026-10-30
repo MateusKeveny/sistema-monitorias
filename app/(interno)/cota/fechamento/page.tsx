@@ -1,5 +1,6 @@
 import Link from '@/componentes/Link';
 import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
+import { setorDoCookie } from '@/lib/setorEscolhido';
 import BotaoFecharCiclo from '@/componentes/BotaoFecharCiclo';
 import AjusteDeFechamento from '@/componentes/AjusteDeFechamento';
 import ValorDaCota from '@/componentes/ValorDaCota';
@@ -44,6 +45,7 @@ export default async function Fechamento({
   searchParams: Promise<{ mes?: string; conferir?: string; setor?: string }>;
 }) {
   const { mes, conferir: pediuConferir, setor: setorPedido } = await searchParams;
+  const escolhido = await setorDoCookie();
   const { competencia, atual } = await resolverCompetencia(mes);
   const db = await criarClienteServidor();
 
@@ -55,7 +57,7 @@ export default async function Fechamento({
     db.from('canais_do_setor').select('setor_id, apelido, ordem').eq('ativo', true).order('ordem'),
   ]);
   const listaSetores = (setores ?? []) as { id: number; nome: string; monitorias: boolean; monitorias_por_semana?: number }[];
-  const setor = listaSetores.find((s) => String(s.id) === setorPedido) ?? listaSetores[0];
+  const setor = listaSetores.find((s) => String(s.id) === (setorPedido ?? escolhido)) ?? listaSetores[0];
   const setorId = setor?.id ?? 1;
   const historicoSetor = (setoresDaPessoa ?? []) as { pessoa_id: string; desde: string; setor_id: number }[];
   /** O setor da pessoa na competência; antes do primeiro registro, vale o primeiro. */
@@ -205,18 +207,6 @@ export default async function Fechamento({
           <h1 className="text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">
             Fechamento{listaSetores.length > 1 && setor ? ` · ${setor.nome}` : ''}
           </h1>
-          {listaSetores.length > 1 && (
-            <div className="mt-2 inline-flex flex-wrap gap-1 rounded-full bg-pilula p-1" role="tablist" aria-label="Setor">
-              {listaSetores.map((s) => (
-                <Link key={s.id} role="tab" aria-selected={s.id === setorId}
-                      href={`/cota/fechamento?mes=${competencia.slice(0, 7)}&setor=${s.id}`}
-                      className={`rounded-full px-4 py-1.5 text-sm transition ${s.id === setorId
-                        ? 'bg-superficie font-semibold text-slate-900 shadow-sm' : 'text-sobre-fundo-suave hover:text-sobre-fundo'}`}>
-                  {s.nome}
-                </Link>
-              ))}
-            </div>
-          )}
           <div className="mt-1.5">
             <SetasDeCompetencia competencia={competencia} atual={atual} caminho="/cota/fechamento" compacto
                                 manter={listaSetores.length > 1 ? { setor: String(setorId) } : undefined} />

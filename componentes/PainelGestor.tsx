@@ -10,6 +10,7 @@ import { fonteDoMes } from '@/lib/resumo';
 import ProjecaoDaCota from '@/componentes/ProjecaoDaCota';
 import { limiteDeRenovacao, pessoasComLeituraPendente, type LeituraDiario } from '@/lib/diario';
 import { todas } from '@/lib/consultas';
+import { setorDoCookie } from '@/lib/setorEscolhido';
 import { MONITORIAS_PADRAO, monitoriasPorSetor, setorDaTela, textoDoPiso } from '@/lib/monitoriasDoSetor';
 
 const CANAIS: Canal[] = ['huggy', 'diretores'];
@@ -79,7 +80,7 @@ export default async function PainelGestor({
   const meses = [competencia, anterior];
   const db = await criarClienteServidor();
   // O piso da monitoria: o do setor da equipe (Monitorias 6.0).
-  const [porSetorMon, { setorId: setorDaEquipe }] = await Promise.all([monitoriasPorSetor(db), setorDaTela(db)]);
+  const [porSetorMon, { setorId: setorDaEquipe }] = await Promise.all([monitoriasPorSetor(db), setorDaTela(db, await setorDoCookie())]);
   const piso = porSetorMon.get(setorDaEquipe)?.piso ?? MONITORIAS_PADRAO.piso;
   const tomDaNota = (v: number) => tomDaNotaCom(v, piso);
   // O resultado de todos no mês: do resumo (migração 58), que era ~2 s ao vivo.
@@ -225,7 +226,7 @@ export default async function PainelGestor({
   }
   if ((semCargo.data ?? []).length) {
     const n = (semCargo.data ?? []).length;
-    pendencias.push({ texto: `${n} pessoa${n > 1 ? 's' : ''} sem cargo no mês`, acao: 'Definir', href: '/cota/atendentes', grave: true });
+    pendencias.push({ texto: `${n} pessoa${n > 1 ? 's' : ''} sem cargo no mês`, acao: 'Definir', href: '/cota/usuarios', grave: true });
   }
   if (diario.count) {
     pendencias.push({

@@ -6,8 +6,8 @@ import type { Monitoria, Operador } from '@/lib/tipos';
 import { ateOMesAberto, mesAbertoDasMonitorias } from '@/lib/mes-aberto';
 import MonitoriasPorAtendente from '@/componentes/MonitoriasPorAtendente';
 import { foraDasMonitorias } from '@/lib/monitorados';
-import AbasDeSetor from '@/componentes/AbasDeSetor';
 import { setorDaTela } from '@/lib/monitoriasDoSetor';
+import { setorDoCookie } from '@/lib/setorEscolhido';
 
 export const dynamic = 'force-dynamic';
 
@@ -81,7 +81,7 @@ export default async function ListaMonitorias({
   const aberto = await mesAbertoDasMonitorias();
   consulta = consulta.lte('mes_referencia', aberto);
   // Monitorias 6.0: com dois ou mais setores, a lista é a de um por vez.
-  const { setores, setorId } = await setorDaTela(db, filtros.setor);
+  const { setores, setorId } = await setorDaTela(db, filtros.setor ?? await setorDoCookie());
   const porSetor = perfil.papel !== 'operador' && setores.length > 1;
   if (porSetor) consulta = consulta.eq('setor_id', setorId);
   if (filtros.operador) consulta = consulta.eq('operador_id', filtros.operador);
@@ -164,9 +164,6 @@ export default async function ListaMonitorias({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">Monitorias</h1>
-          {porSetor && (
-            <div className="my-2"><AbasDeSetor setores={setores} atual={setorId} caminho="/monitorias" /></div>
-          )}
           <p className="text-sm text-sobre-fundo-suave">
             {total} registro{total === 1 ? '' : 's'}
             {ultimaPagina > 1 && ` · página ${pagina} de ${ultimaPagina}`}

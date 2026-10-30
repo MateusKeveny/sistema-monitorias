@@ -8,6 +8,7 @@ import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { hojeNoBrasil, mesRotulo, percentual } from '@/lib/formatar';
 import { ateOMesAberto, mesAbertoDasMonitorias } from '@/lib/mes-aberto';
 import { foraDasMonitorias } from '@/lib/monitorados';
+import { setorDoCookie } from '@/lib/setorEscolhido';
 import { MONITORIAS_PADRAO, monitoriasPorSetor, setorDasPessoas, setorDaTela, textoDoPiso } from '@/lib/monitoriasDoSetor';
 import { janelaDe, monitoriasPorMes, ocorrenciasDaPessoa, repeticoes, repeticoesDaEquipe } from '@/lib/repeticoes';
 import type { LinhaCriterio, LinhaRanking } from '@/lib/tipos';
@@ -209,7 +210,7 @@ async function Equipe({ lista, mesPedido }: { lista: { id: string; nome: string 
   const db = await criarClienteServidor();
   const aberto = await mesAbertoDasMonitorias();
   // O piso e a quantidade por semana: os do setor (Monitorias 6.0; a Expansão: 85% e 4).
-  const [porSetorMon, { setorId: setorDaEquipe }] = await Promise.all([monitoriasPorSetor(db), setorDaTela(db)]);
+  const [porSetorMon, { setorId: setorDaEquipe }] = await Promise.all([monitoriasPorSetor(db), setorDaTela(db, await setorDoCookie())]);
   const doSetor = porSetorMon.get(setorDaEquipe) ?? MONITORIAS_PADRAO;
   const piso = doSetor.piso;
   const tomDaNota = (v: number) => tomDaNotaCom(v, piso);

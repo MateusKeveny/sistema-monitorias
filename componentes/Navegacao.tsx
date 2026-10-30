@@ -15,46 +15,55 @@ import { NOME_SISTEMA, type SistemaDoPainel as Sistema } from '@/lib/sistema';
  * topo — chegava a comer um terço da tela. Grupo com um item só visível (o
  * operador vê só o Presencial de "Registrar") vira link comum.
  */
-export type Item = { href: string; rotulo: string; papeis: Perfil['papel'][]; grupo?: string };
+export type Item = {
+  href: string; rotulo: string; papeis: Perfil['papel'][]; grupo?: string;
+  /** Nome do item para o atendente, quando é diferente (ex.: "Meu C-SAT"). */
+  rotuloOperador?: string;
+};
+
+/** O nome do item para quem está vendo. */
+export const rotuloDo = (i: Item, papel: Perfil['papel']) => (papel === 'operador' && i.rotuloOperador) || i.rotulo;
 
 // O operador não tem "Relatórios": todos eles são recortes do time, e o que é
 // dele já está em "Monitorias" e no painel. Menu com item que não acrescenta
 // nada é ruído.
 export const ITENS: Record<Sistema, Item[]> = {
   monitorias: [
-    { href: '/', rotulo: 'Painel', papeis: ['gestor', 'qualidade', 'operador'] },
+    { href: '/', rotulo: 'Início', papeis: ['gestor', 'qualidade', 'operador'] },
     { href: '/monitorias', rotulo: 'Monitorias', papeis: ['gestor', 'qualidade', 'operador'] },
     { href: '/monitorias/nova', rotulo: 'Nova monitoria', papeis: ['gestor', 'qualidade'], grupo: 'Registrar' },
     { href: '/diario', rotulo: 'Diário de bordo', papeis: ['gestor', 'qualidade'], grupo: 'Registrar' },
     { href: '/relatorios', rotulo: 'Relatórios', papeis: ['gestor', 'qualidade'] },
     { href: '/configuracoes', rotulo: 'Configurações', papeis: ['gestor'], grupo: 'Administrar' },
-    { href: '/reportes', rotulo: 'Reports', papeis: ['gestor'], grupo: 'Administrar' },
+    { href: '/reportes', rotulo: 'Problemas reportados', papeis: ['gestor'], grupo: 'Administrar' },
   ],
+  // O menu da 3.0, aprovado em 30/10/2026: os grupos pelo que se faz — e o
+  // ciclo do mês na ordem em que acontece (importar → lançar → conferir → fechar).
   cota: [
     { href: '/cota', rotulo: 'Início', papeis: ['gestor', 'qualidade', 'operador'] },
-    { href: '/cota/comparativo', rotulo: 'Comparativo', papeis: ['gestor', 'qualidade', 'operador'] },
-    { href: '/cota/extrato', rotulo: 'Extrato', papeis: ['gestor', 'qualidade', 'operador'] },
-    { href: '/cota/historico', rotulo: 'Histórico', papeis: ['gestor', 'qualidade', 'operador'] },
-    { href: '/cota/monitorias', rotulo: 'Monitorias', papeis: ['gestor', 'qualidade', 'operador'] },
+    { href: '/cota/comparativo', rotulo: 'Comparativo', papeis: ['gestor', 'qualidade', 'operador'], grupo: 'Acompanhar' },
+    { href: '/cota/extrato', rotulo: 'Extrato', papeis: ['gestor', 'qualidade', 'operador'], grupo: 'Acompanhar' },
+    { href: '/cota/historico', rotulo: 'Histórico', papeis: ['gestor', 'qualidade', 'operador'], grupo: 'Acompanhar' },
+    // Cenários sobre o mês aberto, sem gravar (1.53.0).
+    { href: '/cota/simulacao', rotulo: 'Simulação', papeis: ['gestor'], grupo: 'Acompanhar' },
+    { href: '/cota/monitorias', rotulo: 'Monitorias', papeis: ['gestor', 'qualidade', 'operador'], grupo: 'Qualidade' },
     // As avaliações de 1 a 5, com o protocolo para revisar (2.10.0).
-    { href: '/cota/csat', rotulo: 'Meu C-SAT', papeis: ['gestor', 'qualidade', 'operador'] },
+    { href: '/cota/csat', rotulo: 'C-SAT', rotuloOperador: 'Meu C-SAT', papeis: ['gestor', 'qualidade', 'operador'], grupo: 'Qualidade' },
     { href: '/cota/diario', rotulo: 'Diário de bordo', papeis: ['gestor', 'qualidade', 'operador'], grupo: 'Registrar' },
     { href: '/cota/presencial', rotulo: 'Presencial', papeis: ['gestor', 'qualidade', 'operador'], grupo: 'Registrar' },
-    { href: '/cota/lancamentos', rotulo: 'Lançamentos', papeis: ['gestor'], grupo: 'Registrar' },
-    { href: '/cota/importar', rotulo: 'Importar', papeis: ['gestor'], grupo: 'Registrar' },
-    { href: '/cota/fechamento', rotulo: 'Fechamento', papeis: ['gestor'] },
-    { href: '/cota/atendentes', rotulo: 'Atendentes', papeis: ['gestor'], grupo: 'Administrar' },
-    // Férias: quem vê é decidido por ve_ferias (cargo Pleno ou Analista conta), não só pelo papel.
-    { href: '/cota/ferias', rotulo: 'Férias', papeis: ['gestor', 'qualidade', 'operador'], grupo: 'Administrar' },
-    { href: '/cota/acessos', rotulo: 'Acessos', papeis: ['gestor'], grupo: 'Administrar' },
+    { href: '/cota/importar', rotulo: 'Importar', papeis: ['gestor'], grupo: 'Ciclo do mês' },
+    { href: '/cota/lancamentos', rotulo: 'Lançamentos', papeis: ['gestor'], grupo: 'Ciclo do mês' },
     // Desligar o TME de uma semana, com justificativa (migração 66).
-    { href: '/cota/metricas', rotulo: 'Métricas da semana', papeis: ['gestor'], grupo: 'Administrar' },
-    // Cenários sobre o mês aberto, sem gravar (1.53.0).
-    { href: '/cota/simulacao', rotulo: 'Simulação', papeis: ['gestor'], grupo: 'Administrar' },
+    { href: '/cota/metricas', rotulo: 'Métricas da semana', papeis: ['gestor'], grupo: 'Ciclo do mês' },
     // Se o cálculo bate entre si; roda sozinha às 06:00 (2.1.0).
-    { href: '/cota/conferencia', rotulo: 'Conferência do cálculo', papeis: ['gestor'], grupo: 'Administrar' },
-    { href: '/cota/configuracao', rotulo: 'Configuração', papeis: ['gestor'], grupo: 'Administrar' },
-    { href: '/reportes', rotulo: 'Reports de problemas', papeis: ['gestor'], grupo: 'Administrar' },
+    { href: '/cota/conferencia', rotulo: 'Conferência do cálculo', papeis: ['gestor'], grupo: 'Ciclo do mês' },
+    { href: '/cota/fechamento', rotulo: 'Fechamento', papeis: ['gestor'], grupo: 'Ciclo do mês' },
+    // Pessoas, logins, papéis e setores num lugar só (3.0): junta Atendentes e Acessos.
+    { href: '/cota/usuarios', rotulo: 'Usuários e setores', papeis: ['gestor'], grupo: 'Equipe' },
+    // Férias: quem vê é decidido por ve_ferias (cargo Pleno ou Analista conta), não só pelo papel.
+    { href: '/cota/ferias', rotulo: 'Férias', papeis: ['gestor', 'qualidade', 'operador'], grupo: 'Equipe' },
+    { href: '/cota/configuracao', rotulo: 'Configuração', papeis: ['gestor'], grupo: 'Sistema' },
+    { href: '/reportes', rotulo: 'Problemas reportados', papeis: ['gestor'], grupo: 'Sistema' },
   ],
 };
 
@@ -122,7 +131,8 @@ export default function Navegacao({
   }, [caminho, deslizante]);
 
   // Na ordem da lista: cada grupo entra onde aparece o primeiro item dele.
-  const visiveis = ITENS[sistema].filter((i) => (i.href === '/cota/ferias' ? veFerias : i.papeis.includes(perfil.papel)));
+  const visiveis = ITENS[sistema].filter((i) => (i.href === '/cota/ferias' ? veFerias : i.papeis.includes(perfil.papel)))
+    .map((i) => ({ ...i, rotulo: rotuloDo(i, perfil.papel) }));
   const entradas: (Item | { grupo: string; itens: Item[] })[] = [];
   for (const item of visiveis) {
     const doGrupo = item.grupo ? visiveis.filter((i) => i.grupo === item.grupo) : [];

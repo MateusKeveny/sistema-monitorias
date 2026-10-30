@@ -1,4 +1,5 @@
 import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
+import { setorDoCookie } from '@/lib/setorEscolhido';
 import MatrizDePesos from '@/componentes/MatrizDePesos';
 import ReguasDeFaixa from '@/componentes/ReguasDeFaixa';
 import PainelRegras from '@/componentes/PainelRegras';
@@ -7,11 +8,8 @@ import AvisosTeams, { type SituacaoAviso } from '@/componentes/AvisosTeams';
 import SubcategoriasDiario from '@/componentes/SubcategoriasDiario';
 import QuemVeODiario, { type VisibilidadeDoDiario } from '@/componentes/QuemVeODiario';
 import HistoricoDePesos, { type AlteracaoDePeso } from '@/componentes/HistoricoDePesos';
-import SetoresECanais, { type SetorDoHubVisto } from '@/componentes/SetoresECanais';
 import RegrasPorFila from '@/componentes/RegrasPorFila';
-import Link from 'next/link';
 import type { Canal, Setor } from '@/lib/setores';
-import { MONITORIAS_PADRAO } from '@/lib/monitoriasDoSetor';
 import type { Subcategoria } from '@/lib/diario';
 import { hojeNoBrasil, mesDeCompetencia } from '@/lib/formatar';
 import type { Cargo, CargoDaPessoa, PesoCargo, Pessoa, ReferenciaCargo, RegraCota } from '@/lib/tipos';
@@ -33,12 +31,13 @@ export default async function ConfiguracaoDaCota({
 }) {
   await exigirGestor();
   const { cat, setor: setorPedido } = await searchParams;
+  const escolhido = await setorDoCookie();
   const db = await criarClienteServidor();
 
   const [
     { data: pessoas }, { data: cargos }, { data: regras },
     { data: pesos }, { data: referencias }, { data: historico }, { data: avisos }, { data: subcategorias }, { data: usosSub }, { data: alteracoes },
-    { data: visibilidade }, { data: setores }, { data: canais }, { data: vistos },
+    { data: visibilidade }, { data: setores }, { data: canais },
   ] = await Promise.all([
     db.from('pessoas').select('id, ativo, desligado_em'),
     db.from('cargos').select('*').eq('ativo', true).order('ordem'),
@@ -58,7 +57,6 @@ export default async function ConfiguracaoDaCota({
     // Setores e canais (migração 79).
     db.from('setores').select('*').order('ordem'),
     db.from('canais_do_setor').select('*').order('ordem'),
-    db.from('vw_setores_do_hub_vistos').select('*').order('atendimentos', { ascending: false }),
   ]);
 
   const usos: Record<number, number> = {};
@@ -66,20 +64,12 @@ export default async function ConfiguracaoDaCota({
 
   // Um setor por vez (etapa 4): cargos, pesos e métricas são do setor.
   const listaSetores = (setores ?? []) as Setor[];
-  const setorId = listaSetores.find((s) => String(s.id) === setorPedido)?.id ?? listaSetores[0]?.id ?? 1;
+  const setorId = listaSetores.find((s) => String(s.id) === (setorPedido ?? escolhido))?.id ?? listaSetores[0]?.id ?? 1;
   const doSetor = (x: { setor_id?: number }) => (x.setor_id ?? 1) === setorId;
   const listaCargos = ((cargos ?? []) as Cargo[]).filter(doSetor);
   const idsDosCargos = new Set(listaCargos.map((c) => c.id));
   const listaPesos = ((pesos ?? []) as PesoCargo[]).filter((p) => idsDosCargos.has(p.cargo_id));
   const listaRegras = ((regras ?? []) as RegraCota[]).filter(doSetor);
-  // Monitorias de cada setor (Monitorias 6.0): quantas por semana e o piso, o faixa_min da régua dele.
-  const monitoriasDosSetores = Object.fromEntries(listaSetores.map((s) => {
-    const regua = ((regras ?? []) as RegraCota[]).find((r) => r.chave === s.regra_monitoria);
-    return [s.id, {
-      porSemana: s.monitorias_por_semana ?? MONITORIAS_PADRAO.porSemana,
-      piso: regua?.faixa_min != null ? Number(regua.faixa_min) : MONITORIAS_PADRAO.piso,
-    }];
-  }));
 
   // Quantas pessoas na operação estão em cada cargo agora: é o "afeta N
   // pessoas" da barra de salvar.
@@ -106,19 +96,6 @@ export default async function ConfiguracaoDaCota({
           As regras da cota. Mudar algo recalcula os meses em aberto; os fechados guardam o valor da época.
         </p>
       </div>
-
-      {listaSetores.length > 1 && (
-        <div className="inline-flex flex-wrap gap-1 rounded-full bg-pilula p-1" role="tablist" aria-label="Setor">
-          {listaSetores.map((s) => (
-            <Link key={s.id} role="tab" aria-selected={s.id === setorId}
-                  href={`/cota/configuracao?setor=${s.id}${cat ? `&cat=${cat}` : ''}`}
-                  className={`rounded-full px-4 py-1.5 text-sm transition ${s.id === setorId
-                    ? 'bg-superficie font-semibold text-slate-900 shadow-sm' : 'text-sobre-fundo-suave hover:text-sobre-fundo'}`}>
-              {s.nome}
-            </Link>
-          ))}
-        </div>
-      )}
 
       {/* `key`: o atalho "+ Métrica manual" troca só o ?cat= e precisa reabrir na aba certa. */}
       <Abas
@@ -160,14 +137,6 @@ export default async function ConfiguracaoDaCota({
                                nomeBase={(base?.nome ?? '').replace(/^Atendente\s+/, '')} />
                 <PainelRegras regras={listaRegras} setorId={setorId} />
               </div>
-            ),
-          },
-          {
-            chave: 'setores',
-            rotulo: 'Setores e filas',
-            conteudo: (
-              <SetoresECanais setores={(setores ?? []) as Setor[]} canais={(canais ?? []) as Canal[]}
-                              vistos={(vistos ?? []) as SetorDoHubVisto[]} monitorias={monitoriasDosSetores} />
             ),
           },
           {

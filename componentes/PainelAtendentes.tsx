@@ -8,6 +8,7 @@ import { NOMES_PAPEL, type Cargo, type CargoDaPessoa, type PapelUsuario, type Pe
 import type { Setor } from '@/lib/setores';
 import { ROTULO_TIPO, type AnotacaoGestor, type LeituraDaPessoa } from '@/lib/diario';
 import { mensagemDoErro } from '@/lib/erro-amigavel';
+import { emailDoLogin } from '@/lib/usuario';
 
 const entrada = `rounded-lg border border-slate-300 bg-superficie px-2.5 py-1.5 text-sm outline-none
                  focus:border-marca-600 disabled:opacity-50`;
@@ -698,10 +699,10 @@ function Ficha({
         <Secao titulo="Acesso">
           <p className="mb-2 text-sm text-slate-600">Ainda não entra no painel.</p>
           <div className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2 text-sm text-slate-600">
-            <label htmlFor="novo-acesso-email">E-mail</label>
-            <input id="novo-acesso-email" type="email" value={novoAcesso.email} disabled={ocupado}
+            <label htmlFor="novo-acesso-email">E-mail ou usuário</label>
+            <input id="novo-acesso-email" type="text" value={novoAcesso.email} disabled={ocupado}
                    onChange={(e) => setNovoAcesso((s) => ({ ...s, email: e.target.value }))}
-                   placeholder="nome@igreenenergy.com.br" className={entrada} />
+                   placeholder="nome@igreenenergy.com.br ou admin" className={entrada} />
             <label htmlFor="novo-acesso-papel">Papel</label>
             <select id="novo-acesso-papel" value={novoAcesso.papel} disabled={ocupado}
                     onChange={(e) => setNovoAcesso((s) => ({ ...s, papel: e.target.value as PapelUsuario }))}
@@ -714,11 +715,11 @@ function Ficha({
           <div className="mt-3 flex justify-end">
             <button type="button" disabled={ocupado || !novoAcesso.email.trim()} className={botaoPrimario}
                     onClick={async () => {
-                      if (!confirm(`Criar o acesso de ${pessoa.nome} (${novoAcesso.email.trim()})? Uma senha temporária será gerada para você repassar.`)) return;
+                      if (!confirm(`Criar o acesso de ${pessoa.nome} (${emailDoLogin(novoAcesso.email)})? Uma senha temporária será gerada para você repassar.`)) return;
                       setOcupado(true); setErro(null); setAviso(null);
                       // Pela função (migração 68), como o Redefinir senha: no banco, só gestor.
                       const { data, error } = await db().rpc('criar_acesso',
-                        { p_pessoa: pessoa.id, p_email: novoAcesso.email.trim(), p_papel: novoAcesso.papel });
+                        { p_pessoa: pessoa.id, p_email: emailDoLogin(novoAcesso.email), p_papel: novoAcesso.papel });
                       setOcupado(false);
                       if (error) { setErro(await mensagemDoErro(error)); return; }
                       // A senha aparece na seção Acesso de quem já entra, que esta vira

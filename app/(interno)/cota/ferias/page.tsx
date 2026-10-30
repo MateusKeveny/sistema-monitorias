@@ -159,7 +159,7 @@ export default async function Ferias({ searchParams }: { searchParams: Promise<{
                     </td>
                     <td className="py-2 tabular-nums text-slate-600">{z.limite ? `${ddmm(z.limite)}/${z.limite.slice(2, 4)}` : '—'}</td>
                     <td className={`py-2 pr-6 text-right sm:pr-7 ${tom(z)}`}>
-                      {z.saldo == null ? <Link href="/cota/atendentes" className="underline-offset-2 hover:underline">sem data de entrada</Link>
+                      {z.saldo == null ? <Link href="/cota/usuarios" className="underline-offset-2 hover:underline">sem data de entrada</Link>
                         : !umAno(z) ? `menos de 1 ano em ${hoje.slice(0, 4)}`
                         : z.saldo === 0 ? 'em dia'
                         : z.dias_ate_limite! < 0 ? `prazo de saída passou · ${z.saldo} dias`

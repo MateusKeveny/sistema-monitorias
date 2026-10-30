@@ -8,6 +8,7 @@ import LeituraObrigatoria from '@/componentes/LeituraObrigatoria';
 import RegistrarAcesso from '@/componentes/RegistrarAcesso';
 import ManterSessao from '@/componentes/ManterSessao';
 import { hojeNoBrasil } from '@/lib/formatar';
+import { setorDoCookie } from '@/lib/setorEscolhido';
 import type { LeituraDiario, RegistroDiario } from '@/lib/diario';
 
 export default async function LayoutInterno({ children }: { children: React.ReactNode }) {
@@ -83,13 +84,22 @@ export default async function LayoutInterno({ children }: { children: React.Reac
     }
 
     const versao = sistema === 'cota' ? VERSAO_COTA : VERSAO_MONITORIAS;
+    // Seletor de setor do menu (3.0): só para quem vê o time. No Monitorias,
+    // só os setores com monitorias.
+    const { data: setoresDb } = perfil.papel === 'operador' ? { data: [] }
+      : await db.from('setores').select('id, nome, monitorias').eq('ativo', true).order('ordem');
+    const setoresDoMenu = ((setoresDb ?? []) as { id: number; nome: string; monitorias: boolean | null }[])
+      .filter((s) => sistema === 'cota' || s.monitorias !== false);
+    const escolhido = await setorDoCookie();
+    const setorAtual = setoresDoMenu.find((s) => String(s.id) === escolhido)?.id ?? setoresDoMenu[0]?.id ?? 1;
     return (
       <div className="lg:grid lg:min-h-screen lg:grid-cols-[15rem_1fr]">
         {/* Uma abertura do painel por carregamento (migração 52, tela Acessos). */}
         <RegistrarAcesso sistema={sistema} />
         <ManterSessao />
         <MenuLateral perfil={perfil} versao={versao} sistema={sistema} veFerias={veFerias}
-                     avisosReporte={avisosReporte} pendentes={pendentes} />
+                     avisosReporte={avisosReporte} pendentes={pendentes}
+                     setores={setoresDoMenu.map(({ id, nome }) => ({ id, nome }))} setorAtual={setorAtual} />
         <div className="min-w-0">
           <div className="lg:hidden">
             <Navegacao perfil={perfil} pendentes={pendentes} sistema={sistema} versao={versao} avisosReporte={avisosReporte} veFerias={veFerias} />

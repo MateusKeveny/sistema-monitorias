@@ -2,7 +2,7 @@ import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
 import PainelCriterios from '@/componentes/PainelCriterios';
 import PainelPessoas from '@/componentes/PainelPessoas';
 import PainelCadastro from '@/componentes/PainelCadastro';
-import AbasDeSetor from '@/componentes/AbasDeSetor';
+import { setorDoCookie } from '@/lib/setorEscolhido';
 import type { Canal, Criterio, Pessoa } from '@/lib/tipos';
 
 export const dynamic = 'force-dynamic';
@@ -10,6 +10,7 @@ export const dynamic = 'force-dynamic';
 export default async function Configuracoes({ searchParams }: { searchParams: Promise<{ setor?: string }> }) {
   await exigirGestor();
   const { setor: setorPedido } = await searchParams;
+  const escolhido = await setorDoCookie();
   const db = await criarClienteServidor();
 
   const [{ data: criterios }, { data: pessoas }, { data: canais }, { data: setores }] = await Promise.all([
@@ -21,7 +22,7 @@ export default async function Configuracoes({ searchParams }: { searchParams: Pr
   ]);
   const comMonitorias = ((setores ?? []) as { id: number; nome: string; monitorias: boolean | null }[])
     .filter((s) => s.monitorias !== false);
-  const setorId = comMonitorias.find((s) => String(s.id) === setorPedido)?.id ?? comMonitorias[0]?.id ?? 1;
+  const setorId = comMonitorias.find((s) => String(s.id) === (setorPedido ?? escolhido))?.id ?? comMonitorias[0]?.id ?? 1;
 
   return (
     <div className="space-y-6">
@@ -31,8 +32,6 @@ export default async function Configuracoes({ searchParams }: { searchParams: Pr
           Critérios e pesos, cadastro de pessoas e canais.
         </p>
       </div>
-
-      <AbasDeSetor setores={comMonitorias} atual={setorId} caminho="/configuracoes" />
 
       <PainelCriterios key={setorId} setorId={setorId}
                        criterios={((criterios ?? []) as Criterio[]).filter((c) => (c.setor_id ?? 1) === setorId)} />

@@ -5,9 +5,11 @@ import { usePathname, useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import BotaoTema from '@/componentes/BotaoTema';
 import BotaoReportar from '@/componentes/BotaoReportar';
-import { ITENS, type Item } from '@/componentes/Navegacao';
+import { ITENS, rotuloDo, type Item } from '@/componentes/Navegacao';
 import { NOME_SISTEMA, type SistemaDoPainel as Sistema } from '@/lib/sistema';
 import SinoDeAvisos from '@/componentes/SinoDeAvisos';
+import SeletorDeSetor from '@/componentes/SeletorDeSetor';
+import { Suspense } from 'react';
 import { NOMES_PAPEL, type Perfil } from '@/lib/tipos';
 
 /** Ícones de traço, desenhados para 20×20, por endereço, nos dois sistemas. */
@@ -33,6 +35,7 @@ const ICONES: Record<string, React.ReactNode> = {
   '/cota/lancamentos': <path d="M10 4v12M4 10h12" />,
   '/cota/importar': <path d="M10 3v9m0 0-3-3m3 3 3-3M4 14v2h12v-2" />,
   '/cota/fechamento': <><rect x="4" y="9" width="12" height="8" rx="1.5" /><path d="M7 9V6.5a3 3 0 0 1 6 0V9" /></>,
+  '/cota/usuarios': <><circle cx="7" cy="8" r="2.5" /><circle cx="14" cy="8" r="2.5" /><path d="M2.5 16c.7-2.3 2.4-3.5 4.5-3.5s3.8 1.2 4.5 3.5M11 12.6c.9-.1 2-.1 3 0 1.9.3 3 1.3 3.5 3.4" /></>,
   '/cota/atendentes': <><circle cx="7" cy="8" r="2.5" /><circle cx="14" cy="8" r="2.5" /><path d="M2.5 16c.7-2.3 2.4-3.5 4.5-3.5s3.8 1.2 4.5 3.5M11 12.6c.9-.1 2-.1 3 0 1.9.3 3 1.3 3.5 3.4" /></>,
   // Relógio: quem acessa e quando (1.37.0).
   // Sol no horizonte: as férias da equipe (migração 61).
@@ -58,7 +61,10 @@ const ICONES: Record<string, React.ReactNode> = {
  * Fechamento e Relatórios não têm grupo no menu do topo — cabem sozinhos —,
  * mas aqui ganham o seu: um é etapa do mês, o outro é consulta.
  */
-export default function MenuLateral({ perfil, versao, sistema, avisosReporte = 0, pendentes = 0, veFerias = false }: {
+export default function MenuLateral({ perfil, versao, sistema, avisosReporte = 0, pendentes = 0, veFerias = false, setores = [], setorAtual = 1 }: {
+  /** Setores do seletor do menu (3.0) e o escolhido; com um só, o seletor não aparece. */
+  setores?: { id: number; nome: string }[];
+  setorAtual?: number;
   /** Vê a tela de Férias (ve_ferias, migração 62). */
   veFerias?: boolean;
   perfil: Perfil;
@@ -87,8 +93,7 @@ export default function MenuLateral({ perfil, versao, sistema, avisosReporte = 0
   const aceso = visiveis.filter((i) => dentro(i.href))
     .sort((a, b) => b.href.length - a.href.length)[0]?.href;
 
-  const grupoDe = (i: Item) =>
-    i.grupo ?? (i.href === '/cota/fechamento' ? 'Fechar' : i.href === '/relatorios' ? 'Analisar' : undefined);
+  const grupoDe = (i: Item) => i.grupo ?? (i.href === '/relatorios' ? 'Analisar' : undefined);
 
   let grupoAnterior: string | undefined;
 
@@ -100,6 +105,8 @@ export default function MenuLateral({ perfil, versao, sistema, avisosReporte = 0
         {/* Avisos da pessoa (2.3.0): semana lançada e valor do mês. */}
         {sistema === 'cota' && <SinoDeAvisos />}
       </div>
+
+      <Suspense><SeletorDeSetor setores={setores} atual={setorAtual} /></Suspense>
 
       <nav className="flex flex-col gap-0.5" aria-label="Menu">
         {visiveis.map((item) => {
@@ -121,7 +128,7 @@ export default function MenuLateral({ perfil, versao, sistema, avisosReporte = 0
                      stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                   {ICONES[item.href]}
                 </svg>
-                {item.rotulo}
+                {rotuloDo(item, perfil.papel)}
                 {/* Exclusões esperando decisão: o quadro só existe no Painel, e
                     sem o contador o gestor não saberia que chegou pedido. */}
                 {item.href === '/' && pendentes > 0 && (

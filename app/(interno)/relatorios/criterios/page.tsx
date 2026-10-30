@@ -1,7 +1,7 @@
 import Link from '@/componentes/Link';
 import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
-import AbasDeSetor from '@/componentes/AbasDeSetor';
 import { setorDaTela } from '@/lib/monitoriasDoSetor';
+import { setorDoCookie } from '@/lib/setorEscolhido';
 import { criarClienteServidor, exigirVisaoDoTime } from '@/lib/supabase/servidor';
 import { Quadro, Tabela, Th, Td, Vazio, Indicador } from '@/componentes/ui';
 import { mesRotulo, percentual, nota } from '@/lib/formatar';
@@ -22,7 +22,7 @@ export default async function RelatorioCriterios({
   const mesEscolhido = mesCompleto(pedido.mes);
   const db = await criarClienteServidor();
   // Monitorias 6.0: um setor por vez (abas com 2 ou mais).
-  const { setores, setorId } = await setorDaTela(db, pedido.setor);
+  const { setores, setorId } = await setorDaTela(db, pedido.setor ?? await setorDoCookie());
 
   const { data } = await conferida(db
     .from('vw_criterios_reprovados')
@@ -84,9 +84,8 @@ export default async function RelatorioCriterios({
             não cabe numa seta, então fica no link ao lado. */}
         <div className="flex items-center gap-3">
           {mes !== 'todos' && (
-            <><AbasDeSetor setores={setores} atual={setorId} caminho="/relatorios/criterios" outros={{ mes: pedido.mes }} />
             <SetasDeCompetencia competencia={mes} atual={meses[0]} caminho="/relatorios/criterios" manter={{ setor: setores.length > 1 ? String(setorId) : undefined }}
-                                disponiveis={meses} compacto /></>
+                                disponiveis={meses} compacto />
           )}
           <Link href={mes === 'todos' ? `/relatorios/criterios?mes=${meses[0]}` : '/relatorios/criterios?mes=todos'}
             className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm

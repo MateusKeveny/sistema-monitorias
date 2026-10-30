@@ -3,7 +3,7 @@ import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { Quadro, Indicador, EtiquetaNota, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import EvolucaoMensal from '@/componentes/GraficoEvolucao';
 import CoberturaDoCiclo from '@/componentes/CoberturaDoCiclo';
-import AbasDeSetor from '@/componentes/AbasDeSetor';
+import { setorDoCookie } from '@/lib/setorEscolhido';
 import { MONITORIAS_PADRAO, monitoriasPorSetor, setorDasPessoas, textoDoPiso } from '@/lib/monitoriasDoSetor';
 import OQueMaisSeRepete from '@/componentes/OQueMaisSeRepete';
 import { janelaDe, repeticoesDaEquipe } from '@/lib/repeticoes';
@@ -33,10 +33,11 @@ export default async function Painel({
     monitoriasPorSetor(db),
     setorDasPessoas(db, mesDeCompetencia(hojeNoBrasil())),
   ]);
+  const setorEscolhido = await setorDoCookie();
   const comMonitorias = ((setoresDb ?? []) as { id: number; nome: string; monitorias: boolean | null }[])
     .filter((s) => s.monitorias !== false);
   const setorId = perfil.papel === 'operador' ? (setorDe.get(perfil.id) ?? 1)
-    : comMonitorias.find((s) => String(s.id) === pedido.setor)?.id ?? comMonitorias[0]?.id ?? 1;
+    : comMonitorias.find((s) => String(s.id) === (pedido.setor ?? setorEscolhido))?.id ?? comMonitorias[0]?.id ?? 1;
   const doSetor = porSetor.get(setorId) ?? MONITORIAS_PADRAO;
 
   // O ranking completo é pequeno — uma linha por operador por mês — e resolve
@@ -238,7 +239,6 @@ export default async function Painel({
             <SetasDeCompetencia competencia={mes} atual={meses[0]} caminho="/" disponiveis={meses} compacto
                                 manter={{ setor: !ehOperador && comMonitorias.length > 1 ? String(setorId) : undefined }} />
           )}
-          {!ehOperador && <AbasDeSetor setores={comMonitorias} atual={setorId} caminho="/" outros={{ mes: pedido.mes }} />}
 
           <Link
             href={ehOperador ? '/monitorias' : '/relatorios'}

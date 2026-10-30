@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
+import { emailDoLogin } from '@/lib/usuario';
 
 const campo = `w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none
                focus:border-marca-600 focus:ring-2 focus:ring-marca-100`;
@@ -28,11 +29,12 @@ export default function FormularioLogin({
     setErro(null);
 
     const { error } = await criarClienteNavegador().auth
-      .signInWithPassword({ email, password: senha });
+      // Nome de usuário ("admin") vira o endereço interno (3.0).
+      .signInWithPassword({ email: emailDoLogin(email), password: senha });
 
     if (error) {
       setErro(error.message === 'Invalid login credentials'
-        ? 'E-mail ou senha incorretos.'
+        ? 'Usuário ou senha incorretos.'
         : error.message);
       setEnviando(false);
       return;
@@ -46,13 +48,13 @@ export default function FormularioLogin({
     <form onSubmit={entrar} className="w-full max-w-sm space-y-5 rounded-2xl border border-slate-200 bg-superficie p-8 shadow-xl">
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">{titulo}</h1>
-        <p className="mt-1 text-sm text-slate-500">Entre com seu e-mail corporativo.</p>
+        <p className="mt-1 text-sm text-slate-500">Entre com seu e-mail corporativo ou nome de usuário.</p>
       </div>
 
       <label className="block">
-        <span className="mb-1 block text-sm font-medium text-slate-700">E-mail</span>
+        <span className="mb-1 block text-sm font-medium text-slate-700">E-mail ou usuário</span>
         <input
-          type="email" name="email" required autoComplete="email" value={email}
+          type="text" name="email" required autoComplete="username" autoCapitalize="none" spellCheck={false} value={email}
           onChange={(e) => setEmail(e.target.value)} className={campo}
         />
       </label>
