@@ -222,7 +222,7 @@ export async function GET(requisicao: NextRequest) {
           colaborador: nomeDe.get(l.pessoa_id) ?? '—',
           cargo: l.cargo ?? '',
           semana: l.semana ? `${l.semana}ª` : 'mês',
-          canal: l.nomeDaFila ?? (l.origem ? NOME_CANAL[l.origem] : '—'),
+          canal: (setorId !== 1 && l.nomeDaFila) || (l.origem ? NOME_CANAL[l.origem] : '—'),
           categoria: l.rotulo,
           quantidade: Number(l.quantidade),
           peso: Number(l.peso),
