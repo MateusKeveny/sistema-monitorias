@@ -21,10 +21,10 @@ type Regua = { grupo: string; titulo: string; cor: string; unidade: Unidade; mai
 const MODELOS: Regua[] = [
   { grupo: 'csat', titulo: 'C-SAT', cor: '#60a5fa', unidade: '%', maiorMelhor: true,
     texto: 'O C-SAT da semana escolhe a faixa; a faixa multiplica os finalizados. Vale para os dois canais.' },
-  { grupo: 'tme', titulo: 'TME Médio Equipe · Expansão', cor: '#34d399', unidade: 'min', maiorMelhor: false,
-    texto: 'O TME da semana escolhe a faixa: o médio da equipe ou, na fila que avalia por pessoa, o de cada um.' },
+  { grupo: 'tme', titulo: 'TME · Expansão', cor: '#34d399', unidade: 'min', maiorMelhor: false,
+    texto: 'O TME da pessoa na semana escolhe a faixa (até outubro/2026, o médio da equipe).' },
   { grupo: 'tme_diretores', titulo: 'TME · Diretores-Expansão', cor: '#2dd4bf', unidade: 'min', maiorMelhor: false,
-    texto: 'O TME da pessoa na semana escolhe a faixa.' },
+    texto: 'O TME da pessoa na semana escolhe a faixa (até outubro/2026, o médio da equipe).' },
   { grupo: 'monitoria', titulo: 'Monitoria', cor: '#fbbf24', unidade: '%', maiorMelhor: true,
     texto: 'A média da semana só pontua acima do mínimo — o valor exato do corte não pontua.' },
 ];
