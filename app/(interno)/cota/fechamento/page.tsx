@@ -221,12 +221,12 @@ export default async function Fechamento({
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
-          <a href={`/api/cota/exportar?mes=${mesCurto}&formato=detalhado`}
+          <a href={`/api/cota/exportar?mes=${mesCurto}&formato=detalhado&setor=${setorId}`}
              className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
                         font-medium text-slate-700 hover:bg-slate-50">
             Relatório detalhado
           </a>
-          <a href={`/api/cota/exportar?mes=${mesCurto}`}
+          <a href={`/api/cota/exportar?mes=${mesCurto}&setor=${setorId}`}
              className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
                         font-medium text-slate-700 hover:bg-slate-50">
             Resumo para importação

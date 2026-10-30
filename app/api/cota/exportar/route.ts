@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { criarClienteServidor, obterPerfil } from '@/lib/supabase/servidor';
 import { gerarXlsx, type Aba, type Coluna } from '@/lib/xlsx-escrever';
 import { mesRotulo, mesValido } from '@/lib/formatar';
+import { setorDasPessoas } from '@/lib/monitoriasDoSetor';
 
 export const dynamic = 'force-dynamic';
 
@@ -87,6 +88,12 @@ const COLUNAS_RESUMO: { cabecalho: string; regra?: string; canal?: 'huggy' | 'di
  *               antigas de conferência
  *
  * Só gestor: é a base do que vai para o outro departamento.
+ *
+ * Por setor (3.0, `?setor=`; sem ele, a Conexão Expansão): só as pessoas do
+ * setor no mês, nas MESMAS colunas — o portal lê pela posição. A 1ª fila do
+ * setor ocupa as colunas "Huggy" e a 2ª as "Diretores"; as métricas copiadas
+ * de outro setor (chave com _s2, _s3…) caem na coluna da original. Para a
+ * Expansão o arquivo sai idêntico ao de antes.
  */
 export async function GET(requisicao: NextRequest) {
   const perfil = await obterPerfil();
@@ -101,9 +108,10 @@ export async function GET(requisicao: NextRequest) {
   }
   const competencia = `${mes}-01`;
   const detalhado = params.get('formato') === 'detalhado';
+  const setorId = Number(params.get('setor')) || 1;
 
   const db = await criarClienteServidor();
-  const [extrato, cotas, csat] = await Promise.all([
+  const [extrato, cotas, csat, filasDb, setorDb, setorDe] = await Promise.all([
     db.from('vw_extrato_cota')
       .select('pessoa_id, semana, origem, regra, rotulo, grupo, ordem, cargo, quantidade, peso, cota')
       .eq('mes_competencia', competencia).order('ordem'),
@@ -111,11 +119,28 @@ export async function GET(requisicao: NextRequest) {
       .eq('mes_competencia', competencia).order('pessoa'),
     db.from('vw_csat_semanal').select('pessoa_id, origem, avaliacoes, positivas')
       .eq('mes_competencia', competencia),
+    db.from('canais_do_setor').select('setor_id, apelido, nome, ordem, id').order('ordem').order('id'),
+    db.from('setores').select('nome').eq('id', setorId).maybeSingle(),
+    setorDasPessoas(db, competencia),
   ]);
 
-  const linhas = (extrato.data ?? []) as Linha[];
-  const lista = (cotas.data ?? []) as Cota[];
-  const avaliacoes = (csat.data ?? []) as Csat[];
+  // As filas do setor nas posições do arquivo: a 1ª nas colunas "Huggy", a 2ª nas "Diretores".
+  const filas = ((filasDb.data ?? []) as { setor_id: number; apelido: string | null; nome: string }[])
+    .filter((f) => f.setor_id === setorId && f.apelido);
+  const posicao = new Map<string, 'huggy' | 'diretores'>(setorId === 1
+    ? [['huggy', 'huggy'], ['diretores', 'diretores']]
+    : filas.slice(0, 2).map((f, i) => [f.apelido!, i === 0 ? 'huggy' : 'diretores']));
+  const nomeDaFila = new Map(filas.map((f) => [f.apelido!, f.nome]));
+  const doSetor = (pessoa: string) => (setorDe.get(pessoa) ?? 1) === setorId;
+  // A métrica copiada (chave_s2) conta na coluna da original.
+  const base = (regra: string) => regra.replace(/_s\d+$/, '');
+
+  const linhas = ((extrato.data ?? []) as Linha[]).filter((l) => doSetor(l.pessoa_id))
+    .map((l) => ({ ...l, nomeDaFila: l.origem ? nomeDaFila.get(l.origem) : undefined,
+                   regra: base(l.regra), origem: l.origem ? posicao.get(l.origem) ?? null : null }));
+  const lista = ((cotas.data ?? []) as Cota[]).filter((p) => doSetor(p.pessoa_id));
+  const avaliacoes = ((csat.data ?? []) as Csat[]).filter((c) => doSetor(c.pessoa_id))
+    .map((c) => ({ ...c, origem: posicao.get(c.origem) ?? c.origem }));
 
   const serial = serialDoExcel(competencia);
 
@@ -197,7 +222,7 @@ export async function GET(requisicao: NextRequest) {
           colaborador: nomeDe.get(l.pessoa_id) ?? '—',
           cargo: l.cargo ?? '',
           semana: l.semana ? `${l.semana}ª` : 'mês',
-          canal: l.origem ? NOME_CANAL[l.origem] : '—',
+          canal: l.nomeDaFila ?? (l.origem ? NOME_CANAL[l.origem] : '—'),
           categoria: l.rotulo,
           quantidade: Number(l.quantidade),
           peso: Number(l.peso),
@@ -227,7 +252,8 @@ export async function GET(requisicao: NextRequest) {
   }
 
   const arquivo = gerarXlsx(abas);
-  const nome = `Cota ${mes}${detalhado ? ' - detalhado' : ''}.xlsx`;
+  const nomeSetor = setorId !== 1 && setorDb.data ? ` - ${(setorDb.data as { nome: string }).nome}` : '';
+  const nome = `Cota ${mes}${nomeSetor}${detalhado ? ' - detalhado' : ''}.xlsx`;
 
   return new NextResponse(arquivo as unknown as BodyInit, {
     headers: {
