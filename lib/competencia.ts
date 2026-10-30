@@ -1,4 +1,5 @@
 import { cache } from 'react';
+import { cookies } from 'next/headers';
 import { criarClienteServidor } from '@/lib/supabase/servidor';
 import { hojeNoBrasil, mesDeCompetencia, mesValido } from '@/lib/formatar';
 
@@ -51,12 +52,14 @@ const competenciaPadrao = cache(async (): Promise<Competencia> => {
 });
 
 /**
- * A competência pedida na URL (`?mes=2026-09`) ou, sem pedido, a padrão.
- * Pedido explícito vale sempre, mesmo que seja um mês vazio.
+ * A competência pedida na URL (`?mes=2026-09`), a escolhida há pouco em outra
+ * tela (cookie "mes", 3.0) ou, sem nenhuma das duas, a padrão. Pedido
+ * explícito vale sempre, mesmo que seja um mês vazio.
  */
 export async function resolverCompetencia(mes?: string): Promise<Competencia> {
-  if (mesValido(mes)) {
-    return { competencia: `${mes}-01`, atual: mesDeCompetencia(hojeNoBrasil()), emAberto: false };
+  const escolhido = mesValido(mes) ? mes : (await cookies()).get('mes')?.value;
+  if (mesValido(escolhido)) {
+    return { competencia: `${escolhido}-01`, atual: mesDeCompetencia(hojeNoBrasil()), emAberto: false };
   }
   return competenciaPadrao();
 }

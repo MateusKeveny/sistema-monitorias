@@ -99,8 +99,9 @@ export default function MenuLateral({ perfil, versao, sistema, avisosReporte = 0
   let grupoAnterior: string | undefined;
 
   return (
-    <aside className="sem-impressao sticky top-0 hidden h-screen flex-col gap-0.5 overflow-y-auto border-r
-                      border-slate-200 bg-superficie px-3.5 py-5 lg:flex">
+    // Só a lista rola; o topo (sistema, sino, setor) e o rodapé (pessoa, sair, novidades) ficam sempre à vista (3.0).
+    <aside className="sem-impressao sticky top-0 hidden h-screen flex-col gap-0.5 border-r
+                      border-slate-200 bg-superficie px-3.5 pb-3 pt-5 lg:flex">
       <div className="flex items-center justify-between gap-2 pb-5 pl-2.5 text-sm font-bold tracking-tight text-marca-700 dark:text-marca-400">
         {NOME_SISTEMA[sistema]}
         {/* Avisos da pessoa (2.3.0): semana lançada e valor do mês. */}
@@ -109,7 +110,7 @@ export default function MenuLateral({ perfil, versao, sistema, avisosReporte = 0
 
       <Suspense><SeletorDeSetor setores={setores} atual={setorAtual} /></Suspense>
 
-      <nav className="flex flex-col gap-0.5" aria-label="Menu">
+      <nav className="-mx-1 flex min-h-0 flex-1 flex-col gap-px overflow-y-auto px-1" aria-label="Menu">
         {visiveis.map((item) => {
           const grupo = grupoDe(item);
           const titulo = grupo && grupo !== grupoAnterior ? grupo : null;
@@ -117,11 +118,11 @@ export default function MenuLateral({ perfil, versao, sistema, avisosReporte = 0
           const atual = aceso === item.href;
           return (
             <div key={item.href}>
-              {titulo && <p className="mx-2.5 mb-1 mt-4 text-xs text-slate-500">{titulo}</p>}
+              {titulo && <p className="mx-2.5 mb-0.5 mt-3 text-xs text-slate-500">{titulo}</p>}
               <Link
                 href={item.href}
                 aria-current={atual ? 'page' : undefined}
-                className={`relative flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors ${
+                className={`relative flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors ${
                   atual ? 'bg-marca-50 text-slate-900' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
               >
                 {atual && <span aria-hidden className="absolute -left-3.5 inset-y-2 w-[3px] rounded-r bg-marca-600" />}
@@ -143,7 +144,7 @@ export default function MenuLateral({ perfil, versao, sistema, avisosReporte = 0
         })}
       </nav>
 
-      <div className="mt-auto border-t border-slate-200 px-2.5 pt-3 text-sm">
+      <div className="shrink-0 border-t border-slate-200 px-2.5 pt-3 text-sm">
         <p className="font-medium text-slate-900">{perfil.nome}</p>
         <p className="text-xs text-slate-500">{NOMES_PAPEL[perfil.papel]}</p>
         <div className="mt-3">

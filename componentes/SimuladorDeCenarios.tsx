@@ -91,12 +91,12 @@ export default function SimuladorDeCenarios({ base, periodos, cargos }: {
 
   return (
     <div className="space-y-4">
-      <p className="rounded-2xl border border-dashed border-amber-500 bg-amber-500/12 px-4 py-2.5 text-sm text-slate-800 dark:text-amber-100">
+      <p className="rounded-xl bg-slate-50 px-4 py-2.5 text-sm text-slate-600 ring-1 ring-slate-200">
         <b>Só simulação.</b> Nada aqui é gravado nem muda o extrato de ninguém; fechar a tela descarta o cenário. Para valer
         de verdade, use as telas de sempre (Métricas da semana, Configuração › Pesos por cargo, Presencial).
       </p>
 
-      <div className="grid items-start gap-4 xl:grid-cols-[26rem_1fr]">
+      <div className="grid items-start gap-4 xl:grid-cols-[22rem_minmax(0,1fr)]">
         <section className="space-y-4 rounded-[20px] bg-superficie px-5 py-4 shadow-sm">
           <div>
             <h2 className="text-base font-semibold text-slate-900">Cenário</h2>
@@ -280,10 +280,11 @@ export default function SimuladorDeCenarios({ base, periodos, cargos }: {
                   <Fragment key={r.pessoa_id}>
                     <tr className={`cursor-pointer border-b border-slate-100 hover:bg-slate-50 ${aqui ? 'bg-slate-50' : ''}`}
                         onClick={() => setAberta(aqui ? null : r.pessoa_id)}>
-                      <td className="py-2 pr-2 text-slate-800">
-                        <span className="mr-1 text-slate-400">{aqui ? '▾' : '▸'}</span>{r.pessoa}
+                      {/* Nome curto e cargo sem "Atendente": o nome cabia em duas linhas e espremia a tabela. */}
+                      <td className="whitespace-nowrap py-2 pr-2 text-slate-800" title={r.pessoa}>
+                        <span className="mr-1 text-slate-400">{aqui ? '▾' : '▸'}</span>{r.pessoa.split(' ').slice(0, 2).join(' ')}
                         {mexida && <span className="ml-1.5 rounded-full bg-amber-500/15 px-1.5 text-[11px] text-amber-700 dark:text-amber-300">ajustada</span>}
-                        {r.cargo && <span className="ml-1.5 text-xs text-slate-400">{r.cargo}</span>}
+                        {r.cargo && <span className="ml-1.5 text-xs text-slate-400">{r.cargo.replace(/^Atendentes+/, '')}</span>}
                       </td>
                       <td className="px-2 py-2 text-right text-slate-600">{pts(r.hoje)}</td>
                       <td className="px-2 py-2 text-right font-semibold text-slate-900">{pts(r.simulado)}</td>

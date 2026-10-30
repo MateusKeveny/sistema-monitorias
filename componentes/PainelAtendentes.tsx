@@ -384,6 +384,110 @@ function Ficha({
       {erro && <p className="my-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800 ring-1 ring-rose-600/20">{erro}</p>}
       {aviso && <p className="my-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-emerald-600/20">{aviso}</p>}
 
+      {/* O acesso logo abaixo do nome (3.0): é o que mais se procura na ficha. */}
+      {pessoa.auth_id && pessoa.ativo && !pessoa.desligado_em && (
+        <Secao titulo="Acesso">
+          {senhaTemporaria ? (
+            <div className="rounded-xl border border-marca-600/40 bg-marca-600/8 px-4 py-3">
+              <p className="text-sm text-slate-700">
+                Senha temporária de <strong>{pessoa.nome.split(' ')[0]}</strong>. Ela aparece <strong>só agora</strong>:
+                passe para a pessoa, que vai trocá-la no primeiro acesso. Não há letras que se confundem
+                (sem 0/O nem 1/l/I), então dá para ditar ou digitar lendo da tela.
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {/* Um clique seleciona a senha inteira, para copiar à mão. */}
+                <code className="select-all rounded-lg bg-superficie px-4 py-2 font-mono text-2xl tracking-[0.2em] text-slate-900 ring-1 ring-slate-200"
+                      onClick={(e) => { const s = window.getSelection(); s?.selectAllChildren(e.currentTarget); }}>
+                  {senhaTemporaria}
+                </code>
+                <button type="button" className={botaoSecundario}
+                        onClick={async () => setCopiada(await copiar(senhaTemporaria) ? 'ok' : 'falhou')}>
+                  {copiada === 'ok' ? 'Copiado, cole para conferir' : 'Copiar'}
+                </button>
+                <button type="button"
+                        onClick={() => {
+                          if (!confirm('Já passou a senha para a pessoa (e conferiu que ela está certa)? Depois de fechar, ela não pode ser vista de novo.')) return;
+                          setSenhaTemporaria(null); setCopiada(null);
+                        }}
+                        className="ml-auto text-xs text-slate-500 hover:underline">
+                  já passei, fechar
+                </button>
+              </div>
+              {copiada === 'falhou' && (
+                <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                  Este navegador bloqueou a cópia. Clique na senha para selecioná-la e use Ctrl+C.
+                </p>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+                <span>{pessoa.senha_definida ? 'Senha própria definida' : 'Ainda não trocou a senha provisória'}</span>
+                <button type="button" disabled={ocupado} className={botaoSecundario}
+                        onClick={async () => {
+                          if (!confirm(`Redefinir a senha de ${pessoa.nome}? A senha atual deixa de valer, `
+                            + 'as sessões abertas são encerradas e uma senha temporária é gerada para você repassar.')) return;
+                          setOcupado(true); setErro(null); setAviso(null);
+                          const { data, error } = await db().rpc('redefinir_senha', { p_pessoa: pessoa.id });
+                          setOcupado(false);
+                          if (error) { setErro(await mensagemDoErro(error)); return; }
+                          setSenhaTemporaria(String(data)); setCopiada(null);
+                          router.refresh();
+                        }}>
+                  Redefinir senha
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-slate-500">
+                Para quem esqueceu a senha: gera uma senha temporária, encerra as sessões abertas e
+                obriga a troca no próximo acesso.
+              </p>
+            </>
+          )}
+        </Secao>
+      )}
+
+      {!pessoa.auth_id && pessoa.ativo && !pessoa.desligado_em && (
+        <Secao titulo="Acesso">
+          <p className="mb-2 text-sm text-slate-600">Ainda não entra no painel.</p>
+          <div className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2 text-sm text-slate-600">
+            <label htmlFor="novo-acesso-email">E-mail ou usuário</label>
+            <input id="novo-acesso-email" type="text" value={novoAcesso.email} disabled={ocupado}
+                   onChange={(e) => setNovoAcesso((s) => ({ ...s, email: e.target.value }))}
+                   placeholder="nome@igreenenergy.com.br ou admin" className={entrada} />
+            <label htmlFor="novo-acesso-papel">Papel</label>
+            <select id="novo-acesso-papel" value={novoAcesso.papel} disabled={ocupado}
+                    onChange={(e) => setNovoAcesso((s) => ({ ...s, papel: e.target.value as PapelUsuario }))}
+                    className={entrada}>
+              <option value="operador">Operador (atendente)</option>
+              <option value="qualidade">Qualidade</option>
+              <option value="gestor">Gestor</option>
+            </select>
+          </div>
+          <div className="mt-3 flex justify-end">
+            <button type="button" disabled={ocupado || !novoAcesso.email.trim()} className={botaoPrimario}
+                    onClick={async () => {
+                      if (!confirm(`Criar o acesso de ${pessoa.nome} (${emailDoLogin(novoAcesso.email)})? Uma senha temporária será gerada para você repassar.`)) return;
+                      setOcupado(true); setErro(null); setAviso(null);
+                      // Pela função (migração 68), como o Redefinir senha: no banco, só gestor.
+                      const { data, error } = await db().rpc('criar_acesso',
+                        { p_pessoa: pessoa.id, p_email: emailDoLogin(novoAcesso.email), p_papel: novoAcesso.papel });
+                      setOcupado(false);
+                      if (error) { setErro(await mensagemDoErro(error)); return; }
+                      // A senha aparece na seção Acesso de quem já entra, que esta vira
+                      // depois do refresh — o estado da ficha continua o mesmo.
+                      setSenhaTemporaria(String(data)); setCopiada(null);
+                      router.refresh();
+                    }}>
+              Criar acesso
+            </button>
+          </div>
+          <p className="mt-1 text-xs text-slate-500">
+            Cria o login com uma senha temporária, mostrada só para você; a pessoa troca no primeiro acesso. Se já
+            existir uma conta com esse e-mail, ela é só vinculada.
+          </p>
+        </Secao>
+      )}
+
       <Secao titulo="Entrada">
         {/* Duas datas (migração 63): a da empresa só vale para as férias (CLT);
             a da equipe é a da cota. Transferido de outra equipe tem as duas. */}
@@ -634,108 +738,6 @@ function Ficha({
         </p>
       </Secao>
 
-      {pessoa.auth_id && pessoa.ativo && !pessoa.desligado_em && (
-        <Secao titulo="Acesso">
-          {senhaTemporaria ? (
-            <div className="rounded-xl border border-marca-600/40 bg-marca-600/8 px-4 py-3">
-              <p className="text-sm text-slate-700">
-                Senha temporária de <strong>{pessoa.nome.split(' ')[0]}</strong>. Ela aparece <strong>só agora</strong>:
-                passe para a pessoa, que vai trocá-la no primeiro acesso. Não há letras que se confundem
-                (sem 0/O nem 1/l/I), então dá para ditar ou digitar lendo da tela.
-              </p>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                {/* Um clique seleciona a senha inteira, para copiar à mão. */}
-                <code className="select-all rounded-lg bg-superficie px-4 py-2 font-mono text-2xl tracking-[0.2em] text-slate-900 ring-1 ring-slate-200"
-                      onClick={(e) => { const s = window.getSelection(); s?.selectAllChildren(e.currentTarget); }}>
-                  {senhaTemporaria}
-                </code>
-                <button type="button" className={botaoSecundario}
-                        onClick={async () => setCopiada(await copiar(senhaTemporaria) ? 'ok' : 'falhou')}>
-                  {copiada === 'ok' ? 'Copiado, cole para conferir' : 'Copiar'}
-                </button>
-                <button type="button"
-                        onClick={() => {
-                          if (!confirm('Já passou a senha para a pessoa (e conferiu que ela está certa)? Depois de fechar, ela não pode ser vista de novo.')) return;
-                          setSenhaTemporaria(null); setCopiada(null);
-                        }}
-                        className="ml-auto text-xs text-slate-500 hover:underline">
-                  já passei, fechar
-                </button>
-              </div>
-              {copiada === 'falhou' && (
-                <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
-                  Este navegador bloqueou a cópia. Clique na senha para selecioná-la e use Ctrl+C.
-                </p>
-              )}
-            </div>
-          ) : (
-            <>
-              <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
-                <span>{pessoa.senha_definida ? 'Senha própria definida' : 'Ainda não trocou a senha provisória'}</span>
-                <button type="button" disabled={ocupado} className={botaoSecundario}
-                        onClick={async () => {
-                          if (!confirm(`Redefinir a senha de ${pessoa.nome}? A senha atual deixa de valer, `
-                            + 'as sessões abertas são encerradas e uma senha temporária é gerada para você repassar.')) return;
-                          setOcupado(true); setErro(null); setAviso(null);
-                          const { data, error } = await db().rpc('redefinir_senha', { p_pessoa: pessoa.id });
-                          setOcupado(false);
-                          if (error) { setErro(await mensagemDoErro(error)); return; }
-                          setSenhaTemporaria(String(data)); setCopiada(null);
-                          router.refresh();
-                        }}>
-                  Redefinir senha
-                </button>
-              </div>
-              <p className="mt-1 text-xs text-slate-500">
-                Para quem esqueceu a senha: gera uma senha temporária, encerra as sessões abertas e
-                obriga a troca no próximo acesso.
-              </p>
-            </>
-          )}
-        </Secao>
-      )}
-
-      {!pessoa.auth_id && pessoa.ativo && !pessoa.desligado_em && (
-        <Secao titulo="Acesso">
-          <p className="mb-2 text-sm text-slate-600">Ainda não entra no painel.</p>
-          <div className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2 text-sm text-slate-600">
-            <label htmlFor="novo-acesso-email">E-mail ou usuário</label>
-            <input id="novo-acesso-email" type="text" value={novoAcesso.email} disabled={ocupado}
-                   onChange={(e) => setNovoAcesso((s) => ({ ...s, email: e.target.value }))}
-                   placeholder="nome@igreenenergy.com.br ou admin" className={entrada} />
-            <label htmlFor="novo-acesso-papel">Papel</label>
-            <select id="novo-acesso-papel" value={novoAcesso.papel} disabled={ocupado}
-                    onChange={(e) => setNovoAcesso((s) => ({ ...s, papel: e.target.value as PapelUsuario }))}
-                    className={entrada}>
-              <option value="operador">Operador (atendente)</option>
-              <option value="qualidade">Qualidade</option>
-              <option value="gestor">Gestor</option>
-            </select>
-          </div>
-          <div className="mt-3 flex justify-end">
-            <button type="button" disabled={ocupado || !novoAcesso.email.trim()} className={botaoPrimario}
-                    onClick={async () => {
-                      if (!confirm(`Criar o acesso de ${pessoa.nome} (${emailDoLogin(novoAcesso.email)})? Uma senha temporária será gerada para você repassar.`)) return;
-                      setOcupado(true); setErro(null); setAviso(null);
-                      // Pela função (migração 68), como o Redefinir senha: no banco, só gestor.
-                      const { data, error } = await db().rpc('criar_acesso',
-                        { p_pessoa: pessoa.id, p_email: emailDoLogin(novoAcesso.email), p_papel: novoAcesso.papel });
-                      setOcupado(false);
-                      if (error) { setErro(await mensagemDoErro(error)); return; }
-                      // A senha aparece na seção Acesso de quem já entra, que esta vira
-                      // depois do refresh — o estado da ficha continua o mesmo.
-                      setSenhaTemporaria(String(data)); setCopiada(null);
-                      router.refresh();
-                    }}>
-              Criar acesso
-            </button>
-          </div>
-          <p className="mt-1 text-xs text-slate-500">
-            Cria o login com uma senha temporária, mostrada só para você; a pessoa troca no primeiro acesso. Se já
-            existir uma conta com esse e-mail, ela é só vinculada.
-          </p>
-        </Secao>
-      )}
 
       <Secao titulo={pessoa.desligado_em ? 'Saída' : 'Saída da operação'}>
         {pessoa.desligado_em ? (

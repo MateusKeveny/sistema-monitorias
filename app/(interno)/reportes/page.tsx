@@ -41,7 +41,7 @@ export default async function Reportes({
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">
-          {ehGestor ? 'Reports de problemas' : 'Meus reports'}
+          {ehGestor ? 'Problemas reportados' : 'Meus problemas reportados'}
         </h1>
         <p className="mt-1 text-sm text-sobre-fundo-suave">
           {ehGestor

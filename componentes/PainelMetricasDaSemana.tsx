@@ -19,6 +19,8 @@ export type SemanaDoCanal = {
   finalizados: number;
   /** O que a faixa de TME rendeu (+) ou tirou (−) na semana, somado na equipe. */
   pontos: number;
+  /** Na fila que avalia o TME por pessoa (migração 90): quantos caíram em cada faixa. */
+  porPessoa?: { faixa: string; pessoas: number }[] | null;
   desligada: {
     motivo: string;
     temRegistroDiario: boolean;
@@ -105,8 +107,17 @@ export default function PainelMetricasDaSemana({
                     <span className="text-sm text-slate-700">
                       {s.tmeSeg == null ? <span className="text-slate-400">sem dado ainda</span> : (
                         <>
-                          TME {duracao(s.tmeSeg)}
-                          {s.faixa && <span className="ml-2 rounded-full bg-slate-100 px-1.5 py-px text-xs text-slate-600">{s.faixa}</span>}
+                          TME {s.porPessoa ? 'médio ' : ''}{duracao(s.tmeSeg)}
+                          {s.faixa && !s.porPessoa && <span className="ml-2 rounded-full bg-slate-100 px-1.5 py-px text-xs text-slate-600">{s.faixa}</span>}
+                          {s.porPessoa && s.porPessoa.length > 0 && (
+                            <span className="mt-1 flex flex-wrap gap-1.5">
+                              {s.porPessoa.map((p) => (
+                                <span key={p.faixa} className="rounded-full bg-slate-100 px-2 py-px text-xs text-slate-600">
+                                  {p.pessoas} {p.pessoas === 1 ? 'pessoa' : 'pessoas'} · {p.faixa}
+                                </span>
+                              ))}
+                            </span>
+                          )}
                           <span className="block text-xs text-slate-500">
                             {s.finalizados.toLocaleString('pt-BR')} atendimentos na equipe
                             {ligada && s.pontos !== 0 && ` · faixa ${s.pontos > 0 ? 'soma' : 'tira'} ${pontos(Math.abs(s.pontos))} pts`}

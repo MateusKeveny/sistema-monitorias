@@ -129,6 +129,12 @@ UNION ALL
   WHERE c.pessoa_id IS NOT NULL AND c.concluido_em IS NOT NULL AND c.status <> 'Cancelado'::text AND x.conta AND c.mes_competencia >= '2026-10-01'::date
   GROUP BY c.pessoa_id, c.mes_competencia, c.semana, r.chave;
 
+-- Os nomes das faixas deixam de dizer "TME Médio Equipe" (o atendente vê o
+-- nome no extrato e, agora, o TME é o dele). Só o nome: chave, faixa e peso
+-- são os mesmos; meses fechados guardam o nome da época.
+update public.regras set rotulo = regexp_replace(rotulo, '^TME Médio Equipe', 'TME')
+ where grupo like 'tme%' and rotulo like 'TME Médio Equipe%';
+
 -- As duas filas da Conexão Expansão, a partir de novembro/2026.
 update public.canais_do_setor set tme_por_pessoa_desde = '2026-11-01'
  where apelido in ('huggy', 'diretores') and tme_por_pessoa_desde is null;

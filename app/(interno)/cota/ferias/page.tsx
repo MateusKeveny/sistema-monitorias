@@ -79,12 +79,20 @@ export default async function Ferias({ searchParams }: { searchParams: Promise<{
 
   return (
     <div className="space-y-6">
-      <header className="text-sobre-fundo">
+      <header className="flex flex-wrap items-end justify-between gap-3 text-sobre-fundo">
+        <div>
         <h1 className="text-2xl font-bold tracking-tight">Férias</h1>
         <p className="text-sm text-sobre-fundo-suave">
           {foraHoje.length ? `De férias hoje: ${foraHoje.map((f) => f.pessoa.split(/\s+/)[0]).join(', ')}` : 'Ninguém de férias hoje'}
           {gestor && ' · os avisos chegam na Agenda da Gestão'}
         </p>
+        </div>
+        {/* O cadastro fica no fim, depois do calendário do ano: o atalho leva direto a ele (3.0). */}
+        {gestor && (
+          <a href="#cadastro" className="rounded-full bg-marca-600 px-4 py-2 text-sm font-semibold text-white hover:bg-marca-700">
+            + Cadastrar férias
+          </a>
+        )}
       </header>
 
       {avisos.length > 0 && (
@@ -120,9 +128,9 @@ export default async function Ferias({ searchParams }: { searchParams: Promise<{
           </div>
         </Secao>
         {gestor && (
-          <Secao titulo="Cadastro">
+          <div id="cadastro" className="scroll-mt-6"><Secao titulo="Cadastro">
             <GestaoDeFerias pessoas={(pessoas ?? []) as { id: string; nome: string }[]} ferias={lista} hoje={hoje} />
-          </Secao>
+          </Secao></div>
         )}
       </Painel>
 

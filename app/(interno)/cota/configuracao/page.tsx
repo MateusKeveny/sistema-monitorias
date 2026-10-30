@@ -139,16 +139,13 @@ export default async function ConfiguracaoDaCota({
               </div>
             ),
           },
+          // O que quase não se mexe (3.0): os avisos no Teams e o diário de bordo, numa aba só.
           {
-            chave: 'avisos',
-            rotulo: 'Avisos no Teams',
-            conteudo: <AvisosTeams situacao={(avisos ?? []) as SituacaoAviso[]} />,
-          },
-          {
-            chave: 'diario',
-            rotulo: 'Diário de bordo',
+            chave: 'outros',
+            rotulo: 'Outros',
             conteudo: (
               <div className="space-y-6">
+                <AvisosTeams situacao={(avisos ?? []) as SituacaoAviso[]} />
                 <QuemVeODiario configuracao={(visibilidade ?? []) as VisibilidadeDoDiario[]} />
                 <SubcategoriasDiario subcategorias={(subcategorias ?? []) as Subcategoria[]} usos={usos} />
               </div>

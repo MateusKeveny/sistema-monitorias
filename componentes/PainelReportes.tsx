@@ -84,7 +84,7 @@ export default function PainelReportes({
       {r.print_url && (
         <a href={r.print_url} target="_blank" rel="noreferrer" className="block w-fit">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={r.print_url} alt={`Print do report #${r.id}`}
+          <img src={r.print_url} alt={`Print do problema #${r.id}`}
                className="max-h-72 rounded-xl object-contain ring-1 ring-slate-200 hover:ring-marca-600/50" />
         </a>
       )}
@@ -120,7 +120,7 @@ export default function PainelReportes({
 
   if (!ehGestor) {
     return (
-      <section className="max-w-4xl rounded-[18px] bg-superficie px-6 py-5 shadow-sm">
+      <section className="max-w-6xl rounded-[18px] bg-superficie px-6 py-5 shadow-sm">
         {Filtros}
         {lista.length === 0 ? (
           <p className="py-10 text-center text-sm text-slate-500">
@@ -149,7 +149,7 @@ export default function PainelReportes({
       <section className="rounded-[18px] bg-superficie px-4 py-4 shadow-sm">
         {Filtros}
         {lista.length === 0 ? (
-          <p className="py-10 text-center text-sm text-slate-500">{reportes.length ? 'Nada neste filtro.' : 'Nenhum report ainda.'}</p>
+          <p className="py-10 text-center text-sm text-slate-500">{reportes.length ? 'Nada neste filtro.' : 'Nenhum problema reportado.'}</p>
         ) : (
           <ul className="grid gap-0.5">
             {lista.map((r) => (

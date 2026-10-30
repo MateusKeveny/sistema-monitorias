@@ -8,7 +8,7 @@ import NotasGuardadas, { type NotaGuardada } from '@/componentes/NotasGuardadas'
 import SemanasDeChamados, { type SemanaDeChamados } from '@/componentes/SemanasDeChamados';
 import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
 import { Quadro } from '@/componentes/ui';
-import { mesAnterior } from '@/lib/competencia';
+import { mesAnterior , resolverCompetencia } from '@/lib/competencia';
 import { dataHora, diaMes, hojeNoBrasil, mesDeCompetencia, mesRotulo, periodoDaSemana, mesValido } from '@/lib/formatar';
 import type { Pessoa } from '@/lib/tipos';
 
@@ -30,8 +30,8 @@ export default async function ImportarAvaliacoes({
   const perfil = await exigirGestor();
   const { mes, aba } = await searchParams;
   const hoje = hojeNoBrasil();
-  const atual = mesDeCompetencia(hoje);
-  const competencia = mesValido(mes) ? `${mes}-01` : atual;
+  // O mesmo mês das outras telas (3.0): o escolhido, ou o mês em trabalho.
+  const { competencia, atual } = await resolverCompetencia(mes);
 
   const db = await criarClienteServidor();
 

@@ -37,9 +37,9 @@ export default async function MetricasDaSemana({
   const [de] = periodoDaSemana(competencia, 1);
   const [, ate] = periodoDaSemana(competencia, 4);
 
-  const [tme, volume, desligadas, faixas, efeito, fechado, diario] = await todas([
+  const [tme, volume, desligadas, faixas, efeito, fechado, diario, filas] = await todas([
     db.from('vw_tme_equipe').select('semana, canal, tme_seg').eq('mes_competencia', competencia),
-    db.from('volume_semanal').select('semana, canal, finalizados').eq('mes_competencia', competencia),
+    db.from('volume_semanal').select('semana, canal, finalizados, tme_seg').eq('mes_competencia', competencia),
     db.from('metricas_desligadas').select('semana, canal, motivo, tem_registro_diario, diario_registro_id, desligado_por_nome, desligado_em')
       .eq('mes_competencia', competencia),
     db.from('regras').select('chave, rotulo, grupo, faixa_min, faixa_max').in('grupo', ['tme', 'tme_diretores']),
@@ -49,7 +49,11 @@ export default async function MetricasDaSemana({
     db.from('fechamentos_cota').select('id', { count: 'exact', head: true }).eq('mes_competencia', competencia),
     db.from('diario_registros').select('id, data, tipo, assunto').gte('data', de).lte('data', ate)
       .order('data'),
+    // TME por pessoa (migração 90): as filas e desde quando.
+    db.from('canais_do_setor').select('*'),
   ]);
+  const porPessoa = (fila: string) => ((filas.data ?? []) as { apelido: string | null; tme_por_pessoa_desde?: string | null }[])
+    .some((f) => f.apelido === fila && !!f.tme_por_pessoa_desde && f.tme_por_pessoa_desde <= competencia);
 
   const listaDesligadas = (desligadas.data ?? []) as Desligada[];
   const registros = (diario.data ?? []) as { id: string; data: string; tipo: string; assunto: string }[];
@@ -85,6 +89,18 @@ export default async function MetricasDaSemana({
         faixa: faixa?.rotulo ?? null,
         finalizados,
         pontos,
+        // Fila que avalia por pessoa: quantos caíram em cada faixa (sem TME = melhor faixa).
+        porPessoa: !porPessoa(c.chave) ? null : ((faixas.data ?? []) as Faixa[])
+          .filter((f) => f.grupo === c.grupo)
+          .sort((a, b) => Number(a.faixa_min ?? -1) - Number(b.faixa_min ?? -1))
+          .map((f) => ({
+            faixa: f.rotulo,
+            pessoas: ((volume.data ?? []) as { semana: number; canal: string; tme_seg: number | null }[])
+              .filter((v) => v.semana === s && v.canal === c.chave).filter((v) => {
+                const t = Number(v.tme_seg ?? 0);
+                return (f.faixa_min == null || t >= Number(f.faixa_min)) && (f.faixa_max == null || t < Number(f.faixa_max));
+              }).length,
+          })).filter((x) => x.pessoas > 0),
         desligada: d ? {
           motivo: d.motivo,
           temRegistroDiario: d.tem_registro_diario,

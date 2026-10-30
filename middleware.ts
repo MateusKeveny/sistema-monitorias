@@ -55,7 +55,14 @@ export async function middleware(requisicao: NextRequest) {
   if (validade == null || validade <= Date.now() / 1000 + MARGEM_SEG) {
     return irPara(requisicao, renovar, caminho + requisicao.nextUrl.search);
   }
-  return NextResponse.next();
+  // O mês escolhido numa tela do Performance (?mes=2026-09) vale para as
+  // outras (3.0): fica num cookie de 12 h, lido por resolverCompetencia.
+  const mes = requisicao.nextUrl.searchParams.get('mes');
+  const resposta = NextResponse.next();
+  if (caminho.startsWith('/cota') && mes && /^\d{4}-\d{2}$/.test(mes)) {
+    resposta.cookies.set('mes', mes, { path: '/', maxAge: 12 * 60 * 60, sameSite: 'lax' });
+  }
+  return resposta;
 }
 
 /** "https://abcd.supabase.co" → "abcd", o miolo do nome do cookie `sb-abcd-auth-token`. */

@@ -383,7 +383,7 @@ export default function DiarioDeBordo({
                       {ROTULO_SITUACAO[r.situacao]}
                     </span>
                   </div>
-                  <p className="whitespace-pre-line text-sm text-slate-700">{r.descricao}</p>
+                  <TextoDoRegistro texto={r.descricao} />
                   <p className="text-xs text-slate-500">
                     {nomeCurto(nomes[r.pessoa_id] ?? '—')} · {registradoEm(r)}
                     {r.autorizado_por && ` · autorizado por ${ROTULO_QUEM[r.autorizado_por]}${r.autorizado_por_nome ? ` (${r.autorizado_por_nome})` : ''}`}
@@ -549,6 +549,23 @@ function QuemLeu({ lista, hoje, desde }: { lista: LeituraDiario[]; hoje: string;
           )) : <li className="text-xs text-slate-500">Todos leram.</li>}
         </ul>
       </div>
+    </div>
+  );
+}
+
+/** O texto do registro em até 3 linhas, com "ver mais" (3.0): na lista da equipe, os textos longos empurravam tudo. */
+function TextoDoRegistro({ texto }: { texto: string }) {
+  const [inteiro, setInteiro] = useState(false);
+  const longo = texto.length > 220 || texto.split('\n').length > 3;
+  return (
+    <div>
+      <p className={`whitespace-pre-line text-sm text-slate-700 ${!inteiro && longo ? 'line-clamp-3' : ''}`}>{texto}</p>
+      {longo && (
+        <button type="button" onClick={() => setInteiro((v) => !v)}
+                className="mt-0.5 text-xs text-marca-700 hover:underline dark:text-marca-400">
+          {inteiro ? 'ver menos' : 'ver mais'}
+        </button>
+      )}
     </div>
   );
 }
