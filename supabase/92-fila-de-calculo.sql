@@ -117,22 +117,27 @@ revoke all on function public.pedir_recalculo_de_tudo() from public, anon, authe
 -- 4. Quem pede: as mudanças. Por pessoa (o setor dela no mês) ou de tudo.
 create or replace function public.mudanca_pede_recalculo()
 returns trigger language plpgsql security definer set search_path = public as $$
-declare r record;
+-- A linha em JSON (e não em "record"): a mesma função serve a várias
+-- tabelas, e numa sessão que grava em duas delas um "record" de tipos
+-- diferentes quebra o plano guardado da função.
+declare
+  linhas jsonb[] := '{}';
+  j jsonb;
 begin
-  foreach r in array array[new, old] loop
-    continue when r is null;
+  if tg_op <> 'DELETE' then linhas := linhas || to_jsonb(new); end if;
+  if tg_op <> 'INSERT' then linhas := linhas || to_jsonb(old); end if;
+  foreach j in array linhas loop
     case tg_table_name
       when 'volume_semanal', 'lancamentos', 'chamados_elo' then
-        perform public.pedir_recalculo_da_pessoa((to_jsonb(r) ->> 'pessoa_id')::uuid, (to_jsonb(r) ->> 'mes_competencia')::date);
+        perform public.pedir_recalculo_da_pessoa((j ->> 'pessoa_id')::uuid, (j ->> 'mes_competencia')::date);
       when 'avaliacoes', 'atendimentos_presenciais' then
-        perform public.pedir_recalculo_da_pessoa((to_jsonb(r) ->> 'pessoa_id')::uuid,
-                                                 public.mes_de_competencia((to_jsonb(r) ->> 'data')::date));
+        perform public.pedir_recalculo_da_pessoa((j ->> 'pessoa_id')::uuid, public.mes_de_competencia((j ->> 'data')::date));
       when 'monitorias' then
-        perform public.pedir_recalculo_da_pessoa((to_jsonb(r) ->> 'operador_id')::uuid, (to_jsonb(r) ->> 'mes_referencia')::date);
+        perform public.pedir_recalculo_da_pessoa((j ->> 'operador_id')::uuid, (j ->> 'mes_referencia')::date);
       when 'cargos_da_pessoa', 'setores_da_pessoa' then
-        perform public.pedir_recalculo_da_pessoa((to_jsonb(r) ->> 'pessoa_id')::uuid);
+        perform public.pedir_recalculo_da_pessoa((j ->> 'pessoa_id')::uuid);
       when 'pessoas' then
-        perform public.pedir_recalculo_da_pessoa((to_jsonb(r) ->> 'id')::uuid);
+        perform public.pedir_recalculo_da_pessoa((j ->> 'id')::uuid);
     end case;
   end loop;
   return null;
