@@ -1,6 +1,7 @@
 import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
 import PainelAtendentes from '@/componentes/PainelAtendentes';
 import CadastroEmLote from '@/componentes/CadastroEmLote';
+import NovoUsuario from '@/componentes/NovoUsuario';
 import { mesAnterior } from '@/lib/competencia';
 import { hojeNoBrasil, mesDeCompetencia, periodoDaSemana } from '@/lib/formatar';
 import type { Cargo, CargoDaPessoa, Pessoa, Saida, SetorDaPessoa } from '@/lib/tipos';
@@ -59,7 +60,10 @@ export default async function TelaPessoas() {
         <b className="font-semibold text-sobre-fundo"> Criar acesso</b>. Vale para os dois sistemas.
       </p>
 
-      <CadastroEmLote pessoas={(pessoas ?? []) as Pessoa[]} setores={(setores ?? []) as Setor[]} cargos={(cargos ?? []) as Cargo[]} />
+      <div className="flex flex-wrap items-start gap-3">
+        <NovoUsuario setores={(setores ?? []) as Setor[]} cargos={(cargos ?? []) as Cargo[]} />
+        <CadastroEmLote pessoas={(pessoas ?? []) as Pessoa[]} setores={(setores ?? []) as Setor[]} cargos={(cargos ?? []) as Cargo[]} />
+      </div>
 
       <PainelAtendentes
         pessoas={(pessoas ?? []) as Pessoa[]}
