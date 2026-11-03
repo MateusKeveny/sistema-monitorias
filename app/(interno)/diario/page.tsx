@@ -1,6 +1,7 @@
 import Link from '@/componentes/Link';
 import { criarClienteServidor, exigirVisaoDoTime } from '@/lib/supabase/servidor';
 import { Quadro, Tabela, Th, Td, Vazio } from '@/componentes/ui';
+import TextoDoRegistro from '@/componentes/TextoDoRegistro';
 import { codigoMonitoria, data as formatarData, hojeNoBrasil, mesDeCompetencia, periodoDaSemana } from '@/lib/formatar';
 import {
   COR_SITUACAO, COR_TIPO, ROTULO_QUEM, ROTULO_SITUACAO, ROTULO_TIPO, TIPOS, validade,
@@ -138,7 +139,7 @@ export default async function ConsultaDoDiario({
                           {validade(r, hoje)!.texto}
                         </span>
                       )}
-                      <span className="block max-w-xl whitespace-pre-line text-xs text-slate-500">{r.descricao}</span>
+                      <div className="max-w-xl"><TextoDoRegistro texto={r.descricao} className="text-xs text-slate-500" /></div>
                       {r.autorizado_por && (
                         <span className="block text-xs text-slate-500">
                           Autorizado por {ROTULO_QUEM[r.autorizado_por]}{r.autorizado_por_nome ? ` (${r.autorizado_por_nome})` : ''}

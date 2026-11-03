@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { Quadro } from '@/componentes/ui';
+import { comNegrito } from '@/componentes/TextoDoRegistro';
 import {
   nota as formatarNota, faixa, percentual,
   semanaDoCiclo, periodoDaSemana, mesDeCompetencia, mesRotulo, hojeNoBrasil,
@@ -477,7 +478,7 @@ export default function FormularioMonitoria({
                     <div className="rounded-r-xl border-l-4 border-amber-500 bg-slate-50 px-4 py-3 text-sm text-slate-700">
                       <b className="text-slate-900">{r.assunto}</b> · {ROTULO_TIPO[r.tipo].toLowerCase()} · {formatarDataBR(r.data)}
                       {r.valido_ate && ` · ${validade(r, hojeNoBrasil())!.texto.toLowerCase()}`}
-                      <span className="mt-1 block whitespace-pre-line">{r.descricao}</span>
+                      <span className="mt-1 block whitespace-pre-line">{comNegrito(r.descricao)}</span>
                       {r.autorizado_por && (
                         <span className="mt-1 block text-xs text-slate-500">
                           Autorizado por {ROTULO_QUEM[r.autorizado_por]}{r.autorizado_por_nome ? ` (${r.autorizado_por_nome})` : ''}

@@ -8,6 +8,7 @@ import {
   juntarOutro, palavrasEncontradas, separarOutro, validade, type LeituraDiario, type RenovacaoDiario, type Subcategoria, type QuemAutorizou, type RegistroDiario, type TipoRegistro,
 } from '@/lib/diario';
 import { mensagemDoErro } from '@/lib/erro-amigavel';
+import TextoDoRegistro from '@/componentes/TextoDoRegistro';
 
 const entrada = `w-full rounded-xl border border-slate-300 bg-superficie px-3 py-2 text-sm outline-none
                  focus:border-marca-600 disabled:opacity-50`;
@@ -549,23 +550,6 @@ function QuemLeu({ lista, hoje, desde }: { lista: LeituraDiario[]; hoje: string;
           )) : <li className="text-xs text-slate-500">Todos leram.</li>}
         </ul>
       </div>
-    </div>
-  );
-}
-
-/** O texto do registro em até 3 linhas, com "ver mais" (3.0): na lista da equipe, os textos longos empurravam tudo. */
-function TextoDoRegistro({ texto }: { texto: string }) {
-  const [inteiro, setInteiro] = useState(false);
-  const longo = texto.length > 220 || texto.split('\n').length > 3;
-  return (
-    <div>
-      <p className={`whitespace-pre-line text-sm text-slate-700 ${!inteiro && longo ? 'line-clamp-3' : ''}`}>{texto}</p>
-      {longo && (
-        <button type="button" onClick={() => setInteiro((v) => !v)}
-                className="mt-0.5 text-xs text-marca-700 hover:underline dark:text-marca-400">
-          {inteiro ? 'ver menos' : 'ver mais'}
-        </button>
-      )}
     </div>
   );
 }

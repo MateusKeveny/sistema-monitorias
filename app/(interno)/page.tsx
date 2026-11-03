@@ -52,7 +52,13 @@ export default async function Painel({
   // fechada (migração 30). Monitoria lançada antes da trava num mês ainda
   // fechado fica guardada, fora da seleção.
   const aberto = await mesAbertoDasMonitorias();
-  const meses = ateOMesAberto([...new Set(ranking.map((l) => l.mes_referencia))].sort().reverse(), aberto);
+  const ehOperador = perfil.papel === 'operador';
+  // Quem lança abre no mês aberto, mesmo antes da primeira monitoria dele
+  // (6.2.0): no começo do mês o que importa é a cobertura da 1ª semana, não o
+  // mês que acabou de fechar. O operador segue no último mês com nota.
+  const comDados = [...new Set(ranking.map((l) => l.mes_referencia))];
+  if (!ehOperador && comDados.length && !comDados.includes(aberto)) comDados.push(aberto);
+  const meses = ateOMesAberto(comDados.sort().reverse(), aberto);
   const proximoBloqueado = mesDeCompetencia(hojeNoBrasil()) > aberto;
 
   // Um operador sem monitorias e um sistema recém-instalado chegam aqui pelo
@@ -80,7 +86,6 @@ export default async function Painel({
 
   // Mês pedido na URL, se existir de fato; senão o mais recente com dados.
   const mes = escolhido && meses.includes(escolhido) ? escolhido : meses[0];
-  const ehOperador = perfil.papel === 'operador';
 
   const [{ data: criterios }, { data: recentes }, { data: porSemana }, { data: ativos },
          { data: solicitacoes, error: erroSolicitacoes }, repetidos] =
@@ -219,7 +224,8 @@ export default async function Painel({
             {ehOperador ? 'Meu desempenho' : 'Painel de qualidade'}
           </h1>
           <p className="text-sm text-sobre-fundo-suave">
-            {total} monitoria{total === 1 ? '' : 's'} avaliada{total === 1 ? '' : 's'}
+            {/* O total já está no primeiro indicador; aqui, o mês (6.2.0). */}
+            {mesRotulo(mes)}
             {mes !== meses[0] && ' · mês anterior ao atual'}
           </p>
           {/* Para quem lança e acompanha: por que o mês novo ainda não aparece. */}

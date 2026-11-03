@@ -3,7 +3,7 @@ import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { Quadro, EtiquetaNota, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import { data as formatarData, mesRotulo, codigoMonitoria } from '@/lib/formatar';
 import type { Monitoria, Operador } from '@/lib/tipos';
-import { ateOMesAberto, mesAbertoDasMonitorias } from '@/lib/mes-aberto';
+import { ateOMesAberto, mesAbertoDasMonitorias, mesCompleto } from '@/lib/mes-aberto';
 import MonitoriasPorAtendente from '@/componentes/MonitoriasPorAtendente';
 import { foraDasMonitorias } from '@/lib/monitorados';
 import { setorDaTela } from '@/lib/monitoriasDoSetor';
@@ -49,7 +49,10 @@ export default async function ListaMonitorias({
   searchParams: Promise<Busca>;
 }) {
   const perfil = await exigirPerfil();
-  const filtros = await searchParams;
+  const pedido = await searchParams;
+  // "2026-10" no endereço também vale (6.2.0): antes, sem o dia, a lista
+  // vinha vazia sem dizer por quê.
+  const filtros = { ...pedido, mes: mesCompleto(pedido.mes) };
   const db = await criarClienteServidor();
 
   // Com um atendente escolhido, a tela abre no formato do Performance (5.7.0).
@@ -268,7 +271,7 @@ export default async function ListaMonitorias({
                   ['operador', 'Operador', ''],
                   ['canal', 'Canal', ''],
                   ['semana_mes', 'Semana', 'text-center'],
-                  ['numero_monitoria', 'Nº', 'text-center'],
+                  ['numero_monitoria', 'Nº no mês', 'text-center'],
                   ['nota_final', 'Nota', 'text-right'],
                 ] as [ColunaOrdenavel, string, string][]).map(([coluna, rotulo, alinha]) => (
                   <Th key={coluna} className={alinha}>

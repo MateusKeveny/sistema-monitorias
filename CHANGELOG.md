@@ -35,6 +35,29 @@ para o Performance.
 
 ---
 
+## Monitorias 6.2.0 e Performance 3.4.2
+
+Sem migração. Agenda sem mudança.
+
+- **Monitorias (atualização): o Início abre no mês aberto.** Gestão e
+  qualidade caem direto em novembro, com a Cobertura do ciclo da 1ª semana,
+  mesmo antes da primeira monitoria do mês; o mês fechado fica a uma seta. O
+  atendente segue no último mês em que tem nota.
+- **Monitorias (atualização): Configurações › Pessoas vira "Quem é
+  avaliado".** Sobra só a marca Avaliada, para quem está na operação (sem
+  desligados, perfil de teste e administrador). Cadastro, acesso, papel e
+  setor ficam em Usuários e setores, no Performance, com link direto. Saem a
+  escolha de papel (oferecia "Administrador" ao gestor, que o banco recusa),
+  e-mail, senha e o texto que mandava para uma tela que não existe mais.
+- **Monitorias e Performance (correção): texto do diário de bordo.** Na
+  consulta das Monitorias, registros longos ficam em 3 linhas com "ver mais"
+  (como no Performance desde a 3.0); nos dois sites e no formulário de
+  monitoria, `**negrito**` aparece como negrito, não com os asteriscos.
+- **Monitorias (correção):** o total de monitorias não aparece mais duas
+  vezes no topo do Início (no lugar, o mês); a coluna "Nº" da lista vira "Nº
+  no mês"; a lista aceita o mês curto no endereço (`?mes=2026-10`), que
+  antes a deixava vazia sem aviso.
+
 ## Performance 3.4.1
 
 Sem migração. Monitorias e Agenda sem mudança.

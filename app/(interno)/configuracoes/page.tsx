@@ -29,7 +29,7 @@ export default async function Configuracoes({ searchParams }: { searchParams: Pr
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">Configurações</h1>
         <p className="text-sm text-sobre-fundo-suave">
-          Critérios e pesos, cadastro de pessoas e canais.
+          Critérios e pesos, quem é avaliado e canais.
         </p>
       </div>
 
