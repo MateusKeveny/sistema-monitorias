@@ -35,6 +35,28 @@ para o Performance.
 
 ---
 
+## Performance 3.4.0 e Monitorias 6.1.1
+
+Sem migração. Agenda sem mudança.
+
+- **Performance (atualização): Conferência dos números**, no Fechamento. Aponta,
+  por pessoa, semana e fila, o que foge do padrão: avaliações sem volume ou
+  mais avaliações que finalizados, queda ou salto forte de finalizados contra
+  as outras semanas, semana sem volume numa fila de costume, C-SAT muito
+  abaixo do resto do mês e pessoa sem nenhum finalizado no mês. Queda
+  explicada por atendimentos em outro setor (iGreen Mob) aparece como
+  atenção, não como erro. Com algo no quadro, o Fechar pede confirmação
+  ("conferiu e está tudo certo?"). Pedido do gestor depois do volume da 4ª
+  semana de outubro importado com 3 em vez de 197.
+- **Performance (atualização): relatório detalhado por atendente.** Uma folha
+  por pessoa, para imprimir ou salvar em PDF: pontos, meta, atingimento e
+  posição; semana a semana (finalizados, C-SAT, TME, monitoria, pontos);
+  extrato por categoria; o que mais somou; pontos de melhoria; assinaturas.
+  Substitui a planilha detalhada; o arquivo para importação não muda.
+- **Performance e Monitorias (correção): impressão no tema escuro.** O papel
+  sai sempre claro (antes o texto ficava quase branco sobre o branco), em A4,
+  uma folha por página — vale também para a folha de feedback do Monitorias.
+
 ## Performance 3.3.2
 
 Migração 95 (já rodada em 03/11/2026). Monitorias e Agenda sem mudança.

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { criarClienteServidor, obterPerfil } from '@/lib/supabase/servidor';
 import { gerarXlsx, type Aba, type Coluna } from '@/lib/xlsx-escrever';
-import { mesRotulo, mesValido } from '@/lib/formatar';
+import { mesValido } from '@/lib/formatar';
 import { setorDasPessoas } from '@/lib/monitoriasDoSetor';
 
 export const dynamic = 'force-dynamic';
@@ -121,7 +121,6 @@ export async function GET(requisicao: NextRequest) {
     return NextResponse.json({ erro: 'Informe a competência como AAAA-MM.' }, { status: 400 });
   }
   const competencia = `${mes}-01`;
-  const detalhado = params.get('formato') === 'detalhado';
   const setorId = Number(params.get('setor')) || 1;
 
   const db = await criarClienteServidor();
@@ -240,63 +239,11 @@ export async function GET(requisicao: NextRequest) {
 
   const abas: Aba[] = [{ nome: 'Base', colunas: colunasResumo, linhas: linhasResumo }];
 
-  // --------------------------------------------------------------- detalhado
-  if (detalhado) {
-    const nomeDe = new Map(lista.map((p) => [p.pessoa_id, p.pessoa]));
-    const NOME_CANAL: Record<string, string> = { huggy: 'Expansão', diretores: 'Diretores-Expansão' };
-
-    abas.push({
-      nome: 'Extrato semanal',
-      colunas: [
-        { cabecalho: 'Colaborador', chave: 'colaborador', largura: 34 },
-        { cabecalho: 'Cargo', chave: 'cargo', largura: 18 },
-        { cabecalho: 'Semana', chave: 'semana', largura: 10 },
-        { cabecalho: 'Canal', chave: 'canal', largura: 20 },
-        { cabecalho: 'Categoria', chave: 'categoria', largura: 36 },
-        { cabecalho: 'Feito', chave: 'quantidade', formato: 'numero', largura: 14 },
-        { cabecalho: 'Pontuação', chave: 'peso', formato: 'numero', largura: 12 },
-        { cabecalho: 'Cota', chave: 'cota', formato: 'numero', largura: 12 },
-      ],
-      linhas: linhas
-        .slice()
-        .sort((a, b) => (nomeDe.get(a.pessoa_id) ?? '').localeCompare(nomeDe.get(b.pessoa_id) ?? '')
-          || (a.semana ?? 9) - (b.semana ?? 9) || a.ordem - b.ordem)
-        .map((l) => ({
-          colaborador: nomeDe.get(l.pessoa_id) ?? '—',
-          cargo: l.cargo ?? '',
-          semana: l.semana ? `${l.semana}ª` : 'mês',
-          canal: (setorId !== 1 && l.nomeDaFila) || (l.origem ? NOME_CANAL[l.origem] : '—'),
-          categoria: l.rotulo,
-          quantidade: Number(l.quantidade),
-          peso: Number(l.peso),
-          cota: Number(l.cota),
-        })),
-    });
-
-    abas.push({
-      nome: 'Resumo do mês',
-      colunas: [
-        { cabecalho: 'Colaborador', chave: 'colaborador', largura: 34 },
-        { cabecalho: 'Cargo', chave: 'cargo', largura: 18 },
-        { cabecalho: 'Competência', chave: 'competencia', largura: 16 },
-        { cabecalho: 'Cota (pts)', chave: 'resultado', formato: 'numero', largura: 14 },
-        { cabecalho: 'Meta', chave: 'meta', formato: 'numero', largura: 12 },
-        { cabecalho: 'Atingimento', chave: 'atingimento', formato: 'percentual', largura: 14 },
-      ],
-      linhas: lista.map((p) => ({
-        colaborador: p.pessoa,
-        cargo: p.cargo ?? '',
-        competencia: mesRotulo(competencia),
-        resultado: Number(p.resultado),
-        meta: p.meta == null ? null : Number(p.meta),
-        atingimento: p.meta ? Number(p.resultado) / Number(p.meta) : null,
-      })),
-    });
-  }
+  // O detalhado virou o relatório por atendente (3.4.0): /cota/fechamento/relatorio.
 
   const arquivo = gerarXlsx(abas);
   const nomeSetor = setorId !== 1 && setorDb.data ? ` - ${(setorDb.data as { nome: string }).nome}` : '';
-  const nome = `Cota ${mes}${nomeSetor}${detalhado ? ' - detalhado' : ''}.xlsx`;
+  const nome = `Cota ${mes}${nomeSetor}.xlsx`;
 
   return new NextResponse(arquivo as unknown as BodyInit, {
     headers: {

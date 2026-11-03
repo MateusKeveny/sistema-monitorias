@@ -336,8 +336,47 @@ html[data-visual='3'] main tbody tr:hover { background-color: var(--color-slate-
 
 /* A folha de feedback sai sempre em papel branco, independente do tema. */
 @media print {
+  /* Papel é sempre claro (3.4.0): no tema escuro a paleta invertida deixava o
+     texto quase branco sobre o papel branco — o PDF saía "em branco". */
+  html.dark, html[data-visual='3'].dark {
+    color-scheme: light;
+    --color-superficie: #ffffff;
+    --color-pagina: #ffffff;
+    --color-sobre-fundo: #0b1513;
+    --color-sobre-fundo-suave: #4b5a56;
+    --color-slate-50: #f4f7f6;
+    --color-slate-100: #eaf0ed;
+    --color-slate-200: #dce3e0;
+    --color-slate-300: #c6d1cc;
+    --color-slate-400: #87958f;
+    --color-slate-500: #66756f;
+    --color-slate-600: #4b5a56;
+    --color-slate-700: #33413c;
+    --color-slate-800: #1b2622;
+    --color-slate-900: #0b1513;
+    --color-emerald-50: #ecfdf5;
+    --color-emerald-100: #d1fae5;
+    --color-emerald-700: #047857;
+    --color-emerald-800: #065f46;
+    --color-rose-50: #fff1f2;
+    --color-rose-100: #ffe4e6;
+    --color-rose-700: #be123c;
+    --color-rose-800: #9f1239;
+    --color-rose-900: #881337;
+    --color-amber-50: #fffbeb;
+    --color-amber-100: #fef3c7;
+    --color-amber-700: #b45309;
+    --color-amber-800: #92400e;
+    --color-amber-900: #78350f;
+    --color-sky-100: #e0f2fe;
+    --color-sky-700: #0369a1;
+    --color-sky-800: #075985;
+    --color-marca-50: #ecfdf5;
+  }
+  @page { size: A4; margin: 12mm; }
   .sem-impressao { display: none !important; }
-  .pagina-impressa { break-after: page; }
+  /* Uma folha por página: um pouco menor no papel do que na tela. */
+  .pagina-impressa { break-after: page; zoom: 0.82; }
   html, body {
     background: #fff !important;
     background-image: none !important;

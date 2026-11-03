@@ -16,7 +16,7 @@ import { mensagemDoErro } from '@/lib/erro-amigavel';
  */
 type Pedido = { id: number; setor_id: number; mes_competencia: string; tipo: string; situacao: string; resultado: number | null; erro: string | null };
 export default function BotaoFecharCiclo({
-  competencia, setorId = 1, pessoas, avisos,
+  competencia, setorId = 1, pessoas, avisos, alertas = 0,
 }: {
   competencia: string;
   /** Fecha só as pessoas deste setor (migração 88). */
@@ -25,6 +25,8 @@ export default function BotaoFecharCiclo({
   pessoas: number;
   /** Pendências que valem confirmar antes de congelar. */
   avisos: string[];
+  /** Números fora do padrão na conferência (3.4.0): pedem confirmação explícita. */
+  alertas?: number;
 }) {
   const router = useRouter();
   const [ocupado, setOcupado] = useState(false);
@@ -58,6 +60,8 @@ export default function BotaoFecharCiclo({
   }, [competencia, setorId, andamento, router]);
 
   async function fechar() {
+    if (alertas > 0 && !confirm(`Há ${alertas} ${alertas === 1 ? 'número fora do padrão' : 'números fora do padrão'} na Conferência dos números.\n\n`
+      + 'Conferiu e está tudo certo? OK fecha mesmo assim; Cancelar volta para conferir.')) return;
     if (!confirm(`Fechar ${mesRotulo(competencia)} com ${pessoas} pessoa(s)?\n\n`
       + 'O resultado e o extrato ficam congelados como estão agora. '
       + 'Mudanças posteriores em pesos, volume ou lançamentos não alteram o que foi fechado, '

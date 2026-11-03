@@ -2,6 +2,7 @@ import Link from '@/componentes/Link';
 import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
 import { setorDoCookie } from '@/lib/setorEscolhido';
 import BotaoFecharCiclo from '@/componentes/BotaoFecharCiclo';
+import { conferirMes, type Csat, type Volume } from '@/lib/conferenciaDoMes';
 import AjusteDeFechamento from '@/componentes/AjusteDeFechamento';
 import ValorDaCota from '@/componentes/ValorDaCota';
 import PagamentoDoMes, { type ValorRh } from '@/componentes/PagamentoDoMes';
@@ -88,7 +89,7 @@ export default async function Fechamento({
     db.from('valores_alteracoes').select('*')
       .eq('mes_competencia', competencia).eq('setor_id', setorId).order('alterado_em', { ascending: false }),
     // Para "Antes de fechar": semanas com volume e a cobertura das monitorias.
-    db.from('volume_semanal').select('semana, canal').eq('mes_competencia', competencia),
+    db.from('volume_semanal').select('pessoa_id, semana, canal, finalizados').eq('mes_competencia', competencia),
     db.from('vw_monitorias').select('operador_id, semana_mes').eq('mes_referencia', competencia),
     db.from('pessoas').select('id, nome').eq('avaliado', true).eq('ativo', true).order('nome'),
     // Pendentes de realocação (migração 71): não pontuam para ninguém.
@@ -193,6 +194,50 @@ export default async function Fechamento({
     antesDeFechar.push({ texto: <>O ciclo ainda está correndo: termina em 25/{competencia.slice(5, 7)}.</> });
   }
 
+  // ------------------------------------------- Conferência dos números (3.4.0)
+  // O que foge do padrão por pessoa, semana e fila: avaliação sem volume,
+  // queda ou salto de finalizados, C-SAT atípico. Aparece antes de fechar e
+  // também no mês fechado (para revisar).
+  const mesAnterior = new Date(Date.UTC(Number(competencia.slice(0, 4)), Number(competencia.slice(5, 7)) - 2, 1)).toISOString().slice(0, 10);
+  const [{ data: csatsDb }, { data: anteriorDb }, { data: nomesFilas }, { data: foraDb }, { data: foraPendentesDb }] = await Promise.all([
+    db.from('vw_csat_semanal').select('pessoa_id, semana, origem, avaliacoes, positivas').eq('mes_competencia', competencia),
+    db.from('volume_semanal').select('pessoa_id, finalizados').eq('mes_competencia', mesAnterior),
+    db.from('canais_do_setor').select('apelido, nome'),
+    // Atendimentos em outro setor (lançados como demanda extra e os pendentes).
+    db.from('lancamentos').select('pessoa_id, semana, quantidade, regra').eq('mes_competencia', competencia).like('regra', 'outro_setor_%'),
+    db.from('atendimentos_outro_setor').select('pessoa_id, semana').eq('mes_competencia', competencia).eq('situacao', 'pendente'),
+  ]);
+  const foraDoSetor = new Map<string, number>();
+  for (const l of (foraDb ?? []) as { pessoa_id: string; semana: number | null; quantidade: number; regra: string }[]) {
+    if (l.semana == null || l.regra.includes('__')) continue;
+    foraDoSetor.set(`${l.pessoa_id}|${l.semana}`, (foraDoSetor.get(`${l.pessoa_id}|${l.semana}`) ?? 0) + Number(l.quantidade));
+  }
+  for (const o of (foraPendentesDb ?? []) as { pessoa_id: string; semana: number }[]) {
+    foraDoSetor.set(`${o.pessoa_id}|${o.semana}`, (foraDoSetor.get(`${o.pessoa_id}|${o.semana}`) ?? 0) + 1);
+  }
+  const volumeAnterior = new Map<string, number>();
+  for (const v of (anteriorDb ?? []) as { pessoa_id: string; finalizados: number }[]) {
+    volumeAnterior.set(v.pessoa_id, (volumeAnterior.get(v.pessoa_id) ?? 0) + Number(v.finalizados));
+  }
+  const naConferencia = new Map<string, string>([
+    ...lista.map((p) => [p.pessoa_id, p.pessoa] as [string, string]),
+    ...congelados.map((c) => [c.pessoa_id, c.pessoa_nome] as [string, string]),
+  ]);
+  const alertas = conferirMes({
+    pessoas: [...naConferencia].filter(([id]) => doSetor(id)).map(([pessoa_id, pessoa]) => ({ pessoa_id, pessoa })),
+    volumes: ((volumes.data ?? []) as Volume[]).filter((v) => doSetor(v.pessoa_id)),
+    csats: ((csatsDb ?? []) as Csat[]).filter((c) => doSetor(c.pessoa_id)),
+    semanasEncerradas,
+    filas: new Map(((nomesFilas ?? []) as { apelido: string | null; nome: string }[]).filter((x) => x.apelido).map((x) => [x.apelido!, x.nome])),
+    volumeMesAnterior: volumeAnterior,
+    outroSetor: foraDoSetor,
+  });
+  const alertasGraves = alertas.filter((a) => a.grave).length;
+  if (alertas.length) {
+    avisos.push(`${alertas.length} ${alertas.length === 1 ? 'número fora do padrão' : 'números fora do padrão'} na conferência`
+      + (alertasGraves ? ` (${alertasGraves} com cara de erro de importação)` : '') + ': veja o quadro "Conferência dos números".');
+  }
+
   const quando = congelados[0]?.fechado_em;
   const historico = (alteracoes.data ?? []) as Alteracao[];
   const NOME_CAMPO: Record<string, string> = {
@@ -221,7 +266,8 @@ export default async function Fechamento({
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
-          <a href={`/api/cota/exportar?mes=${mesCurto}&formato=detalhado&setor=${setorId}`}
+          {/* 3.4.0: uma folha por atendente (imprimir/PDF), no lugar da planilha detalhada. */}
+          <a href={`/cota/fechamento/relatorio?mes=${mesCurto}&setor=${setorId}`}
              className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm
                         font-medium text-slate-700 hover:bg-slate-50">
             Relatório detalhado
@@ -233,6 +279,30 @@ export default async function Fechamento({
           </a>
         </div>
       </div>
+
+      {/* Conferência dos números (3.4.0): sempre que houver o que olhar. */}
+      <Quadro titulo="Conferência dos números"
+              subtitulo={alertas.length ? 'O que foge do padrão de cada pessoa, semana a semana. Confira antes de fechar; se estiver certo, pode seguir.' : undefined}>
+        {alertas.length === 0 ? (
+          <p className="text-sm font-medium text-marca-700 dark:text-marca-400">
+            ✓ Nada fora do padrão: volume, avaliações e C-SAT de cada pessoa batem entre as semanas.
+          </p>
+        ) : (
+          <ul className="divide-y divide-slate-100 text-sm">
+            {alertas.map((a, i) => (
+              <li key={i} className="-mx-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg px-2 py-2.5">
+                <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${a.grave ? 'bg-rose-500' : 'bg-amber-500'}`} />
+                <b className="w-44 shrink-0 text-slate-800">{a.pessoa}</b>
+                <span className="flex-1 text-slate-700">{a.texto}</span>
+                <Link href={`/cota/extrato?mes=${mesCurto}&pessoa=${a.pessoa_id}`}
+                      className="rounded-full bg-marca-600/10 px-2.5 py-0.5 text-xs font-semibold text-marca-700 hover:bg-marca-600/20 dark:text-marca-400">
+                  Extrato ›
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Quadro>
 
       {/* Antes de fechar: só enquanto há gente para fechar. */}
       {pendentes.length > 0 && (
@@ -379,7 +449,7 @@ export default async function Fechamento({
             </Tabela>
 
             <div className="border-t border-slate-100 pt-5">
-              <BotaoFecharCiclo competencia={competencia} setorId={setorId} pessoas={pendentes.length} avisos={avisos} />
+              <BotaoFecharCiclo competencia={competencia} setorId={setorId} pessoas={pendentes.length} avisos={avisos} alertas={alertas.length} />
             </div>
           </div>
         )}
