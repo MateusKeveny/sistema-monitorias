@@ -1,8 +1,10 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
+import { mesRotulo } from '@/lib/formatar';
 import type { RegraCota } from '@/lib/tipos';
 
 type Unidade = 'min' | '%';
@@ -22,9 +24,9 @@ const MODELOS: Regua[] = [
   { grupo: 'csat', titulo: 'C-SAT', cor: '#60a5fa', unidade: '%', maiorMelhor: true,
     texto: 'O C-SAT da semana escolhe a faixa; a faixa multiplica os finalizados. Vale para os dois canais.' },
   { grupo: 'tme', titulo: 'TME · Expansão', cor: '#34d399', unidade: 'min', maiorMelhor: false,
-    texto: 'O TME da pessoa na semana escolhe a faixa (até outubro/2026, o médio da equipe).' },
+    texto: 'O TME da semana escolhe a faixa.' },
   { grupo: 'tme_diretores', titulo: 'TME · Diretores-Expansão', cor: '#2dd4bf', unidade: 'min', maiorMelhor: false,
-    texto: 'O TME da pessoa na semana escolhe a faixa (até outubro/2026, o médio da equipe).' },
+    texto: 'O TME da semana escolhe a faixa.' },
   { grupo: 'monitoria', titulo: 'Monitoria', cor: '#fbbf24', unidade: '%', maiorMelhor: true,
     texto: 'A média da semana só pontua acima do mínimo — o valor exato do corte não pontua.' },
 ];
@@ -39,7 +41,7 @@ function reguasDe(regras: RegraCota[]): Regua[] {
   for (const g of grupos) {
     if (g.startsWith('tme_') && !lista.some((x) => x.grupo === g)) {
       lista.push({ grupo: g, titulo: `TME · ${g.slice(4)}`, cor: '#34d399', unidade: 'min', maiorMelhor: false,
-        texto: 'O TME da semana escolhe a faixa: o médio da equipe ou, na fila que avalia por pessoa, o de cada um.' });
+        texto: 'O TME da semana escolhe a faixa.' });
     }
   }
   return lista;
@@ -59,9 +61,11 @@ const TOM = {
  * soltos por métrica ("de" e "até"), e dava para deixar um buraco entre faixas.
  */
 export default function ReguasDeFaixa({
-  regras, pesosBase, nomeBase,
+  regras, pesosBase, nomeBase, tmePorPessoa = {},
 }: {
   regras: RegraCota[];
+  /** Por grupo de TME: desde quando a fila avalia o TME de cada pessoa (migração 90); nulo = da equipe. */
+  tmePorPessoa?: Record<string, string | null>;
   /** Peso de cada regra no cargo de base, só para mostrar na régua. */
   pesosBase: Record<string, number | null>;
   nomeBase: string;
@@ -164,6 +168,17 @@ export default function ReguasDeFaixa({
                 {g.titulo}
               </h2>
               <p className="mt-0.5 text-sm text-slate-500">{g.texto}</p>
+              {/* Equipe ou pessoa: a escolha fica na fila (Usuários e setores › Setores e filas). */}
+              {g.grupo in tmePorPessoa && (
+                <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                  <span className="rounded-full bg-slate-100 px-2.5 py-0.5 font-semibold">
+                    {tmePorPessoa[g.grupo] ? `TME de cada pessoa desde ${mesRotulo(tmePorPessoa[g.grupo]!)}` : 'TME da equipe (média da fila)'}
+                  </span>
+                  <Link href="/cota/usuarios?cat=setores" className="text-marca-700 hover:underline dark:text-marca-400">
+                    alterar
+                  </Link>
+                </p>
+              )}
 
               <div className="my-4 flex gap-1">
                 {segmentos.map((s, i) => (

@@ -134,7 +134,10 @@ export default async function ConfiguracaoDaCota({
             conteudo: (
               <div className="space-y-6">
                 <ReguasDeFaixa regras={listaRegras} pesosBase={pesosBase}
-                               nomeBase={(base?.nome ?? '').replace(/^Atendente\s+/, '')} />
+                               nomeBase={(base?.nome ?? '').replace(/^Atendente\s+/, '')}
+                               tmePorPessoa={Object.fromEntries(((canais ?? []) as Canal[])
+                                 .filter((c) => c.grupo_tme && doSetor(c))
+                                 .map((c) => [c.grupo_tme!, c.tme_por_pessoa_desde ?? null]))} />
                 <PainelRegras regras={listaRegras} setorId={setorId} />
               </div>
             ),
