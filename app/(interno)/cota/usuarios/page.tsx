@@ -3,11 +3,13 @@ import { exigirGestor } from '@/lib/supabase/servidor';
 import TelaPessoas from '@/componentes/telas/TelaPessoas';
 import TelaSetores from '@/componentes/telas/TelaSetores';
 import TelaAcessos from '@/componentes/telas/TelaAcessos';
+import TelaArvore from '@/componentes/telas/TelaArvore';
 
 export const dynamic = 'force-dynamic';
 
 const ABAS = [
   { chave: 'pessoas', rotulo: 'Pessoas' },
+  { chave: 'arvore', rotulo: 'Árvore' },
   { chave: 'setores', rotulo: 'Setores e filas' },
   { chave: 'acessos', rotulo: 'Uso dos acessos' },
 ] as const;
@@ -39,6 +41,7 @@ export default async function UsuariosESetores({ searchParams }: {
         </div>
       </div>
       {aba === 'pessoas' && <TelaPessoas />}
+      {aba === 'arvore' && <TelaArvore />}
       {aba === 'setores' && <TelaSetores />}
       {aba === 'acessos' && <TelaAcessos sistema={sistema === 'monitorias' ? 'monitorias' : 'cota'} />}
     </div>

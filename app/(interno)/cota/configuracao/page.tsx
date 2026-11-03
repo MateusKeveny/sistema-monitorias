@@ -9,6 +9,7 @@ import SubcategoriasDiario from '@/componentes/SubcategoriasDiario';
 import QuemVeODiario, { type VisibilidadeDoDiario } from '@/componentes/QuemVeODiario';
 import HistoricoDePesos, { type AlteracaoDePeso } from '@/componentes/HistoricoDePesos';
 import RegrasPorFila from '@/componentes/RegrasPorFila';
+import PassoDoSetor, { type ResumoDoSetor } from '@/componentes/PassoDoSetor';
 import type { Canal, Setor } from '@/lib/setores';
 import type { Subcategoria } from '@/lib/diario';
 import { hojeNoBrasil, mesDeCompetencia } from '@/lib/formatar';
@@ -29,7 +30,7 @@ export default async function ConfiguracaoDaCota({
 }: {
   searchParams: Promise<{ cat?: string; setor?: string }>;
 }) {
-  await exigirGestor();
+  const perfil = await exigirGestor();
   const { cat, setor: setorPedido } = await searchParams;
   const escolhido = await setorDoCookie();
   const db = await criarClienteServidor();
@@ -37,9 +38,9 @@ export default async function ConfiguracaoDaCota({
   const [
     { data: pessoas }, { data: cargos }, { data: regras },
     { data: pesos }, { data: referencias }, { data: historico }, { data: avisos }, { data: subcategorias }, { data: usosSub }, { data: alteracoes },
-    { data: visibilidade }, { data: setores }, { data: canais },
+    { data: visibilidade }, { data: setores }, { data: canais }, { data: setoresDaPessoa },
   ] = await Promise.all([
-    db.from('pessoas').select('id, ativo, desligado_em'),
+    db.from('pessoas').select('id, ativo, desligado_em, perfil_de_teste'),
     db.from('cargos').select('*').eq('ativo', true).order('ordem'),
     db.from('regras').select('*').order('ordem'),
     db.from('pesos_por_cargo').select('cargo_id, regra, peso, ativo'),
@@ -57,6 +58,8 @@ export default async function ConfiguracaoDaCota({
     // Setores e canais (migração 79).
     db.from('setores').select('*').order('ordem'),
     db.from('canais_do_setor').select('*').order('ordem'),
+    // O setor de cada pessoa, para o passo ① (3.2.0).
+    db.from('setores_da_pessoa').select('pessoa_id, setor_id, desde'),
   ]);
 
   const usos: Record<number, number> = {};
@@ -83,6 +86,17 @@ export default async function ConfiguracaoDaCota({
     if (vigente) pessoasPorCargo[vigente.cargo_id] = (pessoasPorCargo[vigente.cargo_id] ?? 0) + 1;
   }
 
+  // ① Os setores, com quantas pessoas (no mês) e cargos cada um tem.
+  const setorAtualDe = new Map<string, number>();
+  for (const h of ((setoresDaPessoa ?? []) as { pessoa_id: string; setor_id: number; desde: string }[])
+    .filter((h) => h.desde <= competencia).sort((a, b) => a.desde.localeCompare(b.desde))) setorAtualDe.set(h.pessoa_id, h.setor_id);
+  const resumoDosSetores: ResumoDoSetor[] = listaSetores.map((s) => ({
+    id: s.id, nome: s.nome, monitorias: s.monitorias !== false,
+    // O perfil de teste (migração 39) não conta: é um usuário fantasma.
+    pessoas: naOperacao.filter((p) => !(p as { perfil_de_teste?: boolean }).perfil_de_teste && setorAtualDe.get(p.id) === s.id).length,
+    cargos: ((cargos ?? []) as Cargo[]).filter((c) => (c.setor_id ?? 1) === s.id).length,
+  }));
+
   const base = listaCargos.find((c) => c.nome === 'Atendente Júnior') ?? listaCargos[0];
   const pesosBase = Object.fromEntries(listaPesos
     .filter((p) => p.cargo_id === base?.id)
@@ -96,6 +110,9 @@ export default async function ConfiguracaoDaCota({
           As regras da cota. Mudar algo recalcula os meses em aberto; os fechados guardam o valor da época.
         </p>
       </div>
+
+      <PassoDoSetor setores={resumoDosSetores} atual={setorId} administrador={!!perfil.administrador}
+                    caminho='/cota/configuracao' cat={cat} />
 
       {/* `key`: o atalho "+ Métrica manual" troca só o ?cat= e precisa reabrir na aba certa. */}
       <Abas

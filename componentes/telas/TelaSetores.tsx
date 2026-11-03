@@ -1,5 +1,5 @@
-import { criarClienteServidor } from '@/lib/supabase/servidor';
-import SetoresECanais, { type SetorDoHubVisto } from '@/componentes/SetoresECanais';
+import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
+import SetoresECanais, { type ContagemDoSetor, type SetorDoHubVisto } from '@/componentes/SetoresECanais';
 import { MONITORIAS_PADRAO } from '@/lib/monitoriasDoSetor';
 import type { Canal, Setor } from '@/lib/setores';
 import type { RegraCota } from '@/lib/tipos';
@@ -10,12 +10,17 @@ import type { RegraCota } from '@/lib/tipos';
  * monitorias (quantas por semana e o piso, Monitorias 6.0).
  */
 export default async function TelaSetores() {
+  const perfil = await exigirGestor();
   const db = await criarClienteServidor();
-  const [{ data: setores }, { data: canais }, { data: vistos }, { data: reguas }] = await Promise.all([
+  const [{ data: setores }, { data: canais }, { data: vistos }, { data: reguas }, { data: cargos }, { data: regras }, { data: criterios }] = await Promise.all([
     db.from('setores').select('*').order('ordem'),
     db.from('canais_do_setor').select('*').order('ordem'),
     db.from('vw_setores_do_hub_vistos').select('*').order('atendimentos', { ascending: false }),
     db.from('regras').select('chave, faixa_min').eq('grupo', 'monitoria'),
+    // O que a cópia de um setor leva (assistente de novo setor, 3.2.0).
+    db.from('cargos').select('setor_id').eq('ativo', true),
+    db.from('regras').select('setor_id').eq('ativo', true),
+    db.from('criterios').select('setor_id').eq('ativo', true),
   ]);
   const lista = (setores ?? []) as Setor[];
   const monitorias = Object.fromEntries(lista.map((s) => {
@@ -25,6 +30,11 @@ export default async function TelaSetores() {
       piso: regua?.faixa_min != null ? Number(regua.faixa_min) : MONITORIAS_PADRAO.piso,
     }];
   }));
+  const quantos = (linhas: { setor_id: number | null }[] | null, id: number) => (linhas ?? []).filter((x) => (x.setor_id ?? 1) === id).length;
+  const contagens: Record<number, ContagemDoSetor> = Object.fromEntries(lista.map((s) => [s.id, {
+    cargos: quantos(cargos, s.id), metricas: quantos(regras, s.id), criterios: quantos(criterios, s.id),
+  }]));
   return <SetoresECanais setores={lista} canais={(canais ?? []) as Canal[]}
-                         vistos={(vistos ?? []) as SetorDoHubVisto[]} monitorias={monitorias} />;
+                         vistos={(vistos ?? []) as SetorDoHubVisto[]} monitorias={monitorias}
+                         administrador={!!perfil.administrador} contagens={contagens} />;
 }

@@ -110,6 +110,9 @@ export default function MatrizDePesos({
   const [soPontuam, setSoPontuam] = useState(false);
   const [fechados, setFechados] = useState<Set<string>>(new Set());
   const [cargoAberto, setCargoAberto] = useState<number | 'novo' | null>(null);
+  // 3.2.0: um cargo por vez (primeiro o setor, depois o cargo); "todos" é a tabela lado a lado.
+  const [cargoVisto, setCargoVisto] = useState<number | 'todos'>(cargos[0]?.id ?? 'todos');
+  const visiveis = cargoVisto === 'todos' ? cargos : cargos.filter((c) => c.id === cargoVisto);
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -165,6 +168,26 @@ export default function MatrizDePesos({
 
   return (
     <div className="space-y-4">
+      {/* ② O cargo: um por vez, ou todos lado a lado para comparar. */}
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Cargo">
+        <span className="mr-1 text-xs font-semibold uppercase tracking-wider text-sobre-fundo-suave">Cargo</span>
+        {cargos.map((c) => (
+          <button key={c.id} type="button" aria-pressed={cargoVisto === c.id} onClick={() => setCargoVisto(c.id)}
+                  className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${cargoVisto === c.id
+                    ? 'border-marca-600 bg-marca-600 text-white'
+                    : 'border-slate-200 bg-superficie text-slate-700 hover:border-slate-300'}`}>
+            {curto(c.nome)}
+            <span className={`ml-1.5 text-xs ${cargoVisto === c.id ? 'text-white/80' : 'text-slate-400'}`}>{pessoasPorCargo[c.id] ?? 0}</span>
+          </button>
+        ))}
+        <button type="button" aria-pressed={cargoVisto === 'todos'} onClick={() => setCargoVisto('todos')}
+                className={`rounded-full border px-3.5 py-1.5 text-sm transition-colors ${cargoVisto === 'todos'
+                  ? 'border-marca-600 bg-marca-600/10 font-semibold text-marca-700 dark:text-marca-400'
+                  : 'border-dashed border-slate-300 text-slate-600 hover:border-slate-400'}`}>
+          Todos lado a lado
+        </button>
+      </div>
+
       <div className="rounded-[20px] bg-superficie shadow-sm">
         {/* Ferramentas */}
         <div className="flex flex-wrap items-center gap-2.5 border-b border-slate-100 px-5 py-4">
@@ -232,7 +255,7 @@ export default function MatrizDePesos({
           <table className="w-full min-w-[56rem] table-fixed border-separate border-spacing-0 text-sm tabular-nums">
             <colgroup>
               <col className="w-[30%]" />
-              {cargos.map((c) => <col key={c.id} />)}
+              {visiveis.map((c) => <col key={c.id} />)}
             </colgroup>
             <thead>
               <tr>
@@ -240,7 +263,7 @@ export default function MatrizDePesos({
                                text-xs font-semibold uppercase tracking-wider text-slate-400">
                   Métrica
                 </th>
-                {cargos.map((c) => {
+                {visiveis.map((c) => {
                   const meta = pesos.find((p) => p.cargo_id === c.id && p.regra === REGRA_META)?.peso;
                   const media = pesos.find((p) => p.cargo_id === c.id && p.regra === REGRA_MEDIA && p.ativo);
                   const refs = referencias.filter((r) => r.cargo_id === c.id).map((r) => curto(nomeCargo.get(r.referencia_id) ?? ''));
@@ -289,7 +312,7 @@ export default function MatrizDePesos({
                 <tbody key={g.chave}>
                   <tr className="group cursor-pointer select-none"
                       onClick={() => setFechados((s) => { const n = new Set(s); if (n.has(g.chave)) n.delete(g.chave); else n.add(g.chave); return n; })}>
-                    <td colSpan={cargos.length + 1}
+                    <td colSpan={visiveis.length + 1}
                         className={`whitespace-nowrap px-5 pb-2 pt-5 text-[13px] font-semibold text-slate-800 group-hover:text-marca-700
                                     dark:group-hover:text-marca-400 ${gi ? 'border-t border-slate-100' : ''}`}>
                       <span className="inline-block w-4 text-slate-400">{aberto ? '▾' : '▸'}</span>
@@ -306,7 +329,7 @@ export default function MatrizDePesos({
                         <span className="block text-slate-800">{r.rotulo}</span>
                         <span className="block text-[11.5px] text-slate-400">{tipoDa(r)}</span>
                       </td>
-                      {cargos.map((c) => {
+                      {visiveis.map((c) => {
                         const k = `${c.id}|${r.chave}`;
                         const cel = celulas[k];
                         const mudou = mudancas.includes(k);
