@@ -1,0 +1,24 @@
+{
+  // Repasse da Cloudflare para o Cloud Run (nuvem/repasse-worker.js).
+  // Fase de teste: um Worker NOVO, separado dos três sites — os oficiais
+  // continuam como estão até a troca ser aprovada.
+  //
+  //   npx wrangler deploy --config nuvem/wrangler.repasse.jsonc --env teste
+  //   (a chave: nuvem/configurar-segredos.ps1)
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "painel-nuvem",
+  "main": "repasse-worker.js",
+  "compatibility_date": "2026-08-01",
+  "observability": { "enabled": true },
+  "env": {
+    "teste": {
+      "name": "painel-nuvem-teste",
+      "observability": { "enabled": true },
+      "vars": {
+        "DESTINO": "PREENCHER_COM_O_ENDERECO_DO_CLOUD_RUN",
+        // O painel se comporta como o Performance oficial (mesmo banco).
+        "HOST_DO_SISTEMA": "painel-performance.expansao.workers.dev"
+      }
+    }
+  }
+}
