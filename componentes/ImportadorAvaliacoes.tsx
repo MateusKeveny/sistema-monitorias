@@ -66,8 +66,20 @@ type OutroSetor = {
   mes_competencia: string; semana: number; origem_arquivo: string;
 };
 
+/**
+ * Avaliação já gravada que o arquivo traz diferente (3.3.0): o atendente ou a
+ * nota mudaram no Hub. Vale o arquivo — menos em mês já fechado de quem estava
+ * ou de quem passa a ter a avaliação.
+ */
+type Atualizacao = {
+  data: string; protocolo: string; de_pessoa: string; para_pessoa: string;
+  de_nota: number; para_nota: number; mes_fechado: boolean; origem_arquivo: string;
+};
+
 type AnaliseArquivo = {
   nome: string;
+  /** Já gravadas, mas diferentes no arquivo (atendente ou nota). */
+  atualizar: Atualizacao[];
   aba: string | null;
   formato: 'hub' | 'huggy' | null;
   /** Arquivo fora: sem as colunas ou ilegível. */
@@ -148,7 +160,7 @@ export default function ImportadorAvaliacoes({
   /** Lê um arquivo e separa as linhas, sem olhar o banco ainda. */
   async function lerArquivo(f: File, vistas: Set<string>): Promise<AnaliseArquivo> {
     const a: AnaliseArquivo = {
-      nome: f.name, aba: null, formato: null, erro: null, lidas: 0, semNota: 0, semData: 0, robo: 0,
+      nome: f.name, atualizar: [], aba: null, formato: null, erro: null, lidas: 0, semNota: 0, semData: 0, robo: 0,
       repetidasNoLote: 0, jaImportadas: 0, novas: [], guardar: [], outroSetor: [], outroSetorSemPessoa: 0, outroSetorJa: 0, deOutraEquipe: 0, periodo: null,
     };
     let abas: Map<string, Linha[]>;
@@ -235,14 +247,37 @@ export default function ImportadorAvaliacoes({
       const fins = validos.map((a) => a.periodo![1]).sort();
       const ate = fins[fins.length - 1];
       const existentes = new Set<string>();
+      // As já gravadas, com quem e qual nota: o arquivo pode trazer diferente (3.3.0).
+      const gravadas = new Map<string, { pessoa_id: string; nota: number }>();
       const db = criarClienteNavegador();
       for (const tabela of ['avaliacoes', 'avaliacoes_guardadas'] as const) {
         for (let i = 0; ; i += PAGINA) {
-          const { data: pag, error } = await db.from(tabela).select('data, protocolo')
+          const { data: pag, error } = await db.from(tabela).select(tabela === 'avaliacoes' ? 'data, protocolo, pessoa_id, nota' : 'data, protocolo')
             .gte('data', de).lte('data', ate).order('data').order('protocolo').range(i, i + PAGINA - 1);
           if (error) { setErro(await mensagemDoErro(error)); setOcupado(null); return; }
-          for (const r of pag ?? []) existentes.add(`${r.data}|${r.protocolo}`);
+          for (const r of (pag ?? []) as unknown as { data: string; protocolo: string; pessoa_id?: string; nota?: number }[]) {
+            existentes.add(`${r.data}|${r.protocolo}`);
+            if (r.pessoa_id) gravadas.set(`${r.data}|${r.protocolo}`, { pessoa_id: r.pessoa_id, nota: Number(r.nota) });
+          }
           if ((pag ?? []).length < PAGINA) break;
+        }
+      }
+      // Mês fechado de alguém não muda (o fechamento guarda o valor da época).
+      const fechados = new Set<string>();
+      {
+        const { data: f, error } = await db.from('fechamentos_cota').select('pessoa_id, mes_competencia')
+          .gte('mes_competencia', mesDeCompetencia(de)).lte('mes_competencia', mesDeCompetencia(ate));
+        if (error) { setErro(await mensagemDoErro(error)); setOcupado(null); return; }
+        for (const r of (f ?? []) as { pessoa_id: string; mes_competencia: string }[]) fechados.add(`${r.pessoa_id}|${r.mes_competencia}`);
+      }
+      for (const a of validos) {
+        for (const c of a.novas) {
+          const g = gravadas.get(`${c.data}|${c.protocolo}`);
+          if (!g || (g.pessoa_id === c.pessoa_id && g.nota === c.nota)) continue;
+          const mes = mesDeCompetencia(c.data);
+          a.atualizar.push({ data: c.data, protocolo: c.protocolo, de_pessoa: g.pessoa_id, para_pessoa: c.pessoa_id,
+            de_nota: g.nota, para_nota: c.nota, origem_arquivo: c.origem_arquivo,
+            mes_fechado: fechados.has(`${g.pessoa_id}|${mes}`) || fechados.has(`${c.pessoa_id}|${mes}`) });
         }
       }
       // Outro setor já guardado (pendente, lançado ou descartado) não volta.
@@ -273,6 +308,8 @@ export default function ImportadorAvaliacoes({
   const novas = ok.flatMap((a) => a.novas);
   const guardar = ok.flatMap((a) => a.guardar);
   const outroSetor = ok.flatMap((a) => a.outroSetor);
+  const atualizar = ok.flatMap((a) => a.atualizar).filter((x) => !x.mes_fechado);
+  const atualizarFechado = ok.flatMap((a) => a.atualizar).filter((x) => x.mes_fechado).length;
   const outroSetorJa = ok.reduce((s2, a) => s2 + a.outroSetorJa, 0);
   const outroSetorSemPessoa = ok.reduce((s2, a) => s2 + a.outroSetorSemPessoa, 0);
   const [guardarOutro, setGuardarOutro] = useState(true);
@@ -283,11 +320,25 @@ export default function ImportadorAvaliacoes({
   }, [novas, guardar]);
 
   async function importar() {
-    if (!arquivos || (!novas.length && !guardar.length && !levarOutro.length)) return;
+    if (!arquivos || (!novas.length && !guardar.length && !levarOutro.length && !atualizar.length)) return;
     setOcupado('Importando…'); setErro(null);
     const db = criarClienteNavegador();
     const agora = new Date().toISOString();
     const lote = 500;
+
+    // Já gravadas, diferentes no arquivo: vale o arquivo (3.3.0).
+    for (let i = 0; i < atualizar.length; i += 20) {
+      const resultados = await Promise.all(atualizar.slice(i, i + 20).map((u) => db.from('avaliacoes')
+        .update({ pessoa_id: u.para_pessoa, nota: u.para_nota, origem_arquivo: u.origem_arquivo,
+                  importado_por: importadoPor, importado_em: agora })
+        .eq('data', u.data).eq('protocolo', u.protocolo)));
+      const falha = resultados.find((r) => r.error)?.error;
+      if (falha) {
+        setErro(`Falha ao atualizar avaliações já gravadas: ${await mensagemDoErro(falha)}. Nada mais foi importado; tente de novo.`);
+        setOcupado(null);
+        return;
+      }
+    }
 
     for (let i = 0; i < novas.length; i += lote) {
       const { error } = await db.from('avaliacoes').upsert(
@@ -333,6 +384,7 @@ export default function ImportadorAvaliacoes({
     }
 
     setSucesso(`${novas.length} avaliações importadas`
+      + (atualizar.length ? `, ${atualizar.length} atualizada${atualizar.length > 1 ? 's' : ''} conforme o arquivo` : '')
       + (guardar.length ? ` e ${guardar.length} guardadas sem atendente reconhecido` : '')
       + (levarOutro.length ? `; ${levarOutro.length} atendimento${levarOutro.length > 1 ? 's' : ''} de outro setor pendente${levarOutro.length > 1 ? 's' : ''} em Lançamentos` : '')
       + ` de ${ok.length} arquivo${ok.length > 1 ? 's' : ''}.`
@@ -406,7 +458,8 @@ export default function ImportadorAvaliacoes({
       <p className="mb-4 text-sm text-slate-600">
         Relatórios de atendimentos do Hub (<code>.xlsx</code>), um ou vários de uma vez. Entram só as avaliações com nota
         de 1 a 5, cada uma na fila do seu setor (Configuração › Setores e filas).
-        A mesma avaliação (data e protocolo) entra uma vez só. Nota de atendente não reconhecido fica guardada;
+        A mesma avaliação (data e protocolo) entra uma vez só; se ela já estava gravada e o arquivo traz outro
+        atendente ou outra nota, vale o arquivo (menos em mês já fechado). Nota de atendente não reconhecido fica guardada;
         conversa só com o robô é ignorada. Atendimento de <strong>outro setor</strong> vira demanda extra pendente, para
         decidir em Lançamentos.
       </p>
@@ -475,6 +528,35 @@ export default function ImportadorAvaliacoes({
               {soma((a) => a.deOutraEquipe)} linha{soma((a) => a.deOutraEquipe) > 1 ? 's' : ''} de outras equipes da plataforma
               (filas ou atendentes de outro setor) {soma((a) => a.deOutraEquipe) > 1 ? 'ficaram' : 'ficou'} de fora: cada setor importa só o seu.
             </p>
+          )}
+
+          {(atualizar.length > 0 || atualizarFechado > 0) && (
+            <div className="rounded-lg bg-sky-50 px-4 py-3 text-sm text-sky-900 ring-1 ring-sky-600/20">
+              {atualizar.length > 0 && (
+                <>
+                  <p className="font-semibold">
+                    {atualizar.length} avaliaç{atualizar.length > 1 ? 'ões' : 'ão'} já gravada{atualizar.length > 1 ? 's' : ''} {atualizar.length > 1 ? 'mudaram' : 'mudou'} no arquivo e
+                    {atualizar.length > 1 ? ' serão atualizadas' : ' será atualizada'} conforme ele
+                  </p>
+                  <ul className="mt-1 space-y-0.5">
+                    {[...atualizar.reduce((m, u) => {
+                      const txt = u.de_pessoa !== u.para_pessoa
+                        ? `${nomePessoa.get(u.de_pessoa) ?? '—'} → ${nomePessoa.get(u.para_pessoa) ?? '—'}`
+                        : `${nomePessoa.get(u.para_pessoa) ?? '—'}: nota ${u.de_nota} → ${u.para_nota}`;
+                      return m.set(txt, (m.get(txt) ?? 0) + 1);
+                    }, new Map<string, number>())].sort((a, b) => b[1] - a[1]).map(([txt, n]) => (
+                      <li key={txt}>{txt} <span className="text-sky-700">· {n}</span></li>
+                    ))}
+                  </ul>
+                </>
+              )}
+              {atualizarFechado > 0 && (
+                <p className={atualizar.length ? 'mt-2 text-xs' : ''}>
+                  {atualizarFechado} diferença{atualizarFechado > 1 ? 's' : ''} em mês já fechado {atualizarFechado > 1 ? 'ficam' : 'fica'} como estava{atualizarFechado > 1 ? 'm' : ''}:
+                  o fechamento guarda o valor da época.
+                </p>
+              )}
+            </div>
           )}
 
           {guardarPorNome.length > 0 && (
@@ -587,10 +669,11 @@ export default function ImportadorAvaliacoes({
                     className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-40">
               Cancelar
             </button>
-            <button type="button" onClick={importar} disabled={!!ocupado || (!novas.length && !guardar.length && !levarOutro.length)}
+            <button type="button" onClick={importar} disabled={!!ocupado || (!novas.length && !guardar.length && !levarOutro.length && !atualizar.length)}
                     className="rounded-lg bg-marca-600 px-4 py-2 text-sm font-semibold text-white hover:bg-marca-700 disabled:opacity-40">
-              {!novas.length && !guardar.length && !levarOutro.length ? 'Nada novo para importar'
+              {!novas.length && !guardar.length && !levarOutro.length && !atualizar.length ? 'Nada novo para importar'
                 : `Importar ${novas.length}${guardar.length ? ` e guardar ${guardar.length}` : ''}`
+                  + (atualizar.length ? ` · atualizar ${atualizar.length}` : '')
                   + (levarOutro.length ? ` · ${levarOutro.length} de outro setor pendente${levarOutro.length > 1 ? 's' : ''}` : '')}
             </button>
           </div>

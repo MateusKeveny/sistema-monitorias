@@ -35,6 +35,19 @@ para o Performance.
 
 ---
 
+## Performance 3.3.0
+
+Sem migração. Monitorias e Agenda sem mudança.
+
+- **Performance (atualização): a importação de avaliações atualiza o que
+  mudou no Hub.** Antes, avaliação já gravada (mesma data e protocolo) era
+  ignorada mesmo que o relatório novo trouxesse outro atendente ou outra nota.
+  Agora vale o arquivo: a conferência mostra quantas mudaram ("Fulano →
+  Beltrano", "nota 3 → 5") e elas são atualizadas ao importar. Mês já fechado
+  de quem estava ou de quem passa a ter a avaliação não muda. Caso de origem:
+  43 avaliações de outubro gravadas no gestor que, no relatório corrigido, são
+  de um atendente.
+
 ## Performance 3.2.1
 
 Sem migração. Monitorias e Agenda sem mudança.
