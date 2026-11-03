@@ -1,4 +1,5 @@
-export type PapelUsuario = 'gestor' | 'qualidade' | 'operador';
+/** `administrador` (migração 94): todos os setores. Nas telas, entra como gestor (obterPerfil). */
+export type PapelUsuario = 'administrador' | 'gestor' | 'qualidade' | 'operador';
 
 /**
  * Uma pessoa, uma linha.
@@ -11,6 +12,8 @@ export type PapelUsuario = 'gestor' | 'qualidade' | 'operador';
  */
 export type Pessoa = {
   id: string;
+  /** Só no perfil de quem está logado: é o administrador (que nas telas entra como gestor). */
+  administrador?: boolean;
   /** Usuário do Supabase correspondente. Nulo em quem é avaliado e não acessa. */
   auth_id: string | null;
   nome: string;
@@ -243,6 +246,7 @@ export const REGRA_MEDIA = 'media_da_equipe';
 export const REGRA_MEDIA_REALIZADO = 'media_sobre_realizado';
 
 export const NOMES_PAPEL: Record<PapelUsuario, string> = {
+  administrador: 'Administrador',
   gestor: 'Gestor',
   qualidade: 'Qualidade',
   operador: 'Operador',

@@ -53,6 +53,9 @@ export const obterPerfil = cache(async (): Promise<Perfil | null> => {
     .eq('auth_id', user.id)
     .maybeSingle();
 
+  // Administrador (migração 94): nas telas, é um gestor — o banco é que lhe
+  // abre todos os setores. `administrador` diz quem ele é de fato.
+  if (data?.papel === 'administrador') return { ...(data as Perfil), papel: 'gestor', administrador: true };
   return (data as Perfil | null) ?? null;
 });
 

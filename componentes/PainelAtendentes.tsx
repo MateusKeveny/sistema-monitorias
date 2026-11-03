@@ -729,7 +729,7 @@ function Ficha({
       )}
 
       <Secao titulo="Diário de bordo">
-        {pessoa.papel !== 'gestor' && pessoa.auth_id && (
+        {pessoa.papel !== 'gestor' && pessoa.papel !== 'administrador' && pessoa.auth_id && (
           <div className="mb-3">
             {leitura?.pendentes.length ? (
               <>
