@@ -24,11 +24,16 @@ const serialDoExcel = (iso: string) =>
  * Cada uma diz de onde tira o número: a chave da regra e o canal. O valor é a
  * QUANTIDADE (o "feito"), não os pontos — é assim que o modelo veio.
  */
-const COLUNAS_RESUMO: { cabecalho: string; regra?: string; canal?: 'huggy' | 'diretores'; campo?: string }[] = [
+const COLUNAS_RESUMO: { cabecalho: string; regra?: string; canal?: 'huggy' | 'diretores'; campo?: string; nova?: boolean }[] = [
   { cabecalho: 'Colaborador', campo: 'colaborador' },
   { cabecalho: 'Mês Ref', campo: 'mes' },
   { cabecalho: 'Mês (Ordem)', campo: 'mes' },
   { cabecalho: 'Atendimentos', regra: 'huggy_atendimento', canal: 'huggy' },
+  // TME de Expansão por faixa (1.35.3; logo depois de Atendimentos desde a
+  // 3.3.2, como no modelo do portal): atendimentos da semana na faixa do TME.
+  { cabecalho: 'TME Médio Equipe - até 15 min (Huggy)', regra: 'tme_ate_10', canal: 'huggy' },
+  { cabecalho: 'TME Médio Equipe - até 30 min (Huggy)', regra: 'tme_ate_30', canal: 'huggy' },
+  { cabecalho: 'TME Médio Equipe - acima de 30 min (Huggy)', regra: 'tme_acima_30', canal: 'huggy' },
   { cabecalho: 'Transferencia', regra: 'transferencias' },
   { cabecalho: 'Cota (pts)', campo: 'resultado' },
   { cabecalho: 'CSAT  Mensal (Huggy) (%)', campo: 'csat_huggy' },
@@ -73,11 +78,20 @@ const COLUNAS_RESUMO: { cabecalho: string; regra?: string; canal?: 'huggy' | 'di
   { cabecalho: 'Tratativa de chamados', regra: 'chamados_tratados' },
   { cabecalho: 'SLA < 2', regra: 'chamados_sla_ate_2d' },
   { cabecalho: 'SLA > 2', regra: 'chamados_sla_acima_2d' },
-  // TME de Expansão por faixa (1.35.3), no fim para não deslocar as colunas
-  // que o portal já lê. Como no C-SAT: atendimentos da semana na faixa do TME.
-  { cabecalho: 'TME Médio Equipe - até 15 min (Huggy)', regra: 'tme_ate_10', canal: 'huggy' },
-  { cabecalho: 'TME Médio Equipe - até 30 min (Huggy)', regra: 'tme_ate_30', canal: 'huggy' },
-  { cabecalho: 'TME Médio Equipe - acima de 30 min (Huggy)', regra: 'tme_acima_30', canal: 'huggy' },
+  // iGreen Mob (3.3.2): demanda extra, em colunas próprias no fim (decisão do
+  // gestor, 03/11/2026) — as do portal não se mexem. Quantidades, como as demais.
+  { cabecalho: 'Atendimentos iGreen Mob', regra: 'outro_setor_igreen_mob', nova: true },
+  { cabecalho: 'C-SAT iGreen Mob (%)', campo: 'csat_mob', nova: true },
+  { cabecalho: 'Acima de 95% (iGreen Mob)', regra: 'outro_setor_igreen_mob__csat_95', nova: true },
+  { cabecalho: 'Entre 90% e 94,9% (iGreen Mob)', regra: 'outro_setor_igreen_mob__csat_90_95', nova: true },
+  { cabecalho: 'Entre 85% e 89,9% (iGreen Mob)', regra: 'outro_setor_igreen_mob__csat_85_90', nova: true },
+  { cabecalho: 'Entre 80% e 84,9% (iGreen Mob)', regra: 'outro_setor_igreen_mob__csat_80_85', nova: true },
+  { cabecalho: 'Abaixo de 80% (iGreen Mob)', regra: 'outro_setor_igreen_mob__csat_abaixo_80', nova: true },
+  { cabecalho: 'Nota 1 (iGreen Mob)', regra: 'outro_setor_igreen_mob__nota_1', nova: true },
+  { cabecalho: 'Nota 2 (iGreen Mob)', regra: 'outro_setor_igreen_mob__nota_2', nova: true },
+  { cabecalho: 'Nota 3 (iGreen Mob)', regra: 'outro_setor_igreen_mob__nota_3', nova: true },
+  { cabecalho: 'Nota 4 (iGreen Mob)', regra: 'outro_setor_igreen_mob__nota_4', nova: true },
+  { cabecalho: 'Nota 5 (iGreen Mob)', regra: 'outro_setor_igreen_mob__nota_5', nova: true },
 ];
 
 /**
@@ -150,6 +164,16 @@ export async function GET(requisicao: NextRequest) {
     return total ? suas.reduce((a, c) => a + c.positivas, 0) / total : null;
   };
 
+  // Tudo que pontua ou desconta vai no arquivo (3.3.2): o que não tem coluna
+  // no modelo entra no fim, uma coluna por métrica, com o cabeçalho em amarelo.
+  // Média e multiplicador vão em pontos; o resto, em quantidade, como as demais.
+  const cobertas = new Set(COLUNAS_RESUMO.map((c) => c.regra).filter(Boolean));
+  const extras = [...new Map(linhas
+    .filter((l) => lista.some((p) => p.pessoa_id === l.pessoa_id) && l.grupo !== 'monitoria' && !cobertas.has(l.regra)
+      && (Math.abs(Number(l.cota)) >= 0.005 || Number(l.quantidade)))
+    .map((l) => [l.regra, { regra: l.regra, rotulo: l.rotulo, ordem: l.ordem, emPontos: l.grupo === 'media' }])).values()]
+    .sort((a, b) => a.ordem - b.ordem);
+
   // ------------------------------------------------------------------ resumo
   const linhasResumo = lista.map((p) => {
     const suas = linhas.filter((l) => l.pessoa_id === p.pessoa_id);
@@ -163,6 +187,12 @@ export async function GET(requisicao: NextRequest) {
       resultado: Number(p.resultado),
       csat_huggy: csatDe(p.pessoa_id, 'huggy'),
       csat_diretores: csatDe(p.pessoa_id, 'diretores'),
+      // C-SAT do Mob: notas 4 e 5 sobre o total, como no extrato (2.11.3).
+      csat_mob: (() => {
+        const n = (k: number) => soma(`outro_setor_igreen_mob__nota_${k}`);
+        const total = n(1) + n(2) + n(3) + n(4) + n(5);
+        return total ? (n(4) + n(5)) / total : null;
+      })(),
       // A régua de monitoria do setor (87): pelo grupo, não pela chave.
       monitoria_pontos: suas.filter((l) => l.grupo === 'monitoria').reduce((a, l) => a + Number(l.cota), 0),
     };
@@ -174,6 +204,7 @@ export async function GET(requisicao: NextRequest) {
     for (const c of COLUNAS_RESUMO) {
       if (c.regra) registro[`${c.regra}|${c.canal ?? ''}`] = soma(c.regra, c.canal);
     }
+    for (const x of extras) registro[`extra|${x.regra}`] = soma(x.regra, undefined, x.emPontos ? 'cota' : 'quantidade');
     // Nenhuma célula vazia (1.35.3): o portal de destino parava de ler a linha
     // na primeira célula ausente — setembro chegou só até "Tempo de resposta
     // acima de 1h00". Como no histórico que ele já tem, C-SAT sem avaliação
@@ -187,13 +218,25 @@ export async function GET(requisicao: NextRequest) {
     return registro;
   });
 
-  const colunasResumo: Coluna[] = COLUNAS_RESUMO.map((c) => ({
-    cabecalho: c.cabecalho,
-    chave: c.campo ?? `${c.regra}|${c.canal ?? ''}`,
-    formato: c.campo === 'colaborador' ? 'texto'
-      : c.campo?.startsWith('csat_') ? 'percentual' : 'numero',
-    largura: c.campo === 'colaborador' ? 34 : 16,
-  }));
+  // Coluna nova (fora do modelo do portal) com algum valor no mês: em amarelo.
+  const preenchida = (chave: string) => linhasResumo.some((r) => { const v = r[chave]; return typeof v === 'number' ? Math.abs(v) >= 0.005 : false; });
+  const colunasResumo: Coluna[] = [
+    ...COLUNAS_RESUMO.map((c) => {
+      const chave = c.campo ?? `${c.regra}|${c.canal ?? ''}`;
+      return {
+        cabecalho: c.cabecalho,
+        chave,
+        formato: c.campo === 'colaborador' ? 'texto' as const
+          : c.campo?.startsWith('csat_') ? 'percentual' as const : 'numero' as const,
+        largura: c.campo === 'colaborador' ? 34 : 16,
+        destaque: !!c.nova && preenchida(chave),
+      };
+    }),
+    ...extras.map((x) => ({
+      cabecalho: x.emPontos ? `${x.rotulo} (pts)` : x.rotulo,
+      chave: `extra|${x.regra}`, formato: 'numero' as const, largura: 20, destaque: true,
+    })),
+  ];
 
   const abas: Aba[] = [{ nome: 'Base', colunas: colunasResumo, linhas: linhasResumo }];
 

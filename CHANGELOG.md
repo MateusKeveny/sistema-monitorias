@@ -35,6 +35,23 @@ para o Performance.
 
 ---
 
+## Performance 3.3.2
+
+Migração 95 (já rodada em 03/11/2026). Monitorias e Agenda sem mudança.
+
+- **Performance (correção): exportação vazia.** Com a 94, o cálculo completo do
+  extrato passava do limite de 8 s e os arquivos de outubro saíam só com o
+  cabeçalho. A 95 tirou o custo por linha das regras de acesso (o extrato de
+  outubro caiu para ~1,2 s), sem mudar quem vê o quê.
+- **Performance (correção): arquivo de importação na ordem do portal.** As
+  colunas de TME passam para logo depois de "Atendimentos" (E a G), como no
+  modelo; as demais seguem até "SLA > 2" (AY).
+- **Performance (correção): tudo que pontua vai no arquivo.** iGreen Mob em
+  colunas próprias no fim (atendimentos, C-SAT, faixas e notas de 1 a 5) e
+  qualquer métrica que pontue sem coluna no modelo (ex.: média dos cargos de
+  referência e multiplicador, em pontos). Coluna fora do modelo com valor no
+  mês sai com o cabeçalho em amarelo.
+
 ## Performance 3.3.1
 
 Sem migração. Monitorias e Agenda sem mudança.

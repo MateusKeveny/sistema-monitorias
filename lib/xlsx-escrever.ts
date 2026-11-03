@@ -111,6 +111,8 @@ export type Coluna = {
   largura?: number;
   /** 'texto' (padrão) | 'numero' | 'percentual' | 'quebra' (texto com quebra de linha) */
   formato?: 'texto' | 'numero' | 'percentual' | 'quebra';
+  /** Cabeçalho em amarelo: coluna nova, que o destino ainda não conhece (3.3.2). */
+  destaque?: boolean;
 };
 
 export type Aba = {
@@ -120,7 +122,7 @@ export type Aba = {
 };
 
 // Índices dos estilos definidos em styles.xml, na ordem em que aparecem lá.
-const ESTILO = { padrao: 0, cabecalho: 1, percentual: 2, quebra: 3 } as const;
+const ESTILO = { padrao: 0, cabecalho: 1, percentual: 2, quebra: 3, destaque: 4 } as const;
 
 function letraColuna(indice: number): string {
   let s = '', n = indice;
@@ -137,7 +139,7 @@ function montarAba(aba: Aba): string {
     .join('');
 
   const celulasCabecalho = colunas
-    .map((c, i) => `<c r="${letraColuna(i)}1" s="${ESTILO.cabecalho}" t="inlineStr">`
+    .map((c, i) => `<c r="${letraColuna(i)}1" s="${c.destaque ? ESTILO.destaque : ESTILO.cabecalho}" t="inlineStr">`
       + `<is><t>${escaparXml(c.cabecalho)}</t></is></c>`)
     .join('');
 
@@ -181,24 +183,28 @@ function montarAba(aba: Aba): string {
 const ESTILOS_XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
   + '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
   + '<numFmts count="1"><numFmt numFmtId="164" formatCode="0.0%"/></numFmts>'
-  + '<fonts count="2">'
+  + '<fonts count="3">'
   + '<font><sz val="11"/><name val="Calibri"/></font>'
   + '<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>'
+  + '<font><b/><sz val="11"/><color rgb="FF1F2937"/><name val="Calibri"/></font>'
   + '</fonts>'
-  + '<fills count="3">'
+  + '<fills count="4">'
   + '<fill><patternFill patternType="none"/></fill>'
   + '<fill><patternFill patternType="gray125"/></fill>'
   + '<fill><patternFill patternType="solid">'
   + '<fgColor rgb="FF047857"/><bgColor indexed="64"/></patternFill></fill>'
+  + '<fill><patternFill patternType="solid"><fgColor rgb="FFFDE047"/><bgColor indexed="64"/></patternFill></fill>'
   + '</fills>'
   + '<borders count="1"><border/></borders>'
   + '<cellStyleXfs count="1"><xf/></cellStyleXfs>'
-  + '<cellXfs count="4">'
+  + '<cellXfs count="5">'
   + '<xf xfId="0"/>'                                                        // 0 padrão
   + '<xf xfId="0" fontId="1" fillId="2" applyFont="1" applyFill="1"'
   + ' applyAlignment="1"><alignment vertical="center"/></xf>'               // 1 cabeçalho
   + '<xf xfId="0" numFmtId="164" applyNumberFormat="1"/>'                   // 2 percentual
   + '<xf xfId="0" applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf>' // 3 quebra
+  + '<xf xfId="0" fontId="2" fillId="3" applyFont="1" applyFill="1"'
+  + ' applyAlignment="1"><alignment vertical="center"/></xf>'               // 4 cabeçalho de coluna nova
   + '</cellXfs>'
   + '</styleSheet>';
 
