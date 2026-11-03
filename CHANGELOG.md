@@ -35,6 +35,50 @@ para o Performance.
 
 ---
 
+## Performance 3.0.0 e Monitorias 6.0.0 — a árvore de setores
+
+Migrações 79 a 93, todas já rodadas no banco (cada uma com a prova de que a
+cota de todas as pessoas e meses não mudou; a 90 muda só de novembro/2026 em
+diante). Publicados juntos, por decisão do gestor. Agenda sem mudança.
+
+**Por que o 1º número.** A partir da competência novembro/2026 a faixa de TME
+sai do TME de cada pessoa, e não mais da média da equipe — regra de cálculo
+nova. Nas Monitorias, a quantidade por semana e o piso passam a ser de cada
+setor (exceção decidida pelo gestor: 6.0.0 junto com a virada).
+
+- **Performance (crítico): setores e filas.** A operação é organizada em
+  setores (a equipe: pessoas, cargos, métricas, monitorias, meta e
+  fechamento), cada um com as suas filas (como o Hub separa os atendimentos).
+  Todo o histórico ficou na Conexão Expansão (filas Expansão e
+  Diretores-Expansão), sem mudar valor. Criar setor copia as definições de
+  outro, e depois cada um é independente. Seletor de setor no topo do menu,
+  valendo para todas as telas.
+- **Performance (crítico): TME por pessoa** a partir de novembro/2026, nas
+  duas filas; semana sem TME conta como a melhor faixa. Configurável por fila
+  (Usuários e setores › Setores e filas; atalho nos cartões de TME da
+  Configuração). As faixas deixam de dizer "TME Médio Equipe".
+- **Performance (atualização): menu novo** — Acompanhar, Qualidade,
+  Registrar, Ciclo do mês, Equipe e Sistema; **Usuários e setores** reúne
+  pessoas, logins ("+ Novo usuário", login por nome de usuário), setores e o
+  uso dos acessos. Cadastro por planilha pelo papel.
+- **Performance (atualização): importação por setor.** Cada setor importa e
+  lança só o seu: avaliações do Hub só das filas e pessoas do setor.
+  Exportação também por setor.
+- **Performance (atualização): fechamento em segundo plano.** "Fechar" vira
+  um pedido na fila de cálculo; o aviso chega no sino quando termina. Os
+  números se atualizam em segundos ("Atualizando os números…").
+- **Performance (atualização): quadro "Para bater a meta"** no Início do
+  atendente — situação, o que mudou entre as semanas, caminhos e combinado;
+  escala da pessoa (na ficha) e férias contam no "por dia"; aviso no sino
+  quando o ritmo fica abaixo da meta (todo dia às 9h).
+- **Performance (atualização): visual novo** — telas modernizadas e gráficos
+  com o valor ao passar o mouse; "Novidades da 3.0" no primeiro acesso.
+- **Performance (correção): desempenho.** Regras de acesso, média da equipe e
+  índices: várias vezes mais rápido, pronto para vários setores.
+- **Monitorias (crítico): monitorias por setor.** Critérios, quantidade por
+  semana e % a partir da qual pontua de cada setor, editáveis em Usuários e
+  setores; relatórios, ranking e cobertura por setor.
+
 ## Agenda da Gestão 1.8.1
 
 Sem migração. Não muda as Monitorias nem o Performance.

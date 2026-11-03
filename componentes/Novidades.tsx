@@ -17,6 +17,7 @@ const ITENS = {
     itens: [
       ['Visual novo', 'telas mais limpas e gráficos que mostram o valor exato ao passar o mouse.'],
       ['Seu TME agora é seu', 'a partir de novembro, a pontuação de TME vem do seu tempo na semana, e não mais da média da equipe.'],
+      ['Para bater a meta', 'no Início, quanto falta para a meta do mês e os caminhos para chegar lá. Se o ritmo ficar abaixo, você recebe um aviso no sino.'],
       ['C-SAT em destaque', 'em "Meu C-SAT", o seu percentual do mês e a proporção das suas notas de 1 a 5, de relance.'],
       ['Menu organizado', 'Acompanhar, Qualidade e Registrar.'],
     ],
@@ -29,6 +30,7 @@ const ITENS = {
       ['Ciclo do mês', 'Importar, Lançamentos, Métricas da semana, Conferência e Fechamento, no menu, na ordem do trabalho.'],
       ['Fechamento', 'agora roda em segundo plano, e você recebe um aviso no sino quando termina.'],
       ['TME por pessoa', 'a partir de novembro, configurável por fila.'],
+      ['Para bater a meta', 'o Início do atendente mostra quanto falta e os caminhos para a meta, contando a escala de cada um (na ficha da pessoa) e as férias.'],
       ['Monitorias por setor', 'critérios, quantidade por semana e piso de cada setor, configuráveis.'],
       ['Desempenho', 'o sistema ficou várias vezes mais rápido e preparado para vários setores ao mesmo tempo.'],
     ],
