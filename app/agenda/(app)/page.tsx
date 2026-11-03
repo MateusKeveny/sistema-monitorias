@@ -17,8 +17,8 @@ export const dynamic = 'force-dynamic';
  * do sistema numa ordem só, com o motivo de cada um estar ali. Embaixo, o que
  * vem nos próximos dias e o que ainda não tem data.
  */
-export default async function MeuDia({ searchParams }: { searchParams: Promise<{ novo?: string }> }) {
-  const [usuario, { novo }] = await Promise.all([exigirUsuario(), searchParams]);
+export default async function MeuDia({ searchParams }: { searchParams: Promise<{ novo?: string; reagendar?: string }> }) {
+  const [usuario, { novo, reagendar }] = await Promise.all([exigirUsuario(), searchParams]);
   const db = await criarServidorDaAgenda();
   // As pendências vêm do banco dos painéis, pela ponte (lib/agenda/ponte.ts).
   const vePendencias = usuario.ve_pendencias;
@@ -106,7 +106,8 @@ export default async function MeuDia({ searchParams }: { searchParams: Promise<{
                     tom={pendencias.some((p) => p.grave) ? 'text-amber-700' : undefined} />
         </div>
 
-        <ListaDaAgenda grupos={grupos} />
+        {/* "Reagendar" na notificação do computador abre o lembrete já no formulário. */}
+        <ListaDaAgenda grupos={grupos} abrir={reagendar ? itens.find((i) => i.id === reagendar) ?? null : null} />
       </Painel>
 
       {aparelhos === 0 && (

@@ -46,11 +46,17 @@ export async function nomeDoBot(): Promise<string | null> {
   }
 }
 
-/** Botões de um lembrete. O callback leva a ação e o item: "c:<id>" ou "a:<id>". */
-export const botoesDoItem = (item: string): Botao[][] => [[
-  { text: '✓ Concluir', callback_data: `c:${item}` },
-  { text: 'Adiar 15 min', callback_data: `a:${item}` },
-]];
+/**
+ * Botões de um lembrete. O callback leva a ação e o item: "c:<id>" Concluir,
+ * "a:<id>" Adiar 15 min, "r:<id>" Reagendar (o bot pergunta para quando).
+ */
+export const botoesDoItem = (item: string): Botao[][] => [
+  [
+    { text: '✓ Concluir', callback_data: `c:${item}` },
+    { text: 'Adiar 15 min', callback_data: `a:${item}` },
+  ],
+  [{ text: '🗓 Reagendar', callback_data: `r:${item}` }],
+];
 
 /** Mensagem de um aviso: título em negrito, texto e o botão de abrir a agenda. */
 export function mensagemDoAviso(aviso: { titulo: string; corpo: string; url: string; item?: string | null }) {

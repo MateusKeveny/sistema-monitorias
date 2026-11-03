@@ -28,11 +28,15 @@ const TOM: Record<string, string> = {
  * "Desfazer" por alguns segundos), adiar, editar e abrir a pendência no
  * Performance.
  */
-export default function ListaDaAgenda({ grupos }: { grupos: Grupo[] }) {
+export default function ListaDaAgenda({ grupos, abrir = null }: {
+  grupos: Grupo[];
+  /** Lembrete para abrir já no formulário (?reagendar=<id>, vindo da notificação). */
+  abrir?: ItemAgenda | null;
+}) {
   const router = useRouter();
   const [escondidos, setEscondidos] = useState<Set<string>>(new Set());
   const [aviso, setAviso] = useState<{ texto: string; desfazer?: string } | null>(null);
-  const [editando, setEditando] = useState<ItemAgenda | null>(null);
+  const [editando, setEditando] = useState<ItemAgenda | null>(abrir);
   const relogio = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // A lista nova do servidor substitui o que estava escondido de antemão.
@@ -122,7 +126,11 @@ export default function ListaDaAgenda({ grupos }: { grupos: Grupo[] }) {
         </div>
       )}
 
-      {editando && <FormularioItem inicial={rascunhoDoItem(editando)} aoFechar={() => setEditando(null)} />}
+      {editando && <FormularioItem inicial={rascunhoDoItem(editando)} aoFechar={() => {
+        setEditando(null);
+        // Tira o ?reagendar= do endereço, para não reabrir ao atualizar a tela.
+        if (location.search.includes('reagendar=')) history.replaceState(null, '', location.pathname);
+      }} />}
     </>
   );
 }

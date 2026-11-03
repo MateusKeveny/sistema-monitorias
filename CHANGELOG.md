@@ -35,6 +35,55 @@ para o Performance.
 
 ---
 
+## Agenda da Gestão 1.8.1
+
+Sem migração. Não muda as Monitorias nem o Performance.
+
+- **Agenda (correção): /reagendar mais tolerante.** "/reagendar escola de
+  líderes de ontem para hoje 15h" não achava o lembrete por causa de "de
+  ontem"; palavras como ontem, hoje, evento e lembrete ficam fora da busca.
+  Sem "para" ("/reagendar escola de líderes amanhã 14h"), o bot separa o nome
+  da data sozinho. Sem achar nada, lista os lembretes em aberto.
+- **Agenda (correção): repetição reagendada só nesta vez** não mostra mais
+  "16:00–16:00": o fim é da série, e a ocorrência movida fica com o novo
+  início.
+
+## Agenda da Gestão 1.8.0
+
+`supabase/agenda/07-reagendar-pelo-telegram.sql` (banco da agenda). Não muda
+as Monitorias nem o Performance.
+
+- **Agenda (atualização): reagendar pelo Telegram.** Os avisos ganham
+  **🗓 Reagendar** (o bot pergunta para quando); responder a um aviso com a
+  nova data ("amanhã 10h", "sexta das 14h às 15h") também reagenda; e
+  `/reagendar <nome> para <quando>` acha o lembrete pelo nome — com vários,
+  mostra botões para escolher. Sem hora na frase, mantém a hora; com duração,
+  o fim anda junto. No que se repete, muda só esta vez.
+- **Agenda (atualização): Reagendar na notificação do computador.** Os botões
+  passam a ser **Concluir** e **Reagendar** (o navegador do computador mostra
+  só dois); Reagendar abre a agenda com o lembrete no formulário. Onde cabem
+  três (Android), vai também o Adiar 15 min.
+
+## Performance 2.11.4
+
+Sem migração. Não muda as Monitorias nem a Agenda.
+
+- **Performance (correção): nome das regras do iGreen Mob na lista de
+  lançamentos.** Em Lançamentos, as linhas de C-SAT e de notas do iGreen Mob
+  apareciam com a chave interna (`outro_setor_igreen_mob__nota_5`); agora
+  aparecem com o nome ("Nota 5 · iGreen Mob").
+
+## Performance 2.11.3
+
+Sem migração. Não muda as Monitorias nem a Agenda.
+
+- **Performance (correção): o C-SAT do iGreen Mob no extrato.** O quadro do
+  iGreen Mob não mostrava o percentual de C-SAT. Agora aparece no cartão da
+  semana (ao lado de Exp e Dir), no detalhe da semana e no resumo do mês, com
+  a linha "C-SAT no mês" e as semanas marcadas em cada faixa, como nos
+  canais. O percentual sai das notas de 1 a 5 do próprio extrato (4 e 5 sobre
+  o total), a mesma conta do cálculo.
+
 ## Agenda da Gestão 1.7.0
 
 `supabase/agenda/06-itens-do-resumo.sql` (banco da agenda). Não muda as

@@ -26,7 +26,10 @@ export type Entrada =
 export const diaDoItem = (i: ItemAgenda) => (i.lembrar_em ? diaLocal(i.lembrar_em) : null);
 
 /** "14:00" ou, com horário de término (agenda/05), "14:00–16:00". */
-export const faixaDeHora = (i: ItemAgenda, hora: string) => (i.hora_fim ? `${hora}–${i.hora_fim.slice(0, 5)}` : hora);
+// O fim só vale se vier depois do início — numa repetição reagendada só nesta
+// vez, o fim da série pode ficar para trás.
+const fimDe = (i: ItemAgenda, hora: string) => (i.hora_fim && i.hora_fim.slice(0, 5) > hora ? i.hora_fim.slice(0, 5) : null);
+export const faixaDeHora = (i: ItemAgenda, hora: string) => { const f = fimDe(i, hora); return f ? `${hora}–${f}` : hora; };
 
 export function atrasado(i: ItemAgenda, agora: Agora): boolean {
   if (!i.lembrar_em) return false;
@@ -65,7 +68,7 @@ export function planoDoDia(itens: ItemAgenda[], pendencias: Pendencia[], agora: 
     } else if (i.prioridade === 3) {
       empurrar(8, hora ?? '99', { ...base, motivo: hora ? `Quando der · ${faixaDeHora(i, hora)}` : 'Quando der', tom: 'normal' });
     } else {
-      empurrar(6, hora ?? '99', { ...base, motivo: hora ? (i.hora_fim ? `Das ${hora} às ${i.hora_fim.slice(0, 5)}` : `Às ${hora}`) : 'Hoje', tom: 'normal' });
+      empurrar(6, hora ?? '99', { ...base, motivo: hora ? (fimDe(i, hora) ? `Das ${hora} às ${fimDe(i, hora)}` : `Às ${hora}`) : 'Hoje', tom: 'normal' });
     }
   }
 
