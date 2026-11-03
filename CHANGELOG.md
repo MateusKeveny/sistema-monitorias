@@ -35,9 +35,9 @@ para o Performance.
 
 ---
 
-## Performance 3.2.0, Monitorias 6.1.1 e Agenda 1.8.2
+## Performance 3.2.0
 
-Sem migração.
+Sem migração. Monitorias e Agenda não mudam de versão (só ganharam a assinatura).
 
 - **Performance (atualização): Árvore dos setores** (Usuários e setores ›
   Árvore). A operação desenhada como organograma: setores e, em cada um,
@@ -53,8 +53,8 @@ Sem migração.
   "Todos lado a lado" para comparar.
 - **Performance (correção):** Setores e filas não quebra mais logo depois de
   criar um setor ou uma fila.
-- **Performance, Monitorias e Agenda (correção): assinatura** "by Mateus
-  Keveny" no rodapé do menu e na tela de entrada.
+- **Assinatura** "by Mateus Keveny" no rodapé do menu e na tela de entrada dos
+  três sites (sem versão própria).
 
 ## Performance 3.1.0 e Monitorias 6.1.0 — acesso por setor
 
