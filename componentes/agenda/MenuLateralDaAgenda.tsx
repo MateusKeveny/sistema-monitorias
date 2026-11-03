@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import BotaoTema from '@/componentes/BotaoTema';
 import BotaoSair from '@/componentes/agenda/BotaoSair';
 import { Icone, MENU_DA_AGENDA, itemAtivo } from '@/componentes/agenda/menu';
+import { ASSINATURA } from '@/lib/sistema';
 
 /** Menu lateral da agenda em tela larga, no mesmo desenho do dos painéis. */
 export default function MenuLateralDaAgenda({ nome, usuario, versao }: { nome: string; usuario: string; versao: string }) {
@@ -37,6 +38,7 @@ export default function MenuLateralDaAgenda({ nome, usuario, versao }: { nome: s
           <BotaoSair />
         </div>
         <p aria-label={`Versão ${versao}`} className="mt-3 select-none text-[10px] tabular-nums text-slate-400/60">v{versao}</p>
+        <p className="mt-0.5 select-none text-[11px] text-slate-400">{ASSINATURA}</p>
       </div>
     </aside>
   );

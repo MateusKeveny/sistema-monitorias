@@ -6,7 +6,7 @@ import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import BotaoTema from '@/componentes/BotaoTema';
 import BotaoReportar from '@/componentes/BotaoReportar';
 import { ITENS, rotuloDo, type Item } from '@/componentes/Navegacao';
-import { NOME_SISTEMA, type SistemaDoPainel as Sistema } from '@/lib/sistema';
+import { ASSINATURA, NOME_SISTEMA, type SistemaDoPainel as Sistema } from '@/lib/sistema';
 import SinoDeAvisos from '@/componentes/SinoDeAvisos';
 import SeletorDeSetor from '@/componentes/SeletorDeSetor';
 import Novidades from '@/componentes/Novidades';
@@ -164,6 +164,7 @@ export default function MenuLateral({ perfil, versao, sistema, avisosReporte = 0
         <p aria-label={`Versão ${versao}`} className="mt-3 select-none text-[10px] tabular-nums text-slate-400/60">
           v{versao}
         </p>
+        <p className="mt-0.5 select-none text-[11px] text-slate-400">{ASSINATURA}</p>
       </div>
     </aside>
   );

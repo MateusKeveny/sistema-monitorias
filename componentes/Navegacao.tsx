@@ -7,7 +7,7 @@ import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import BotaoTema from '@/componentes/BotaoTema';
 import BotaoReportar from '@/componentes/BotaoReportar';
 import { NOMES_PAPEL, type Perfil } from '@/lib/tipos';
-import { NOME_SISTEMA, type SistemaDoPainel as Sistema } from '@/lib/sistema';
+import { ASSINATURA, NOME_SISTEMA, type SistemaDoPainel as Sistema } from '@/lib/sistema';
 
 /**
  * `grupo` junta itens num menu que abre ao clicar. Nove links soltos quebravam
@@ -157,7 +157,7 @@ export default function Navegacao({
               aria-label={`Versão ${versao}`}
               className="mt-1 select-none text-[10px] tabular-nums text-slate-400/60"
             >
-              v{versao}
+              v{versao} · {ASSINATURA}
             </span>
           )}
         </span>

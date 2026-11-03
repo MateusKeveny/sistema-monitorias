@@ -35,6 +35,27 @@ para o Performance.
 
 ---
 
+## Performance 3.2.0, Monitorias 6.1.1 e Agenda 1.8.2
+
+Sem migração.
+
+- **Performance (atualização): Árvore dos setores** (Usuários e setores ›
+  Árvore). A operação desenhada como organograma: setores e, em cada um,
+  gestão, qualidade, filas e atendentes. O administrador vê todos e move
+  atendentes entre setores a partir de um mês, escolhendo o cargo do setor
+  novo; o gestor vê o dele. O perfil de teste não aparece.
+- **Performance (atualização): criar setor em etapas** (só o administrador):
+  nome e base, filas, monitorias, revisar e criar — e, no fim, o próximo
+  passo (cadastrar o gestor do setor). Para o gestor, o bloco não aparece.
+- **Performance (atualização): Configuração por setor e depois por cargo.**
+  O administrador escolhe o setor em cartões e ele vale para todas as abas;
+  o gestor vê o setor dele fixo. Em Pesos por cargo, um cargo por vez, com
+  "Todos lado a lado" para comparar.
+- **Performance (correção):** Setores e filas não quebra mais logo depois de
+  criar um setor ou uma fila.
+- **Performance, Monitorias e Agenda (correção): assinatura** "by Mateus
+  Keveny" no rodapé do menu e na tela de entrada.
+
 ## Performance 3.1.0 e Monitorias 6.1.0 — acesso por setor
 
 `supabase/94-acesso-por-setor.sql` (ensaio: `94-ensaio-com-dois-setores.sql`,

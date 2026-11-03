@@ -30,6 +30,9 @@ export const ENDERECO_MONITORIAS = 'https://painel-monitorias.expansao.workers.d
 /** As pendências da agenda levam às telas do Performance. */
 export const ENDERECO_PERFORMANCE = 'https://painel-performance.expansao.workers.dev';
 
+/** A assinatura do projeto (3.2.0): no rodapé do menu e no login dos três sites. */
+export const ASSINATURA = 'by Mateus Keveny';
+
 /** Página inicial do site de cota. */
 export const INICIO_COTA = '/cota';
 

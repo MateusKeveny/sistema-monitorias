@@ -1,5 +1,5 @@
 import FormularioLogin from '@/componentes/FormularioLogin';
-import { NOME_SISTEMA } from '@/lib/sistema';
+import { ASSINATURA, NOME_SISTEMA } from '@/lib/sistema';
 import { sistemaAtual } from '@/lib/sistema-servidor';
 import { destinoInterno } from '@/lib/destino';
 
@@ -28,6 +28,7 @@ export default async function PaginaLogin({
         aviso={erro ? MENSAGENS[erro] ?? null : null}
         proximo={destinoInterno(proximo)}
       />
+      <p className="fixed bottom-4 left-0 right-0 select-none text-center text-[11px] text-slate-400">{ASSINATURA}</p>
     </main>
   );
 }
