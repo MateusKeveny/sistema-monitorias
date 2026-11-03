@@ -10,6 +10,7 @@ import { fonteDoMes } from '@/lib/resumo';
 import ProjecaoDaCota from '@/componentes/ProjecaoDaCota';
 import { limiteDeRenovacao, pessoasComLeituraPendente, type LeituraDiario } from '@/lib/diario';
 import { todas } from '@/lib/consultas';
+import { conferirNumerosDoMes } from '@/lib/conferenciaDoMes';
 import { setorDoCookie } from '@/lib/setorEscolhido';
 import { MONITORIAS_PADRAO, monitoriasPorSetor, setorDaTela, textoDoPiso } from '@/lib/monitoriasDoSetor';
 
@@ -223,6 +224,25 @@ export default async function PainelGestor({
       texto: `Conferência do cálculo: ${conferencia.falhas} divergência${conferencia.falhas > 1 ? 's' : ''}`,
       acao: 'Ver', href: '/cota/conferencia', grave: true,
     });
+  }
+  // Conferência dos números (3.5.0): a mesma do Fechamento, todo dia, enquanto
+  // o mês não fecha — o volume de 3 no lugar de 197 (out/2026) só apareceu no
+  // fim do mês.
+  if (!fechadoEm(competencia)) {
+    const alertas = await conferirNumerosDoMes(db, {
+      competencia, semanasEncerradas: semanasEsperadas,
+      pessoas: todasAsCotas.map((c) => ({ pessoa_id: c.pessoa_id, pessoa: c.pessoa })),
+      volumes: todoVolume.filter((v) => v.mes_competencia === competencia),
+      csats: todoCsat.filter((c) => c.mes_competencia === competencia),
+    });
+    const graves = alertas.filter((a) => a.grave).length;
+    if (alertas.length) {
+      pendencias.push({
+        texto: `Conferência dos números: ${alertas.length} fora do padrão`
+          + (graves ? ` (${graves} com cara de erro de importação)` : ''),
+        acao: 'Conferir', href: `/cota/fechamento?mes=${mes}`, grave: graves > 0,
+      });
+    }
   }
   if ((semCargo.data ?? []).length) {
     const n = (semCargo.data ?? []).length;

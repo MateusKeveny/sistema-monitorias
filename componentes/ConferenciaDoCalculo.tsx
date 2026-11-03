@@ -17,8 +17,10 @@ export type Rodada = { rodada_em: string; por: string; falhas: number; resultado
  * cenário reproduz o resultado de hoje — roda aqui, no navegador, porque a
  * simulação é calculada no navegador.
  */
-export default function ConferenciaDoCalculo({ ultima, competencia, fonte }: {
+export default function ConferenciaDoCalculo({ ultima, competencia, fonte, numeros }: {
   ultima: Rodada | null;
+  /** Conferência dos números do mês (3.5.0), calculada na tela a cada visita. */
+  numeros?: Verificacao;
   competencia: string;
   fonte: { extrato: string; mensal: string };
 }) {
@@ -54,7 +56,7 @@ export default function ConferenciaDoCalculo({ ultima, competencia, fonte }: {
     router.refresh();
   }
 
-  const lista = [...(ultima?.resultado ?? []), ...(simulacao ? [simulacao] : [])];
+  const lista = [...(ultima?.resultado ?? []), ...(numeros ? [numeros] : []), ...(simulacao ? [simulacao] : [])];
   const falhas = lista.filter((v) => !v.ok).length;
 
   return (

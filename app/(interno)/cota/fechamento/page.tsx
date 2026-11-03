@@ -2,7 +2,7 @@ import Link from '@/componentes/Link';
 import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
 import { setorDoCookie } from '@/lib/setorEscolhido';
 import BotaoFecharCiclo from '@/componentes/BotaoFecharCiclo';
-import { conferirMes, type Csat, type Volume } from '@/lib/conferenciaDoMes';
+import { conferirNumerosDoMes, type Csat, type Volume } from '@/lib/conferenciaDoMes';
 import AjusteDeFechamento from '@/componentes/AjusteDeFechamento';
 import ValorDaCota from '@/componentes/ValorDaCota';
 import PagamentoDoMes, { type ValorRh } from '@/componentes/PagamentoDoMes';
@@ -198,39 +198,16 @@ export default async function Fechamento({
   // O que foge do padrão por pessoa, semana e fila: avaliação sem volume,
   // queda ou salto de finalizados, C-SAT atípico. Aparece antes de fechar e
   // também no mês fechado (para revisar).
-  const mesAnterior = new Date(Date.UTC(Number(competencia.slice(0, 4)), Number(competencia.slice(5, 7)) - 2, 1)).toISOString().slice(0, 10);
-  const [{ data: csatsDb }, { data: anteriorDb }, { data: nomesFilas }, { data: foraDb }, { data: foraPendentesDb }] = await Promise.all([
-    db.from('vw_csat_semanal').select('pessoa_id, semana, origem, avaliacoes, positivas').eq('mes_competencia', competencia),
-    db.from('volume_semanal').select('pessoa_id, finalizados').eq('mes_competencia', mesAnterior),
-    db.from('canais_do_setor').select('apelido, nome'),
-    // Atendimentos em outro setor (lançados como demanda extra e os pendentes).
-    db.from('lancamentos').select('pessoa_id, semana, quantidade, regra').eq('mes_competencia', competencia).like('regra', 'outro_setor_%'),
-    db.from('atendimentos_outro_setor').select('pessoa_id, semana').eq('mes_competencia', competencia).eq('situacao', 'pendente'),
-  ]);
-  const foraDoSetor = new Map<string, number>();
-  for (const l of (foraDb ?? []) as { pessoa_id: string; semana: number | null; quantidade: number; regra: string }[]) {
-    if (l.semana == null || l.regra.includes('__')) continue;
-    foraDoSetor.set(`${l.pessoa_id}|${l.semana}`, (foraDoSetor.get(`${l.pessoa_id}|${l.semana}`) ?? 0) + Number(l.quantidade));
-  }
-  for (const o of (foraPendentesDb ?? []) as { pessoa_id: string; semana: number }[]) {
-    foraDoSetor.set(`${o.pessoa_id}|${o.semana}`, (foraDoSetor.get(`${o.pessoa_id}|${o.semana}`) ?? 0) + 1);
-  }
-  const volumeAnterior = new Map<string, number>();
-  for (const v of (anteriorDb ?? []) as { pessoa_id: string; finalizados: number }[]) {
-    volumeAnterior.set(v.pessoa_id, (volumeAnterior.get(v.pessoa_id) ?? 0) + Number(v.finalizados));
-  }
+  const { data: csatsDb } = await db.from('vw_csat_semanal').select('pessoa_id, semana, origem, avaliacoes, positivas').eq('mes_competencia', competencia);
   const naConferencia = new Map<string, string>([
     ...lista.map((p) => [p.pessoa_id, p.pessoa] as [string, string]),
     ...congelados.map((c) => [c.pessoa_id, c.pessoa_nome] as [string, string]),
   ]);
-  const alertas = conferirMes({
+  const alertas = await conferirNumerosDoMes(db, {
+    competencia, semanasEncerradas,
     pessoas: [...naConferencia].filter(([id]) => doSetor(id)).map(([pessoa_id, pessoa]) => ({ pessoa_id, pessoa })),
-    volumes: ((volumes.data ?? []) as Volume[]).filter((v) => doSetor(v.pessoa_id)),
-    csats: ((csatsDb ?? []) as Csat[]).filter((c) => doSetor(c.pessoa_id)),
-    semanasEncerradas,
-    filas: new Map(((nomesFilas ?? []) as { apelido: string | null; nome: string }[]).filter((x) => x.apelido).map((x) => [x.apelido!, x.nome])),
-    volumeMesAnterior: volumeAnterior,
-    outroSetor: foraDoSetor,
+    volumes: (volumes.data ?? []) as Volume[],
+    csats: (csatsDb ?? []) as Csat[],
   });
   const alertasGraves = alertas.filter((a) => a.grave).length;
   if (alertas.length) {

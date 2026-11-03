@@ -35,6 +35,21 @@ para o Performance.
 
 ---
 
+## Performance 3.5.0
+
+Sem migração. Monitorias e Agenda sem mudança.
+
+- **Performance (atualização): Conferência dos números todo dia, não só no
+  Fechamento.** Enquanto o mês não fecha, a tela inicial do gestor mostra em
+  "Precisa de você" quantos números estão fora do padrão (em vermelho quando
+  algum tem cara de erro de importação), com o caminho para o Fechamento; e a
+  Conferência do cálculo ganha a verificação "Números do mês dentro do
+  padrão". Assim um volume errado (como o 3 no lugar de 197 de outubro)
+  aparece no dia da importação.
+- **Performance (correção):** semana encerrada ainda sem nenhum volume
+  importado não entra na conferência — é importação por fazer, já avisada
+  como "semana sem volume", e não anomalia de cada pessoa.
+
 ## Monitorias 6.2.0 e Performance 3.4.2
 
 Sem migração. Agenda sem mudança.
