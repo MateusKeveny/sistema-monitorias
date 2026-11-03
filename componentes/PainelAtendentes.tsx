@@ -667,7 +667,22 @@ function Ficha({
         </div>
         <p className="mt-1 text-xs text-slate-500">É por ele que a importação acha a pessoa.</p>
         {(pessoa.nomes_hub_extras ?? []).length > 0 && (
-          <p className="mt-1 text-xs text-slate-500">Também reconhecido como: {pessoa.nomes_hub_extras!.map((n) => `"${n}"`).join(', ')}.</p>
+          // Nome extra ligado por engano vira a pessoa errada na importação (3.4.1): dá para tirar aqui.
+          <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+            Também reconhecido como:
+            {pessoa.nomes_hub_extras!.map((n) => (
+              <span key={n} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-slate-700">
+                “{n}”
+                <button type="button" disabled={ocupado} aria-label={`Tirar o nome "${n}"`}
+                        onClick={() => {
+                          if (!confirm(`Tirar "${n}" dos nomes de ${pessoa.nome} no Hub? As próximas importações deixam de ligar esse nome a ${pessoa.nome}.`)) return;
+                          executar(() => db().from('pessoas')
+                            .update({ nomes_hub_extras: (pessoa.nomes_hub_extras ?? []).filter((x) => x !== n) }).eq('id', pessoa.id));
+                        }}
+                        className="text-slate-400 hover:text-rose-600">×</button>
+              </span>
+            ))}
+          </p>
         )}
       </Secao>
 

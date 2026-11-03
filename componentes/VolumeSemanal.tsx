@@ -149,7 +149,16 @@ export default function VolumeSemanal({
   const [vindoDoHub, setVindoDoHub] = useState<Set<string>>(new Set());
   const porNomeHub = new Map<string, Pessoa>();
   for (const p of pessoas) for (const n of [p.nome_hub, ...(p.nomes_hub_extras ?? []), p.nome]) if (n) porNomeHub.set(normalizar(n), p);
-  const casar = (l: LinhaDoHub) => porNomeHub.get(normalizar(l.nome)) ?? pessoas.find((p) => p.id === ligar[l.nome]);
+  // Linha do Hub deixada de fora à mão (3.4.1): vale também para nome reconhecido.
+  const [deFora, setDeFora] = useState<Set<string>>(new Set());
+  const casar = (l: LinhaDoHub) => (deFora.has(l.nome) ? undefined
+    : porNomeHub.get(normalizar(l.nome)) ?? pessoas.find((p) => p.id === ligar[l.nome]));
+  // Duas linhas do Hub na mesma pessoa (3.4.1): antes a última sobrescrevia a
+  // outra em silêncio — em out/2026 o João Vitor ficou com os 3 da linha
+  // "Luciana Freire" (nome extra guardado por engano) no lugar dos 197 dele.
+  const linhasPorPessoa = new Map<string, string[]>();
+  for (const l of lidoDoHub ?? []) { const p = casar(l); if (p) linhasPorPessoa.set(p.id, [...(linhasPorPessoa.get(p.id) ?? []), l.nome]); }
+  const repetidas = new Set([...linhasPorPessoa.values()].filter((x) => x.length > 1).flat());
 
   async function preencherDoHub() {
     if (!lidoDoHub) return;
@@ -168,7 +177,7 @@ export default function VolumeSemanal({
         await db.rpc('salvar_nome_hub', { p_pessoa: ligar[l.nome], p_nome: l.nome, p_extra: true });
       }
     }
-    setColando(false); setLidoDoHub(null); setColado(''); setLigar({});
+    setColando(false); setLidoDoHub(null); setColado(''); setLigar({}); setDeFora(new Set());
     setAviso(`${vieram.size} pessoa(s) preenchidas do Hub. Confira e clique em Salvar ${semana}ª semana.`);
   }
 
@@ -225,10 +234,26 @@ export default function VolumeSemanal({
                     const p = casar(l);
                     const antes = p ? daSemana.get(p.id) : undefined;
                     return (
-                      <tr key={l.nome} className={`border-t border-slate-200 ${antes ? 'bg-amber-500/10' : ''}`}>
+                      <tr key={l.nome} className={`border-t border-slate-200 ${repetidas.has(l.nome) ? 'bg-rose-500/15' : antes ? 'bg-amber-500/10' : ''}`}>
                         <td className="py-1.5 pr-2 text-slate-700">{l.nome}</td>
                         <td className="py-1.5 pr-2">
-                          {automatico ? <span className="text-slate-800">{automatico.nome}</span> : (
+                          {deFora.has(l.nome) ? (
+                            <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">deixada de fora
+                              <button type="button" onClick={() => setDeFora((d) => { const n = new Set(d); n.delete(l.nome); return n; })}
+                                      className="text-marca-700 hover:underline dark:text-marca-400">voltar</button>
+                            </span>
+                          ) : automatico ? (
+                            <span className="inline-flex items-center gap-1.5">
+                              <span className="text-slate-800">{automatico.nome}</span>
+                              {repetidas.has(l.nome) && (
+                                <>
+                                  <span className="rounded-full bg-rose-500/15 px-2 py-px text-xs text-rose-700 dark:text-rose-300">mesma pessoa de outra linha</span>
+                                  <button type="button" onClick={() => setDeFora((d) => new Set(d).add(l.nome))}
+                                          className="text-xs text-marca-700 hover:underline dark:text-marca-400">deixar de fora</button>
+                                </>
+                              )}
+                            </span>
+                          ) : (
                             <span className="inline-flex items-center gap-1.5">
                               <span className="rounded-full bg-amber-500/15 px-2 py-px text-xs text-amber-700 dark:text-amber-300">não reconhecido</span>
                               <select value={ligar[l.nome] ?? ''} onChange={(e) => setLigar((s) => ({ ...s, [l.nome]: e.target.value }))}
@@ -257,10 +282,18 @@ export default function VolumeSemanal({
               <button type="button" onClick={() => setLidoDoHub(lerColagemDoHub(colado))} disabled={!colado.trim()}
                       className="rounded-lg bg-marca-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-40">Ler</button>
             ) : lidoDoHub.length > 0 && (
-              <button type="button" onClick={preencherDoHub}
-                      className="rounded-lg bg-marca-600 px-3 py-1.5 text-sm font-semibold text-white">Preencher a {semana}ª semana</button>
+              <button type="button" onClick={preencherDoHub} disabled={repetidas.size > 0}
+                      title={repetidas.size ? 'Resolva as linhas em vermelho antes' : undefined}
+                      className="rounded-lg bg-marca-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-40">Preencher a {semana}ª semana</button>
             )}
           </div>
+          {repetidas.size > 0 && (
+            <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800 ring-1 ring-rose-600/20">
+              Em vermelho, mais de uma linha do Hub cai na mesma pessoa ({[...linhasPorPessoa].filter(([, x]) => x.length > 1)
+                .map(([id, x]) => `${pessoas.find((p) => p.id === id)?.nome}: ${x.map((n) => `"${n}"`).join(' e ')}`).join('; ')}).
+              Deixe de fora a linha que não é dela; se o nome extra estiver errado, tire-o na ficha da pessoa.
+            </p>
+          )}
           {lidoDoHub && lidoDoHub.length > 0 && (
             <p className="mt-1 text-xs text-slate-500">
               Preencher só coloca os números no quadro abaixo; nada é gravado até <b>Salvar {semana}ª semana</b>. Em âmbar, quem

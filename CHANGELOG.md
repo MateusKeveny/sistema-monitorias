@@ -35,6 +35,19 @@ para o Performance.
 
 ---
 
+## Performance 3.4.1
+
+Sem migração. Monitorias e Agenda sem mudança.
+
+- **Performance (correção): colar do Hub não sobrescreve mais em silêncio.**
+  Quando duas linhas do Hub caíam na mesma pessoa, a última valia: em
+  outubro, o João Vitor ficou com os 3 resolvidos da linha "Luciana Freire"
+  (nome extra guardado por engano na ficha dele) no lugar dos 197 dele. Agora
+  as linhas repetidas ficam em vermelho, cada uma pode ser deixada de fora, e
+  o Preencher só libera depois de resolver. O nome extra errado foi tirado.
+- **Performance (correção): nomes extras do Hub na ficha da pessoa** ganham
+  um × para tirar o que foi ligado por engano.
+
 ## Performance 3.4.0 e Monitorias 6.1.1
 
 Sem migração. Agenda sem mudança.
