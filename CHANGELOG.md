@@ -35,6 +35,18 @@ para o Performance.
 
 ---
 
+## Performance 3.3.1
+
+Sem migração. Monitorias e Agenda sem mudança.
+
+- **Performance (correção): a importação reconhece o atendimento pelo
+  protocolo.** Antes era por data e protocolo, e quando o Hub mudava a data de
+  um atendimento no relatório corrigido, o mesmo protocolo entrava de novo
+  (em 03/11: 2 avaliações e 60 atendimentos do iGreen Mob em dobro, já
+  removidos/descartados). Agora, protocolo já gravado com outra data é
+  atualizado para a data do arquivo, como o atendente e a nota (3.3.0). Linha
+  repetida no próprio relatório fica com a que tem nota.
+
 ## Performance 3.3.0
 
 Sem migração. Monitorias e Agenda sem mudança.

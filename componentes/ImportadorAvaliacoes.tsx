@@ -67,12 +67,13 @@ type OutroSetor = {
 };
 
 /**
- * Avaliação já gravada que o arquivo traz diferente (3.3.0): o atendente ou a
+ * Avaliação já gravada que o arquivo traz diferente (3.3.1): o atendente ou a
  * nota mudaram no Hub. Vale o arquivo — menos em mês já fechado de quem estava
  * ou de quem passa a ter a avaliação.
  */
 type Atualizacao = {
-  data: string; protocolo: string; de_pessoa: string; para_pessoa: string;
+  /** data: a do arquivo; de_data: a gravada (o Hub às vezes muda a data do atendimento). */
+  data: string; de_data: string; protocolo: string; de_pessoa: string; para_pessoa: string;
   de_nota: number; para_nota: number; mes_fechado: boolean; origem_arquivo: string;
 };
 
@@ -183,8 +184,14 @@ export default function ImportadorAvaliacoes({
           const data = lerData(l[col.data]);
           if (ehRobo(atendente) || !data || !setor) continue;
           const protocolo = String(l[col.protocolo] ?? '').trim();
-          if (vistas.has(`${data}|${protocolo}`)) { a.repetidasNoLote++; continue; }
-          vistas.add(`${data}|${protocolo}`);
+          if (vistas.has(protocolo)) {
+            // Repetido no relatório: fica a linha que tem nota.
+            const notaAqui = Number(l[col.nota]);
+            const antes = a.outroSetor.find((x) => x.protocolo === protocolo);
+            if (antes && antes.nota == null && notaAqui >= 1 && notaAqui <= 5) antes.nota = notaAqui;
+            a.repetidasNoLote++; continue;
+          }
+          vistas.add(protocolo);
           const pessoa = porNomeHub.get(normalizar(atendente));
           if (!pessoa) { a.outroSetorSemPessoa++; continue; }
           if (pessoaDeFora(pessoa.id)) { a.deOutraEquipe++; continue; }
@@ -209,9 +216,9 @@ export default function ImportadorAvaliacoes({
       if (ehRobo(atendente)) { a.robo++; continue; }
 
       const protocolo = String(l[col.protocolo] ?? '').trim();
-      const chave = `${data}|${protocolo}`;
-      if (vistas.has(chave)) { a.repetidasNoLote++; continue; }
-      vistas.add(chave);
+      // O protocolo é único por conversa (3.3.1): a data pode mudar de um relatório para outro.
+      if (vistas.has(protocolo)) { a.repetidasNoLote++; continue; }
+      vistas.add(protocolo);
 
       const tabulacao = col.tabulacao && l[col.tabulacao] != null ? String(l[col.tabulacao]) : null;
       const pessoa = a.formato === 'hub' ? porNomeHub.get(normalizar(atendente)) : porEmail.get(normalizar(atendente));
@@ -243,12 +250,14 @@ export default function ImportadorAvaliacoes({
     const validos = lidos.filter((a) => !a.erro && a.periodo);
     if (validos.length) {
       setOcupado('Conferindo o que já foi importado…');
-      const de = validos.map((a) => a.periodo![0]).sort()[0];
+      // Com folga de 15 dias: o mesmo protocolo pode estar gravado com outra data (3.3.1).
+      const deslocar = (d: string, dias: number) => new Date(Date.parse(`${d}T12:00:00Z`) + dias * 86_400_000).toISOString().slice(0, 10);
+      const de = deslocar(validos.map((a) => a.periodo![0]).sort()[0], -15);
       const fins = validos.map((a) => a.periodo![1]).sort();
-      const ate = fins[fins.length - 1];
+      const ate = deslocar(fins[fins.length - 1], 15);
       const existentes = new Set<string>();
-      // As já gravadas, com quem e qual nota: o arquivo pode trazer diferente (3.3.0).
-      const gravadas = new Map<string, { pessoa_id: string; nota: number }>();
+      // As já gravadas, com quem e qual nota: o arquivo pode trazer diferente (3.3.1).
+      const gravadas = new Map<string, { data: string; pessoa_id: string; nota: number }>();
       const db = criarClienteNavegador();
       for (const tabela of ['avaliacoes', 'avaliacoes_guardadas'] as const) {
         for (let i = 0; ; i += PAGINA) {
@@ -256,8 +265,8 @@ export default function ImportadorAvaliacoes({
             .gte('data', de).lte('data', ate).order('data').order('protocolo').range(i, i + PAGINA - 1);
           if (error) { setErro(await mensagemDoErro(error)); setOcupado(null); return; }
           for (const r of (pag ?? []) as unknown as { data: string; protocolo: string; pessoa_id?: string; nota?: number }[]) {
-            existentes.add(`${r.data}|${r.protocolo}`);
-            if (r.pessoa_id) gravadas.set(`${r.data}|${r.protocolo}`, { pessoa_id: r.pessoa_id, nota: Number(r.nota) });
+            existentes.add(r.protocolo);
+            if (r.pessoa_id) gravadas.set(r.protocolo, { data: r.data, pessoa_id: r.pessoa_id, nota: Number(r.nota) });
           }
           if ((pag ?? []).length < PAGINA) break;
         }
@@ -272,12 +281,13 @@ export default function ImportadorAvaliacoes({
       }
       for (const a of validos) {
         for (const c of a.novas) {
-          const g = gravadas.get(`${c.data}|${c.protocolo}`);
-          if (!g || (g.pessoa_id === c.pessoa_id && g.nota === c.nota)) continue;
+          const g = gravadas.get(c.protocolo);
+          if (!g || (g.pessoa_id === c.pessoa_id && g.nota === c.nota && g.data === c.data)) continue;
           const mes = mesDeCompetencia(c.data);
-          a.atualizar.push({ data: c.data, protocolo: c.protocolo, de_pessoa: g.pessoa_id, para_pessoa: c.pessoa_id,
+          const mesAntes = mesDeCompetencia(g.data);
+          a.atualizar.push({ data: c.data, de_data: g.data, protocolo: c.protocolo, de_pessoa: g.pessoa_id, para_pessoa: c.pessoa_id,
             de_nota: g.nota, para_nota: c.nota, origem_arquivo: c.origem_arquivo,
-            mes_fechado: fechados.has(`${g.pessoa_id}|${mes}`) || fechados.has(`${c.pessoa_id}|${mes}`) });
+            mes_fechado: fechados.has(`${g.pessoa_id}|${mesAntes}`) || fechados.has(`${c.pessoa_id}|${mes}`) });
         }
       }
       // Outro setor já guardado (pendente, lançado ou descartado) não volta.
@@ -286,16 +296,16 @@ export default function ImportadorAvaliacoes({
         const { data: pag, error } = await db.from('atendimentos_outro_setor').select('data, protocolo')
           .gte('data', de).lte('data', ate).order('data').order('protocolo').range(i, i + PAGINA - 1);
         if (error) { setErro(await mensagemDoErro(error)); setOcupado(null); return; }
-        for (const r of pag ?? []) jaOutro.add(`${r.data}|${r.protocolo}`);
+        for (const r of pag ?? []) jaOutro.add(r.protocolo);
         if ((pag ?? []).length < PAGINA) break;
       }
       for (const a of validos) {
         const antesOutro = a.outroSetor.length;
-        a.outroSetor = a.outroSetor.filter((c) => !jaOutro.has(`${c.data}|${c.protocolo}`));
+        a.outroSetor = a.outroSetor.filter((c) => !jaOutro.has(c.protocolo));
         a.outroSetorJa = antesOutro - a.outroSetor.length;
         const antes = a.novas.length + a.guardar.length;
-        a.novas = a.novas.filter((c) => !existentes.has(`${c.data}|${c.protocolo}`));
-        a.guardar = a.guardar.filter((c) => !existentes.has(`${c.data}|${c.protocolo}`));
+        a.novas = a.novas.filter((c) => !existentes.has(c.protocolo));
+        a.guardar = a.guardar.filter((c) => !existentes.has(c.protocolo));
         a.jaImportadas = antes - a.novas.length - a.guardar.length;
       }
     }
@@ -326,12 +336,12 @@ export default function ImportadorAvaliacoes({
     const agora = new Date().toISOString();
     const lote = 500;
 
-    // Já gravadas, diferentes no arquivo: vale o arquivo (3.3.0).
+    // Já gravadas, diferentes no arquivo: vale o arquivo (3.3.1).
     for (let i = 0; i < atualizar.length; i += 20) {
       const resultados = await Promise.all(atualizar.slice(i, i + 20).map((u) => db.from('avaliacoes')
-        .update({ pessoa_id: u.para_pessoa, nota: u.para_nota, origem_arquivo: u.origem_arquivo,
+        .update({ data: u.data, pessoa_id: u.para_pessoa, nota: u.para_nota, origem_arquivo: u.origem_arquivo,
                   importado_por: importadoPor, importado_em: agora })
-        .eq('data', u.data).eq('protocolo', u.protocolo)));
+        .eq('data', u.de_data).eq('protocolo', u.protocolo)));
       const falha = resultados.find((r) => r.error)?.error;
       if (falha) {
         setErro(`Falha ao atualizar avaliações já gravadas: ${await mensagemDoErro(falha)}. Nada mais foi importado; tente de novo.`);
@@ -458,7 +468,7 @@ export default function ImportadorAvaliacoes({
       <p className="mb-4 text-sm text-slate-600">
         Relatórios de atendimentos do Hub (<code>.xlsx</code>), um ou vários de uma vez. Entram só as avaliações com nota
         de 1 a 5, cada uma na fila do seu setor (Configuração › Setores e filas).
-        A mesma avaliação (data e protocolo) entra uma vez só; se ela já estava gravada e o arquivo traz outro
+        A mesma avaliação (o mesmo protocolo) entra uma vez só; se ela já estava gravada e o arquivo traz outro
         atendente ou outra nota, vale o arquivo (menos em mês já fechado). Nota de atendente não reconhecido fica guardada;
         conversa só com o robô é ignorada. Atendimento de <strong>outro setor</strong> vira demanda extra pendente, para
         decidir em Lançamentos.
@@ -542,7 +552,9 @@ export default function ImportadorAvaliacoes({
                     {[...atualizar.reduce((m, u) => {
                       const txt = u.de_pessoa !== u.para_pessoa
                         ? `${nomePessoa.get(u.de_pessoa) ?? '—'} → ${nomePessoa.get(u.para_pessoa) ?? '—'}`
-                        : `${nomePessoa.get(u.para_pessoa) ?? '—'}: nota ${u.de_nota} → ${u.para_nota}`;
+                        : u.de_nota !== u.para_nota
+                          ? `${nomePessoa.get(u.para_pessoa) ?? '—'}: nota ${u.de_nota} → ${u.para_nota}`
+                          : `${nomePessoa.get(u.para_pessoa) ?? '—'}: data do atendimento mudou no Hub`;
                       return m.set(txt, (m.get(txt) ?? 0) + 1);
                     }, new Map<string, number>())].sort((a, b) => b[1] - a[1]).map(([txt, n]) => (
                       <li key={txt}>{txt} <span className="text-sky-700">· {n}</span></li>
