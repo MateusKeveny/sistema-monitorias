@@ -35,6 +35,24 @@ para o Performance.
 
 ---
 
+## Performance 3.1.0 e Monitorias 6.1.0 — acesso por setor
+
+`supabase/94-acesso-por-setor.sql` (ensaio: `94-ensaio-com-dois-setores.sql`,
+51 testes com um segundo setor de mentira). Com um setor só, ninguém perde nem
+ganha nada: a migração prova que gestor, qualidade, atendente e o admin
+enxergam o mesmo de antes e que a cota não muda. Agenda sem mudança.
+
+- **Performance e Monitorias (atualização): papel administrador.** A conta
+  "admin" vê e mexe em todos os setores (cadastro da árvore, cargos,
+  correções); nas telas, entra como gestor. Só ele cria e apaga setor e dá o
+  papel de administrador.
+- **Performance e Monitorias (atualização): cada um no seu setor.** Gestor e
+  qualidade veem e gravam só pessoas, lançamentos, importações, métricas,
+  cargos, regras, monitorias e fechamento do setor em que estão; o atendente
+  segue vendo só o que é dele. Uma guarda no banco recusa ("Fora do seu
+  setor") qualquer gravação em outro setor, inclusive pelas funções que
+  importam, movem e fecham. Pessoa nova nasce no setor de quem a cria.
+
 ## Performance 3.0.0 e Monitorias 6.0.0 — a árvore de setores
 
 Migrações 79 a 93, todas já rodadas no banco (cada uma com a prova de que a
