@@ -35,6 +35,16 @@ para o Performance.
 
 ---
 
+## Performance 3.2.1
+
+Sem migração. Monitorias e Agenda sem mudança.
+
+- **Performance (correção): Novidades.** Para a gestão, a janela passa a ser a
+  da 3.2 (acesso por setor, Árvore, Configuração por setor e cargo e, para o
+  administrador, criar setor e mover atendentes), com a 3.0 resumida no pé;
+  aparece uma vez para quem ainda não viu. Depois do "Entendi", somem a
+  janela e o link do rodapé. O atendente não teve novidade e não vê de novo.
+
 ## Performance 3.2.0
 
 Sem migração. Monitorias e Agenda não mudam de versão (só ganharam a assinatura).
