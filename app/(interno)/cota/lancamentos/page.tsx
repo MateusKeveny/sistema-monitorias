@@ -206,7 +206,8 @@ export default async function LancamentosDeCota({
         <VolumeSemanal
           key={`${competencia}-${canal}-${s}`}
           canal={canal} nomeFila={fila.nome} competencia={competencia} semana={s} periodo={periodo}
-          pessoas={pessoasDoVolume} volumes={listaVolumes} esperados={[...esperados]} recebem={recebem}
+          pessoas={pessoasDoVolume} volumes={listaVolumes}
+          cadastro={((pessoas.data ?? []) as Pessoa[]).map((p) => ({ id: p.id, nome: p.nome, nome_hub: p.nome_hub ?? null }))} esperados={[...esperados]} recebem={recebem}
         />
       ),
     };

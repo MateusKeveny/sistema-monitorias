@@ -56,8 +56,10 @@ const entrada = `w-24 rounded-md border border-slate-300 px-2 py-1 text-right te
  * como referência para pegar erro de digitação.
  */
 export default function VolumeSemanal({
-  competencia, canal, nomeFila, semana, periodo, pessoas: todas, volumes, esperados, recebem = [],
+  competencia, canal, nomeFila, semana, periodo, pessoas: todas, volumes, esperados, recebem = [], cadastro = [],
 }: {
+  /** Todo o cadastro (3.5.0): nome do Hub que é de outra pessoa não liga a ninguém. */
+  cadastro?: { id: string; nome: string; nome_hub: string | null }[];
   /** Para quem dá para mover o volume (⇄ mover, migração 71). */
   recebem?: { id: string; nome: string }[];
   competencia: string;
@@ -151,8 +153,22 @@ export default function VolumeSemanal({
   for (const p of pessoas) for (const n of [p.nome_hub, ...(p.nomes_hub_extras ?? []), p.nome]) if (n) porNomeHub.set(normalizar(n), p);
   // Linha do Hub deixada de fora à mão (3.4.1): vale também para nome reconhecido.
   const [deFora, setDeFora] = useState<Set<string>>(new Set());
-  const casar = (l: LinhaDoHub) => (deFora.has(l.nome) ? undefined
+  // Linha do Hub com o nome de outra pessoa do cadastro, fora desta fila (3.5.0):
+  // em out e nov/2026 a "Luciana Freire" foi parar no João Vitor como nome
+  // extra e levou o volume dela para ele. O nome de alguém nunca vale como
+  // nome extra de outro: a linha fica de fora, sem opção de ligar.
+  const naLista = new Set(pessoas.map((p) => p.id));
+  const donoNoCadastro = new Map<string, { id: string; nome: string }>();
+  for (const c of cadastro) for (const n of [c.nome, c.nome_hub]) if (n) donoNoCadastro.set(normalizar(n), c);
+  const deOutraPessoa = (l: LinhaDoHub) => {
+    const dono = donoNoCadastro.get(normalizar(l.nome));
+    return dono && !naLista.has(dono.id) ? dono : undefined;
+  };
+  const casar = (l: LinhaDoHub) => (deFora.has(l.nome) || deOutraPessoa(l) ? undefined
     : porNomeHub.get(normalizar(l.nome)) ?? pessoas.find((p) => p.id === ligar[l.nome]));
+  /** Reconhecido por um nome extra (não pelo nome nem pelo Nome no Hub): fica à vista. */
+  const peloExtra = (l: LinhaDoHub, p: Pessoa) => normalizar(l.nome) !== normalizar(p.nome)
+    && normalizar(l.nome) !== normalizar(p.nome_hub ?? '');
   // Duas linhas do Hub na mesma pessoa (3.4.1): antes a última sobrescrevia a
   // outra em silêncio — em out/2026 o João Vitor ficou com os 3 da linha
   // "Luciana Freire" (nome extra guardado por engano) no lugar dos 197 dele.
@@ -173,7 +189,7 @@ export default function VolumeSemanal({
     // Quem foi ligado à mão fica lembrado como outro Nome no Hub da pessoa.
     const db = criarClienteNavegador();
     for (const l of lidoDoHub) {
-      if (!porNomeHub.has(normalizar(l.nome)) && ligar[l.nome]) {
+      if (!porNomeHub.has(normalizar(l.nome)) && !deOutraPessoa(l) && ligar[l.nome]) {
         await db.rpc('salvar_nome_hub', { p_pessoa: ligar[l.nome], p_nome: l.nome, p_extra: true });
       }
     }
@@ -232,12 +248,17 @@ export default function VolumeSemanal({
                   {lidoDoHub.map((l) => {
                     const automatico = porNomeHub.get(normalizar(l.nome));
                     const p = casar(l);
+                    const outra = deOutraPessoa(l);
                     const antes = p ? daSemana.get(p.id) : undefined;
                     return (
                       <tr key={l.nome} className={`border-t border-slate-200 ${repetidas.has(l.nome) ? 'bg-rose-500/15' : antes ? 'bg-amber-500/10' : ''}`}>
                         <td className="py-1.5 pr-2 text-slate-700">{l.nome}</td>
                         <td className="py-1.5 pr-2">
-                          {deFora.has(l.nome) ? (
+                          {outra ? (
+                            <span className="inline-flex items-center gap-1.5">
+                              <span className="rounded-full bg-rose-500/15 px-2 py-px text-xs text-rose-700 dark:text-rose-300">fora: é {outra.nome}, que não pontua nesta fila</span>
+                            </span>
+                          ) : deFora.has(l.nome) ? (
                             <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">deixada de fora
                               <button type="button" onClick={() => setDeFora((d) => { const n = new Set(d); n.delete(l.nome); return n; })}
                                       className="text-marca-700 hover:underline dark:text-marca-400">voltar</button>
@@ -245,6 +266,10 @@ export default function VolumeSemanal({
                           ) : automatico ? (
                             <span className="inline-flex items-center gap-1.5">
                               <span className="text-slate-800">{automatico.nome}</span>
+                              {peloExtra(l, automatico) && (
+                                <span className="rounded-full bg-amber-500/15 px-2 py-px text-xs text-amber-700 dark:text-amber-300"
+                                      title="Ligado por um nome extra guardado na ficha. Se não for dela, tire-o na ficha da pessoa.">pelo nome extra</span>
+                              )}
                               {repetidas.has(l.nome) && (
                                 <>
                                   <span className="rounded-full bg-rose-500/15 px-2 py-px text-xs text-rose-700 dark:text-rose-300">mesma pessoa de outra linha</span>
@@ -264,7 +289,7 @@ export default function VolumeSemanal({
                             </span>
                           )}
                         </td>
-                        <td className="py-1.5 text-right font-semibold">{l.resolvidos.toLocaleString('pt-BR')}</td>
+                        <td className={`py-1.5 text-right font-semibold ${outra ? 'text-slate-400 line-through' : ''}`}>{l.resolvidos.toLocaleString('pt-BR')}</td>
                         <td className="py-1.5 text-right">{paraTempo(l.tmaSeg) || '—'}</td>
                         <td className="py-1.5 text-right">{paraTempo(l.tmeUtilSeg) || '—'}</td>
                         <td className="py-1.5 pl-2 text-xs text-amber-700 dark:text-amber-300">{antes ? `substitui ${antes.finalizados}` : ''}</td>

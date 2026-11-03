@@ -49,6 +49,13 @@ Sem migração. Monitorias e Agenda sem mudança.
 - **Performance (correção):** semana encerrada ainda sem nenhum volume
   importado não entra na conferência — é importação por fazer, já avisada
   como "semana sem volume", e não anomalia de cada pessoa.
+- **Performance (correção): colar do Hub não liga o nome de outra pessoa.**
+  Linha do Hub com o nome (ou Nome no Hub) de alguém do cadastro que não
+  pontua na fila fica riscada como "fora" e não pode ser ligada a outro.
+  Em novembro, a linha "Luciana Freire" de Diretores ia de novo para o João
+  Vitor, porque o nome dela tinha voltado à ficha dele como nome extra (tirado
+  outra vez). Quem é reconhecido por nome extra agora aparece marcado "pelo
+  nome extra", para ficar à vista.
 
 ## Monitorias 6.2.0 e Performance 3.4.2
 
