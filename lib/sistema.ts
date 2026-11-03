@@ -31,7 +31,8 @@ export const ENDERECO_MONITORIAS = 'https://painel-monitorias.expansao.workers.d
 export const ENDERECO_PERFORMANCE = 'https://painel-performance.expansao.workers.dev';
 
 /** A assinatura do projeto (3.2.0): no rodapé do menu e no login dos três sites. */
-export const ASSINATURA = 'by Mateus Keveny';
+export const AUTOR = 'Mateus Keveny';
+export const ASSINATURA = `Desenvolvido por ${AUTOR}`;
 
 /** Página inicial do site de cota. */
 export const INICIO_COTA = '/cota';
