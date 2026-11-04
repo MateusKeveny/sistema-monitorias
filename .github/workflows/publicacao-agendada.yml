@@ -1,0 +1,134 @@
+name: Publicação agendada (22h)
+
+# Publica à noite, com o computador do gestor desligado (04/11/2026): logo
+# depois de publicar, o plano gratuito da Cloudflare devolve o erro 1102 por
+# alguns minutos (a partida do site passa do limite de processamento), e o
+# gestor decidiu ficar no gratuito e publicar em horário de pouco uso.
+#
+# Como funciona:
+# - A versão aprovada de dia vai para a branch `agendado`.
+# - Às 22h (01h UTC), se `agendado` mudou desde a última tentativa, monta o
+#   projeto e publica só os sites cuja versão mudou: Monitorias (package.json),
+#   Performance (VERSAO_COTA) e Agenda (VERSAO_AGENDA), contra a tag `publicado`.
+# - Confere cada site publicado a cada 30 s por 15 min. Se nos últimos 5 min
+#   ainda houver erro (3 ou mais de 10), volta aquele site para a versão de
+#   antes, sozinho, e a execução termina com falha (o GitHub avisa por e-mail).
+# - Tudo certo: a tag `publicado` passa a apontar para `agendado`.
+#
+# Chaves (Settings › Secrets and variables › Actions), cadastradas pelo gestor:
+# CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, NEXT_PUBLIC_SUPABASE_URL,
+# NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_AGENDA_SUPABASE_URL,
+# NEXT_PUBLIC_AGENDA_SUPABASE_ANON_KEY.
+
+on:
+  schedule:
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+    inputs:
+      forcar:
+        description: 'Publicar mesmo que já tenha tentado esta versão'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publicacao
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_AGENDA_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_AGENDA_SUPABASE_URL }}
+      NEXT_PUBLIC_AGENDA_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_AGENDA_SUPABASE_ANON_KEY }}
+
+    steps:
+      - name: Baixar a versão agendada
+        uses: actions/checkout@v4
+        with:
+          ref: agendado
+          fetch-depth: 0
+
+      - name: O que mudou
+        id: mudou
+        run: |
+          git fetch --tags --force
+          agora=$(git rev-parse HEAD)
+          tentada=$(git rev-parse -q --verify 'refs/tags/ultima-tentativa^{commit}' || true)
+          if [ "$agora" = "$tentada" ] && [ "${{ inputs.forcar }}" != "true" ]; then
+            echo "Nada novo em 'agendado' desde a última tentativa ($agora)."; echo "sites=" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          base=$(git rev-parse -q --verify 'refs/tags/publicado^{commit}' || true)
+          versao() { git show "$1:$2" 2>/dev/null | grep -oE "$3" | head -1; }
+          sites=""
+          [ "$(versao "$base" package.json '"version": "[^"]+"')" != "$(versao HEAD package.json '"version": "[^"]+"')" ] && sites="$sites monitorias"
+          [ "$(versao "$base" lib/versoes.ts "VERSAO_COTA = '[^']+'")" != "$(versao HEAD lib/versoes.ts "VERSAO_COTA = '[^']+'")" ] && sites="$sites performance"
+          [ "$(versao "$base" lib/versoes.ts "VERSAO_AGENDA = '[^']+'")" != "$(versao HEAD lib/versoes.ts "VERSAO_AGENDA = '[^']+'")" ] && sites="$sites agenda"
+          echo "Base (publicado): ${base:-nenhuma} · agendado: $agora · sites:${sites:- nenhum}"
+          echo "sites=$sites" >> "$GITHUB_OUTPUT"
+          echo "commit=$agora" >> "$GITHUB_OUTPUT"
+
+      - name: Preparar o Node
+        if: steps.mudou.outputs.sites != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Montar
+        if: steps.mudou.outputs.sites != ''
+        run: |
+          npm ci
+          npx opennextjs-cloudflare build
+
+      - name: Publicar e conferir
+        if: steps.mudou.outputs.sites != ''
+        run: |
+          set -u
+          git config user.name "Publicação agendada"
+          git config user.email "actions@users.noreply.github.com"
+          git tag -f ultima-tentativa "${{ steps.mudou.outputs.commit }}"
+          git push -f origin refs/tags/ultima-tentativa
+
+          worker() { case "$1" in monitorias) echo painel-monitorias;; performance) echo painel-performance;; agenda) echo painel-agenda;; esac; }
+          ambiente() { case "$1" in monitorias) echo "";; *) echo "--env $1";; esac; }
+
+          falhou=""
+          for s in ${{ steps.mudou.outputs.sites }}; do
+            w=$(worker "$s")
+            antes=$(npx wrangler deployments status --name "$w" --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);console.log(j.versions.sort((a,b)=>b.percentage-a.percentage)[0].version_id)})')
+            echo "::group::$s ($w): publicando; versão de antes $antes"
+            npx opennextjs-cloudflare deploy $(ambiente "$s")
+            echo "::endgroup::"
+
+            url="https://$w.expansao.workers.dev/login"
+            erros=()
+            for i in $(seq 1 30); do
+              sleep 30
+              c=$(curl -s -o /dev/null -m 20 -w '%{http_code}' "$url" || echo 000)
+              case "$c" in 5*|000) erros+=(1);; *) erros+=(0);; esac
+              echo "$s · $(date -u +%H:%M:%S) · $c"
+            done
+            ultimos=$(printf '%s\n' "${erros[@]: -10}" | grep -c 1 || true)
+            if [ "$ultimos" -ge 3 ]; then
+              echo "::error::$s ainda com erro nos últimos 5 min ($ultimos de 10): voltando para $antes"
+              npx wrangler rollback "$antes" --name "$w" --message "publicação agendada: erro após 15 min, volta automática" -y
+              falhou="$falhou $s"
+            else
+              echo "$s no ar ($ultimos erros nos últimos 10)."
+            fi
+          done
+
+          if [ -n "$falhou" ]; then
+            echo "::error::Voltaram para a versão anterior:$falhou"
+            exit 1
+          fi
+          git tag -f publicado "${{ steps.mudou.outputs.commit }}"
+          git push -f origin refs/tags/publicado
