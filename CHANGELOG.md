@@ -50,8 +50,9 @@ Sem migração. Monitorias e Agenda sem mudança.
 - **Performance (atualização): aba Geral no Comparativo** (a primeira).
   Tudo mês a mês, contra o mês anterior: atendimentos lançados (todas as
   filas), avaliações, taxa de avaliação, C-SAT de todas as filas, nota de
-  monitoria e pontuação média; gráficos no visual 3.0 (atendimentos ×
-  avaliações, taxa de avaliação, C-SAT × monitoria); quadro mês a mês (com o volume de
+  monitoria e pontuação média; três gráficos no visual 3.0, cada série com
+  a sua cor e legenda (atendimentos e avaliações em barras com a taxa de
+  avaliação em linha; taxa de avaliação por fila; C-SAT e monitoria); quadro mês a mês (com o volume de
   cada fila, notas 1 a 3 e monitorias); e a ficha do mês por atendente, tudo
   numa linha. Atendimentos, avaliações e C-SAT contam todo mundo (panorama
   geral); as médias de monitoria e pontuação seguem quem entra nas médias.

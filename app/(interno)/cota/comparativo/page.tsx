@@ -2,6 +2,7 @@ import Link from '@/componentes/Link';
 import Abas from '@/componentes/Abas';
 import { AbasDeCanal, NoCanal, ProvedorDeCanal, type Canal } from '@/componentes/Canal';
 import GraficoDeLinha, { type PontoDaLinha } from '@/componentes/GraficoDeLinha';
+import GraficoBarrasELinha from '@/componentes/GraficoBarrasELinha';
 import { Painel, Secao, Vazio } from '@/componentes/ui';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { percentual } from '@/lib/formatar';
@@ -448,33 +449,42 @@ export default async function Comparativo({
         ))}
       </div>
 
-      {/* Gráficos no visual 3.0 (GraficoDeLinha), como as outras abas: a
-          série principal colorida e a de comparação em cinza, atrás. */}
+      {/* Gráficos no visual 3.0, cada série com a sua cor e legenda. */}
       <Painel>
-        <Secao titulo="Atendimentos × avaliações" subtitulo="Atendimentos lançados (todas as filas) e, em cinza, as avaliações do Hub, mês a mês.">
-          <GraficoDeLinha largura={Math.max(1400, meses.length * 120)} rotulos={meses.map(rotuloMes)} formatar={inteiro}
-                          pontos={geralEquipe.map((g): PontoDaLinha => (g.atendimentos ? { valor: g.atendimentos, tom: 'bom' } : null))}
-                          comparacao={{ pontos: geralEquipe.map((g) => g.avaliacoes || null), rotulo: 'Avaliações', rotuloAtual: 'Atendimentos' }} />
+        <Secao titulo="Atendimentos × avaliações" subtitulo="Barras: atendimentos lançados (todas as filas) e avaliações do Hub. Linha: a taxa de avaliação, no eixo da direita.">
+          <GraficoBarrasELinha largura={Math.max(1400, meses.length * 120)} rotulos={meses.map(rotuloMes)}
+                               formatar={inteiro} formatarDir={percentual} minDir={0}
+                               barras={[
+                                 { nome: 'Atendimentos', cor: 'var(--color-slate-400)', valores: geralEquipe.map((g) => g.atendimentos || null) },
+                                 { nome: 'Avaliações', cor: 'var(--color-marca-600)', valores: geralEquipe.map((g) => g.avaliacoes || null) },
+                               ]}
+                               linhas={[{ nome: 'Taxa de avaliação', cor: 'var(--color-amber-500)', direita: true, valores: geralEquipe.map(taxaDe) }]} />
         </Secao>
       </Painel>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <Painel>
-          <Secao titulo="Taxa de avaliação" subtitulo="Avaliações ÷ atendimentos. Linha tracejada: a média do período.">
-            <GraficoDeLinha largura={760} rotulos={meses.map(rotuloMes)} formatar={percentual} min={0}
-                            max={Math.min(1, Math.max(0.5, ...semNulos(geralEquipe.map(taxaDe))) * 1.15)}
-                            referencia={media(semNulos(geralEquipe.map(taxaDe))) != null
-                              ? { valor: media(semNulos(geralEquipe.map(taxaDe)))!, rotulo: `média ${percentual(media(semNulos(geralEquipe.map(taxaDe)))!)}` } : undefined}
-                            pontos={geralEquipe.map((g): PontoDaLinha => (taxaDe(g) == null ? null : { valor: taxaDe(g)!, tom: 'bom' }))} />
+          <Secao titulo="Taxa de avaliação por fila" subtitulo="Quanto de cada fila foi avaliado: avaliações ÷ atendimentos.">
+            <GraficoBarrasELinha largura={760} rotulos={meses.map(rotuloMes)} formatar={percentual} min={0}
+                                 linhas={filasNosDados.map((c, k) => ({
+                                   nome: c === 'huggy' ? 'Expansão' : c === 'diretores' ? 'Diretores' : c,
+                                   cor: k === 0 ? 'var(--color-marca-600)' : '#0ea5e9',
+                                   valores: meses.map((m) => {
+                                     const a = indice.get(em(TODOS, c, m));
+                                     // Sem avaliação importada no mês (planilhas antigas): sem dado, não 0%.
+                                     return a?.finalizados && a.avaliacoes ? a.avaliacoes / a.finalizados : null;
+                                   }),
+                                 }))} />
           </Secao>
         </Painel>
         <Painel>
-          <Secao titulo="C-SAT e monitoria" subtitulo="C-SAT de todas as filas (com a cor da escala) e, em cinza, a nota de monitoria. Tracejada: a meta de 95%.">
-            <GraficoDeLinha largura={760} rotulos={meses.map(rotuloMes)} formatar={percentual} min={0.7} max={1}
-                            referencia={{ valor: 0.95, rotulo: 'meta 95%' }}
-                            pontos={geralEquipe.map((g): PontoDaLinha => (csatDoGeral(g) == null ? null
-                              : { valor: csatDoGeral(g)!, tom: TOM_LINHA[tomDoCsat(csatDoGeral(g)!)] }))}
-                            comparacao={{ pontos: notaEquipe, rotulo: 'Monitoria', rotuloAtual: 'C-SAT' }} />
+          <Secao titulo="C-SAT e monitoria" subtitulo="C-SAT de todas as filas e a nota média de monitoria. Tracejada: a meta de 95%.">
+            <GraficoBarrasELinha largura={760} rotulos={meses.map(rotuloMes)} formatar={percentual} min={0.7} max={1}
+                                 referencia={{ valor: 0.95, rotulo: 'meta 95%' }}
+                                 linhas={[
+                                   { nome: 'C-SAT', cor: 'var(--color-marca-600)', valores: geralEquipe.map(csatDoGeral) },
+                                   { nome: 'Monitoria', cor: '#8b5cf6', valores: notaEquipe },
+                                 ]} />
           </Secao>
         </Painel>
       </div>
