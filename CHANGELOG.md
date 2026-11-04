@@ -35,6 +35,17 @@ para o Performance.
 
 ---
 
+## Performance 3.6.0
+
+Migração 96 (só tabela nova). Monitorias e Agenda sem mudança.
+
+- **Performance (atualização): Conferência dos números com "Ciente".** Cada
+  aviso ganha o botão Ciente (e "Marcar os N como ciente"); o que foi
+  conferido sai da tela inicial, do aviso e da confirmação extra do Fechar, e
+  fica em "Ver os N já conferidos" com quem marcou, quando e desfazer. Se o
+  número mudar, o aviso volta: o ciente vale para aquele número. Os 10 avisos
+  de outubro foram marcados pelo gestor em 04/11/2026.
+
 ## Performance 3.5.0
 
 Sem migração. Monitorias e Agenda sem mudança.

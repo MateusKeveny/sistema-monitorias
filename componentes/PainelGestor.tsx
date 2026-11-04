@@ -10,7 +10,7 @@ import { fonteDoMes } from '@/lib/resumo';
 import ProjecaoDaCota from '@/componentes/ProjecaoDaCota';
 import { limiteDeRenovacao, pessoasComLeituraPendente, type LeituraDiario } from '@/lib/diario';
 import { todas } from '@/lib/consultas';
-import { conferirNumerosDoMes } from '@/lib/conferenciaDoMes';
+import { conferirNumerosDoMes, pendentesDaConferencia } from '@/lib/conferenciaDoMes';
 import { setorDoCookie } from '@/lib/setorEscolhido';
 import { MONITORIAS_PADRAO, monitoriasPorSetor, setorDaTela, textoDoPiso } from '@/lib/monitoriasDoSetor';
 
@@ -229,12 +229,12 @@ export default async function PainelGestor({
   // o mês não fecha — o volume de 3 no lugar de 197 (out/2026) só apareceu no
   // fim do mês.
   if (!fechadoEm(competencia)) {
-    const alertas = await conferirNumerosDoMes(db, {
+    const alertas = pendentesDaConferencia(await conferirNumerosDoMes(db, {
       competencia, semanasEncerradas: semanasEsperadas,
       pessoas: todasAsCotas.map((c) => ({ pessoa_id: c.pessoa_id, pessoa: c.pessoa })),
       volumes: todoVolume.filter((v) => v.mes_competencia === competencia),
       csats: todoCsat.filter((c) => c.mes_competencia === competencia),
-    });
+    }));
     const graves = alertas.filter((a) => a.grave).length;
     if (alertas.length) {
       pendencias.push({

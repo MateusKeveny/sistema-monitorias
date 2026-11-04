@@ -2,7 +2,7 @@ import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
 import ConferenciaDoCalculo, { type Rodada } from '@/componentes/ConferenciaDoCalculo';
 import { hojeNoBrasil, mesDeCompetencia, mesRotulo, semanaDoCiclo } from '@/lib/formatar';
 import { fonteDoMes } from '@/lib/resumo';
-import { conferirNumerosDoMes, type Csat, type Volume } from '@/lib/conferenciaDoMes';
+import { conferirNumerosDoMes, pendentesDaConferencia, type Csat, type Volume } from '@/lib/conferenciaDoMes';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,12 +25,14 @@ export default async function Conferencia() {
   const { data: pessoas } = await db.from(fonte.mensal).select('pessoa_id, pessoa').eq('mes_competencia', competencia);
   const semanasEncerradas = Math.max(0, semanaDoCiclo(hojeNoBrasil()) - 1);
   const importadas = new Set(((volumes ?? []) as Volume[]).map((v) => v.semana).filter((x) => x <= semanasEncerradas)).size;
-  const alertas = await conferirNumerosDoMes(db, {
+  const todosAlertas = await conferirNumerosDoMes(db, {
     competencia, semanasEncerradas,
     pessoas: (pessoas ?? []) as { pessoa_id: string; pessoa: string }[],
     volumes: (volumes ?? []) as Volume[],
     csats: (csats ?? []) as Csat[],
   });
+  const alertas = pendentesDaConferencia(todosAlertas);
+  const cientes = todosAlertas.length - alertas.length;
 
   return (
     <div className="space-y-5">
@@ -47,7 +49,8 @@ export default async function Conferencia() {
                                 ? `${mesRotulo(competencia).toLowerCase()}: nenhuma semana encerrada ainda`
                                 : `${mesRotulo(competencia).toLowerCase()}: ${semanasEncerradas} semana${semanasEncerradas > 1 ? 's' : ''} encerrada${semanasEncerradas > 1 ? 's' : ''}`
                                   + (importadas < semanasEncerradas ? ` (${importadas ? `${importadas} com volume importado` : 'nenhuma com volume importado ainda'})` : '')
-                                  + (alertas.length ? `, ${alertas.length} fora do padrão — confira no Fechamento` : ''),
+                                  + (alertas.length ? `, ${alertas.length} fora do padrão — confira no Fechamento` : '')
+                                  + (cientes ? ` · ${cientes} já conferido${cientes > 1 ? 's' : ''} (ciente)` : ''),
                               itens: alertas.map((a) => `${a.grave ? '' : '(atenção) '}${a.pessoa}: ${a.texto}`),
                             }} />
     </div>

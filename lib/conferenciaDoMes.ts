@@ -10,7 +10,13 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type Volume = { pessoa_id: string; semana: number; canal: string; finalizados: number };
 export type Csat = { pessoa_id: string; semana: number; origem: string; avaliacoes: number; positivas: number };
-export type Alerta = { pessoa_id: string; pessoa: string; grave: boolean; texto: string };
+export type Alerta = {
+  pessoa_id: string; pessoa: string; grave: boolean; texto: string;
+  /** tipo|fila|semana: com o texto, reconhece o aviso marcado como ciente (3.6.0). */
+  chave: string;
+  /** Marcado como ciente pelo gestor, para este mesmo número (migração 96). */
+  ciente?: { id: number; por: string | null; em: string };
+};
 
 const avaliacoes = (n: number) => `${n} ${n === 1 ? 'avaliação' : 'avaliações'}`;
 const pct = (v: number) => `${(v * 100).toFixed(1).replace('.', ',')}%`;
@@ -37,14 +43,14 @@ export function conferirMes({ pessoas, volumes, csats, semanasEncerradas, filas,
   const nomeFila = (c: string) => filas.get(c) ?? c;
 
   for (const p of pessoas) {
-    const add = (grave: boolean, texto: string) => alertas.push({ pessoa_id: p.pessoa_id, pessoa: p.pessoa, grave, texto });
+    const add = (grave: boolean, texto: string, chave: string) => alertas.push({ pessoa_id: p.pessoa_id, pessoa: p.pessoa, grave, texto, chave });
     const vols = volumes.filter((v) => v.pessoa_id === p.pessoa_id);
     const cs = csats.filter((c) => c.pessoa_id === p.pessoa_id);
     const totalMes = vols.filter((v) => semanas.includes(v.semana)).reduce((a, v) => a + Number(v.finalizados), 0);
 
     // Sem volume no mês, mas com volume no anterior: nome que não casou na importação?
     if (semanas.length && totalMes === 0 && (volumeMesAnterior.get(p.pessoa_id) ?? 0) >= 20) {
-      add(true, `Nenhum finalizado no mês (no mês anterior: ${volumeMesAnterior.get(p.pessoa_id)}).`);
+      add(true, `Nenhum finalizado no mês (no mês anterior: ${volumeMesAnterior.get(p.pessoa_id)}).`, 'nenhum-finalizado');
     }
 
     const filasDaPessoa = [...new Set([...vols.map((v) => v.canal), ...cs.map((c) => c.origem)])];
@@ -57,9 +63,9 @@ export function conferirMes({ pessoas, volumes, csats, semanasEncerradas, filas,
       for (const s of semanas) {
         // Avaliação sem atendimento: impossível — o volume da semana está errado.
         if (av(s) > 0 && !temVolume(s)) {
-          add(true, `${nomeFila(fila)}, semana ${s}: ${avaliacoes(av(s))} e nenhum volume lançado.`);
+          add(true, `${nomeFila(fila)}, semana ${s}: ${avaliacoes(av(s))} e nenhum volume lançado.`, `avaliacoes-sem-volume|${fila}|${s}`);
         } else if (av(s) > fin(s)) {
-          add(true, `${nomeFila(fila)}, semana ${s}: ${avaliacoes(av(s))} para só ${fin(s)} finalizados.`);
+          add(true, `${nomeFila(fila)}, semana ${s}: ${avaliacoes(av(s))} para só ${fin(s)} finalizados.`, `avaliacoes-acima|${fila}|${s}`);
         }
       }
 
@@ -74,14 +80,14 @@ export function conferirMes({ pessoas, volumes, csats, semanasEncerradas, filas,
             // Atendeu em outro setor na semana: explica a queda; vira atenção, não erro.
             const fora = outroSetor.get(`${p.pessoa_id}|${s}`) ?? 0;
             add(fora === 0, `${nomeFila(fila)}, semana ${s}: ${fin(s)} finalizados, muito abaixo das outras semanas (média ${Math.round(media)})`
-              + (fora ? `; na semana, ${fora} atendimentos em outro setor (demanda extra).` : '.'));
+              + (fora ? `; na semana, ${fora} atendimentos em outro setor (demanda extra).` : '.'), `queda|${fila}|${s}`);
           }
-          else if (fin(s) > media * 2.5) add(false, `${nomeFila(fila)}, semana ${s}: ${fin(s)} finalizados, muito acima das outras semanas (média ${Math.round(media)}).`);
+          else if (fin(s) > media * 2.5) add(false, `${nomeFila(fila)}, semana ${s}: ${fin(s)} finalizados, muito acima das outras semanas (média ${Math.round(media)}).`, `salto|${fila}|${s}`);
         }
         // Semana encerrada sem volume numa fila em que a pessoa atende com regularidade.
         for (const s of semanas.filter((x) => !temVolume(x))) {
           const media = comVolume.reduce((a, x) => a + fin(x), 0) / comVolume.length;
-          if (media >= 20) add(true, `${nomeFila(fila)}, semana ${s}: sem volume lançado (nas outras, média ${Math.round(media)}).`);
+          if (media >= 20) add(true, `${nomeFila(fila)}, semana ${s}: sem volume lançado (nas outras, média ${Math.round(media)}).`, `semana-sem-volume|${fila}|${s}`);
         }
       }
 
@@ -92,7 +98,7 @@ export function conferirMes({ pessoas, volumes, csats, semanasEncerradas, filas,
           const outras = semanasCsat.filter((x) => x !== s);
           const resto = outras.reduce((a, x) => a + pos(x), 0) / outras.reduce((a, x) => a + av(x), 0);
           const daSemana = pos(s) / av(s);
-          if (daSemana < resto - 0.2) add(false, `${nomeFila(fila)}, semana ${s}: C-SAT de ${pct(daSemana)}, bem abaixo do resto do mês (${pct(resto)}). Confira as avaliações importadas.`);
+          if (daSemana < resto - 0.2) add(false, `${nomeFila(fila)}, semana ${s}: C-SAT de ${pct(daSemana)}, bem abaixo do resto do mês (${pct(resto)}). Confira as avaliações importadas.`, `csat|${fila}|${s}`);
         }
       }
     }
@@ -115,12 +121,14 @@ export async function conferirNumerosDoMes(db: SupabaseClient, { competencia, pe
 }): Promise<Alerta[]> {
   if (!pessoas.length || semanasEncerradas === 0) return [];
   const mesAnterior = new Date(Date.UTC(Number(competencia.slice(0, 4)), Number(competencia.slice(5, 7)) - 2, 1)).toISOString().slice(0, 10);
-  const [{ data: anteriorDb }, { data: nomesFilas }, { data: foraDb }, { data: foraPendentesDb }] = await Promise.all([
+  const [{ data: anteriorDb }, { data: nomesFilas }, { data: foraDb }, { data: foraPendentesDb }, { data: cientesDb }] = await Promise.all([
     db.from('volume_semanal').select('pessoa_id, finalizados').eq('mes_competencia', mesAnterior),
     db.from('canais_do_setor').select('apelido, nome'),
     // Atendimentos em outro setor (lançados como demanda extra e os pendentes).
     db.from('lancamentos').select('pessoa_id, semana, quantidade, regra').eq('mes_competencia', competencia).like('regra', 'outro_setor_%'),
     db.from('atendimentos_outro_setor').select('pessoa_id, semana').eq('mes_competencia', competencia).eq('situacao', 'pendente'),
+    // Marcados como cientes (migração 96). Sem a migração, vem vazio e tudo segue pendente.
+    db.from('conferencia_cientes').select('id, pessoa_id, chave, texto, marcado_por_nome, marcado_em').eq('mes_competencia', competencia),
   ]);
   const outroSetor = new Map<string, number>();
   for (const l of (foraDb ?? []) as { pessoa_id: string; semana: number | null; quantidade: number; regra: string }[]) {
@@ -135,10 +143,15 @@ export async function conferirNumerosDoMes(db: SupabaseClient, { competencia, pe
     volumeMesAnterior.set(v.pessoa_id, (volumeMesAnterior.get(v.pessoa_id) ?? 0) + Number(v.finalizados));
   }
   const ids = new Set(pessoas.map((p) => p.pessoa_id));
+  const cientes = new Map(((cientesDb ?? []) as { id: number; pessoa_id: string; chave: string; texto: string; marcado_por_nome: string | null; marcado_em: string }[])
+    .map((c) => [`${c.pessoa_id}|${c.chave}|${c.texto}`, { id: c.id, por: c.marcado_por_nome, em: c.marcado_em }]));
   return conferirMes({
     pessoas, semanasEncerradas, outroSetor, volumeMesAnterior,
     volumes: volumes.filter((v) => ids.has(v.pessoa_id)),
     csats: csats.filter((c) => ids.has(c.pessoa_id)),
     filas: new Map(((nomesFilas ?? []) as { apelido: string | null; nome: string }[]).filter((x) => x.apelido).map((x) => [x.apelido!, x.nome])),
-  });
+  }).map((a) => ({ ...a, ciente: cientes.get(`${a.pessoa_id}|${a.chave}|${a.texto}`) }));
 }
+
+/** O que ainda pede olhar: os avisos que ninguém marcou como ciente. */
+export const pendentesDaConferencia = (alertas: Alerta[]) => alertas.filter((a) => !a.ciente);

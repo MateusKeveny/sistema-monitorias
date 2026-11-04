@@ -2,7 +2,8 @@ import Link from '@/componentes/Link';
 import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
 import { setorDoCookie } from '@/lib/setorEscolhido';
 import BotaoFecharCiclo from '@/componentes/BotaoFecharCiclo';
-import { conferirNumerosDoMes, type Csat, type Volume } from '@/lib/conferenciaDoMes';
+import { conferirNumerosDoMes, pendentesDaConferencia, type Csat, type Volume } from '@/lib/conferenciaDoMes';
+import ConferenciaDosNumeros from '@/componentes/ConferenciaDosNumeros';
 import AjusteDeFechamento from '@/componentes/AjusteDeFechamento';
 import ValorDaCota from '@/componentes/ValorDaCota';
 import PagamentoDoMes, { type ValorRh } from '@/componentes/PagamentoDoMes';
@@ -209,9 +210,11 @@ export default async function Fechamento({
     volumes: (volumes.data ?? []) as Volume[],
     csats: (csatsDb ?? []) as Csat[],
   });
-  const alertasGraves = alertas.filter((a) => a.grave).length;
-  if (alertas.length) {
-    avisos.push(`${alertas.length} ${alertas.length === 1 ? 'número fora do padrão' : 'números fora do padrão'} na conferência`
+  // Só o que ninguém marcou como ciente (3.6.0) pesa no aviso e no Fechar.
+  const naoConferidos = pendentesDaConferencia(alertas);
+  const alertasGraves = naoConferidos.filter((a) => a.grave).length;
+  if (naoConferidos.length) {
+    avisos.push(`${naoConferidos.length} ${naoConferidos.length === 1 ? 'número fora do padrão' : 'números fora do padrão'} na conferência`
       + (alertasGraves ? ` (${alertasGraves} com cara de erro de importação)` : '') + ': veja o quadro "Conferência dos números".');
   }
 
@@ -259,26 +262,8 @@ export default async function Fechamento({
 
       {/* Conferência dos números (3.4.0): sempre que houver o que olhar. */}
       <Quadro titulo="Conferência dos números"
-              subtitulo={alertas.length ? 'O que foge do padrão de cada pessoa, semana a semana. Confira antes de fechar; se estiver certo, pode seguir.' : undefined}>
-        {alertas.length === 0 ? (
-          <p className="text-sm font-medium text-marca-700 dark:text-marca-400">
-            ✓ Nada fora do padrão: volume, avaliações e C-SAT de cada pessoa batem entre as semanas.
-          </p>
-        ) : (
-          <ul className="divide-y divide-slate-100 text-sm">
-            {alertas.map((a, i) => (
-              <li key={i} className="-mx-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg px-2 py-2.5">
-                <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${a.grave ? 'bg-rose-500' : 'bg-amber-500'}`} />
-                <b className="w-44 shrink-0 text-slate-800">{a.pessoa}</b>
-                <span className="flex-1 text-slate-700">{a.texto}</span>
-                <Link href={`/cota/extrato?mes=${mesCurto}&pessoa=${a.pessoa_id}`}
-                      className="rounded-full bg-marca-600/10 px-2.5 py-0.5 text-xs font-semibold text-marca-700 hover:bg-marca-600/20 dark:text-marca-400">
-                  Extrato ›
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
+              subtitulo={naoConferidos.length ? 'O que foge do padrão de cada pessoa, semana a semana. Confira; se estiver certo, marque Ciente.' : undefined}>
+        <ConferenciaDosNumeros alertas={alertas} competencia={competencia} />
       </Quadro>
 
       {/* Antes de fechar: só enquanto há gente para fechar. */}
@@ -426,7 +411,7 @@ export default async function Fechamento({
             </Tabela>
 
             <div className="border-t border-slate-100 pt-5">
-              <BotaoFecharCiclo competencia={competencia} setorId={setorId} pessoas={pendentes.length} avisos={avisos} alertas={alertas.length} />
+              <BotaoFecharCiclo competencia={competencia} setorId={setorId} pessoas={pendentes.length} avisos={avisos} alertas={naoConferidos.length} />
             </div>
           </div>
         )}
