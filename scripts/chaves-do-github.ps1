@@ -6,14 +6,16 @@
 #
 # Uso (na pasta do projeto):  powershell -ExecutionPolicy Bypass -File scripts\chaves-do-github.ps1
 
-$ErrorActionPreference = 'Stop'
+# Continue: no PowerShell 5.1, o aviso que o gh escreve no stderr ("not logged")
+# virava erro fatal com 'Stop' e o script parava antes do login.
+$ErrorActionPreference = 'Continue'
 $repo = 'MateusKeveny/sistema-monitorias'
 
 # GitHub CLI: instalado e com login.
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
   Write-Host 'Instale o GitHub CLI: winget install GitHub.cli  (depois abra um novo terminal)' -ForegroundColor Yellow; exit 1
 }
-gh auth status *> $null
+cmd /c "gh auth status >nul 2>&1"
 if ($LASTEXITCODE -ne 0) { Write-Host 'Entrando no GitHub (abre o navegador)...'; gh auth login --hostname github.com --web --git-protocol https }
 
 function Gravar($nome, $valor) {
