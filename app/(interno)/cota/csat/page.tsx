@@ -1,4 +1,5 @@
 import AvaliacoesDeUmACinco, { type AvaliacaoDoAtendente } from '@/componentes/AvaliacoesDeUmACinco';
+import CsatDaEquipe, { type NotasCsat, type VolumeCsat } from '@/componentes/CsatDaEquipe';
 import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
 import { Painel, Secao, Vazio } from '@/componentes/ui';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
@@ -26,15 +27,28 @@ export default async function MeuCsat({
   const veOTime = perfil.papel !== 'operador';
   const db = await criarClienteServidor();
 
-  const [{ competencia, atual }, { data: pessoas }] = await Promise.all([
-    resolverCompetencia(mes),
-    veOTime
-      // Todos os ativos, não só os avaliados: Pleno e Analista também têm notas.
-      ? db.from('pessoas').select('id, nome').eq('ativo', true).is('desligado_em', null).order('nome')
-      : Promise.resolve({ data: [] as { id: string; nome: string }[] }),
+  const { competencia, atual } = await resolverCompetencia(mes);
+  const vazio = Promise.resolve({ data: [] as never[] });
+  // Visão do gestor (3.7.0): atendimentos lançados × avaliações, do mesmo
+  // volume e do mesmo C-SAT do cálculo.
+  const [{ data: pessoas }, { data: volumes }, { data: notasDoMes }, { data: filasDb }] = await Promise.all([
+    // Todos, não só os avaliados: Pleno e Analista também têm notas; o
+    // desligado no mês ainda aparece no resumo do mês.
+    veOTime ? db.from('pessoas').select('id, nome, papel, ativo, desligado_em, perfil_de_teste').order('nome') : vazio,
+    veOTime ? db.from('volume_semanal').select('pessoa_id, canal, semana, finalizados').eq('mes_competencia', competencia) : vazio,
+    veOTime ? db.from('vw_csat_semanal').select('pessoa_id, origem, semana, avaliacoes, positivas').eq('mes_competencia', competencia) : vazio,
+    veOTime ? db.from('canais_do_setor').select('apelido, nome, ordem').eq('ativo', true).order('ordem') : vazio,
   ]);
-  const lista = (pessoas ?? []) as { id: string; nome: string }[];
-  const pessoaId = veOTime ? (pedida && lista.some((p) => p.id === pedida) ? pedida : null) : perfil.id;
+  type P = { id: string; nome: string; papel: string; ativo: boolean; desligado_em: string | null; perfil_de_teste?: boolean };
+  const todas = ((pessoas ?? []) as P[]).filter((p) => !p.perfil_de_teste && p.papel !== 'administrador');
+  // No seletor, quem está na operação.
+  const lista = todas.filter((p) => p.ativo && !p.desligado_em);
+  const vols = (volumes ?? []) as VolumeCsat[];
+  const notasEquipe = (notasDoMes ?? []) as NotasCsat[];
+  const filas = ((filasDb ?? []) as { apelido: string | null; nome: string }[])
+    .filter((x) => x.apelido).map((x) => [x.apelido!, x.nome] as [string, string]);
+  const semanasComDados = [1, 2, 3, 4].filter((sem) => vols.some((v) => v.semana === sem) || notasEquipe.some((n) => n.semana === sem));
+  const pessoaId = veOTime ? (pedida && todas.some((p) => p.id === pedida) ? pedida : null) : perfil.id;
 
   const [inicio] = periodoDaSemana(competencia, 1);
   const [, fim] = periodoDaSemana(competencia, 4);
@@ -44,7 +58,7 @@ export default async function MeuCsat({
     : { data: [] };
   const notas = (data ?? []) as (AvaliacaoDoAtendente & { origem: 'huggy' | 'diretores' })[];
   const canais = CANAIS.filter(([c]) => notas.some((a) => a.origem === c));
-  const nome = lista.find((p) => p.id === pessoaId)?.nome;
+  const nome = todas.find((p) => p.id === pessoaId)?.nome;
 
   return (
     <div className="space-y-6">
@@ -57,7 +71,11 @@ export default async function MeuCsat({
             <SetasDeCompetencia competencia={competencia} atual={atual} caminho="/cota/csat" compacto
                                 manter={pessoaId && veOTime ? { pessoa: pessoaId } : undefined} />
           </div>
-          <p className="mt-2 text-sm text-sobre-fundo-suave">As avaliações do Hub de 1 a 5, as mesmas do cálculo do C-SAT.</p>
+          <p className="mt-2 text-sm text-sobre-fundo-suave">
+            {veOTime && !pessoaId
+              ? 'Atendimentos lançados × avaliações do Hub, as mesmas do cálculo do C-SAT. Escolha um atendente para ver as notas de 1 a 5.'
+              : 'As avaliações do Hub de 1 a 5, as mesmas do cálculo do C-SAT.'}
+          </p>
         </div>
         {veOTime && (
           <form className="flex items-end gap-2">
@@ -65,20 +83,28 @@ export default async function MeuCsat({
             <label>
               <span className="mb-1 block text-xs font-medium text-sobre-fundo-suave">Atendente</span>
               <select name="pessoa" defaultValue={pessoaId ?? ''} className="rounded-md border border-slate-300 bg-superficie px-2 py-1.5 text-sm">
-                <option value="">Escolha…</option>
+                <option value="">Equipe toda</option>
                 {lista.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
               </select>
             </label>
             <button className="rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
               Abrir
             </button>
+            {pessoaId && (
+              <a href={`/cota/csat?mes=${competencia.slice(0, 7)}`} className="px-1 py-1.5 text-sm text-marca-700 hover:underline dark:text-marca-400">
+                Equipe
+              </a>
+            )}
           </form>
         )}
       </div>
 
-      {!pessoaId ? (
-        <Painel><Secao><Vazio>Escolha um atendente para ver as avaliações dele.</Vazio></Secao></Painel>
-      ) : canais.length === 0 ? (
+      {veOTime && (
+        <CsatDaEquipe pessoas={todas} volumes={vols} notas={notasEquipe} filas={filas} competencia={competencia}
+                      pessoaId={pessoaId} semanasComDados={semanasComDados} />
+      )}
+
+      {!pessoaId ? null : canais.length === 0 ? (
         <Painel><Secao><Vazio>Nenhuma avaliação neste mês.</Vazio></Secao></Painel>
       ) : canais.map(([c, rotulo]) => (
         <AvaliacoesDeUmACinco key={c} rotulo={rotulo} avaliacoes={notas.filter((a) => a.origem === c)} />

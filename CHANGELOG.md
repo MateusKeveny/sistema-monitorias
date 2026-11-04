@@ -35,6 +35,19 @@ para o Performance.
 
 ---
 
+## Performance 3.7.0
+
+Sem migração. Monitorias e Agenda sem mudança.
+
+- **Performance (atualização): C-SAT na visão do gestor.** A tela abre na
+  equipe (antes ficava vazia até escolher alguém): atendimentos lançados (soma
+  do volume de todas as filas), avaliações, taxa de avaliação (avaliações ÷
+  atendimentos), C-SAT e notas 1 a 3; por fila; semana a semana; e por
+  atendente, com avaliações / atendimentos de cada fila, linha da equipe e
+  link para as notas de 1 a 5 de cada um. Com uma pessoa escolhida, o mesmo
+  resumo é só dela, acima das notas. Mesmos números do cálculo
+  (volume_semanal e vw_csat_semanal).
+
 ## Performance 3.6.0
 
 Migração 96 (só tabela nova). Monitorias e Agenda sem mudança.
