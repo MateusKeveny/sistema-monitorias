@@ -75,6 +75,18 @@ jobs:
           echo "sites=$sites" >> "$GITHUB_OUTPUT"
           echo "commit=$agora" >> "$GITHUB_OUTPUT"
 
+      # Sem uma das chaves, o site seria montado sem o endereço do banco: a tela
+      # de login ainda abre (e passaria na conferência), mas ninguém entra.
+      - name: Conferir as chaves
+        if: steps.mudou.outputs.sites != ''
+        run: |
+          faltam=""
+          for v in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY \
+                   NEXT_PUBLIC_AGENDA_SUPABASE_URL NEXT_PUBLIC_AGENDA_SUPABASE_ANON_KEY; do
+            [ -z "${!v}" ] && faltam="$faltam $v"
+          done
+          if [ -n "$faltam" ]; then echo "::error::Faltam chaves no GitHub:$faltam. Nada foi publicado."; exit 1; fi
+
       - name: Preparar o Node
         if: steps.mudou.outputs.sites != ''
         uses: actions/setup-node@v4
