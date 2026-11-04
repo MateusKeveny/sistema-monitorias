@@ -2,6 +2,7 @@ import Link from '@/componentes/Link';
 import Abas from '@/componentes/Abas';
 import { AbasDeCanal, NoCanal, ProvedorDeCanal, type Canal } from '@/componentes/Canal';
 import GraficoDeLinha, { type PontoDaLinha } from '@/componentes/GraficoDeLinha';
+import GraficosDoGeral from '@/componentes/GraficosDoGeralCarregar';
 import { Painel, Secao, Vazio } from '@/componentes/ui';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { percentual } from '@/lib/formatar';
@@ -367,7 +368,202 @@ export default async function Comparativo({
 
   const ids = (l: { pessoa_id: string }[]) => l.map((x) => x.pessoa_id);
 
+  // ---------------------------------------------------------- Geral (3.7.0)
+  // Tudo junto, mês a mês: atendimentos lançados (todas as filas) ×
+  // avaliações, a taxa de avaliação, C-SAT, monitoria e pontuação. Os mesmos
+  // números das outras abas, somados entre as filas.
+  const filasNosDados = [...new Set<string>([...todoCsat.map((x) => x.origem), ...todoVolume.map((x) => x.canal)])];
+  type Geral = { atendimentos: number; avaliacoes: number; positivas: number };
+  const geralDe = (quem: string, m: string): Geral => {
+    const g = { atendimentos: 0, avaliacoes: 0, positivas: 0 };
+    for (const c of filasNosDados) {
+      const a = indice.get(em(quem, c, m));
+      if (a) { g.atendimentos += a.finalizados; g.avaliacoes += a.avaliacoes; g.positivas += a.positivas; }
+    }
+    return g;
+  };
+  const taxaDe = (g: Geral) => (g.atendimentos ? g.avaliacoes / g.atendimentos : null);
+  const csatDoGeral = (g: Geral) => (g.avaliacoes ? g.positivas / g.avaliacoes : null);
+  const geralEquipe = meses.map((m) => geralDe(EQUIPE, m));
+  const notaEquipe = meses.map((m) => notaDe(EQUIPE, m));
+  const monitoriasNoMes = meses.map((m) => indice.get(em(EQUIPE, '-', m))?.notas.length ?? 0);
+  const iFim = meses.length - 1;
+  const pct = (v: number | null) => (v == null ? null : Math.round(v * 1000) / 10);
+  const dadosDoGrafico = meses.map((m, i) => ({
+    mes: rotuloMes(m),
+    atendimentos: geralEquipe[i].atendimentos || null,
+    avaliacoes: geralEquipe[i].avaliacoes || null,
+    taxa: pct(taxaDe(geralEquipe[i])),
+    csat: pct(csatDoGeral(geralEquipe[i])),
+    monitoria: pct(notaEquipe[i]),
+  }));
+  const tilesGeral: { rotulo: string; valor: string; v: ReturnType<typeof variacao> }[] = [
+    { rotulo: 'Atendimentos lançados', valor: inteiro(geralEquipe[iFim].atendimentos),
+      v: variacao('vol', geralEquipe[iFim].atendimentos || null, geralEquipe[iFim - 1]?.atendimentos || null) },
+    { rotulo: 'Avaliações', valor: inteiro(geralEquipe[iFim].avaliacoes),
+      v: variacao('vol', geralEquipe[iFim].avaliacoes || null, geralEquipe[iFim - 1]?.avaliacoes || null) },
+    { rotulo: 'Taxa de avaliação', valor: taxaDe(geralEquipe[iFim]) == null ? '—' : percentual(taxaDe(geralEquipe[iFim])!),
+      v: variacao('csat', taxaDe(geralEquipe[iFim]), iFim ? taxaDe(geralEquipe[iFim - 1]) : null) },
+    { rotulo: 'C-SAT (todas as filas)', valor: csatDoGeral(geralEquipe[iFim]) == null ? '—' : percentual(csatDoGeral(geralEquipe[iFim])!),
+      v: variacao('csat', csatDoGeral(geralEquipe[iFim]), iFim ? csatDoGeral(geralEquipe[iFim - 1]) : null) },
+    { rotulo: 'Nota de monitoria', valor: notaEquipe[iFim] == null ? '—' : percentual(notaEquipe[iFim]!),
+      v: variacao('mon', notaEquipe[iFim], notaEquipe[iFim - 1] ?? null) },
+    { rotulo: veOTime ? 'Pontuação média' : 'Sua pontuação', valor: equipePts[iFim] == null ? '—' : inteiro(equipePts[iFim]!),
+      v: variacao('pts', equipePts[iFim], equipePts[iFim - 1] ?? null) },
+  ];
+  // As linhas do quadro mês a mês: o valor de cada mês já formatado.
+  const linhasGeral: { rotulo: string; valores: (string | null)[]; tom?: (i: number) => Tom; destaque?: boolean }[] = [
+    { rotulo: 'Atendimentos lançados', valores: geralEquipe.map((g) => (g.atendimentos ? inteiro(g.atendimentos) : null)), destaque: true },
+    ...filasNosDados.map((c) => ({
+      rotulo: `· ${c === 'huggy' ? 'Expansão' : c === 'diretores' ? 'Diretores' : c}`,
+      valores: meses.map((m) => { const v = volDe(c as Canal, EQUIPE, m); return v ? inteiro(v) : null; }),
+    })),
+    { rotulo: 'Avaliações', valores: geralEquipe.map((g) => (g.avaliacoes ? inteiro(g.avaliacoes) : null)), destaque: true },
+    { rotulo: 'Taxa de avaliação', valores: geralEquipe.map((g) => (taxaDe(g) == null ? null : percentual(taxaDe(g)!))) },
+    { rotulo: 'C-SAT', valores: geralEquipe.map((g) => (csatDoGeral(g) == null ? null : percentual(csatDoGeral(g)!))),
+      tom: (i) => (csatDoGeral(geralEquipe[i]) == null ? 'neutro' : tomDoCsat(csatDoGeral(geralEquipe[i])!)) },
+    { rotulo: 'Notas 1 a 3', valores: geralEquipe.map((g) => (g.avaliacoes ? inteiro(g.avaliacoes - g.positivas) : null)) },
+    { rotulo: 'Monitorias', valores: monitoriasNoMes.map((n) => (n ? inteiro(n) : null)) },
+    { rotulo: 'Nota de monitoria', valores: notaEquipe.map((v) => (v == null ? null : percentual(v))),
+      tom: (i) => (notaEquipe[i] == null ? 'neutro' : tomDaNota(notaEquipe[i]!)) },
+    { rotulo: veOTime ? 'Pontuação média' : 'Pontuação', valores: equipePts.map((v) => (v == null ? null : inteiro(v))), destaque: true },
+  ];
+  // A ficha do mês mais recente, por atendente: tudo numa linha.
+  const fichas = !veOTime ? [] : [...new Set([...todoVolume, ...todoCsat].filter((x) => x.mes_competencia === fim).map((x) => x.pessoa_id)
+    .concat(pontuacoes.filter((p) => p.mes_competencia === fim).map((p) => p.pessoa_id)))]
+    .filter(exibe)
+    .map((id) => {
+      const g = geralDe(id, fim);
+      const p = pontoDe(id, fim);
+      return { id, nome: nome.get(id) ?? '—', g, nota: notaDe(id, fim), monitorias: indice.get(em(id, '-', fim))?.notas.length ?? 0,
+               pontos: p ? Number(p.resultado) : null, meta: p?.meta ? Number(p.meta) : null };
+    })
+    .filter((f) => f.g.atendimentos || f.g.avaliacoes || f.pontos != null)
+    .sort((a, b) => (b.pontos ?? -1) - (a.pontos ?? -1));
+
+  const geral = (
+    <div className="space-y-4">
+      <div className="grid divide-y divide-slate-200 rounded-[20px] border border-slate-200 bg-superficie shadow-sm sm:grid-cols-3 sm:divide-y-0 xl:grid-cols-6 xl:divide-x">
+        {tilesGeral.map((t) => (
+          <div key={t.rotulo} className="px-5 py-4">
+            <p className="text-sm text-slate-500">{t.rotulo}</p>
+            <p className="mt-1 text-[1.5rem] font-semibold tracking-tight tabular-nums text-slate-900">{t.valor}</p>
+            <p className={`text-xs font-semibold tabular-nums ${!t.v ? 'text-slate-400' : t.v.melhor ? 'text-marca-700 dark:text-marca-400' : 'text-rose-700 dark:text-rose-300'}`}>
+              {t.v ? `${t.v.texto} contra ${rotuloMes(meses[iFim - 1])}` : 'sem o mês anterior'}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Painel>
+          <Secao titulo="Atendimentos × avaliações" subtitulo="Barras: atendimentos lançados (todas as filas) e avaliações do Hub. Linha: a taxa de avaliação (eixo da direita).">
+            <GraficosDoGeral tipo="volume" dados={dadosDoGrafico} />
+          </Secao>
+        </Painel>
+        <Painel>
+          <Secao titulo="C-SAT e monitoria" subtitulo="C-SAT de todas as filas juntas e a nota média de monitoria, mês a mês.">
+            <GraficosDoGeral tipo="qualidade" dados={dadosDoGrafico} />
+          </Secao>
+        </Painel>
+      </div>
+
+      <Painel>
+        <Secao titulo="Mês a mês" subtitulo={veOTime ? 'A equipe em cada mês do período, com a cor da escala do painel em C-SAT e monitoria. Como nas outras abas, quem está marcado para não entrar nas médias (Configuração › Exibição e contagem) fica fora dos totais.' : 'Você em cada mês do período.'}>
+          <div className="-mx-6 overflow-x-auto sm:-mx-7">
+            <table className="w-full text-sm tabular-nums">
+              <thead>
+                <tr className="text-xs text-slate-500">
+                  <th className="py-2.5 pl-6 pr-3 text-left font-medium sm:pl-7" />
+                  {meses.map((m, i) => (
+                    <th key={m} className={`px-3 py-2.5 text-right ${i === iFim ? 'font-semibold text-slate-800' : 'font-medium'}`}>{rotuloMes(m)}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {linhasGeral.map((l) => (
+                  <tr key={l.rotulo} className="border-t border-slate-100">
+                    <td className={`whitespace-nowrap py-2 pl-6 pr-3 sm:pl-7 ${l.destaque ? 'font-semibold text-slate-900' : l.rotulo.startsWith('·') ? 'pl-9 text-slate-500 sm:pl-10' : 'font-medium text-slate-700'}`}>{l.rotulo}</td>
+                    {l.valores.map((v, i) => (
+                      <td key={i} className="px-3 py-2 text-right">
+                        {v == null ? <span className="text-slate-300">—</span> : l.tom ? (
+                          <span className={`inline-block min-w-14 rounded-full px-2 py-0.5 ${COR_CELULA[l.tom(i)]} ${i === iFim ? 'font-semibold' : ''}`}>{v}</span>
+                        ) : <span className={i === iFim || l.destaque ? 'font-semibold text-slate-900' : 'text-slate-700'}>{v}</span>}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Secao>
+      </Painel>
+
+      {veOTime && (
+        <Painel>
+          <Secao titulo={`Por atendente em ${rotuloMes(fim)}`}
+                 subtitulo="Tudo numa linha: atendimentos × avaliações, C-SAT, monitoria e pontos. O nome abre o C-SAT da pessoa.">
+            {fichas.length === 0 ? <Vazio>Ninguém com dado no mês.</Vazio> : (
+              <div className="-mx-6 overflow-x-auto sm:-mx-7">
+                <table className="w-full text-sm tabular-nums">
+                  <thead>
+                    <tr className="text-xs text-slate-500">
+                      <th className="py-2.5 pl-6 pr-3 text-left font-medium sm:pl-7">Pessoa</th>
+                      <th className="px-3 py-2.5 text-right font-medium">Atendimentos</th>
+                      <th className="px-3 py-2.5 text-right font-medium">Avaliações</th>
+                      <th className="px-3 py-2.5 text-right font-medium">Taxa</th>
+                      <th className="px-3 py-2.5 text-right font-medium">C-SAT</th>
+                      <th className="px-3 py-2.5 text-right font-medium">Notas 1–3</th>
+                      <th className="px-3 py-2.5 text-right font-medium">Monitoria</th>
+                      <th className="px-3 py-2.5 pr-6 text-right font-medium sm:pr-7">Pontos</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {fichas.map((f) => {
+                      const c = csatDoGeral(f.g);
+                      return (
+                        <tr key={f.id} className="border-t border-slate-100 transition-colors hover:bg-slate-50">
+                          <td className="whitespace-nowrap py-2 pl-6 pr-3 sm:pl-7">
+                            <Link href={`/cota/csat?mes=${fim.slice(0, 7)}&pessoa=${f.id}`} className="font-medium text-slate-800 hover:text-marca-700 hover:underline dark:hover:text-marca-400">{f.nome}</Link>
+                          </td>
+                          <td className="px-3 py-2 text-right">{f.g.atendimentos ? inteiro(f.g.atendimentos) : '—'}</td>
+                          <td className="px-3 py-2 text-right">{f.g.avaliacoes ? inteiro(f.g.avaliacoes) : '—'}</td>
+                          <td className="px-3 py-2 text-right">{taxaDe(f.g) == null ? '—' : percentual(taxaDe(f.g)!)}</td>
+                          <td className="px-3 py-2 text-right">
+                            {c == null ? <span className="text-slate-300">—</span>
+                              : <span className={`inline-block min-w-14 rounded-full px-2 py-0.5 ${COR_CELULA[tomDoCsat(c)]}`}>{percentual(c)}</span>}
+                          </td>
+                          <td className={`px-3 py-2 text-right ${f.g.avaliacoes - f.g.positivas ? 'text-rose-700 dark:text-rose-300' : 'text-slate-300'}`}>
+                            {f.g.avaliacoes - f.g.positivas || '—'}
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            {f.nota == null ? <span className="text-slate-300">—</span> : (
+                              <span className={`inline-block min-w-14 rounded-full px-2 py-0.5 ${COR_CELULA[tomDaNota(f.nota)]}`}
+                                    title={`${f.monitorias} monitoria${f.monitorias === 1 ? '' : 's'}`}>{percentual(f.nota)}</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 pr-6 text-right font-semibold sm:pr-7">
+                            {f.pontos == null ? '—' : (
+                              <span className={f.meta ? (f.pontos >= f.meta ? 'text-marca-700 dark:text-marca-400' : 'text-rose-700 dark:text-rose-300') : 'text-slate-900'}>
+                                {inteiro(f.pontos)}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Secao>
+        </Painel>
+      )}
+    </div>
+  );
+
   const itens = [
+    { chave: 'geral', rotulo: 'Geral', conteudo: geral },
     {
       chave: 'pts', rotulo: 'Pontuação',
       conteudo: (

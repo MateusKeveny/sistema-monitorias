@@ -47,6 +47,13 @@ Sem migração. Monitorias e Agenda sem mudança.
   link para as notas de 1 a 5 de cada um. Com uma pessoa escolhida, o mesmo
   resumo é só dela, acima das notas. Mesmos números do cálculo
   (volume_semanal e vw_csat_semanal).
+- **Performance (atualização): aba Geral no Comparativo** (a primeira).
+  Tudo mês a mês, contra o mês anterior: atendimentos lançados (todas as
+  filas), avaliações, taxa de avaliação, C-SAT de todas as filas, nota de
+  monitoria e pontuação média; gráfico de atendimentos × avaliações com a
+  taxa, gráfico de C-SAT e monitoria; quadro mês a mês (com o volume de
+  cada fila, notas 1 a 3 e monitorias); e a ficha do mês por atendente, tudo
+  numa linha. No acesso do atendente, a mesma visão só dele.
 
 ## Performance 3.6.0
 
