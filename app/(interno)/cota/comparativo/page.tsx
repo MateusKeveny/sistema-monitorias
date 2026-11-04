@@ -2,7 +2,6 @@ import Link from '@/componentes/Link';
 import Abas from '@/componentes/Abas';
 import { AbasDeCanal, NoCanal, ProvedorDeCanal, type Canal } from '@/componentes/Canal';
 import GraficoDeLinha, { type PontoDaLinha } from '@/componentes/GraficoDeLinha';
-import GraficosDoGeral from '@/componentes/GraficosDoGeralCarregar';
 import { Painel, Secao, Vazio } from '@/componentes/ui';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { percentual } from '@/lib/formatar';
@@ -177,6 +176,9 @@ export default async function Comparativo({
   // somada junto. Filtrar a lista inteira para cada pessoa e mês estourava o
   // limite de processamento do Worker em 12 meses.
   const EQUIPE = '*';
+  // Todos, sem a regra de quem entra nas médias: os totais da aba Geral
+  // (3.7.0) são o panorama do que aconteceu, e toda avaliação conta.
+  const TODOS = '**';
   type Acumulado = { positivas: number; avaliacoes: number; finalizados: number; volumes: number; tmes: number[]; notas: number[] };
   const indice = new Map<string, Acumulado>();
   const acumular = (chave: string) => {
@@ -186,13 +188,13 @@ export default async function Comparativo({
   };
   const em = (quem: string, c: string, m: string) => `${quem}|${c}|${m}`;
   for (const x of todoCsat) {
-    for (const quem of conta(x.pessoa_id) ? [x.pessoa_id, EQUIPE] : [x.pessoa_id]) {
+    for (const quem of conta(x.pessoa_id) ? [x.pessoa_id, EQUIPE, TODOS] : [x.pessoa_id, TODOS]) {
       const a = acumular(em(quem, x.origem, x.mes_competencia));
       a.positivas += x.positivas; a.avaliacoes += x.avaliacoes;
     }
   }
   for (const x of todoVolume) {
-    for (const quem of conta(x.pessoa_id) ? [x.pessoa_id, EQUIPE] : [x.pessoa_id]) {
+    for (const quem of conta(x.pessoa_id) ? [x.pessoa_id, EQUIPE, TODOS] : [x.pessoa_id, TODOS]) {
       const a = acumular(em(quem, x.canal, x.mes_competencia));
       a.finalizados += x.finalizados; a.volumes += 1;
       if ((x.tme_seg ?? 0) > 0) a.tmes.push(Number(x.tme_seg));
@@ -384,19 +386,10 @@ export default async function Comparativo({
   };
   const taxaDe = (g: Geral) => (g.atendimentos ? g.avaliacoes / g.atendimentos : null);
   const csatDoGeral = (g: Geral) => (g.avaliacoes ? g.positivas / g.avaliacoes : null);
-  const geralEquipe = meses.map((m) => geralDe(EQUIPE, m));
+  const geralEquipe = meses.map((m) => geralDe(TODOS, m));
   const notaEquipe = meses.map((m) => notaDe(EQUIPE, m));
   const monitoriasNoMes = meses.map((m) => indice.get(em(EQUIPE, '-', m))?.notas.length ?? 0);
   const iFim = meses.length - 1;
-  const pct = (v: number | null) => (v == null ? null : Math.round(v * 1000) / 10);
-  const dadosDoGrafico = meses.map((m, i) => ({
-    mes: rotuloMes(m),
-    atendimentos: geralEquipe[i].atendimentos || null,
-    avaliacoes: geralEquipe[i].avaliacoes || null,
-    taxa: pct(taxaDe(geralEquipe[i])),
-    csat: pct(csatDoGeral(geralEquipe[i])),
-    monitoria: pct(notaEquipe[i]),
-  }));
   const tilesGeral: { rotulo: string; valor: string; v: ReturnType<typeof variacao> }[] = [
     { rotulo: 'Atendimentos lançados', valor: inteiro(geralEquipe[iFim].atendimentos),
       v: variacao('vol', geralEquipe[iFim].atendimentos || null, geralEquipe[iFim - 1]?.atendimentos || null) },
@@ -416,7 +409,7 @@ export default async function Comparativo({
     { rotulo: 'Atendimentos lançados', valores: geralEquipe.map((g) => (g.atendimentos ? inteiro(g.atendimentos) : null)), destaque: true },
     ...filasNosDados.map((c) => ({
       rotulo: `· ${c === 'huggy' ? 'Expansão' : c === 'diretores' ? 'Diretores' : c}`,
-      valores: meses.map((m) => { const v = volDe(c as Canal, EQUIPE, m); return v ? inteiro(v) : null; }),
+      valores: meses.map((m) => { const v = volDe(c as Canal, TODOS, m); return v ? inteiro(v) : null; }),
     })),
     { rotulo: 'Avaliações', valores: geralEquipe.map((g) => (g.avaliacoes ? inteiro(g.avaliacoes) : null)), destaque: true },
     { rotulo: 'Taxa de avaliação', valores: geralEquipe.map((g) => (taxaDe(g) == null ? null : percentual(taxaDe(g)!))) },
@@ -455,21 +448,39 @@ export default async function Comparativo({
         ))}
       </div>
 
+      {/* Gráficos no visual 3.0 (GraficoDeLinha), como as outras abas: a
+          série principal colorida e a de comparação em cinza, atrás. */}
+      <Painel>
+        <Secao titulo="Atendimentos × avaliações" subtitulo="Atendimentos lançados (todas as filas) e, em cinza, as avaliações do Hub, mês a mês.">
+          <GraficoDeLinha largura={Math.max(1400, meses.length * 120)} rotulos={meses.map(rotuloMes)} formatar={inteiro}
+                          pontos={geralEquipe.map((g): PontoDaLinha => (g.atendimentos ? { valor: g.atendimentos, tom: 'bom' } : null))}
+                          comparacao={{ pontos: geralEquipe.map((g) => g.avaliacoes || null), rotulo: 'Avaliações', rotuloAtual: 'Atendimentos' }} />
+        </Secao>
+      </Painel>
+
       <div className="grid gap-4 xl:grid-cols-2">
         <Painel>
-          <Secao titulo="Atendimentos × avaliações" subtitulo="Barras: atendimentos lançados (todas as filas) e avaliações do Hub. Linha: a taxa de avaliação (eixo da direita).">
-            <GraficosDoGeral tipo="volume" dados={dadosDoGrafico} />
+          <Secao titulo="Taxa de avaliação" subtitulo="Avaliações ÷ atendimentos. Linha tracejada: a média do período.">
+            <GraficoDeLinha largura={760} rotulos={meses.map(rotuloMes)} formatar={percentual} min={0}
+                            max={Math.min(1, Math.max(0.5, ...semNulos(geralEquipe.map(taxaDe))) * 1.15)}
+                            referencia={media(semNulos(geralEquipe.map(taxaDe))) != null
+                              ? { valor: media(semNulos(geralEquipe.map(taxaDe)))!, rotulo: `média ${percentual(media(semNulos(geralEquipe.map(taxaDe)))!)}` } : undefined}
+                            pontos={geralEquipe.map((g): PontoDaLinha => (taxaDe(g) == null ? null : { valor: taxaDe(g)!, tom: 'bom' }))} />
           </Secao>
         </Painel>
         <Painel>
-          <Secao titulo="C-SAT e monitoria" subtitulo="C-SAT de todas as filas juntas e a nota média de monitoria, mês a mês.">
-            <GraficosDoGeral tipo="qualidade" dados={dadosDoGrafico} />
+          <Secao titulo="C-SAT e monitoria" subtitulo="C-SAT de todas as filas (com a cor da escala) e, em cinza, a nota de monitoria. Tracejada: a meta de 95%.">
+            <GraficoDeLinha largura={760} rotulos={meses.map(rotuloMes)} formatar={percentual} min={0.7} max={1}
+                            referencia={{ valor: 0.95, rotulo: 'meta 95%' }}
+                            pontos={geralEquipe.map((g): PontoDaLinha => (csatDoGeral(g) == null ? null
+                              : { valor: csatDoGeral(g)!, tom: TOM_LINHA[tomDoCsat(csatDoGeral(g)!)] }))}
+                            comparacao={{ pontos: notaEquipe, rotulo: 'Monitoria', rotuloAtual: 'C-SAT' }} />
           </Secao>
         </Painel>
       </div>
 
       <Painel>
-        <Secao titulo="Mês a mês" subtitulo={veOTime ? 'A equipe em cada mês do período, com a cor da escala do painel em C-SAT e monitoria. Como nas outras abas, quem está marcado para não entrar nas médias (Configuração › Exibição e contagem) fica fora dos totais.' : 'Você em cada mês do período.'}>
+        <Secao titulo="Mês a mês" subtitulo={veOTime ? 'A equipe em cada mês do período, com a cor da escala do painel em C-SAT e monitoria. Atendimentos, avaliações e C-SAT contam todo mundo; nota de monitoria e pontuação média seguem quem entra nas médias (Configuração › Exibição e contagem).' : 'Você em cada mês do período.'}>
           <div className="-mx-6 overflow-x-auto sm:-mx-7">
             <table className="w-full text-sm tabular-nums">
               <thead>
