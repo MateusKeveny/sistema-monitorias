@@ -9,6 +9,7 @@ import {
   type Cargo, type PesoCargo, type ReferenciaCargo, type RegraCota,
 } from '@/lib/tipos';
 import { mensagemDoErro } from '@/lib/erro-amigavel';
+import { COR_DA_METRICA } from '@/lib/cores';
 
 /**
  * O cargo de base é avaliado em todas as regras e serve de referência para os
@@ -30,13 +31,13 @@ const iniciais = (nome: string) =>
 
 /** Os grupos na ordem da planilha, com a cor da bolinha. */
 const GRUPOS = [
-  { chave: 'expansao', titulo: 'Expansão', cor: '#34d399' },
-  { chave: 'csat', titulo: 'C-SAT', cor: '#60a5fa' },
-  { chave: 'notas', titulo: 'Notas', cor: '#a78bfa' },
-  { chave: 'diretores', titulo: 'Diretores-Expansão', cor: '#2dd4bf' },
-  { chave: 'monitoria', titulo: 'Monitoria', cor: '#fbbf24' },
-  { chave: 'extra', titulo: 'Demanda extra', cor: '#f472b6' },
-  { chave: 'chamados', titulo: 'Chamados', cor: '#94a3b8' },
+  { chave: 'expansao', titulo: 'Expansão', cor: COR_DA_METRICA.expansao },
+  { chave: 'csat', titulo: 'C-SAT', cor: COR_DA_METRICA.csat },
+  { chave: 'notas', titulo: 'Notas', cor: COR_DA_METRICA.notas },
+  { chave: 'diretores', titulo: 'Diretores-Expansão', cor: COR_DA_METRICA.diretores },
+  { chave: 'monitoria', titulo: 'Monitoria', cor: COR_DA_METRICA.monitoria },
+  { chave: 'extra', titulo: 'Demanda extra', cor: COR_DA_METRICA.extra },
+  { chave: 'chamados', titulo: 'Chamados', cor: COR_DA_METRICA.chamados },
 ] as const;
 
 function grupoDa(r: RegraCota): string {

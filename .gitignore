@@ -20,3 +20,7 @@ dados/
 
 # Permissões pessoais do Claude Code — valem só nesta máquina
 .claude/settings.local.json
+
+# Build da apresentação local (banco-local/apresentacao.ps1)
+/.next-apresentacao/
+/.next-online/

@@ -10,6 +10,7 @@ import { resolverCompetencia } from '@/lib/competencia';
 import { fonteDoMes, situacaoDoResumo } from '@/lib/resumo';
 import { todas } from '@/lib/consultas';
 import { MONITORIAS_PADRAO, monitoriasPorSetor, setorDasPessoas, textoDoPiso } from '@/lib/monitoriasDoSetor';
+import { SERIES } from '@/lib/cores';
 
 export const dynamic = 'force-dynamic';
 
@@ -456,9 +457,9 @@ export default async function Comparativo({
                                formatar={inteiro} formatarDir={percentual} minDir={0}
                                barras={[
                                  { nome: 'Atendimentos', cor: 'var(--color-slate-400)', valores: geralEquipe.map((g) => g.atendimentos || null) },
-                                 { nome: 'Avaliações', cor: 'var(--color-marca-600)', valores: geralEquipe.map((g) => g.avaliacoes || null) },
+                                 { nome: 'Avaliações', cor: SERIES[0], valores: geralEquipe.map((g) => g.avaliacoes || null) },
                                ]}
-                               linhas={[{ nome: 'Taxa de avaliação', cor: 'var(--color-amber-500)', direita: true, valores: geralEquipe.map(taxaDe) }]} />
+                               linhas={[{ nome: 'Taxa de avaliação', cor: SERIES[2], direita: true, valores: geralEquipe.map(taxaDe) }]} />
         </Secao>
       </Painel>
 
@@ -468,7 +469,7 @@ export default async function Comparativo({
             <GraficoBarrasELinha largura={760} rotulos={meses.map(rotuloMes)} formatar={percentual} min={0}
                                  linhas={filasNosDados.map((c, k) => ({
                                    nome: c === 'huggy' ? 'Expansão' : c === 'diretores' ? 'Diretores' : c,
-                                   cor: k === 0 ? 'var(--color-marca-600)' : '#0ea5e9',
+                                   cor: SERIES[k % SERIES.length],
                                    valores: meses.map((m) => {
                                      const a = indice.get(em(TODOS, c, m));
                                      // Sem avaliação importada no mês (planilhas antigas): sem dado, não 0%.
@@ -482,8 +483,8 @@ export default async function Comparativo({
             <GraficoBarrasELinha largura={760} rotulos={meses.map(rotuloMes)} formatar={percentual} min={0.7} max={1}
                                  referencia={{ valor: 0.95, rotulo: 'meta 95%' }}
                                  linhas={[
-                                   { nome: 'C-SAT', cor: 'var(--color-marca-600)', valores: geralEquipe.map(csatDoGeral) },
-                                   { nome: 'Monitoria', cor: '#8b5cf6', valores: notaEquipe },
+                                   { nome: 'C-SAT', cor: SERIES[0], valores: geralEquipe.map(csatDoGeral) },
+                                   { nome: 'Monitoria', cor: SERIES[4], valores: notaEquipe },
                                  ]} />
           </Secao>
         </Painel>

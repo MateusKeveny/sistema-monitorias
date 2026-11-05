@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { mesRotulo } from '@/lib/formatar';
 import type { RegraCota } from '@/lib/tipos';
+import { COR_DA_METRICA } from '@/lib/cores';
 
 type Unidade = 'min' | '%';
 
@@ -21,13 +22,13 @@ const paraBanco = (t: string, u: Unidade) => {
 type Regua = { grupo: string; titulo: string; cor: string; unidade: Unidade; maiorMelhor: boolean; texto: string };
 
 const MODELOS: Regua[] = [
-  { grupo: 'csat', titulo: 'C-SAT', cor: '#60a5fa', unidade: '%', maiorMelhor: true,
+  { grupo: 'csat', titulo: 'C-SAT', cor: COR_DA_METRICA.csat, unidade: '%', maiorMelhor: true,
     texto: 'O C-SAT da semana escolhe a faixa; a faixa multiplica os finalizados. Vale para os dois canais.' },
-  { grupo: 'tme', titulo: 'TME · Expansão', cor: '#34d399', unidade: 'min', maiorMelhor: false,
+  { grupo: 'tme', titulo: 'TME · Expansão', cor: COR_DA_METRICA.expansao, unidade: 'min', maiorMelhor: false,
     texto: 'O TME da semana escolhe a faixa.' },
-  { grupo: 'tme_diretores', titulo: 'TME · Diretores-Expansão', cor: '#2dd4bf', unidade: 'min', maiorMelhor: false,
+  { grupo: 'tme_diretores', titulo: 'TME · Diretores-Expansão', cor: COR_DA_METRICA.diretores, unidade: 'min', maiorMelhor: false,
     texto: 'O TME da semana escolhe a faixa.' },
-  { grupo: 'monitoria', titulo: 'Monitoria', cor: '#fbbf24', unidade: '%', maiorMelhor: true,
+  { grupo: 'monitoria', titulo: 'Monitoria', cor: COR_DA_METRICA.monitoria, unidade: '%', maiorMelhor: true,
     texto: 'A média da semana só pontua acima do mínimo — o valor exato do corte não pontua.' },
 ];
 
@@ -40,7 +41,7 @@ function reguasDe(regras: RegraCota[]): Regua[] {
   }
   for (const g of grupos) {
     if (g.startsWith('tme_') && !lista.some((x) => x.grupo === g)) {
-      lista.push({ grupo: g, titulo: `TME · ${g.slice(4)}`, cor: '#34d399', unidade: 'min', maiorMelhor: false,
+      lista.push({ grupo: g, titulo: `TME · ${g.slice(4)}`, cor: COR_DA_METRICA.expansao, unidade: 'min', maiorMelhor: false,
         texto: 'O TME da semana escolhe a faixa.' });
     }
   }

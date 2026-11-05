@@ -135,48 +135,53 @@ body {
    da arte, superfícies e cinzas grafite-esverdeados, verde só no destaque — e
    o texto que ficava sobre a arte (claro nos dois temas) passa a seguir o fundo.
 --------------------------------------------------------------------------- */
+/* Paleta "Cores do Dashboard iGreen" (05/11/2026): verdes da marca (já eram
+   estes), neutras slate da paleta — Labels #94A3B8, Texto auxiliar #64748B,
+   Texto secundário #475569, Divisórias #334155, Blocos #1E293B — e, no tema
+   escuro, Fundo escuro #020617, Fundo médio #0A0F1E e Texto claro #CBD5E1. */
 html[data-visual='3'] {
-  --color-pagina: #eef1f3;
+  --color-pagina: #f1f5f9;
   --color-superficie: #ffffff;
-  --color-sobre-fundo: #0b1513;
-  --color-sobre-fundo-suave: #4b5a56;
+  --color-sobre-fundo: #0f172a;
+  --color-sobre-fundo-suave: #475569;
   --color-pilula: rgb(5 150 105 / 0.10);
   --color-sobre-fundo-bom: #047857;
   --color-sobre-fundo-atencao: #b45309;
 
-  --color-slate-50:  #f4f7f6;
-  --color-slate-100: #eaf0ed;
-  --color-slate-200: #dce3e0;
-  --color-slate-300: #c6d1cc;
-  --color-slate-400: #87958f;
-  --color-slate-500: #66756f;
-  --color-slate-600: #4b5a56;
-  --color-slate-700: #33413c;
-  --color-slate-800: #1b2622;
-  --color-slate-900: #0b1513;
+  --color-slate-50:  #f8fafc;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  --color-slate-300: #cbd5e1;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-800: #1e293b;
+  --color-slate-900: #0f172a;
 
   --sombra-3: 0 1px 2px rgb(15 23 42 / 0.06), 0 6px 18px rgb(15 23 42 / 0.06);
 }
 
 html[data-visual='3'].dark {
-  --color-pagina: #0a0d0c;
-  --color-superficie: #131816;
-  --color-sobre-fundo: #f2f6f4;
-  --color-sobre-fundo-suave: #a2b2ab;
+  --color-pagina: #020617;
+  --color-superficie: #0a0f1e;
+  --color-sobre-fundo: #ffffff;
+  --color-sobre-fundo-suave: #94a3b8;
   --color-pilula: rgb(16 185 129 / 0.15);
   --color-sobre-fundo-bom: #6ee7b7;
   --color-sobre-fundo-atencao: #fcd34d;
 
-  --color-slate-50:  #18201d;
-  --color-slate-100: #1d2622;
-  --color-slate-200: #24302b;
-  --color-slate-300: #34423c;
-  --color-slate-400: #6a7a73;
-  --color-slate-500: #87968f;
-  --color-slate-600: #a2b2ab;
-  --color-slate-700: #c7d3ce;
-  --color-slate-800: #e2eae6;
-  --color-slate-900: #f2f6f4;
+  /* Escura: a escala invertida, com os tons da paleta nos pontos-chave. */
+  --color-slate-50:  #111a2e;
+  --color-slate-100: #172136;
+  --color-slate-200: #1e293b;
+  --color-slate-300: #334155;
+  --color-slate-400: #64748b;
+  --color-slate-500: #94a3b8;
+  --color-slate-600: #b0bccc;
+  --color-slate-700: #cbd5e1;
+  --color-slate-800: #e2e8f0;
+  --color-slate-900: #ffffff;
 
   --sombra-3: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 8px 28px rgb(0 0 0 / 0.45);
 }
