@@ -35,6 +35,24 @@ para o Performance.
 
 ---
 
+## Performance 3.8.0
+
+Sem migração. Monitorias e Agenda sem mudança. A 4.0.0 (aprovação da CEO,
+Cruzeiro, metas por lista, novo setor em página) segue guardada na branch
+`versao-4` e sobe depois, a pedido do gestor (06/11/2026).
+
+- **Paleta "Cores do Dashboard iGreen"**, só no Performance (visual 3.0): os
+  verdes da marca continuam os mesmos; as neutras passam a ser as da paleta
+  (escala slate) nos dois temas. No escuro, fundo `#020617`, cartões e menu
+  `#0A0F1E`, blocos e divisórias `#1E293B`/`#334155`, textos `#94A3B8` e
+  `#CBD5E1`; no claro, fundo `#F1F5F9` e textos `#475569`/`#64748B`.
+- **Gráficos com as 10 cores de série da paleta**, na ordem dela
+  (`lib/cores.ts`), e a mesma cor por métrica em todo lugar: Expansão verde,
+  C-SAT ciano, Monitoria âmbar, Notas roxo (Comparativo, pesos por cargo e
+  réguas de faixa).
+
+---
+
 ## Performance 3.7.0
 
 Sem migração. Monitorias e Agenda sem mudança.
