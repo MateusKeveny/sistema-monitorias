@@ -116,14 +116,15 @@ export default async function MeuCsat({
         )}
       </div>
 
-      {veOTime && (
-        <CsatDaEquipe pessoas={todas} volumes={vols} notas={notasEquipe} filas={filas} competencia={competencia}
-                      pessoaId={pessoaId} semanasComDados={semanasComDados} />
-      )}
-
+      {/* As principais tabulações no topo (3.9.0), na visão da equipe. */}
       {veOTime && !pessoaId && (
         <AssuntosDoMes linhas={assuntos} finalizados={finalizadosPorFila} filas={filasDoSetor}
                        mes={mesRotulo(competencia).split(' ')[0].toLowerCase()} />
+      )}
+
+      {veOTime && (
+        <CsatDaEquipe pessoas={todas} volumes={vols} notas={notasEquipe} filas={filas} competencia={competencia}
+                      pessoaId={pessoaId} semanasComDados={semanasComDados} />
       )}
 
       {!pessoaId ? null : canais.length === 0 ? (
