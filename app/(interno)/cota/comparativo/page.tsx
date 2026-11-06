@@ -109,14 +109,15 @@ export default async function Comparativo({
     db.from('canais_do_setor').select('id, apelido, nome, ordem, setor_id').eq('ativo', true).order('ordem').then((r) => r.data ?? []),
     db.from('setores').select('id').eq('ativo', true).order('ordem').then((r) => r.data ?? []),
     setorDoCookie(),
-    veOTime ? db.from('volume_ia').select('canal_id, mes_competencia, total, resolvidos_ia')
+    veOTime ? db.from('volume_ia').select('setor_id, mes_competencia, semana, total, resolvidos_ia')
       .gte('mes_competencia', de).lte('mes_competencia', fim).then((r) => r.data ?? []) : Promise.resolve([]),
   ]);
   const setorDaAba = (setoresDb as { id: number }[]).find((x) => String(x.id) === setorEscolhido)?.id
     ?? (setoresDb as { id: number }[])[0]?.id ?? 1;
   const filasDoSetor = (filasDb as { id: number; apelido: string | null; nome: string; setor_id?: number }[])
     .filter((f) => f.apelido && (f.setor_id ?? 1) === setorDaAba) as { id: number; apelido: string; nome: string }[];
-  const todoSol = solDb as { canal_id: number; mes_competencia: string; total: number | null; resolvidos_ia: number | null }[];
+  // A Sol é do setor inteiro (a resolução da IA não sai por canal).
+  const todoSol = (solDb as LinhaSol[]).filter((x) => x.setor_id === setorDaAba);
   const [pessoas, fechados, csat, volume, monitorias, lancados, presenciais, chamados] = await todas([
     db.from('pessoas').select('id, nome, exibir_no_painel, conta_nas_medias'),
     db.from('fechamentos_cota').select('pessoa_id, mes_competencia, resultado, meta')
@@ -631,8 +632,8 @@ export default async function Comparativo({
     },
     {
       chave: 'vol', rotulo: 'Volume',
-      // 3.9.0: Geral (as filas somadas) e uma aba por fila do setor, cada uma
-      // com o atendimento da Sol (lançado em Lançamentos) e os finalizados.
+      // 3.9.0: Geral (as filas somadas, com o atendimento da Sol do setor) e
+      // uma aba por fila do setor, com os finalizados.
       conteudo: (
         <AbasLocais rotulo="Fila" abas={[
           { chave: 'geral', rotulo: 'Geral', filas: filasDoSetor },
@@ -643,18 +644,13 @@ export default async function Comparativo({
             return vs.length ? vs.reduce((a, b) => a + b, 0) : null;
           });
           const med = media(semNulos(equipe));
-          const idsDaAba = new Set(aba.filas.map((f) => f.id));
-          const solDoMes = meses.map((m) => {
-            const ls = todoSol.filter((x) => idsDaAba.has(x.canal_id) && x.mes_competencia === m);
-            if (!ls.length) return null;
-            return { total: ls.reduce((t, x) => t + (x.total ?? 0), 0), sol: ls.reduce((t, x) => t + (x.resolvidos_ia ?? 0), 0) };
-          });
           const apelidos = new Set(aba.filas.map((f) => f.apelido));
           return {
             chave: aba.chave, rotulo: aba.rotulo,
             conteudo: (
               <div className="space-y-4">
-                {veOTime && <QuadroDaSol rotulos={meses.map(rotuloMes)} sol={solDoMes} equipe={equipe} />}
+                {/* A Sol só no Geral: ela vem do setor inteiro, sem divisão por fila. */}
+                {veOTime && aba.chave === 'geral' && <QuadroDaSol meses={meses} rotulos={meses.map(rotuloMes)} linhas={todoSol} equipe={equipe} />}
                 <Vista k="vol" formatar={inteiro} tom={() => 'neutro'} equipe={equipe}
                        titulo={aba.chave === 'geral' ? 'Finalizados da equipe por mês, todas as filas' : 'Finalizados da equipe por mês'}
                        subtitulo="Os finalizados lançados da equipe. Linha tracejada: a média do período."
@@ -730,57 +726,118 @@ export default async function Comparativo({
   );
 }
 
+type LinhaSol = { setor_id: number; mes_competencia: string; semana: number; total: number | null; resolvidos_ia: number | null };
+
+// Cores da paleta (lib/cores): a Sol em ciano (a IA), a equipe e o resto em verde (a marca).
+const COR_SOL = SERIES[1];
+const COR_EQUIPE = SERIES[0];
+const inteiroSol = (v: number) => Math.round(v).toLocaleString('pt-BR');
+
+/** Uma coluna empilhada: a Sol embaixo, a equipe e o resto em cima; o total e a % da Sol no topo. */
+function ColunaDaSol({ rotulo, total, sol, maior, destaque = false }: { rotulo: string; total: number; sol: number; maior: number; destaque?: boolean }) {
+  const altura = maior ? (total / maior) * 100 : 0;
+  const fatia = total ? sol / total : 0;
+  return (
+    <div className="flex min-w-0 flex-1 flex-col items-center">
+      <span className="text-sm font-semibold tabular-nums text-slate-900">{total ? inteiroSol(total) : '—'}</span>
+      <span className="h-4 text-xs font-semibold tabular-nums" style={{ color: COR_SOL }}>{total ? percentual(fatia) : ''}</span>
+      <div className="mt-1.5 flex h-44 w-full max-w-20 items-end">
+        {total > 0 ? (
+          <div className="crescer-y flex w-full origin-bottom flex-col overflow-hidden rounded-t-lg" style={{ height: `${Math.max(altura, 3)}%` }}
+               title={`${rotulo}: ${inteiroSol(total)} no total, ${inteiroSol(sol)} pela Sol (${percentual(fatia)})`}>
+            <div className="flex-1" style={{ background: COR_EQUIPE }} />
+            <div style={{ height: `${fatia * 100}%`, background: COR_SOL }} />
+          </div>
+        ) : <div className="h-px w-full bg-slate-200" />}
+      </div>
+      <span className={`mt-1.5 text-xs ${destaque ? 'font-semibold text-slate-800' : 'text-slate-500'}`}>{rotulo}</span>
+    </div>
+  );
+}
+
 /**
- * Atendimento da Sol (3.9.0, migração 99), mês a mês: o número geral que a
- * gestão lança, quantos a Sol resolveu, a % dela e, para comparar, os
- * finalizados da equipe (da importação). Só informação: não pontua.
+ * Atendimento da Sol (3.9.0, migração 99): o que a gestão lança em
+ * Lançamentos — o número geral e quantos a Sol (a IA) resolveu. Em destaque, o
+ * mês mais recente lançado: os números, a fatia da Sol no total e as semanas;
+ * abaixo, mês a mês. Colunas empilhadas (Sol × equipe e demais), nas cores da
+ * paleta. Para comparar, os finalizados da equipe (da importação). Só informação.
  */
-function QuadroDaSol({ rotulos, sol, equipe }: {
-  rotulos: string[];
-  sol: ({ total: number; sol: number } | null)[];
-  equipe: (number | null)[];
+function QuadroDaSol({ meses, rotulos, linhas, equipe }: {
+  meses: string[]; rotulos: string[]; linhas: LinhaSol[]; equipe: (number | null)[];
 }) {
-  const inteiroSol = (v: number) => Math.round(v).toLocaleString('pt-BR');
-  if (!sol.some((x) => x)) {
+  const doMes = (m: string) => linhas.filter((x) => x.mes_competencia === m);
+  const soma = (ls: LinhaSol[]) => ({ total: ls.reduce((t, x) => t + (x.total ?? 0), 0), sol: ls.reduce((t, x) => t + (x.resolvidos_ia ?? 0), 0) });
+  const porMes = meses.map((m, i) => ({ m, i, ...soma(doMes(m)), lancado: doMes(m).length > 0 }));
+  const comDado = porMes.filter((x) => x.lancado);
+  if (!comDado.length) {
     return (
       <Painel><Secao titulo="Atendimento da Sol">
         <Vazio>Nada lançado ainda. A gestão lança por semana em Lançamentos › Atendimento da Sol: o número geral e quantos a Sol resolveu.</Vazio>
       </Secao></Painel>
     );
   }
-  const pct = sol.map((x) => (x && x.total ? x.sol / x.total : null));
-  const linhas: [string, (number | null)[], (v: number) => string][] = [
-    ['Número geral', sol.map((x) => x?.total ?? null), inteiroSol],
-    ['Resolvidos pela Sol', sol.map((x) => x?.sol ?? null), inteiroSol],
-    ['% da Sol', pct, (v) => percentual(v)],
-    ['Finalizados pela equipe', equipe, inteiroSol],
+  const ult = comDado[comDado.length - 1];
+  const fatia = ult.total ? ult.sol / ult.total : 0;
+  const demais = Math.max(0, ult.total - ult.sol);
+  const equipeUlt = equipe[ult.i];
+  const semanas = [1, 2, 3, 4].map((sem) => ({ sem, ...soma(doMes(ult.m).filter((x) => x.semana === sem)) }));
+  const maiorSemana = Math.max(...semanas.map((x) => x.total), 1);
+  const maiorMes = Math.max(...porMes.map((x) => x.total), 1);
+  const numeros: { rotulo: string; valor: string; nota?: string; cor?: string }[] = [
+    { rotulo: `Número geral · ${rotulos[ult.i]}`, valor: inteiroSol(ult.total) },
+    { rotulo: 'Resolvidos pela Sol', valor: inteiroSol(ult.sol), nota: `${percentual(fatia)} do número geral`, cor: COR_SOL },
+    { rotulo: 'Equipe e demais', valor: inteiroSol(demais), nota: `${percentual(ult.total ? demais / ult.total : 0)} do número geral`, cor: COR_EQUIPE },
+    { rotulo: 'Finalizados pela equipe', valor: equipeUlt == null ? '—' : inteiroSol(equipeUlt), nota: 'da importação, para comparar' },
   ];
+  const Legenda = () => (
+    <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-500">
+      <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ background: COR_SOL }} />Resolvidos pela Sol</span>
+      <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ background: COR_EQUIPE }} />Equipe e demais</span>
+    </div>
+  );
   return (
     <Painel>
-      <Secao titulo="Atendimento da Sol" subtitulo="Lançado pela gestão em Lançamentos. Barras: número geral e resolvidos pela Sol. Linha: a % da Sol, no eixo da direita.">
-        <GraficoBarrasELinha largura={1400} rotulos={rotulos} formatar={inteiroSol} formatarDir={percentual} minDir={0} maxDir={1}
-          barras={[
-            { nome: 'Número geral', cor: 'var(--color-slate-400)', valores: sol.map((x) => x?.total ?? null) },
-            { nome: 'Resolvidos pela Sol', cor: SERIES[1], valores: sol.map((x) => x?.sol ?? null) },
-          ]}
-          linhas={[{ nome: '% da Sol', cor: SERIES[2], direita: true, valores: pct }]} />
-        <div className="-mx-6 mt-4 overflow-x-auto sm:-mx-7">
-          <table className="w-full text-sm tabular-nums">
-            <thead>
-              <tr className="text-xs text-slate-500">
-                <th className="py-2 pl-6 pr-3 text-left font-medium sm:pl-7" />
-                {rotulos.map((r, i) => <th key={r} className={`px-2 py-2 text-right ${i === rotulos.length - 1 ? 'font-semibold text-slate-800' : 'font-medium'}`}>{r}</th>)}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {linhas.map(([rotulo, valores, fmt]) => (
-                <tr key={rotulo}>
-                  <td className="whitespace-nowrap py-2 pl-6 pr-3 text-slate-600 sm:pl-7">{rotulo}</td>
-                  {valores.map((v, i) => <td key={i} className="px-2 py-2 text-right text-slate-800">{v == null ? <span className="text-slate-300">—</span> : fmt(v)}</td>)}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <Secao titulo="Atendimento da Sol" subtitulo="Lançado pela gestão em Lançamentos: o número geral e quantos a Sol resolveu. Só informação: não entra na pontuação.">
+        <div className="grid divide-y divide-slate-200 rounded-2xl border border-slate-200 sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-4 xl:divide-x">
+          {numeros.map((n) => (
+            <div key={n.rotulo} className="px-5 py-4">
+              <p className="text-sm text-slate-500">{n.rotulo}</p>
+              <p className="mt-1 text-[1.5rem] font-semibold tracking-tight tabular-nums text-slate-900" style={n.cor ? { color: n.cor } : undefined}>{n.valor}</p>
+              {n.nota && <p className="text-xs text-slate-500">{n.nota}</p>}
+            </div>
+          ))}
+        </div>
+
+        {/* A fatia da Sol no número geral do mês mais recente. */}
+        <div className="mt-5 space-y-2">
+          <div className="flex h-9 w-full overflow-hidden rounded-full text-xs font-semibold text-white">
+            {ult.sol > 0 && (
+              <div className="crescer-x flex origin-left items-center justify-center" style={{ width: `${fatia * 100}%`, background: COR_SOL }}>
+                {fatia >= 0.12 ? `Sol · ${percentual(fatia)}` : ''}
+              </div>
+            )}
+            {demais > 0 && (
+              <div className="flex flex-1 items-center justify-center" style={{ background: COR_EQUIPE }}>
+                {1 - fatia >= 0.12 ? `Equipe e demais · ${percentual(1 - fatia)}` : ''}
+              </div>
+            )}
+          </div>
+          <Legenda />
+        </div>
+
+        <div className="mt-7 grid gap-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
+          <div>
+            <p className="mb-3 text-sm font-semibold text-slate-800">Semana a semana · {rotulos[ult.i]}</p>
+            <div className="flex items-end gap-3">
+              {semanas.map((x) => <ColunaDaSol key={x.sem} rotulo={`${x.sem}ª sem`} total={x.total} sol={x.sol} maior={maiorSemana} />)}
+            </div>
+          </div>
+          <div>
+            <p className="mb-3 text-sm font-semibold text-slate-800">Mês a mês</p>
+            <div className="flex items-end gap-3">
+              {porMes.map((x) => <ColunaDaSol key={x.m} rotulo={rotulos[x.i]} total={x.total} sol={x.sol} maior={maiorMes} destaque={x.m === ult.m} />)}
+            </div>
+          </div>
         </div>
       </Secao>
     </Painel>

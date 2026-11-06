@@ -27,7 +27,7 @@ const ITENS = {
     titulo: 'O que mudou da 3.7 à 3.9',
     itens: [
       ['Assuntos mais tratados', 'em C-SAT (visão da equipe), o Top 10 das tabulações do mês, com a % das avaliações, o volume estimado e o C-SAT de cada assunto. Geral e por fila.'],
-      ['Atendimento da Sol', 'em Lançamentos, um cartão por fila para lançar, por semana, o número geral e quantos a Sol resolveu. No Comparativo › Volume, a evolução mês a mês, em Geral e por fila.'],
+      ['Atendimento da Sol', 'em Lançamentos, um cartão para lançar, por semana, o número geral do setor e quantos a Sol resolveu. No Comparativo › Volume (aba Geral), a fatia da Sol semana a semana e mês a mês.'],
       ['Cores novas', 'a paleta do Dashboard iGreen nos dois temas, e as mesmas cores para cada métrica em todos os gráficos.'],
       ['Comparativo › Geral', 'atendimentos × avaliações, C-SAT, monitoria e pontos mês a mês, com gráficos; e, em C-SAT, os atendimentos lançados × avaliações da equipe.'],
     ],

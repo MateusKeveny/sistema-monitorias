@@ -16,12 +16,13 @@ const SEMANAS = [1, 2, 3, 4];
 const numero = (t: string) => (t.trim() === '' ? null : Number(t.replace(/\D/g, '')));
 
 /**
- * Atendimento da Sol (3.9.0, migração 99): por fila e semana, o número geral
- * de atendimentos e quantos a Sol (a IA) resolveu. Só informação — não pontua.
- * Serve para qualquer fila de qualquer setor (grava pelo número da fila).
+ * Atendimento da Sol (3.9.0, migração 99): por setor e semana, o número geral
+ * de atendimentos (todas as filas) e quantos a Sol (a IA) resolveu — a
+ * resolução da IA não sai por canal. Só informação — não pontua. Serve para
+ * qualquer setor (grava pelo número do setor).
  */
-export default function VolumeDaSol({ canalId, nomeFila, competencia, linhas }: {
-  canalId: number; nomeFila: string; competencia: string; linhas: LinhaDaSol[];
+export default function VolumeDaSol({ setorId, nomeSetor, competencia, linhas }: {
+  setorId: number; nomeSetor: string; competencia: string; linhas: LinhaDaSol[];
 }) {
   const router = useRouter();
   const inicial = Object.fromEntries(SEMANAS.map((s) => {
@@ -44,9 +45,9 @@ export default function VolumeDaSol({ canalId, nomeFila, competencia, linhas }: 
     for (const s of mudou) {
       const total = numero(valores[s].total), resolvidos_ia = numero(valores[s].sol);
       const { error } = total == null && resolvidos_ia == null
-        ? await db.from('volume_ia').delete().eq('canal_id', canalId).eq('mes_competencia', competencia).eq('semana', s)
-        : await db.from('volume_ia').upsert({ canal_id: canalId, mes_competencia: competencia, semana: s, total, resolvidos_ia },
-            { onConflict: 'canal_id,mes_competencia,semana' });
+        ? await db.from('volume_ia').delete().eq('setor_id', setorId).eq('mes_competencia', competencia).eq('semana', s)
+        : await db.from('volume_ia').upsert({ setor_id: setorId, mes_competencia: competencia, semana: s, total, resolvidos_ia },
+            { onConflict: 'setor_id,mes_competencia,semana' });
       if (error) { setOcupado(false); setAviso({ ok: false, texto: await mensagemDoErro(error) }); return; }
     }
     setOcupado(false);
@@ -59,8 +60,8 @@ export default function VolumeDaSol({ canalId, nomeFila, competencia, linhas }: 
   const entrada = 'w-28 rounded-md border border-slate-300 bg-superficie px-2 py-1 text-right text-sm tabular-nums outline-none focus:border-marca-600';
 
   return (
-    <Quadro titulo={`Atendimento da Sol · ${nomeFila}`}
-            subtitulo="Por semana: o número geral de atendimentos da fila e quantos a Sol resolveu. Só informação: não entra na pontuação.">
+    <Quadro titulo={`Atendimento da Sol · ${nomeSetor}`}
+            subtitulo="Do setor inteiro (todas as filas), por semana: o número geral de atendimentos e quantos a Sol resolveu. É o mesmo lançamento em qualquer aba de fila. Só informação: não entra na pontuação.">
       <div className="-mx-6 overflow-x-auto sm:-mx-7">
         <table className="w-full text-sm tabular-nums">
           <thead>

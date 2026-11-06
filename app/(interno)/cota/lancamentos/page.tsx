@@ -51,7 +51,7 @@ export default async function LancamentosDeCota({
   const { data: filasDoBanco } = await db.from('canais_do_setor')
     .select('id, nome, apelido, ordem, regra_finalizado, setor_id').eq('ativo', true).order('ordem');
   // Cada um lança e importa só o seu (3.0): as filas do setor do seletor do menu.
-  const { data: setoresDb } = await db.from('setores').select('id').eq('ativo', true).order('ordem');
+  const { data: setoresDb } = await db.from('setores').select('id, nome').eq('ativo', true).order('ordem');
   const setorEscolhido = await setorDoCookie();
   const setorId = ((setoresDb ?? []) as { id: number }[]).find((x) => String(x.id) === setorEscolhido)?.id
     ?? (setoresDb?.[0] as { id: number } | undefined)?.id ?? 1;
@@ -215,20 +215,20 @@ export default async function LancamentosDeCota({
   });
 
   // Atendimento da Sol (3.9.0, migração 99): número geral e resolvidos pela IA,
-  // por semana, na fila escolhida. Só informação; vale para qualquer fila.
-  const { data: solDb } = fila.id > 0
-    ? await db.from('volume_ia').select('semana, total, resolvidos_ia, salvo_por_nome, salvo_em')
-        .eq('canal_id', fila.id).eq('mes_competencia', competencia)
-    : { data: [] };
+  // por semana, do SETOR (a resolução da IA não sai por canal). Só informação;
+  // o mesmo lançamento aparece em qualquer aba de fila do setor.
+  const nomeDoSetor = ((setoresDb ?? []) as { id: number; nome: string }[]).find((x) => x.id === setorId)?.nome ?? 'Setor';
+  const { data: solDb } = await db.from('volume_ia').select('semana, total, resolvidos_ia, salvo_por_nome, salvo_em')
+    .eq('setor_id', setorId).eq('mes_competencia', competencia);
   const linhasSol = (solDb ?? []) as LinhaDaSol[];
-  if (fila.id > 0) {
+  {
     const totalSol = linhasSol.reduce((t, l) => t + (l.total ?? 0), 0);
     const resolvidosSol = linhasSol.reduce((t, l) => t + (l.resolvidos_ia ?? 0), 0);
     destaques.push({
       chave: 'sol',
       bloco: (
         <>
-          <p className="text-[13px] text-slate-500">Atendimento da Sol</p>
+          <p className="text-[13px] text-slate-500">Atendimento da Sol · do setor</p>
           <p className="text-[1.65rem] font-semibold tracking-tight tabular-nums text-slate-900">
             {totalSol ? `${Math.round((resolvidosSol / totalSol) * 1000) / 10}%`.replace('.', ',') : '—'}
           </p>
@@ -239,7 +239,7 @@ export default async function LancamentosDeCota({
           </p>
         </>
       ),
-      detalhe: <VolumeDaSol key={`sol-${competencia}-${fila.id}`} canalId={fila.id} nomeFila={fila.nome} competencia={competencia} linhas={linhasSol} />,
+      detalhe: <VolumeDaSol key={`sol-${competencia}-${setorId}`} setorId={setorId} nomeSetor={nomeDoSetor} competencia={competencia} linhas={linhasSol} />,
     });
   }
 

@@ -49,13 +49,15 @@ vai pelo número da fila, e as abas são as filas do setor escolhido no menu.
   equipe) e o C-SAT do assunto (positiva a partir da nota 4, a regra do
   cálculo). Abas Geral e por fila; "Ver todos" abre a lista inteira. Função
   `assuntos_do_mes`.
-- **Atendimento da Sol** (a IA): em Lançamentos, um cartão por fila para a
-  gestão lançar, por semana, o **número geral** de atendimentos e quantos **a
-  Sol resolveu** (tabela `volume_ia`; quem salvou fica registrado). Só
-  informação: não entra na pontuação. No **Comparativo › Volume**, abas
-  **Geral** e uma por fila, cada uma com o atendimento da Sol mês a mês
-  (número geral, resolvidos pela Sol, % da Sol e os finalizados da equipe) e
-  os finalizados por atendente.
+- **Atendimento da Sol** (a IA): em Lançamentos, o cartão "Atendimento da
+  Sol · do setor" para a gestão lançar, por semana, o **número geral** de
+  atendimentos do setor e quantos **a Sol resolveu** — por setor, porque a
+  resolução da IA não sai por canal (tabela `volume_ia`; quem salvou fica
+  registrado). Só informação: não entra na pontuação. No **Comparativo ›
+  Volume**, abas **Geral** e uma por fila; o atendimento da Sol fica no
+  Geral, em colunas empilhadas nas cores da paleta (Sol em ciano, equipe e
+  demais em verde): números do mês, a fatia da Sol, semana a semana e mês a
+  mês, com os finalizados da equipe para comparar.
 - Novidades da gestão atualizadas (3.7 a 3.9).
 
 ---
