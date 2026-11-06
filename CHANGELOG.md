@@ -49,6 +49,13 @@ novas. Monitorias e Agenda sem mudança.
   seletor e das listas e guarda tudo, e **Reativar** traz de volta; só com
   ninguém ativo no setor. O último setor ativo não pode sair. O banco confere
   tudo de novo (`historico_do_setor`, `excluir_setor`, `desativar_setor`).
+- **Gabarito do cadastro por planilha** (Usuários › Cadastrar várias pessoas):
+  **⬇ Baixar gabarito (.xlsx)**, como o modelo das metas por lista. A aba
+  **Pessoas** traz o cabeçalho pronto (Nome, E-mail, Setor, Cargo, Nome no
+  Hub, Entrada, Papel); **Como preencher** explica cada coluna com exemplo; e
+  **Setores e cargos** lista os setores ativos e os cargos de cada um com o
+  nome exato que o sistema aceita. Na subida, vale a aba Pessoas (as de
+  consulta são ignoradas).
 
 ---
 

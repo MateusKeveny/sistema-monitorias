@@ -10,6 +10,8 @@ import { mensagemDoErro } from '@/lib/erro-amigavel';
 import { emailDoLogin } from '@/lib/usuario';
 import type { Cargo, PapelUsuario, Pessoa } from '@/lib/tipos';
 import type { Setor } from '@/lib/setores';
+import { gerarXlsx } from '@/lib/xlsx-escrever';
+import { baixarArquivo } from '@/componentes/MetasPorLista';
 
 const normalizar = (v: unknown) => String(v ?? '').normalize('NFD')
   .replace(/[̀-ͯ]/g, '').trim().toLowerCase();
@@ -24,6 +26,55 @@ const COLUNAS = {
   entrada: ['entrada', 'admissao', 'na equipe desde', 'data de entrada'],
   papel: ['papel', 'perfil', 'acesso'],
 } as const;
+
+/**
+ * O gabarito do cadastro (4.1.0), como o modelo das metas por lista: a aba
+ * "Pessoas" para preencher (só o cabeçalho), "Como preencher" com cada coluna
+ * e "Setores e cargos" com os nomes exatamente como o sistema aceita.
+ */
+function gabaritoXlsx(setores: Setor[], cargos: Cargo[]): Uint8Array {
+  const ativos = setores.filter((s) => s.ativo !== false);
+  const primeiro = ativos[0];
+  const exemploSetor = primeiro?.nome ?? '';
+  const exemploCargo = cargos.find((c) => (c.setor_id ?? 1) === primeiro?.id)?.nome ?? '';
+  const umSetor = ativos.length === 1;
+  return gerarXlsx([
+    { nome: 'Pessoas', linhas: [], colunas: [
+      { cabecalho: 'Nome', chave: 'nome', largura: 34 },
+      { cabecalho: 'E-mail', chave: 'email', largura: 34 },
+      { cabecalho: 'Setor', chave: 'setor', largura: 24 },
+      { cabecalho: 'Cargo', chave: 'cargo', largura: 24 },
+      { cabecalho: 'Nome no Hub', chave: 'hub', largura: 28 },
+      { cabecalho: 'Entrada', chave: 'entrada', largura: 14 },
+      { cabecalho: 'Papel', chave: 'papel', largura: 14 },
+    ] },
+    { nome: 'Como preencher', colunas: [
+      { cabecalho: 'Coluna', chave: 'coluna', largura: 16 },
+      { cabecalho: 'Obrigatória', chave: 'obrigatoria', largura: 12 },
+      { cabecalho: 'O que colocar', chave: 'oque', largura: 72, formato: 'quebra' },
+      { cabecalho: 'Exemplo', chave: 'exemplo', largura: 26 },
+    ], linhas: [
+      { coluna: 'Nome', obrigatoria: 'Sim', oque: 'O nome completo. Uma pessoa por linha, na aba Pessoas (as outras abas são só de consulta).', exemplo: 'Maria da Silva Souza' },
+      { coluna: 'E-mail', obrigatoria: 'Não', oque: 'Com e-mail (ou nome de usuário), o acesso já é criado e a senha temporária aparece no fim. Em branco: só a ficha, sem acesso.', exemplo: 'maria.souza@empresa.com.br' },
+      { coluna: 'Setor', obrigatoria: umSetor ? 'Não' : 'Sim', oque: `O setor exatamente como na aba Setores e cargos.${umSetor ? ` Em branco: ${exemploSetor}.` : ''}`, exemplo: exemploSetor },
+      { coluna: 'Cargo', obrigatoria: 'Não', oque: 'Só para Atendente: um cargo do setor da pessoa, como na aba Setores e cargos. Gestão e qualidade ficam sem cargo (deixe em branco).', exemplo: exemploCargo },
+      { coluna: 'Nome no Hub', obrigatoria: 'Não', oque: 'Como a pessoa aparece nos relatórios do Hub, para ligar volume e avaliações a ela. Não pode repetir o de outra pessoa.', exemplo: 'Maria Souza' },
+      { coluna: 'Entrada', obrigatoria: 'Não', oque: 'A data de entrada (dd/mm/aaaa). Setor e cargo valem a partir do mês dessa data. Em branco: o mês aberto.', exemplo: '01/11/2026' },
+      { coluna: 'Papel', obrigatoria: 'Não', oque: 'Atendente, Qualidade ou Gestor. Em branco: Atendente. Gestão e qualidade ficam fora das listas, das médias e das monitorias.', exemplo: 'Atendente' },
+    ] },
+    { nome: 'Setores e cargos', colunas: [
+      { cabecalho: 'Setor', chave: 'setor', largura: 28 },
+      { cabecalho: 'Cargo', chave: 'cargo', largura: 32 },
+    ], linhas: [
+      ...ativos.flatMap((s) => {
+        const doSetor = cargos.filter((c) => (c.setor_id ?? 1) === s.id);
+        return doSetor.length ? doSetor.map((c) => ({ setor: s.nome, cargo: c.nome })) : [{ setor: s.nome, cargo: '(sem cargos)' }];
+      }),
+      { setor: '', cargo: '' },
+      { setor: 'Papéis válidos', cargo: 'Atendente · Qualidade · Gestor' },
+    ] },
+  ]);
+}
 
 const PAPEIS: Record<string, PapelUsuario> = {
   operador: 'operador', atendente: 'operador', qualidade: 'qualidade', monitor: 'qualidade', gestor: 'gestor',
@@ -78,7 +129,10 @@ export default function CadastroEmLote({ pessoas, setores, cargos }: {
     try { abas = await lerPlanilha(f); } catch (e) {
       setErro(e instanceof Error ? e.message : 'Não foi possível ler a planilha.'); return;
     }
-    const [, linhas] = [...abas].find(([, l]) => l.length > 1) ?? ['', []];
+    // A aba "Pessoas" do gabarito; senão, a primeira com dados (fora as de consulta).
+    const consulta = ['como preencher', 'setores e cargos'];
+    const [, linhas] = [...abas].find(([nome, l]) => normalizar(nome) === 'pessoas' && l.length > 1)
+      ?? [...abas].find(([nome, l]) => l.length > 1 && !consulta.includes(normalizar(nome))) ?? ['', []];
     if (!linhas.length) { setErro('A planilha está vazia.'); return; }
 
     const [cabecalho, ...dados] = linhas;
@@ -207,6 +261,15 @@ export default function CadastroEmLote({ pessoas, setores, cargos }: {
         Atendente). Gestão e qualidade entram sem cargo e fora das listas, das médias e das monitorias. Na coluna E-mail
         vale também um nome de usuário, como &ldquo;admin&rdquo;.
       </p>
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        <button type="button" onClick={() => baixarArquivo(gabaritoXlsx(setores, cargos), 'gabarito-cadastro-de-pessoas.xlsx')}
+                className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+          ⬇ Baixar gabarito (.xlsx)
+        </button>
+        <span className="text-xs text-slate-500">
+          Preencha a aba <b>Pessoas</b>; as outras explicam cada coluna e trazem os setores e cargos com o nome exato.
+        </span>
+      </div>
       <label className="flex cursor-pointer items-center gap-2 rounded-xl border-2 border-dashed border-slate-300 px-4 py-4 text-sm text-slate-600 hover:border-marca-600">
         <input type="file" accept=".xlsx" className="sr-only" disabled={!!ocupado}
                onChange={(e) => { escolher(e.target.files?.[0]); e.target.value = ''; }} />
