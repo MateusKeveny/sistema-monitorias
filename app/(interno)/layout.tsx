@@ -1,4 +1,7 @@
 import { redirect } from 'next/navigation';
+import GuardaDaDiretoria from '@/componentes/GuardaDaDiretoria';
+import AtualizacaoAutomatica from '@/componentes/AtualizacaoAutomatica';
+import { ENDERECO_PERFORMANCE } from '@/lib/sistema';
 import Navegacao from '@/componentes/Navegacao';
 import MenuLateral from '@/componentes/MenuLateral';
 import { VERSAO_COTA, VERSAO_MONITORIAS } from '@/lib/versoes';
@@ -20,10 +23,15 @@ export default async function LayoutInterno({ children }: { children: React.Reac
   if (sistema === 'agenda') redirect('/agenda');
   const perfil = await exigirPerfil();
 
+  // Diretoria (4.0.0): só a tela de aprovação, no Performance. No site das
+  // Monitorias, vai para lá; dentro do Performance, a página inicial e o
+  // GuardaDaDiretoria (abaixo) levam até ela.
+  if (perfil.papel === 'diretoria' && sistema !== 'cota') redirect(`${ENDERECO_PERFORMANCE}/cota/aprovacao`);
+
   // As consultas do layout saem juntas (1.39.3): rodam a cada clique, e uma
   // atrás da outra somavam as esperas pelo banco.
   const db = await criarClienteServidor();
-  const leDiario = sistema === 'cota' && perfil.papel !== 'gestor';
+  const leDiario = sistema === 'cota' && perfil.papel !== 'gestor' && perfil.papel !== 'diretoria';
   const [pendentes, avisosReporte, leituras, veFerias] = await Promise.all([
     // Exclusões esperando decisão aparecem no Painel, mas o quadro só existe
     // quando há alguma — o gestor não teria como saber que chegou pedido sem
@@ -46,7 +54,7 @@ export default async function LayoutInterno({ children }: { children: React.Reac
       : Promise.resolve([] as LeituraDiario[]),
     // Férias (62): gestor e Qualidade sempre; operador só com cargo Pleno ou
     // Analista no mês — e isso só o banco sabe, daí a pergunta só para ele.
-    sistema !== 'cota' ? Promise.resolve(false)
+    sistema !== 'cota' || perfil.papel === 'diretoria' ? Promise.resolve(false)
       : perfil.papel !== 'operador' ? Promise.resolve(true)
       : db.rpc('ve_ferias').then((r) => r.data === true),
   ]);
@@ -87,7 +95,7 @@ export default async function LayoutInterno({ children }: { children: React.Reac
     const versao = sistema === 'cota' ? VERSAO_COTA : VERSAO_MONITORIAS;
     // Seletor de setor do menu (3.0): só para quem vê o time. No Monitorias,
     // só os setores com monitorias.
-    const { data: setoresDb } = perfil.papel === 'operador' ? { data: [] }
+    const { data: setoresDb } = perfil.papel === 'operador' || perfil.papel === 'diretoria' ? { data: [] }
       : await db.from('setores').select('id, nome, monitorias').eq('ativo', true).order('ordem');
     const setoresDoMenu = ((setoresDb ?? []) as { id: number; nome: string; monitorias: boolean | null }[])
       .filter((s) => sistema === 'cota' || s.monitorias !== false);
@@ -100,9 +108,13 @@ export default async function LayoutInterno({ children }: { children: React.Reac
         <ManterSessao />
         {/* Toda tabela ordena pelo título da coluna (3.9.0). */}
         <OrdenarTabelas />
+        {perfil.papel === 'diretoria' && <GuardaDaDiretoria />}
+        {/* 4.0.0: a página se atualiza sozinha quando muda fechamento, aprovação, correção ou aviso. */}
+        {sistema === 'cota' && (perfil.papel === 'gestor' || perfil.papel === 'diretoria') && <AtualizacaoAutomatica />}
         <MenuLateral perfil={perfil} versao={versao} sistema={sistema} veFerias={veFerias}
                      avisosReporte={avisosReporte} pendentes={pendentes}
-                     setores={setoresDoMenu.map(({ id, nome }) => ({ id, nome }))} setorAtual={setorAtual} />
+                     setores={setoresDoMenu.map(({ id, nome }) => ({ id, nome }))} setorAtual={setorAtual}
+                     apresentacao={process.env.APRESENTACAO === '1'} />
         <div className="min-w-0">
           <div className="lg:hidden">
             <Navegacao perfil={perfil} pendentes={pendentes} sistema={sistema} versao={versao} avisosReporte={avisosReporte} veFerias={veFerias} />

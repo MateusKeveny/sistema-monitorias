@@ -39,7 +39,7 @@ export default async function TelaArvore() {
     .filter((p) => p.ativo && !p.desligado_em && !p.perfil_de_teste);
 
   const galhos: GalhoDoSetor[] = ((setores ?? []) as Setor[]).map((s) => {
-    const doSetor = naOperacao.filter((p) => p.papel !== 'administrador' && vigente(hSetor, p.id, mes)?.setor_id === s.id);
+    const doSetor = naOperacao.filter((p) => p.papel !== 'administrador' && p.papel !== 'diretoria' && vigente(hSetor, p.id, mes)?.setor_id === s.id);
     return {
       id: s.id,
       nome: s.nome,
@@ -58,6 +58,7 @@ export default async function TelaArvore() {
 
   return (
     <ArvoreDeSetores galhos={galhos} administrador={!!perfil.administrador} mesAtual={mes}
-                     administradores={naOperacao.filter((p) => p.papel === 'administrador').map((p) => p.nome)} />
+                     administradores={naOperacao.filter((p) => p.papel === 'administrador').map((p) => p.nome)}
+                     ceo={naOperacao.filter((p) => p.papel === 'diretoria').map((p) => p.nome)} />
   );
 }

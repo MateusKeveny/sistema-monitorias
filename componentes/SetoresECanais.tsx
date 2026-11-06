@@ -8,6 +8,8 @@ import { data as formatarData, hojeNoBrasil, mesDeCompetencia, mesRotulo } from 
 import { mensagemDoErro } from '@/lib/erro-amigavel';
 import { normalizarSetor, type Canal, type Setor } from '@/lib/setores';
 import { MONITORIAS_PADRAO, type MonitoriasDoSetor } from '@/lib/monitoriasDoSetor';
+import NovoSetorEmPagina from '@/componentes/NovoSetorEmPagina';
+import type { ContextoMetas } from '@/lib/metasPorLista';
 
 export type SetorDoHubVisto = { setor: string; atendimentos: number; ultima_vez: string };
 
@@ -24,8 +26,10 @@ type Regras = { copiar: string; tme: boolean };
  * fila diz como pontua: copiando as métricas de outra (e acompanhando as
  * mudanças dela) ou com regras próprias, com peso zero até o gestor preencher.
  */
-export default function SetoresECanais({ setores, canais, vistos, monitorias = {}, administrador = false, contagens = {} }: {
+export default function SetoresECanais({ setores, canais, vistos, monitorias = {}, administrador = false, metasPorSetor = {} }: {
   setores: Setor[]; canais: Canal[]; vistos: SetorDoHubVisto[];
+  /** Cargos, métricas e pesos de cada setor: a base do passo "Cargos e metas" do novo setor (4.0.0). */
+  metasPorSetor?: Record<number, ContextoMetas>;
   /** Só o administrador cria setor (migração 94). */
   administrador?: boolean;
   /** Cargos, métricas e critérios de cada setor: o resumo do que a cópia leva. */
@@ -48,6 +52,7 @@ export default function SetoresECanais({ setores, canais, vistos, monitorias = {
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [atualizando, iniciar] = useTransition();
+  const [criando, setCriando] = useState(false);
 
   const lista = (t: string) => [...new Set(t.split(',').map((x) => x.trim()).filter(Boolean))];
   const mudou = setores.some((s) => rascunho[`s${s.id}`].trim() !== s.nome)
@@ -234,6 +239,16 @@ export default function SetoresECanais({ setores, canais, vistos, monitorias = {
     });
   }
 
+  // Novo setor (4.0.0): a página do assistente toma o lugar da tela.
+  if (criando) {
+    return (
+      <NovoSetorEmPagina setores={setores} canais={canais} comRegras={comRegras} metasPorSetor={metasPorSetor}
+                         camposDe={camposDe} lerCampos={lerCampos} CamposDeMonitoria={CamposDeMonitoria} EscolhaDeRegras={EscolhaDeRegras}
+                         aoFechar={() => { setCriando(false); iniciar(() => router.refresh()); }}
+                         aoCriar={(texto) => { setErro(null); setAviso(texto); }} />
+    );
+  }
+
   return (
     <div className="space-y-6">
       <Quadro titulo="Setores e filas"
@@ -367,12 +382,14 @@ export default function SetoresECanais({ setores, canais, vistos, monitorias = {
                 </ul>
               </li>
             ))}
-            {/* Criar setor: só o administrador (migração 94), em etapas (3.2.0). */}
+            {/* Criar setor: só o administrador (migração 94); abre a página do novo setor (4.0.0). */}
             {administrador && (
               <li>
-                <AssistenteDeSetor setores={setores} canais={canais} comRegras={comRegras} contagens={contagens}
-                                   camposDe={camposDe} lerCampos={lerCampos}
-                                   aoCriar={(texto) => { setErro(null); setAviso(texto); iniciar(() => router.refresh()); }} />
+                <button type="button" onClick={() => { setCriando(true); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                        className="w-full rounded-xl border border-dashed border-slate-300 px-4 py-3 text-left text-sm font-semibold text-slate-600
+                                   transition hover:border-marca-600 hover:text-marca-700">
+                  + Novo setor
+                </button>
               </li>
             )}
           </ul>
@@ -455,206 +472,4 @@ function EscolhaDeRegras({ r, mudar, filas, ocupado }: {
   );
 }
 
-type FilaNova = { nome: string; hub: string; regras: Regras };
 export type ContagemDoSetor = { cargos: number; metricas: number; criterios: number };
-
-/**
- * Criar setor em etapas (3.2.0; só o administrador): nome e base → filas →
- * monitorias → revisar. Antes era uma linha só com tudo junto.
- */
-function AssistenteDeSetor({ setores, canais, comRegras, contagens, camposDe, lerCampos, aoCriar }: {
-  setores: Setor[]; canais: Canal[]; comRegras: Canal[];
-  contagens: Record<number, ContagemDoSetor>;
-  camposDe: (id?: number) => CamposMonitoria;
-  lerCampos: (c: CamposMonitoria) => [number, number] | string;
-  aoCriar: (aviso: string) => void;
-}) {
-  const [passo, setPasso] = useState(0);
-  const [nome, setNome] = useState('');
-  const [origem, setOrigem] = useState(setores[0] ? String(setores[0].id) : '');
-  const regrasPadrao = (): Regras => ({ copiar: comRegras[0] ? String(comRegras[0].id) : '', tme: true });
-  const [filas, setFilas] = useState<FilaNova[]>([{ nome: '', hub: '', regras: regrasPadrao() }]);
-  const [comMonitorias, setComMonitorias] = useState(false);
-  const [campos, setCampos] = useState<CamposMonitoria>(() => camposDe(setores[0]?.id));
-  const [ocupado, setOcupado] = useState(false);
-  const [erro, setErro] = useState<string | null>(null);
-
-  const lista = (t: string) => [...new Set(t.split(',').map((x) => x.trim()).filter(Boolean))];
-  const base = setores.find((s) => String(s.id) === origem);
-  const conta = base ? contagens[base.id] : undefined;
-  const filasValidas = filas.filter((f) => f.nome.trim());
-  const PASSOS = ['Nome e base', 'Filas', 'Monitorias', 'Revisar e criar'];
-
-  function conferirFilas(): string | null {
-    const ocupados = new Map(canais.flatMap((c) => c.nomes_no_hub.map((n) => [normalizarSetor(n), c.nome] as const)));
-    const daqui = new Set<string>();
-    for (const f of filasValidas) {
-      for (const n of lista(f.hub || f.nome)) {
-        const k = normalizarSetor(n);
-        if (ocupados.has(k)) return `"${n}" já está na fila ${ocupados.get(k)}.`;
-        if (daqui.has(k)) return `"${n}" está em duas filas novas.`;
-        daqui.add(k);
-      }
-    }
-    return null;
-  }
-
-  function avancar() {
-    setErro(null);
-    if (passo === 1 && !nome.trim()) { setErro('Dê um nome ao setor.'); return; }
-    if (passo === 1 && setores.some((s) => s.nome.trim().toLowerCase() === nome.trim().toLowerCase())) {
-      setErro(`Já existe o setor "${nome.trim()}".`); return;
-    }
-    if (passo === 2) { const f = conferirFilas(); if (f) { setErro(f); return; } }
-    if (passo === 3 && comMonitorias) { const l = lerCampos(campos); if (typeof l === 'string') { setErro(l); return; } }
-    setPasso(passo + 1);
-  }
-
-  async function criar() {
-    const lidos = comMonitorias ? lerCampos(campos) : null;
-    if (typeof lidos === 'string') { setErro(lidos); return; }
-    setOcupado(true); setErro(null);
-    const db = criarClienteNavegador();
-    const { data: id, error } = await db.rpc('clonar_setor', lidos ? {
-      p_nome: nome.trim(), p_origem: origem ? Number(origem) : null, p_monitorias: true, p_por_semana: lidos[0], p_piso: lidos[1],
-    } : { p_nome: nome.trim(), p_origem: origem ? Number(origem) : null, p_monitorias: false });
-    if (error) { setOcupado(false); setErro(await mensagemDoErro(error)); return; }
-    const falhas: string[] = [];
-    for (const [i, f] of filasValidas.entries()) {
-      const { data: fila, error: e1 } = await db.from('canais_do_setor')
-        .insert({ setor_id: Number(id), nome: f.nome.trim(), nomes_no_hub: lista(f.hub || f.nome), ordem: i + 1 })
-        .select('id').single();
-      if (e1) { falhas.push(`${f.nome}: ${await mensagemDoErro(e1)}`); continue; }
-      const { error: e2 } = await db.rpc('definir_regras_da_fila', {
-        p_fila: fila.id, p_copiar_de: f.regras.copiar ? Number(f.regras.copiar) : null, p_tme: f.regras.tme });
-      if (e2) falhas.push(`${f.nome} (regras): ${await mensagemDoErro(e2)}`);
-    }
-    setOcupado(false);
-    setPasso(0); setNome(''); setFilas([{ nome: '', hub: '', regras: regrasPadrao() }]); setComMonitorias(false);
-    aoCriar(falhas.length
-      ? `Setor "${nome.trim()}" criado, mas algumas filas falharam: ${falhas.join('; ')}. Ajuste abaixo.`
-      : `Setor "${nome.trim()}" criado. Próximo passo: cadastrar o gestor do setor em Pessoas › + Novo usuário.`);
-  }
-
-  if (passo === 0) {
-    return (
-      <button type="button" onClick={() => setPasso(1)}
-              className="w-full rounded-xl border border-dashed border-slate-300 px-4 py-3 text-left text-sm font-semibold text-slate-600
-                         hover:border-marca-600 hover:text-marca-700">
-        + Novo setor
-      </button>
-    );
-  }
-
-  const opcoes = [
-    ...setores.map((s) => ({ id: String(s.id), titulo: `Copiar de ${s.nome}`,
-      texto: `${contagens[s.id]?.cargos ?? 0} cargos com pesos e meta, faixas e nomes das métricas` })),
-    { id: '', titulo: 'Do zero', texto: 'Sem cargos nem pesos: tudo é cadastrado depois' },
-  ];
-
-  return (
-    <div className="rounded-2xl border border-marca-600/40 bg-superficie p-5">
-      <ol className="mb-4 flex flex-wrap gap-2 text-xs">
-        {PASSOS.map((p, i) => (
-          <li key={p} className={`rounded-full px-3 py-1 font-semibold ${i + 1 === passo ? 'bg-marca-600 text-white'
-            : i + 1 < passo ? 'bg-marca-600/15 text-marca-700 dark:text-marca-400' : 'bg-slate-100 text-slate-500'}`}>
-            {i + 1}. {p}
-          </li>
-        ))}
-      </ol>
-      {erro && <p className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800 ring-1 ring-rose-600/20">{erro}</p>}
-
-      {passo === 1 && (
-        <div className="space-y-3">
-          <label className="block text-sm text-slate-600">Nome do setor (a equipe)
-            <input value={nome} autoFocus onChange={(e) => setNome(e.target.value)} className={`${entrada} mt-1 block w-80`} />
-          </label>
-          <p className="text-sm text-slate-600">De onde vêm os cargos e as métricas</p>
-          <div className="grid gap-2 sm:grid-cols-3">
-            {opcoes.map((o) => (
-              <button key={o.id || 'zero'} type="button"
-                      onClick={() => { setOrigem(o.id); setCampos(camposDe(o.id ? Number(o.id) : undefined)); }}
-                      className={`rounded-xl border px-3 py-2.5 text-left ${origem === o.id
-                        ? 'border-marca-600 ring-2 ring-marca-600/20' : 'border-slate-200 hover:border-slate-300'}`}>
-                <b className="block text-sm text-slate-900">{o.titulo}</b>
-                <span className="text-xs text-slate-500">{o.texto}</span>
-              </button>
-            ))}
-          </div>
-          <p className="text-xs text-slate-500">Copiar faz cópias independentes: mudar depois um setor não mexe no outro.</p>
-        </div>
-      )}
-
-      {passo === 2 && (
-        <div className="space-y-2">
-          <p className="text-sm text-slate-600">As filas do setor, como o Hub separa os atendimentos. Dá para criar depois.</p>
-          {filas.map((f, i) => (
-            <div key={i} className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 px-3 py-2">
-              <input value={f.nome} placeholder="Nome da fila" aria-label={`Nome da fila ${i + 1}`}
-                     onChange={(e) => setFilas((l) => l.map((x, j) => (j === i ? { ...x, nome: e.target.value } : x)))}
-                     className={`${entrada} w-48`} />
-              <input value={f.hub} placeholder="Nome no Hub (se for diferente)" aria-label={`Nome no Hub da fila ${i + 1}`}
-                     onChange={(e) => setFilas((l) => l.map((x, j) => (j === i ? { ...x, hub: e.target.value } : x)))}
-                     className={`${entrada} w-64`} />
-              <EscolhaDeRegras r={f.regras} filas={comRegras} ocupado={ocupado}
-                               mudar={(r) => setFilas((l) => l.map((x, j) => (j === i ? { ...x, regras: { ...x.regras, ...r } } : x)))} />
-              {filas.length > 1 && (
-                <button type="button" onClick={() => setFilas((l) => l.filter((_, j) => j !== i))}
-                        className="text-xs text-slate-500 hover:underline">remover</button>
-              )}
-            </div>
-          ))}
-          <button type="button" onClick={() => setFilas((l) => [...l, { nome: '', hub: '', regras: regrasPadrao() }])}
-                  className="text-sm text-marca-700 hover:underline dark:text-marca-400">+ outra fila</button>
-        </div>
-      )}
-
-      {passo === 3 && (
-        <div className="space-y-3">
-          <label className="flex items-center gap-2 text-sm text-slate-700">
-            <input type="checkbox" checked={comMonitorias} onChange={(e) => setComMonitorias(e.target.checked)}
-                   className="h-4 w-4 accent-marca-600" />
-            Monitorias neste setor
-          </label>
-          {comMonitorias && <CamposDeMonitoria c={campos} mudar={setCampos} ocupado={ocupado} />}
-          <p className="text-xs text-slate-500">
-            {comMonitorias
-              ? `Os critérios do formulário vêm ${base ? `de ${base.nome}` : 'em branco'}; dá para ajustar depois.`
-              : 'Sem monitorias, o setor não aparece no Monitorias e a monitoria não pontua; dá para ligar depois.'}
-          </p>
-        </div>
-      )}
-
-      {passo === 4 && (
-        <ul className="space-y-1.5 text-sm text-slate-700">
-          <li><b>{nome.trim()}</b></li>
-          <li>{base ? `Cópia de ${base.nome}: ${conta?.cargos ?? 0} cargos com pesos e meta, as faixas e os nomes das métricas.`
-            : 'Do zero: sem cargos nem pesos.'}</li>
-          <li>{filasValidas.length ? `Filas: ${filasValidas.map((f) => f.nome.trim()).join(', ')}.` : 'Sem filas por enquanto.'}</li>
-          <li>{comMonitorias
-            ? `Monitorias: ${campos.qtd} por semana, pontua a partir de ${campos.piso}%${base ? `, ${conta?.criterios ?? 0} critérios de ${base.nome}` : ''}.`
-            : 'Sem monitorias.'}</li>
-          <li className="text-xs text-slate-500">Depois: cadastrar o gestor do setor (Pessoas › + Novo usuário) e, se precisar, mover pessoas pela Árvore.</li>
-        </ul>
-      )}
-
-      <div className="mt-4 flex items-center gap-2">
-        <button type="button" onClick={() => { setErro(null); setPasso(passo - 1); }} disabled={ocupado}
-                className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50">
-          {passo === 1 ? 'Cancelar' : 'Voltar'}
-        </button>
-        {passo < 4 ? (
-          <button type="button" onClick={avancar}
-                  className="rounded-lg bg-marca-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-marca-700">
-            Continuar
-          </button>
-        ) : (
-          <button type="button" onClick={criar} disabled={ocupado}
-                  className="rounded-lg bg-marca-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-marca-700 disabled:opacity-40">
-            {ocupado ? 'Criando…' : 'Criar setor'}
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}

@@ -35,6 +35,83 @@ para o Performance.
 
 ---
 
+## Performance 4.0.0 e Monitorias 6.3.1
+
+**Exceção à regra de numeração, decidida pelo gestor (04/11/2026)**, como foi a
+Monitorias 6.0: nada que já existia deixa de valer — o cálculo e os meses já
+fechados não mudam —, mas a entrega muda o fluxo do mês (a cota fechada passa
+pela aprovação da CEO) e a forma de montar setores. Migração **98**
+(`supabase/98-aprovacao-da-diretoria.sql`), que roda depois da 99 sem
+conflito. Montada sobre a 3.9.0 (06/11/2026). Agenda sem mudança.
+**Monitorias 6.3.1** (correção, código compartilhado): o menu lateral fica
+acima do conteúdo — o painel do sino não fica mais atrás de faixas e cartões —
+e a conta da CEO fica fora das listas de monitoria.
+
+- **Aprovação das cotas pela CEO.** Papel novo **CEO** (`diretoria` no banco): só a
+  tela Aprovação das cotas, de todos os setores, **só em pontos** (nunca R$ nem
+  a meta em número; só Atingida/Próxima/Abaixo). Um cartão por setor; no setor
+  escolhido, os 4 números do mês com a variação contra o mês anterior, o C-SAT
+  por semana por canal, os **últimos 3 meses** (tabela e C-SAT mês a mês) e a
+  pontuação de cada pessoa com os 2 meses anteriores. Aprovar, recusar (motivo
+  obrigatório), "Aprovar os pendentes" e alterar uma recusa. **Aprovada, a cota
+  fica finalizada:** sem correção, reabertura nem troca de decisão (trava no
+  banco, em qualquer caminho; "🔒 Finalizada" no Fechamento, no lugar da
+  Correção, e na lista da CEO; aprovar pede confirmação). O nome abre o
+  extrato congelado, com os 3 meses da pessoa; cada mês (e os pontos em cinza
+  dos meses anteriores) abre o extrato daquele mês. A aprovação **não trava** o
+  fechamento nem o pagamento: fica registrada. Começa em **novembro/2026**
+  (`inicio_da_aprovacao()`); meses anteriores seguiram o fluxo antigo.
+- **Menu da CEO:** Aprovação das cotas › **Aguardando aprovação** (o que falta
+  decidir, inclusive recusadas com o gestor) e **Aprovadas** (as finalizadas,
+  para consultar, também de meses anteriores ao início), e o Cruzeiro.
+- **Gráficos com 3 linhas ou mais** (C-SAT por canal e de todos os canais):
+  sem os números de cada ponto, que se encavalavam — ficam na caixinha do
+  mouse —, e as etiquetas do último ponto empilhadas, sem sobrepor.
+- **Avisos só no sino** (sem Teams, decisão do gestor): para a CEO quando o
+  gestor fecha o mês, refaz a cota de alguém já decidido ou responde a uma
+  recusa; para o gestor quando a CEO recusa (com o motivo) e quando o setor
+  fica todo aprovado. Fechar o mês avisa na confirmação que as cotas vão para
+  a CEO, e o Fechamento mostra "Encaminhado à CEO" com a contagem.
+- **Atualização automática** (gestor e CEO): a cada 30 s, só com a aba na
+  tela, o navegador pergunta ao banco uma marca do que mudou (fechamentos,
+  decisões, correções, avisos não lidos — `marca_de_mudancas`, só um código) e
+  a página só se atualiza quando ela muda. Não passa pelo servidor da
+  Cloudflare; quem está digitando não é interrompido.
+- **Resposta à recusa.** No Fechamento, quadro **Pendências com a CEO** no
+  Congelado: as recusadas aguardando o gestor (botão **Responder**, só o
+  texto) e as respondidas aguardando a CEO. A Correção da linha (ajustar
+  pontos ou meta) também vale como resposta; reabrir e fechar de novo manda a
+  cota refeita. Respondida, a cota volta para a CEO decidir, com a recusa e a
+  resposta à vista e o histórico no extrato. Coluna **CEO** com a decisão; no
+  Início, a pendência "A CEO recusou N cotas".
+- **Conta da CEO:** só o administrador cria (Pessoas › + Novo usuário › papel
+  CEO), pela `criar_acesso_diretoria`. Fica **fora da árvore**, como o
+  administrador: sem setor e sem cargo. A CEO não lê as tabelas: tudo sai por
+  funções que conferem o papel.
+- **Cruzeiro** (Acompanhar › Cruzeiro): o ranking de cada setor somando os
+  pontos dos meses escolhidos (clique nos meses para incluir ou tirar), com
+  pódio dos 3 primeiros e a classificação com os pontos de cada mês. No setor,
+  só quem atende (Júnior, Pleno, Sênior, Analista): gestor e acima ficam fora,
+  pelo cargo do fechamento. A CEO e o administrador abrem no **ranking geral**
+  (quem atende, de todos os setores, com a coluna Setor) e no da **gestão de
+  todos os setores**, e podem escolher um setor; o gestor vê o setor dele;
+  atendentes não veem. Só entram as cotas **aprovadas pela CEO**
+  (finalizadas). Funções `meses_do_cruzeiro`, `cruzeiro` e
+  `eh_gestao_no_cruzeiro`.
+- **Metas e pesos por lista** (Configuração › Pesos por cargo): baixar o modelo
+  **.xlsx** com os valores de hoje — uma linha por métrica, uma coluna por
+  cargo —, editar no Excel e subir de volta (ou colar as células). Conferência
+  "de → para" antes de gravar, cargo novo com o que faltar copiado do cargo de
+  base, motivo obrigatório no histórico de pesos. Vazio = não muda; "não
+  pontua" desliga. Também aceita .csv e o formato antigo (cargo por linha).
+- **Novo setor em página** (Usuários e setores › Setores e filas, só o
+  administrador): abertura animada e 6 passos — Nome, Base, Filas, **Cargos e
+  metas** (com a lista), Monitorias, Revisar —, com a pré-visualização do setor
+  se montando ao lado e um visto animado no fim. Substitui o assistente de 4
+  passos da 3.2.0.
+
+---
+
 ## Performance 3.9.0 e Monitorias 6.3.0
 
 Migração **99** (`supabase/99-assuntos-e-volume-da-sol.sql`), aditiva.

@@ -5,6 +5,7 @@ import BotaoFecharCiclo from '@/componentes/BotaoFecharCiclo';
 import { conferirNumerosDoMes, pendentesDaConferencia, type Csat, type Volume } from '@/lib/conferenciaDoMes';
 import ConferenciaDosNumeros from '@/componentes/ConferenciaDosNumeros';
 import AjusteDeFechamento from '@/componentes/AjusteDeFechamento';
+import PendenciasDaCeo, { type PendenciaDaCeo } from '@/componentes/PendenciasDaCeo';
 import ValorDaCota from '@/componentes/ValorDaCota';
 import PagamentoDoMes, { type ValorRh } from '@/componentes/PagamentoDoMes';
 import type {
@@ -30,6 +31,11 @@ type Fechado = {
   id: string;
   pessoa_id: string; pessoa_nome: string; cargo: string | null;
   resultado: number; meta: number | null; fechado_por_nome: string | null; fechado_em: string;
+};
+
+type Decisao = {
+  fechamento_id: string; situacao: 'aprovado' | 'recusado' | 'respondido'; motivo: string | null;
+  decidido_em: string; decidido_por_nome: string | null;
 };
 
 const num = (v: number) => Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
@@ -127,6 +133,34 @@ export default async function Fechamento({
   const outroPendentes = ((await outroSetor).data ?? []) as unknown as { pessoa_id: string; pessoas: { nome: string } | null }[];
   const lista = ((abertos.data ?? []) as Aberto[]).filter((p) => doSetor(p.pessoa_id));
   const congelados = (fechados.data ?? []) as Fechado[];
+  // A decisão da diretoria sobre cada fechamento (4.0.0, migração 98). Fora do
+  // todas(): sem a migração, a tela segue sem a coluna.
+  // Só a partir do mês em que a aprovação começou (inicio_da_aprovacao): antes, a coluna não aparece.
+  const { data: inicioDb } = await db.rpc('inicio_da_aprovacao');
+  const comAprovacao = typeof inicioDb === 'string' && competencia >= inicioDb;
+  const { data: decisoesDb } = comAprovacao && congelados.length
+    ? await db.from('vw_aprovacao_atual').select('fechamento_id, situacao, motivo, decidido_em, decidido_por_nome')
+        .in('fechamento_id', congelados.map((f) => f.id))
+    : { data: [] };
+  const decisao = new Map(((decisoesDb ?? []) as Decisao[]).map((d) => [d.fechamento_id, d]));
+  const recusadas = congelados.filter((f) => decisao.get(f.id)?.situacao === 'recusado').length;
+  const aprovadas = congelados.filter((f) => decisao.get(f.id)?.situacao === 'aprovado').length;
+  const respondidas = congelados.filter((f) => decisao.get(f.id)?.situacao === 'respondido');
+  // Pendências com a CEO (4.0.0): recusas sem resposta e respostas sem nova decisão.
+  // Para as respondidas, o motivo da recusa que foi respondida.
+  const { data: recusasDb } = respondidas.length
+    ? await db.from('aprovacoes_cota').select('fechamento_id, motivo, decidido_em').eq('situacao', 'recusado')
+        .in('fechamento_id', respondidas.map((f) => f.id)).order('decidido_em', { ascending: false })
+    : { data: [] };
+  const recusaDe = new Map<string, string | null>();
+  for (const r of (recusasDb ?? []) as { fechamento_id: string; motivo: string | null }[]) {
+    if (!recusaDe.has(r.fechamento_id)) recusaDe.set(r.fechamento_id, r.motivo);
+  }
+  const pendenciasDaCeo: PendenciaDaCeo[] = congelados.flatMap((f) => {
+    const d = decisao.get(f.id);
+    if (!d || (d.situacao !== 'recusado' && d.situacao !== 'respondido')) return [];
+    return [{ fechamento_id: f.id, pessoa: f.pessoa_nome, situacao: d.situacao, texto: d.motivo, recusa: recusaDe.get(f.id) ?? null, em: d.decidido_em }];
+  });
   const jaFechados = new Set(congelados.map((f) => f.pessoa_id));
   const pendentes = lista.filter((p) => !jaFechados.has(p.pessoa_id));
 
@@ -244,6 +278,16 @@ export default async function Fechamento({
                 </span>
               : <span className="font-semibold text-sobre-fundo-atencao">Ainda aberto</span>}
           </p>
+          {/* 4.0.0: o mês fechado já foi para a CEO (vai sozinho, ao fechar). */}
+          {comAprovacao && congelados.length > 0 && (
+            <p className="mt-1 text-xs font-semibold text-sobre-fundo-bom">
+              {aprovadas === congelados.length
+                ? '✓ Aprovado pela CEO: todas as cotas'
+                : `✓ Encaminhado à CEO${quando ? ` em ${dataHora(quando)}` : ''} · ${aprovadas} aprovada${aprovadas === 1 ? '' : 's'}, `
+                  + `${recusadas} recusada${recusadas === 1 ? '' : 's'}, ${congelados.length - aprovadas - recusadas} aguardando`
+                  + (respondidas.length ? ` (${respondidas.length} respondida${respondidas.length === 1 ? '' : 's'})` : '')}
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap items-end gap-2">
           {/* 3.4.0: uma folha por atendente (imprimir/PDF), no lugar da planilha detalhada. */}
@@ -296,8 +340,11 @@ export default async function Fechamento({
       {congelados.length > 0 && (
         <Quadro
           titulo={`Congelado (${congelados.length})`}
+          subtitulo={comAprovacao ? `CEO: ${aprovadas} aprovada${aprovadas === 1 ? '' : 's'}, ${recusadas} recusada${recusadas === 1 ? '' : 's'}, `
+            + `${congelados.length - aprovadas - recusadas} aguardando.${recusadas ? ' Para atender uma recusa: Responder (só o texto), ou a Correção da linha (ajustar pontos ou meta), ou reabrir e fechar de novo. Em todos, a cota volta para a CEO.' : ''}${aprovadas ? ' Aprovada pela CEO, a cota fica finalizada: sem correção nem reabertura.' : ''}` : undefined}
           acao={<span className="text-xs text-slate-500">valores entregues, não mudam mais</span>}
         >
+          {comAprovacao && pendenciasDaCeo.length > 0 && <PendenciasDaCeo itens={pendenciasDaCeo} />}
           <Tabela noQuadro>
             <thead>
               <tr>
@@ -306,6 +353,7 @@ export default async function Fechamento({
                 <Th className="text-right">Meta</Th>
                 <Th className="text-right">Atingimento</Th>
                 <Th>Extrato</Th>
+                {comAprovacao && <Th>CEO</Th>}
                 <Th>Correção</Th>
               </tr>
             </thead>
@@ -325,13 +373,40 @@ export default async function Fechamento({
                       ver
                     </Link>
                   </Td>
+                  {comAprovacao && <Td className="max-w-xs">
+                    {(() => {
+                      const d = decisao.get(f.id);
+                      if (!d) return <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">Aguardando</span>;
+                      if (d.situacao === 'respondido') {
+                        return (
+                          <span title={`${d.decidido_por_nome ?? 'Gestor'} · ${dataHora(d.decidido_em)}`}>
+                            <span className="text-xs font-semibold text-sky-700 dark:text-sky-300">↩ Respondida · aguardando a CEO</span>
+                            {d.motivo && <span className="block text-xs text-slate-500">{d.motivo}</span>}
+                          </span>
+                        );
+                      }
+                      return (
+                        <span title={`${d.decidido_por_nome ?? 'CEO'} · ${dataHora(d.decidido_em)}`}>
+                          <span className={`text-xs font-semibold ${d.situacao === 'aprovado' ? 'text-marca-700 dark:text-marca-300' : 'text-rose-700 dark:text-rose-300'}`}>
+                            {d.situacao === 'aprovado' ? '✓ Aprovada' : '✕ Recusada'}
+                          </span>
+                          {d.motivo && <span className="block text-xs text-rose-700 dark:text-rose-300">{d.motivo}</span>}
+                        </span>
+                      );
+                    })()}
+                  </Td>}
                   <Td>
-                    <AjusteDeFechamento
-                      fechamentoId={f.id}
-                      pessoa={f.pessoa_nome}
-                      resultado={Number(f.resultado)}
-                      meta={f.meta == null ? null : Number(f.meta)}
-                    />
+                    {/* Aprovada pela CEO (4.0.0): a aprovação é final, sem correção nem reabertura. */}
+                    {decisao.get(f.id)?.situacao === 'aprovado' ? (
+                      <span className="text-xs text-slate-500" title="Aprovada pela CEO: finalizada, sem correção nem reabertura.">🔒 Finalizada</span>
+                    ) : (
+                      <AjusteDeFechamento
+                        fechamentoId={f.id}
+                        pessoa={f.pessoa_nome}
+                        resultado={Number(f.resultado)}
+                        meta={f.meta == null ? null : Number(f.meta)}
+                      />
+                    )}
                   </Td>
                 </tr>
               ))}
@@ -411,7 +486,7 @@ export default async function Fechamento({
             </Tabela>
 
             <div className="border-t border-slate-100 pt-5">
-              <BotaoFecharCiclo competencia={competencia} setorId={setorId} pessoas={pendentes.length} avisos={avisos} alertas={naoConferidos.length} />
+              <BotaoFecharCiclo competencia={competencia} setorId={setorId} pessoas={pendentes.length} avisos={avisos} alertas={naoConferidos.length} comAprovacao={comAprovacao} />
             </div>
           </div>
         )}

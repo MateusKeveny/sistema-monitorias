@@ -25,7 +25,7 @@ export default function PainelPessoas({ pessoas }: { pessoas: Pessoa[] }) {
   // fantasma") e a conta de administrador não são monitorados.
   const naOperacao = pessoas.filter((p) => p.ativo && !p.desligado_em
     && !(p as { perfil_de_teste?: boolean }).perfil_de_teste
-    && (p.papel as string) !== 'administrador');
+    && (p.papel as string) !== 'administrador' && (p.papel as string) !== 'diretoria');
   const avaliadas = naOperacao.filter((p) => p.avaliado).length;
 
   async function marcar(p: Pessoa, avaliado: boolean) {

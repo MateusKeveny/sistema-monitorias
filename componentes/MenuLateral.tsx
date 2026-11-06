@@ -12,6 +12,7 @@ import SeletorDeSetor from '@/componentes/SeletorDeSetor';
 import Novidades from '@/componentes/Novidades';
 import { Suspense } from 'react';
 import { NOMES_PAPEL, type Perfil } from '@/lib/tipos';
+import VoltarApresentacaoAoInicio from '@/componentes/VoltarApresentacaoAoInicio';
 
 /** Ícones de traço, desenhados para 20×20, por endereço, nos dois sistemas. */
 const ICONES: Record<string, React.ReactNode> = {
@@ -35,6 +36,11 @@ const ICONES: Record<string, React.ReactNode> = {
   '/cota/presencial': <><circle cx="10" cy="7" r="3" /><path d="M4 17c1-3 3.5-4.5 6-4.5s5 1.5 6 4.5" /></>,
   '/cota/lancamentos': <path d="M10 4v12M4 10h12" />,
   '/cota/importar': <path d="M10 3v9m0 0-3-3m3 3 3-3M4 14v2h12v-2" />,
+  // Aprovação da CEO (4.0.0): o relógio para o que aguarda, o selo com o visto para as aprovadas.
+  '/cota/aprovacao': <><circle cx="10" cy="10" r="7" /><path d="M10 6.5V10l2.5 1.8" /></>,
+  '/cota/aprovacao/aprovadas': <><circle cx="10" cy="8.5" r="5" /><path d="m7.8 8.6 1.6 1.6 3-3.2M7 13l-1 4 4-1.8 4 1.8-1-4" /></>,
+  // Navio de cruzeiro: o Cruzeiro, ranking por setor (4.0.0).
+  '/cota/cruzeiro': <><path d="M1.5 11H17l1.6-1.3-2.7 5.8H1.5" /><path d="M1.5 8.2H11l2.1 2.8M1.5 5.6h6l1.6 2.6M3.4 5.6V3.2h2.5l.3 2.4" /><path d="M4.8 13.2h.01M7.8 13.2h.01M10.8 13.2h.01M13.6 13.2h.01" strokeWidth="2" /><path d="M1 18.2c1.4 0 1.4-.7 2.8-.7s1.4.7 2.8.7 1.4-.7 2.8-.7 1.4.7 2.8.7 1.4-.7 2.8-.7 1.4.7 2.8.7" /></>,
   '/cota/fechamento': <><rect x="4" y="9" width="12" height="8" rx="1.5" /><path d="M7 9V6.5a3 3 0 0 1 6 0V9" /></>,
   '/cota/usuarios': <><circle cx="7" cy="8" r="2.5" /><circle cx="14" cy="8" r="2.5" /><path d="M2.5 16c.7-2.3 2.4-3.5 4.5-3.5s3.8 1.2 4.5 3.5M11 12.6c.9-.1 2-.1 3 0 1.9.3 3 1.3 3.5 3.4" /></>,
   '/cota/atendentes': <><circle cx="7" cy="8" r="2.5" /><circle cx="14" cy="8" r="2.5" /><path d="M2.5 16c.7-2.3 2.4-3.5 4.5-3.5s3.8 1.2 4.5 3.5M11 12.6c.9-.1 2-.1 3 0 1.9.3 3 1.3 3.5 3.4" /></>,
@@ -62,7 +68,9 @@ const ICONES: Record<string, React.ReactNode> = {
  * Fechamento e Relatórios não têm grupo no menu do topo — cabem sozinhos —,
  * mas aqui ganham o seu: um é etapa do mês, o outro é consulta.
  */
-export default function MenuLateral({ perfil, versao, sistema, avisosReporte = 0, pendentes = 0, veFerias = false, setores = [], setorAtual = 1 }: {
+export default function MenuLateral({ perfil, versao, sistema, avisosReporte = 0, pendentes = 0, veFerias = false, setores = [], setorAtual = 1, apresentacao = false }: {
+  /** Cópia da apresentação (APRESENTACAO=1): o botão de voltar ao início, para a gestão (gestor e administrador). */
+  apresentacao?: boolean;
   /** Setores do seletor do menu (3.0) e o escolhido; com um só, o seletor não aparece. */
   setores?: { id: number; nome: string }[];
   setorAtual?: number;
@@ -100,7 +108,7 @@ export default function MenuLateral({ perfil, versao, sistema, avisosReporte = 0
 
   return (
     // Só a lista rola; o topo (sistema, sino, setor) e o rodapé (pessoa, sair, novidades) ficam sempre à vista (3.0).
-    <aside className="sem-impressao sticky top-0 hidden h-screen flex-col gap-0.5 border-r
+    <aside className="sem-impressao sticky top-0 z-40 hidden h-screen flex-col gap-0.5 border-r
                       border-slate-200 bg-superficie px-3.5 pb-3 pt-5 lg:flex">
       <div className="flex items-center justify-between gap-2 pb-5 pl-2.5 text-sm font-bold tracking-tight text-marca-700 dark:text-marca-400">
         {NOME_SISTEMA[sistema]}
@@ -151,6 +159,7 @@ export default function MenuLateral({ perfil, versao, sistema, avisosReporte = 0
           <BotaoReportar sistema={sistema === 'cota' ? 'performance' : 'monitorias'} versao={versao} pessoaId={perfil.id}
                          ehGestor={perfil.papel === 'gestor'} avisos={avisosReporte} />
         </div>
+        {apresentacao && perfil.papel === 'gestor' && <VoltarApresentacaoAoInicio />}
         <div className="mt-2 flex items-center gap-2">
           <BotaoTema />
           <button onClick={sair}
@@ -160,7 +169,7 @@ export default function MenuLateral({ perfil, versao, sistema, avisosReporte = 0
         </div>
         {/* Apagada de propósito: serve para quem reporta um problema dizer em qual versão viu. */}
         {/* Novidades da 3.0: abre sozinha no primeiro acesso; aqui, para rever. */}
-        {sistema === 'cota' && <div className="mt-3 empty:hidden"><Novidades gestao={perfil.papel !== 'operador'} administrador={!!perfil.administrador} /></div>}
+        {sistema === 'cota' && perfil.papel !== 'diretoria' && <div className="mt-3 empty:hidden"><Novidades gestao={perfil.papel !== 'operador'} administrador={!!perfil.administrador} /></div>}
         <p aria-label={`Versão ${versao}`} className="mt-3 select-none text-[10px] tabular-nums text-slate-400/60">
           v{versao}
         </p>

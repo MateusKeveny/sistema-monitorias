@@ -2,7 +2,8 @@ import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
 import SetoresECanais, { type ContagemDoSetor, type SetorDoHubVisto } from '@/componentes/SetoresECanais';
 import { MONITORIAS_PADRAO } from '@/lib/monitoriasDoSetor';
 import type { Canal, Setor } from '@/lib/setores';
-import type { RegraCota } from '@/lib/tipos';
+import type { PesoCargo, RegraCota } from '@/lib/tipos';
+import { contextoDasMetas, type ContextoMetas } from '@/lib/metasPorLista';
 
 /**
  * Setores e filas (aba de "Usuários e setores", 3.0; era uma aba da
@@ -17,11 +18,12 @@ export default async function TelaSetores() {
     db.from('canais_do_setor').select('*').order('ordem'),
     db.from('vw_setores_do_hub_vistos').select('*').order('atendimentos', { ascending: false }),
     db.from('regras').select('chave, faixa_min').eq('grupo', 'monitoria'),
-    // O que a cópia de um setor leva (assistente de novo setor, 3.2.0).
-    db.from('cargos').select('setor_id').eq('ativo', true),
-    db.from('regras').select('setor_id').eq('ativo', true),
+    // O que a cópia de um setor leva (novo setor: 3.2.0; cargos e metas no passo 4, 4.0.0).
+    db.from('cargos').select('id, nome, ordem, setor_id').eq('ativo', true),
+    db.from('regras').select('chave, rotulo, ordem, ativo, grupo, setor_id'),
     db.from('criterios').select('setor_id').eq('ativo', true),
   ]);
+  const { data: pesos } = await db.from('pesos_por_cargo').select('cargo_id, regra, peso, ativo');
   const lista = (setores ?? []) as Setor[];
   const monitorias = Object.fromEntries(lista.map((s) => {
     const regua = ((reguas ?? []) as Pick<RegraCota, 'chave' | 'faixa_min'>[]).find((r) => r.chave === s.regra_monitoria);
@@ -32,9 +34,16 @@ export default async function TelaSetores() {
   }));
   const quantos = (linhas: { setor_id: number | null }[] | null, id: number) => (linhas ?? []).filter((x) => (x.setor_id ?? 1) === id).length;
   const contagens: Record<number, ContagemDoSetor> = Object.fromEntries(lista.map((s) => [s.id, {
-    cargos: quantos(cargos, s.id), metricas: quantos(regras, s.id), criterios: quantos(criterios, s.id),
+    cargos: quantos(cargos, s.id), metricas: quantos((regras ?? []).filter((r) => r.ativo), s.id), criterios: quantos(criterios, s.id),
   }]));
+  // A base do passo "Cargos e metas" do novo setor: o mesmo contexto da lista de metas.
+  const metasPorSetor: Record<number, ContextoMetas> = Object.fromEntries(lista.map((s) => {
+    const cs = (cargos ?? []).filter((c) => (c.setor_id ?? 1) === s.id);
+    const ids = new Set(cs.map((c) => c.id));
+    return [s.id, contextoDasMetas(cs, (regras ?? []).filter((r) => (r.setor_id ?? 1) === s.id),
+      ((pesos ?? []) as PesoCargo[]).filter((p) => ids.has(p.cargo_id)))];
+  }));
   return <SetoresECanais setores={lista} canais={(canais ?? []) as Canal[]}
                          vistos={(vistos ?? []) as SetorDoHubVisto[]} monitorias={monitorias}
-                         administrador={!!perfil.administrador} contagens={contagens} />;
+                         administrador={!!perfil.administrador} contagens={contagens} metasPorSetor={metasPorSetor} />;
 }

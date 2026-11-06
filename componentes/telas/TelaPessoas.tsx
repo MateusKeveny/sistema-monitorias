@@ -17,7 +17,7 @@ import type { AnotacaoGestor, LeituraDaPessoa, LeituraDiario } from '@/lib/diari
  * monitorias.
  */
 export default async function TelaPessoas() {
-  await exigirGestor();
+  const perfil = await exigirGestor();
   const db = await criarClienteServidor();
 
   const [{ data: pessoas }, { data: saidas }, { data: cargos }, { data: historico }, { data: leituras },
@@ -61,7 +61,7 @@ export default async function TelaPessoas() {
       </p>
 
       <div className="flex flex-wrap items-start gap-3">
-        <NovoUsuario setores={(setores ?? []) as Setor[]} cargos={(cargos ?? []) as Cargo[]} />
+        <NovoUsuario setores={(setores ?? []) as Setor[]} cargos={(cargos ?? []) as Cargo[]} administrador={!!perfil.administrador} />
         <CadastroEmLote pessoas={(pessoas ?? []) as Pessoa[]} setores={(setores ?? []) as Setor[]} cargos={(cargos ?? []) as Cargo[]} />
       </div>
 

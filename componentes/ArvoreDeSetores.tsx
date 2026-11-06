@@ -27,11 +27,13 @@ type Mudanca = { pessoa: { id: string; nome: string }; de: number; para: string;
  * no setor antigo).
  */
 export default function ArvoreDeSetores({
-  galhos, administrador, administradores, mesAtual,
+  galhos, administrador, administradores, ceo = [], mesAtual,
 }: {
   galhos: GalhoDoSetor[];
   administrador: boolean;
   administradores: string[];
+  /** A CEO (4.0.0): fora da árvore, como o administrador. */
+  ceo?: string[];
   mesAtual: string;
 }) {
   const router = useRouter();
@@ -97,6 +99,9 @@ export default function ArvoreDeSetores({
                 <b className="block text-base text-slate-900">{galhos.length} {galhos.length === 1 ? 'setor' : 'setores'}</b>
                 {administradores.length > 0 && (
                   <span className="block text-xs text-slate-500">Administrador: {administradores.join(', ')}</span>
+                )}
+                {ceo.length > 0 && (
+                  <span className="block text-xs text-slate-500">CEO: {ceo.join(', ')}</span>
                 )}
               </span>
               <ul>

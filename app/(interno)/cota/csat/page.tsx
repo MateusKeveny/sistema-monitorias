@@ -46,7 +46,7 @@ export default async function MeuCsat({
     setorDoCookie(),
   ]);
   type P = { id: string; nome: string; papel: string; ativo: boolean; desligado_em: string | null; perfil_de_teste?: boolean };
-  const todas = ((pessoas ?? []) as P[]).filter((p) => !p.perfil_de_teste && p.papel !== 'administrador');
+  const todas = ((pessoas ?? []) as P[]).filter((p) => !p.perfil_de_teste && p.papel !== 'administrador' && p.papel !== 'diretoria');
   // No seletor, quem está na operação.
   const lista = todas.filter((p) => p.ativo && !p.desligado_em);
   const vols = (volumes ?? []) as VolumeCsat[];

@@ -335,8 +335,29 @@ html[data-visual='3'] main tbody tr:hover { background-color: var(--color-slate-
 @keyframes girar { to { transform: rotate(360deg); } }
 .girar { animation: girar 1s linear infinite; }
 
+/* Novo setor em página (4.0.0): passos que deslizam, itens que sobem em
+   sequência (atraso por style), chips que "estalam", a abertura flutuando, o
+   passo atual pulsando e o visto desenhado no fim. Também nos cartões da
+   tela de aprovação. */
+@keyframes entra-dir { from { opacity: 0; transform: translateX(48px); } }
+@keyframes entra-esq { from { opacity: 0; transform: translateX(-48px); } }
+@keyframes sobe { from { opacity: 0; transform: translateY(16px); } }
+@keyframes estala { 0% { opacity: 0; transform: scale(.6); } 70% { opacity: 1; transform: scale(1.06); } }
+@keyframes flutua { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
+@keyframes pulso-passo { from { box-shadow: 0 0 0 0 rgb(16 185 129 / .45); } to { box-shadow: 0 0 0 14px transparent; } }
+@keyframes traco { to { stroke-dashoffset: 0; } }
+.entra-dir { animation: entra-dir 450ms cubic-bezier(.2,.8,.2,1) both; }
+.entra-esq { animation: entra-esq 450ms cubic-bezier(.2,.8,.2,1) both; }
+.sobe { animation: sobe 500ms cubic-bezier(.2,.8,.2,1) both; }
+.estala { animation: estala 420ms cubic-bezier(.2,.8,.2,1) both; }
+.flutua { animation: flutua 4.5s ease-in-out infinite; }
+.pulso-passo { animation: pulso-passo 1.6s ease-out infinite; }
+.traco { animation: traco 700ms ease-out forwards; }
+
 @media (prefers-reduced-motion: reduce) {
-  .crescer-y, .crescer-x, .desenhar-linha, .grafico-pulso, .surgir, .realce-resumo, .girar { animation: none; }
+  .crescer-y, .crescer-x, .desenhar-linha, .grafico-pulso, .surgir, .realce-resumo, .girar,
+  .entra-dir, .entra-esq, .sobe, .estala, .flutua, .pulso-passo { animation: none; }
+  .traco { animation: none; stroke-dashoffset: 0; }
 }
 
 /* A folha de feedback sai sempre em papel branco, independente do tema. */

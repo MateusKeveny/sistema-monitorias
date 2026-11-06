@@ -16,7 +16,7 @@ import { mensagemDoErro } from '@/lib/erro-amigavel';
  */
 type Pedido = { id: number; setor_id: number; mes_competencia: string; tipo: string; situacao: string; resultado: number | null; erro: string | null };
 export default function BotaoFecharCiclo({
-  competencia, setorId = 1, pessoas, avisos, alertas = 0,
+  competencia, setorId = 1, pessoas, avisos, alertas = 0, comAprovacao = false,
 }: {
   competencia: string;
   /** Fecha só as pessoas deste setor (migração 88). */
@@ -27,6 +27,8 @@ export default function BotaoFecharCiclo({
   avisos: string[];
   /** Números fora do padrão na conferência (3.4.0): pedem confirmação explícita. */
   alertas?: number;
+  /** O mês passa pela aprovação da CEO (4.0.0, migração 98): a confirmação avisa. */
+  comAprovacao?: boolean;
 }) {
   const router = useRouter();
   const [ocupado, setOcupado] = useState(false);
@@ -49,7 +51,7 @@ export default function BotaoFecharCiclo({
       if (p.situacao === 'na_fila' || p.situacao === 'calculando') { setAndamento(p); return; }
       if (andamento) {
         setAndamento(null);
-        if (p.situacao === 'pronto') setAviso(`${p.resultado ?? 0} pessoa(s) fechadas em ${mesRotulo(competencia)}.`);
+        if (p.situacao === 'pronto') setAviso(`${p.resultado ?? 0} pessoa(s) fechadas em ${mesRotulo(competencia)}.${comAprovacao ? ' As cotas foram para a aprovação da CEO.' : ''}`);
         else setErro(p.erro ?? 'O fechamento não foi concluído.');
         router.refresh();
       }
@@ -57,7 +59,7 @@ export default function BotaoFecharCiclo({
     conferir();
     const intervalo = setInterval(conferir, andamento ? 3_000 : 30_000);
     return () => { parado = true; clearInterval(intervalo); };
-  }, [competencia, setorId, andamento, router]);
+  }, [competencia, setorId, andamento, router, comAprovacao]);
 
   async function fechar() {
     if (alertas > 0 && !confirm(`Há ${alertas} ${alertas === 1 ? 'número fora do padrão' : 'números fora do padrão'} na Conferência dos números.\n\n`
@@ -65,7 +67,8 @@ export default function BotaoFecharCiclo({
     if (!confirm(`Fechar ${mesRotulo(competencia)} com ${pessoas} pessoa(s)?\n\n`
       + 'O resultado e o extrato ficam congelados como estão agora. '
       + 'Mudanças posteriores em pesos, volume ou lançamentos não alteram o que foi fechado, '
-      + 'e não existe caminho para desfazer.')) return;
+      + 'e não existe caminho para desfazer.'
+      + (comAprovacao ? '\n\nAo fechar, as cotas vão para a aprovação da CEO, que recebe o aviso no sino.' : ''))) return;
 
     setOcupado(true); setErro(null); setAviso(null);
     const { data, error } = await criarClienteNavegador().rpc('pedir_fechamento', { p_mes: competencia, p_setor: setorId });

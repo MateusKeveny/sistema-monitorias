@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import PainelGestor from '@/componentes/PainelGestor';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
@@ -87,6 +88,9 @@ export default async function InicioCota({
   const [perfil, { competencia, atual, emAberto }] = await todas([
     exigirPerfil(), resolverCompetencia(mes), situacaoDoResumo(),
   ]);
+  // Diretoria (4.0.0): a página inicial dela é a Aprovação. É para cá que o
+  // login leva, então o redirecionamento fica aqui, no servidor.
+  if (perfil.papel === 'diretoria') redirect('/cota/aprovacao');
   const outroMes = competencia !== atual;
 
   // "Atualizado às" (migração 58): só quando os totais vêm do resumo. No mês

@@ -59,6 +59,18 @@
     // o nome precisa começar com "painel-agenda". A chave pública VAPID é
     // pública de verdade (vai para o navegador); a privada e o segredo do
     // envio são segredos do Worker: `node scripts/chaves-da-agenda.js worker`.
+    // Cópia da apresentação da 4.0 (banco: projeto Supabase painel-apresentacao).
+    // Construída à parte, com as chaves desse projeto; tem o botão de voltar ao início.
+    "apresentacao": {
+      "name": "painel-apresentacao",
+      "observability": {
+        "enabled": true
+      },
+      "vars": {
+        "SISTEMA": "cota",
+        "APRESENTACAO": "1"
+      }
+    },
     "agenda": {
       "name": "painel-agenda",
       "observability": {

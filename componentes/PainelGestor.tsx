@@ -4,7 +4,7 @@ import GraficoDeLinha, { type PontoDaLinha } from '@/componentes/GraficoDeLinha'
 import SeletorDeDetalhe, { type Destaque } from '@/componentes/SeletorDeDetalhe';
 import { BarraDeMeta, Painel, Secao, Vazio } from '@/componentes/ui';
 import { criarClienteServidor } from '@/lib/supabase/servidor';
-import { corDoCsat, hojeNoBrasil, percentual, semanaDoCiclo } from '@/lib/formatar';
+import { corDoCsat, hojeNoBrasil, mesRotulo, percentual, semanaDoCiclo } from '@/lib/formatar';
 import { mesAnterior } from '@/lib/competencia';
 import { fonteDoMes } from '@/lib/resumo';
 import ProjecaoDaCota from '@/componentes/ProjecaoDaCota';
@@ -223,6 +223,17 @@ export default async function PainelGestor({
     pendencias.push({
       texto: `Conferência do cálculo: ${conferencia.falhas} divergência${conferencia.falhas > 1 ? 's' : ''}`,
       acao: 'Ver', href: '/cota/conferencia', grave: true,
+    });
+  }
+  // Cota recusada pela diretoria (4.0.0, migração 98), em qualquer mês: fica
+  // aqui até o gestor reabrir e fechar de novo. Sem a migração, a view não
+  // existe e não há pendência.
+  const { data: recusas } = await db.from('vw_aprovacao_atual').select('mes_competencia').eq('situacao', 'recusado');
+  for (const m of [...new Set((recusas ?? []).map((r) => r.mes_competencia as string))].sort()) {
+    const n = (recusas ?? []).filter((r) => r.mes_competencia === m).length;
+    pendencias.push({
+      texto: `A CEO recusou ${n} cota${n > 1 ? 's' : ''} de ${mesRotulo(m)}`,
+      acao: 'Ver o motivo', href: `/cota/fechamento?mes=${m.slice(0, 7)}`, grave: true,
     });
   }
   // Conferência dos números (3.5.0): a mesma do Fechamento, todo dia, enquanto

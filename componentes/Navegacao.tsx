@@ -41,9 +41,15 @@ export const ITENS: Record<Sistema, Item[]> = {
   // ciclo do mês na ordem em que acontece (importar → lançar → conferir → fechar).
   cota: [
     { href: '/cota', rotulo: 'Início', papeis: ['gestor', 'qualidade', 'operador'] },
+    // A CEO (4.0.0, migração 98): o submenu da aprovação e o Cruzeiro.
+    { href: '/cota/aprovacao', rotulo: 'Aguardando aprovação', papeis: ['diretoria'], grupo: 'Aprovação das cotas' },
+    { href: '/cota/aprovacao/aprovadas', rotulo: 'Aprovadas', papeis: ['diretoria'], grupo: 'Aprovação das cotas' },
+    // Cruzeiro (4.0.0): ranking por setor, somando os meses escolhidos (só cotas aprovadas).
+    { href: '/cota/cruzeiro', rotulo: 'Cruzeiro', papeis: ['diretoria'], grupo: 'Acompanhar' },
     { href: '/cota/comparativo', rotulo: 'Comparativo', papeis: ['gestor', 'qualidade', 'operador'], grupo: 'Acompanhar' },
     { href: '/cota/extrato', rotulo: 'Extrato', papeis: ['gestor', 'qualidade', 'operador'], grupo: 'Acompanhar' },
     { href: '/cota/historico', rotulo: 'Histórico', papeis: ['gestor', 'qualidade', 'operador'], grupo: 'Acompanhar' },
+    { href: '/cota/cruzeiro', rotulo: 'Cruzeiro', papeis: ['gestor'], grupo: 'Acompanhar' },
     // Cenários sobre o mês aberto, sem gravar (1.53.0).
     { href: '/cota/simulacao', rotulo: 'Simulação', papeis: ['gestor'], grupo: 'Acompanhar' },
     { href: '/cota/monitorias', rotulo: 'Monitorias', papeis: ['gestor', 'qualidade', 'operador'], grupo: 'Qualidade' },

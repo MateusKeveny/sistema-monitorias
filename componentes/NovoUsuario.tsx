@@ -23,7 +23,7 @@ const rotulo = 'mb-1 block text-xs font-medium text-slate-600';
  * Quem não é atendente (gestão, qualidade, administrador) nasce fora das
  * listas, das médias e das monitorias — e sem cargo, porque não pontua.
  */
-export default function NovoUsuario({ setores, cargos }: { setores: Setor[]; cargos: Cargo[] }) {
+export default function NovoUsuario({ setores, cargos, administrador = false }: { setores: Setor[]; cargos: Cargo[]; administrador?: boolean }) {
   const router = useRouter();
   const competencia = mesDeCompetencia(hojeNoBrasil());
   const vazio = { nome: '', papel: 'operador' as PapelUsuario, setor: String(setores[0]?.id ?? 1), cargo: '', login: '', desde: competencia.slice(0, 7) };
@@ -35,12 +35,17 @@ export default function NovoUsuario({ setores, cargos }: { setores: Setor[]; car
   const [copiada, setCopiada] = useState(false);
 
   const atendente = f.papel === 'operador';
+  // A CEO (4.0.0) fica fora da árvore, como o administrador: sem setor e sem
+  // cargo. Vê todos os setores pelas funções da aprovação (migração 98).
+  const ceo = f.papel === 'diretoria';
   const cargosDoSetor = cargos.filter((c) => (c.setor_id ?? 1) === Number(f.setor));
 
   async function criar() {
     const nome = f.nome.trim();
     if (!nome) { setErro('Informe o nome.'); return; }
     const login = f.login.trim() ? emailDoLogin(f.login) : null;
+    // Diretoria (4.0.0) só existe para entrar e aprovar: sem login não faz sentido.
+    if (ceo && !login) { setErro('Informe o login da CEO.'); return; }
     if (!confirm(`Cadastrar ${nome}${login ? ` e criar o acesso (${login})` : ''}?`)) return;
     setOcupado(true); setErro(null);
     const db = criarClienteNavegador();
@@ -52,9 +57,10 @@ export default function NovoUsuario({ setores, cargos }: { setores: Setor[]; car
     if (error || !criada) { setOcupado(false); setErro(await mensagemDoErro(error!)); return; }
 
     // O setor padrão que o banco põe na pessoa nova (migração 86) dá lugar ao escolhido.
+    // A CEO fica sem setor nenhum (fora da árvore).
     const passos = [
       () => db.from('setores_da_pessoa').delete().eq('pessoa_id', criada.id),
-      () => db.from('setores_da_pessoa').insert({ pessoa_id: criada.id, desde, setor_id: Number(f.setor) }),
+      ...(ceo ? [] : [() => db.from('setores_da_pessoa').insert({ pessoa_id: criada.id, desde, setor_id: Number(f.setor) })]),
       ...(atendente && f.cargo ? [() => db.from('cargos_da_pessoa').insert({ pessoa_id: criada.id, desde, cargo_id: Number(f.cargo) })] : []),
     ];
     for (const passo of passos) {
@@ -63,7 +69,9 @@ export default function NovoUsuario({ setores, cargos }: { setores: Setor[]; car
     }
     let senha: string | null = null;
     if (login) {
-      const { data, error: e } = await db.rpc('criar_acesso', { p_pessoa: criada.id, p_email: login, p_papel: f.papel });
+      const { data, error: e } = ceo
+        ? await db.rpc('criar_acesso_diretoria', { p_pessoa: criada.id, p_email: login })
+        : await db.rpc('criar_acesso', { p_pessoa: criada.id, p_email: login, p_papel: f.papel });
       if (e) { setOcupado(false); setErro(`Pessoa criada, mas o acesso não: ${await mensagemDoErro(e)}`); router.refresh(); return; }
       senha = String(data);
     }
@@ -117,13 +125,14 @@ export default function NovoUsuario({ setores, cargos }: { setores: Setor[]; car
                 <option value="operador">Atendente</option>
                 <option value="qualidade">Qualidade</option>
                 <option value="gestor">Gestor</option>
+                {administrador && <option value="diretoria">CEO (aprova a cota, fora da árvore)</option>}
               </select>
             </label>
-            <label><span className={rotulo}>Setor</span>
+            {!ceo && <label><span className={rotulo}>Setor</span>
               <select value={f.setor} onChange={(e) => setF({ ...f, setor: e.target.value, cargo: '' })} className={entrada} disabled={ocupado}>
                 {setores.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
               </select>
-            </label>
+            </label>}
             {atendente && (
               <label><span className={rotulo}>Cargo</span>
                 <select value={f.cargo} onChange={(e) => setF({ ...f, cargo: e.target.value })} className={entrada} disabled={ocupado}>
@@ -132,9 +141,9 @@ export default function NovoUsuario({ setores, cargos }: { setores: Setor[]; car
                 </select>
               </label>
             )}
-            <label><span className={rotulo}>Entrada (setor e cargo valem a partir de)</span>
+            {!ceo && <label><span className={rotulo}>Entrada (setor e cargo valem a partir de)</span>
               <input type="month" value={f.desde} onChange={(e) => setF({ ...f, desde: e.target.value })} className={entrada} disabled={ocupado} />
-            </label>
+            </label>}
             <label className="xl:col-span-2"><span className={rotulo}>Login: e-mail ou nome de usuário (opcional)</span>
               <input value={f.login} onChange={(e) => setF({ ...f, login: e.target.value })} placeholder="nome@igreenenergy.com.br ou admin"
                      className={entrada} disabled={ocupado} autoCapitalize="none" spellCheck={false} />
@@ -143,7 +152,9 @@ export default function NovoUsuario({ setores, cargos }: { setores: Setor[]; car
           <p className="text-xs text-slate-500">
             {atendente
               ? `Atendente: entra nas listas, nas médias e nas monitorias. Setor e cargo a partir de ${mesRotulo(`${f.desde}-01`)}.`
-              : 'Gestão e qualidade: ficam fora das listas, das médias e das monitorias, e sem cargo (não pontuam).'}
+              : ceo
+                ? 'CEO: fica fora da árvore, como o administrador. Só aprova ou recusa a cota fechada de cada pessoa, em pontos, de todos os setores. Não lança nem edita; fica fora das listas e das médias.'
+                : 'Gestão e qualidade: ficam fora das listas, das médias e das monitorias, e sem cargo (não pontuam).'}
           </p>
           <div className="flex justify-end">
             <button type="button" onClick={criar} disabled={ocupado || !f.nome.trim()}

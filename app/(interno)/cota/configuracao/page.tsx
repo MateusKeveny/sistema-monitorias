@@ -1,6 +1,8 @@
 import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
 import { setorDoCookie } from '@/lib/setorEscolhido';
 import MatrizDePesos from '@/componentes/MatrizDePesos';
+import MetasPorLista from '@/componentes/MetasPorLista';
+import { contextoDasMetas } from '@/lib/metasPorLista';
 import ReguasDeFaixa from '@/componentes/ReguasDeFaixa';
 import PainelRegras from '@/componentes/PainelRegras';
 import Abas from '@/componentes/Abas';
@@ -123,14 +125,20 @@ export default async function ConfiguracaoDaCota({
             chave: 'pesos',
             rotulo: 'Pesos por cargo',
             conteudo: (
-              <MatrizDePesos
-                setorId={setorId}
-                cargos={listaCargos}
-                regras={listaRegras}
-                pesos={listaPesos}
-                referencias={(referencias ?? []) as ReferenciaCargo[]}
-                pessoasPorCargo={pessoasPorCargo}
-              />
+              <div className="space-y-4">
+                {/* A matriz numa planilha (4.0.0): baixar, editar no Excel, subir com conferência. */}
+                <MetasPorLista key={`lista-${setorId}`} setorId={setorId}
+                               setorNome={listaSetores.find((s) => s.id === setorId)?.nome ?? 'setor'}
+                               ctx={contextoDasMetas(listaCargos, listaRegras, listaPesos)} />
+                <MatrizDePesos
+                  setorId={setorId}
+                  cargos={listaCargos}
+                  regras={listaRegras}
+                  pesos={listaPesos}
+                  referencias={(referencias ?? []) as ReferenciaCargo[]}
+                  pessoasPorCargo={pessoasPorCargo}
+                />
+              </div>
             ),
           },
           {

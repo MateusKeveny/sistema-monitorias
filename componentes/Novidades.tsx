@@ -23,19 +23,23 @@ const ITENS = {
     ],
   },
   gestao: {
-    versao: '3.9',
-    titulo: 'O que mudou da 3.7 à 3.9',
+    versao: '4.0',
+    titulo: 'Bem-vindo à versão 4.0',
     itens: [
+      ['Aprovação da CEO', 'depois que você fecha o mês, a CEO aprova ou recusa a cota de cada pessoa. A recusa chega no sino com o motivo. No Fechamento, o quadro Pendências com a CEO mostra as recusadas (botão Responder; a Correção da linha também vale como resposta) e as respondidas aguardando a CEO. Começa com novembro.'],
+      ['Cruzeiro', 'em Acompanhar › Cruzeiro, o ranking do setor (só quem atende; gestão fora) somando os pontos dos meses que você escolher. Só entram as cotas aprovadas pela CEO, então os números são os definitivos. A CEO vê todos os setores e um ranking à parte da gestão.'],
+      ['Metas por lista', 'em Configuração › Pesos por cargo, baixe a planilha com as metas e os pesos de hoje, ajuste no Excel e suba de volta. Antes de gravar, a tela mostra o que muda; o motivo vai para o histórico.'],
+    ],
+    administrador: [
+      ['Novo setor em página', 'em Usuários e setores › Setores e filas, criar setor virou um passo a passo de 6 etapas, com as metas de cada cargo (digitadas ou por lista) e a prévia do setor se montando ao lado.'],
+      ['Conta da CEO', 'só o administrador cria: Pessoas › + Novo usuário › papel CEO. Fica fora da árvore, como o administrador. Os avisos para a CEO chegam no sino.'],
+    ],
+    anteriores: [
       ['Assuntos mais tratados', 'em C-SAT (visão da equipe), o Top 10 das tabulações do mês, com a % das avaliações, o volume estimado e o C-SAT de cada assunto. Geral e por fila.'],
       ['Atendimento da Sol', 'em Lançamentos, um cartão para lançar, por semana, o número geral do setor e quantos a Sol resolveu. No Comparativo › Volume (aba Geral), a fatia da Sol semana a semana e mês a mês.'],
       ['Tabelas que ordenam', 'em qualquer tabela, clique no título da coluna: do maior para o menor, do menor para o maior e, no terceiro clique, a ordem original.'],
       ['Cores novas', 'a paleta do Dashboard iGreen nos dois temas, e as mesmas cores para cada métrica em todos os gráficos.'],
       ['Comparativo › Geral', 'atendimentos × avaliações, C-SAT, monitoria e pontos mês a mês, com gráficos; e, em C-SAT, os atendimentos lançados × avaliações da equipe.'],
-    ],
-    administrador: [
-      ['Administrador', 'você vê e ajusta todos os setores, cria setor (em etapas: nome e base, filas, monitorias e revisão) e move atendentes entre setores pela Árvore.'],
-    ],
-    anteriores: [
       ['Cada um no seu setor', 'gestão e qualidade veem e mexem só no setor em que estão; o banco recusa qualquer gravação em outro setor.'],
       ['Árvore dos setores', 'em Usuários e setores › Árvore, a operação desenhada como organograma: gestão, qualidade, filas e atendentes de cada setor.'],
       ['Configuração por setor e cargo', 'primeiro o setor, depois um cargo por vez nos pesos (com "Todos lado a lado" para comparar).'],

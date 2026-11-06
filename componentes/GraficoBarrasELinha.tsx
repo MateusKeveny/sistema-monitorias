@@ -89,7 +89,10 @@ export default function GraficoBarrasELinha({
 
   const larguraBarra = Math.min(46, (coluna * 0.62) / Math.max(1, barras.length));
   const vao = 6;
-  const rotularTodos = n <= 6;
+  // Com 3 linhas ou mais, os números de cada ponto se encavalavam (4.0.0): ficam
+  // só na caixinha do mouse, e as etiquetas do último ponto vão empilhadas.
+  const muitas = linhas.length > 2;
+  const rotularTodos = n <= 6 && !muitas;
 
   /** Barra com o topo arredondado e a base reta. */
   const barra = (x: number, v: number, cor: string, k: number) => {
@@ -104,6 +107,22 @@ export default function GraficoBarrasELinha({
   const mediaDe = (s: SerieDoGrafico) => { const v = s.valores.filter((x): x is number => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0; };
   const emCima = new Set(linhas.length === 2
     ? [mediaDe(linhas[0]) >= mediaDe(linhas[1]) ? 0 : 1] : linhas.map((_, k) => k));
+
+  // Etiquetas do último ponto com 3 linhas ou mais: cada uma na altura do seu
+  // ponto, empurradas para não encostar (28 px entre elas), ao lado do ponto.
+  const ALT_ETQ = 24, VAO_ETQ = 4;
+  const etiquetas = new Map<number, number>();
+  if (muitas) {
+    const fila = linhas.map((s, k) => {
+      const i = s.valores.map((v, j) => (v != null ? j : -1)).filter((j) => j >= 0).at(-1);
+      return i == null ? null : { k, y: y(s.valores[i]!, s.direita) - ALT_ETQ / 2 };
+    }).filter((e): e is { k: number; y: number } => e != null).sort((a, b) => a.y - b.y);
+    for (let j = 1; j < fila.length; j++) fila[j].y = Math.max(fila[j].y, fila[j - 1].y + ALT_ETQ + VAO_ETQ);
+    // Passou do chão: sobe o bloco todo.
+    const sobra = (fila.at(-1)?.y ?? 0) + ALT_ETQ - chao;
+    if (sobra > 0) for (const e of fila) e.y -= sobra;
+    for (const e of fila) etiquetas.set(e.k, Math.max(4, e.y));
+  }
 
   return (
     <>
@@ -187,8 +206,12 @@ export default function GraficoBarrasELinha({
                     <circle cx={cx(p.i)} cy={py} r={p.i === ultimo ? 6.5 : 5} fill={s.cor} stroke="var(--color-superficie)" strokeWidth={2.5} />
                     {p.i === ultimo ? (() => {
                       const t = fmt(p.v), lg = t.length * 8 + 18;
-                      const ex = Math.max(esq, Math.min(L - dir - lg, cx(p.i) - lg / 2));
-                      const ey = cima ? py - 40 : py + 16;
+                      const empilhada = etiquetas.get(k);
+                      // Empilhada: ao lado do ponto (à esquerda se não couber à direita).
+                      const ex = empilhada != null
+                        ? (cx(p.i) + 14 + lg <= L - 2 ? cx(p.i) + 14 : cx(p.i) - 14 - lg)
+                        : Math.max(esq, Math.min(L - dir - lg, cx(p.i) - lg / 2));
+                      const ey = empilhada ?? (cima ? py - 40 : py + 16);
                       return (
                         <>
                           <rect x={ex} y={ey} width={lg} height={24} rx={12} fill={s.cor} />

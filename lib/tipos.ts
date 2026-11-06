@@ -1,5 +1,6 @@
 /** `administrador` (migração 94): todos os setores. Nas telas, entra como gestor (obterPerfil). */
-export type PapelUsuario = 'administrador' | 'gestor' | 'qualidade' | 'operador';
+/** `diretoria` (migração 98): a CEO — só aprova a cota fechada, em pontos. */
+export type PapelUsuario = 'administrador' | 'gestor' | 'qualidade' | 'operador' | 'diretoria';
 
 /**
  * Uma pessoa, uma linha.
@@ -250,6 +251,7 @@ export const NOMES_PAPEL: Record<PapelUsuario, string> = {
   gestor: 'Gestor',
   qualidade: 'Qualidade',
   operador: 'Operador',
+  diretoria: 'CEO',
 };
 
 /** Valor por ponto de uma competência, informado pelo gestor. */

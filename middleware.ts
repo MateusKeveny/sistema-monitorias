@@ -58,6 +58,10 @@ export async function middleware(requisicao: NextRequest) {
   // O mês escolhido numa tela do Performance (?mes=2026-09) vale para as
   // outras (3.0): fica num cookie de 12 h, lido por resolverCompetencia.
   const mes = requisicao.nextUrl.searchParams.get('mes');
+  // (4.0.0) Não alterar os cabeçalhos da requisição aqui: o Next confere um
+  // código dos cabeçalhos nas navegações dentro do painel, e a alteração fez a
+  // tela da diretoria recarregar sem parar. A diretoria é levada à Aprovação
+  // pela página inicial e pelo GuardaDaDiretoria (no navegador).
   const resposta = NextResponse.next();
   if (caminho.startsWith('/cota') && mes && /^\d{4}-\d{2}$/.test(mes)) {
     resposta.cookies.set('mes', mes, { path: '/', maxAge: 12 * 60 * 60, sameSite: 'lax' });
