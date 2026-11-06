@@ -21,7 +21,7 @@ export default async function TelaSetores() {
     db.from('regras').select('chave, faixa_min').eq('grupo', 'monitoria'),
     // O que a cópia de um setor leva (novo setor: 3.2.0; cargos e metas no passo 4, 4.0.0).
     db.from('cargos').select('id, nome, ordem, setor_id').eq('ativo', true),
-    db.from('regras').select('chave, rotulo, ordem, ativo, grupo, setor_id'),
+    db.from('regras').select('chave, rotulo, ordem, ativo, grupo, setor_id, faixa_min, faixa_max, valor_manual'),
     db.from('criterios').select('setor_id').eq('ativo', true),
   ]);
   const { data: pesos } = await db.from('pesos_por_cargo').select('cargo_id, regra, peso, ativo');

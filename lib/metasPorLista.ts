@@ -19,7 +19,15 @@ import type { criarClienteNavegador } from '@/lib/supabase/cliente';
  * aceito.
  */
 
-export type MetricaDaLista = { chave: string; rotulo: string };
+export type MetricaDaLista = {
+  chave: string; rotulo: string;
+  /** Para a aba "Métricas" do modelo (4.1.0): como conta e a faixa. */
+  tipo?: string; faixa?: string; grupo?: string;
+};
+type RegraDaLista = {
+  chave: string; rotulo: string; ordem: number; ativo: boolean; grupo: string;
+  faixa_min?: number | null; faixa_max?: number | null; valor_manual?: boolean | null;
+};
 export type ContextoMetas = {
   cargos: { id: number; nome: string; ordem: number }[];
   /** As métricas que pontuam no setor, na ordem da tela. */
@@ -64,15 +72,46 @@ const normal = (s: unknown) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]
  */
 export function contextoDasMetas(
   cargos: { id: number; nome: string; ordem: number }[],
-  regras: { chave: string; rotulo: string; ordem: number; ativo: boolean; grupo: string }[],
+  regras: RegraDaLista[],
   pesos: PesoCargo[],
 ): ContextoMetas {
   return {
     cargos: cargos.map(({ id, nome, ordem }) => ({ id, nome, ordem })),
     metricas: regras.filter((r) => r.ativo && r.chave !== REGRA_META && r.chave !== REGRA_MEDIA && r.grupo !== 'config')
-      .sort((a, b) => a.ordem - b.ordem).map(({ chave, rotulo }) => ({ chave, rotulo })),
+      .sort((a, b) => a.ordem - b.ordem)
+      .map((r) => ({ chave: r.chave, rotulo: r.rotulo, tipo: tipoDaRegra(r), faixa: faixaDaRegra(r), grupo: NOME_DO_GRUPO[r.grupo.replace(/_s\d+$/, '')] ?? r.grupo })),
     pesos,
   };
+}
+
+const NOME_DO_GRUPO: Record<string, string> = {
+  atendimento: 'Atendimento', tme: 'TME', tme_diretores: 'TME Diretores', csat: 'C-SAT',
+  nota: 'Notas do C-SAT', monitoria: 'Monitoria', manual: 'Lançamento manual',
+};
+
+/** Como a métrica conta — o mesmo texto da tabela de Pesos por cargo. */
+function tipoDaRegra(r: RegraDaLista): string {
+  const g = r.grupo.replace(/_s\d+$/, '');
+  if (r.valor_manual) return 'valor digitado no lançamento (o peso multiplica o valor)';
+  if (g === 'atendimento') return 'pontos por atendimento finalizado';
+  if (g === 'tme' || g === 'tme_diretores') return 'pontos por atendimento, conforme a faixa de TME';
+  if (g === 'csat') return 'pontos por atendimento, conforme a faixa de C-SAT (os dois canais)';
+  if (g === 'nota') return 'pontos por avaliação com esta nota';
+  if (g === 'monitoria') return 'pontos por ponto percentual acima do mínimo da monitoria';
+  return 'pontos por lançamento (quantidade lançada × peso)';
+}
+
+/** A faixa da régua, na unidade da tela (minutos ou %). */
+function faixaDaRegra(r: RegraDaLista): string {
+  const g = r.grupo.replace(/_s\d+$/, '');
+  const conv = (v: number) => g === 'tme' || g === 'tme_diretores' ? `${Math.round((v / 60) * 100) / 100} min`
+    : g === 'csat' || g === 'monitoria' ? `${Math.round(v * 10000) / 100}%` : String(v);
+  const min = r.faixa_min != null ? conv(Number(r.faixa_min)) : null;
+  const max = r.faixa_max != null ? conv(Number(r.faixa_max)) : null;
+  if (min && max) return `de ${min} a ${max}`;
+  if (min) return `a partir de ${min}`;
+  if (max) return `até ${max}`;
+  return '';
 }
 
 /** O cargo de onde um cargo novo copia o que não veio: o de base, ou o primeiro. */
@@ -98,16 +137,54 @@ export function modeloXlsx(ctx: ContextoMetas, nomeDaAba = 'Metas'): Uint8Array 
     ['k', rotulo],
     ...cargos.map((c, i) => {
       const v = valorAtual(ctx, c.id, item);
-      // Desligada sai vazia: no modelo, vazio = não muda.
-      // Desligada sai vazia (vazio = não muda): a média de quem não recebe, e métrica que não pontua.
-      return [`c${i}`, v == null ? '' : v];
+      // Cada célula com a pontuação de hoje (4.1.0). Métrica desligada sai
+      // escrita "não pontua" (subir de volta não muda nada); meta e média de
+      // quem não tem saem vazias (vazio = não muda).
+      if (v != null) return [`c${i}`, v];
+      return [`c${i}`, item === 'meta' || item === 'media' ? '' : NAO_PONTUA];
     }),
   ]);
-  return gerarXlsx([{
-    nome: nomeDaAba,
-    colunas,
-    linhas: [linha(ROTULO_META, 'meta'), linha(ROTULO_MEDIA, 'media'), ...ctx.metricas.map((m) => linha(m.rotulo, m.chave))],
-  }]);
+  const nomes = cargos.map((c) => c.nome).join(', ');
+  return gerarXlsx([
+    {
+      nome: nomeDaAba,
+      colunas,
+      linhas: [linha(ROTULO_META, 'meta'), linha(ROTULO_MEDIA, 'media'), ...ctx.metricas.map((m) => linha(m.rotulo, m.chave))],
+    },
+    {
+      nome: 'Métricas',
+      colunas: [
+        { cabecalho: 'Métrica', chave: 'rotulo', largura: 38 },
+        { cabecalho: 'Grupo', chave: 'grupo', largura: 18 },
+        { cabecalho: 'Como pontua', chave: 'tipo', largura: 60, formato: 'quebra' },
+        { cabecalho: 'Faixa', chave: 'faixa', largura: 22 },
+        { cabecalho: 'Chave no sistema', chave: 'chave', largura: 30 },
+      ],
+      linhas: [
+        { rotulo: ROTULO_META, grupo: 'Configuração', tipo: 'Pontos que o cargo precisa somar no mês para bater a cota.', faixa: '', chave: REGRA_META },
+        { rotulo: ROTULO_MEDIA, grupo: 'Média da equipe', tipo: 'Multiplicador sobre a média dos cargos de referência (ex.: 1,2 = 120% da média). Só para cargo que já recebe média: quem compõe a média se escolhe em Editar cargo.', faixa: '', chave: REGRA_MEDIA },
+        ...ctx.metricas.map((m) => ({ rotulo: m.rotulo, grupo: m.grupo ?? '', tipo: m.tipo ?? '', faixa: m.faixa ?? '', chave: m.chave })),
+      ],
+    },
+    {
+      nome: 'Como preencher',
+      colunas: [
+        { cabecalho: 'Item', chave: 'item', largura: 24 },
+        { cabecalho: 'Como funciona', chave: 'regra', largura: 90, formato: 'quebra' },
+      ],
+      linhas: [
+        { item: 'Onde editar', regra: `Só na aba "${nomeDaAba}": uma linha por métrica, uma coluna por cargo (${nomes || 'os cargos do setor'}), a pontuação no cruzamento. As abas "Métricas" e "Como preencher" são só de consulta.` },
+        { item: 'Número', regra: 'A pontuação da métrica no cargo. Negativo desconta (ex.: -50). Decimal com vírgula (ex.: 0,25). Número numa métrica que não pontuava liga a métrica no cargo.' },
+        { item: '"não pontua"', regra: 'Desliga a métrica no cargo (o peso fica guardado, para religar depois).' },
+        { item: 'Célula vazia', regra: 'Não muda nada naquele cargo.' },
+        { item: ROTULO_META, regra: 'Os pontos para bater a cota no mês. Precisa ser maior que zero.' },
+        { item: ROTULO_MEDIA, regra: 'Só troca o multiplicador de quem já recebe média. Para ligar ou tirar a média, use Editar cargo.' },
+        { item: 'Cargo novo', regra: 'Uma coluna com um nome de cargo que não existe vira cargo novo. Precisa da meta; o que ficar vazio é copiado do cargo de base (Atendente Júnior).' },
+        { item: 'Nomes', regra: 'Não mude o texto da coluna Métrica nem o nome dos cargos no cabeçalho: é por eles que o sistema reconhece cada linha e coluna. Linha que não for métrica do setor é ignorada.' },
+        { item: 'Subir', regra: 'Salve como .xlsx e use "Subir lista". Nada é gravado antes da conferência, que mostra cada valor que muda (de → para).' },
+      ],
+    },
+  ]);
 }
 
 // ------------------------------------------------------------------ Leitura
@@ -132,7 +209,9 @@ export function gradeDoTexto(texto: string): string[][] {
 export async function gradeDoArquivo(arquivo: File): Promise<string[][]> {
   if (!/\.xlsx$/i.test(arquivo.name)) return gradeDoTexto(await arquivo.text());
   const abas = await lerPlanilha(arquivo);
-  const linhas = [...abas.values()][0] ?? [];
+  // A aba de metas: a primeira que não é de consulta ("Métricas", "Como preencher").
+  const consulta = ['metricas', 'como preencher'];
+  const linhas = [...abas].find(([nome]) => !consulta.includes(normal(nome)))?.[1] ?? [...abas.values()][0] ?? [];
   const indice = (col: string) => [...col].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0) - 1;
   const ultima = Math.max(0, ...linhas.flatMap((l) => Object.keys(l).map(indice)));
   return linhas.map((l) => {

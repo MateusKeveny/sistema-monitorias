@@ -59,6 +59,12 @@ usa as regras deste. Monitorias e Agenda sem mudança.
   **Setores e cargos** lista os setores ativos e os cargos de cada um com o
   nome exato que o sistema aceita. Na subida, vale a aba Pessoas (as de
   consulta são ignoradas).
+- **Modelo das metas e pesos por lista completo** (Configuração › Pesos por
+  cargo e o passo Cargos e metas do novo setor): cada célula da aba **Metas**
+  vem com a pontuação de hoje, e métrica desligada vem escrita **não pontua**
+  (antes saía vazia e parecia faltar a pontuação). Abas novas de consulta:
+  **Métricas** (grupo, como pontua, faixa em minutos ou % e a chave no
+  sistema) e **Como preencher**. Subir o modelo sem mexer não muda nada.
 
 ---
 
