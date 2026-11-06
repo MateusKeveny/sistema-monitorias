@@ -60,11 +60,12 @@ usa as regras deste. Monitorias e Agenda sem mudança.
   nome exato que o sistema aceita. Na subida, vale a aba Pessoas (as de
   consulta são ignoradas).
 - **Modelo das metas e pesos por lista completo** (Configuração › Pesos por
-  cargo e o passo Cargos e metas do novo setor): cada célula da aba **Metas**
-  vem com a pontuação de hoje, e métrica desligada vem escrita **não pontua**
-  (antes saía vazia e parecia faltar a pontuação). Abas novas de consulta:
-  **Métricas** (grupo, como pontua, faixa em minutos ou % e a chave no
-  sistema) e **Como preencher**. Subir o modelo sem mexer não muda nada.
+  cargo e o passo Cargos e metas do novo setor): numa aba só, **métrica por
+  linha** com **Como pontua** e **Faixa** (minutos ou %) para leitura, e
+  **uma coluna por cargo** com o cabeçalho em amarelo — é o que se preenche.
+  Cada célula vem com a pontuação de hoje, e métrica desligada vem escrita
+  **não pontua** (antes saía vazia e parecia faltar a pontuação). Aba
+  **Como preencher** com as regras. Subir o modelo sem mexer não muda nada.
 
 ---
 
