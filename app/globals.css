@@ -390,3 +390,24 @@ html[data-visual='3'] main tbody tr:hover { background-color: var(--color-slate-
   main { padding: 0 !important; }
   a[href]::after { content: none !important; }
 }
+
+/* Ordenar tabelas pelo título da coluna (OrdenarTabelas, 3.9.0): o título que
+   ordena vira clicável; a seta mostra a ordem atual (▼ maior → menor, ▲ menor
+   → maior). Sem seta: a ordem original. */
+main th[data-ordenavel] {
+  cursor: pointer;
+  user-select: none;
+}
+main th[data-ordenavel]:hover {
+  color: var(--color-slate-800);
+}
+main th[data-ordem='desc']::after {
+  content: ' ▼';
+  font-size: 0.75em;
+  color: var(--color-marca-600);
+}
+main th[data-ordem='asc']::after {
+  content: ' ▲';
+  font-size: 0.75em;
+  color: var(--color-marca-600);
+}

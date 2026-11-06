@@ -7,6 +7,7 @@ import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import LeituraObrigatoria from '@/componentes/LeituraObrigatoria';
 import RegistrarAcesso from '@/componentes/RegistrarAcesso';
 import ManterSessao from '@/componentes/ManterSessao';
+import OrdenarTabelas from '@/componentes/OrdenarTabelas';
 import { hojeNoBrasil } from '@/lib/formatar';
 import { setorDoCookie } from '@/lib/setorEscolhido';
 import type { LeituraDiario, RegistroDiario } from '@/lib/diario';
@@ -97,6 +98,8 @@ export default async function LayoutInterno({ children }: { children: React.Reac
         {/* Uma abertura do painel por carregamento (migração 52, tela Acessos). */}
         <RegistrarAcesso sistema={sistema} />
         <ManterSessao />
+        {/* Toda tabela ordena pelo título da coluna (3.9.0). */}
+        <OrdenarTabelas />
         <MenuLateral perfil={perfil} versao={versao} sistema={sistema} veFerias={veFerias}
                      avisosReporte={avisosReporte} pendentes={pendentes}
                      setores={setoresDoMenu.map(({ id, nome }) => ({ id, nome }))} setorAtual={setorAtual} />

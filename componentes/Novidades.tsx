@@ -28,6 +28,7 @@ const ITENS = {
     itens: [
       ['Assuntos mais tratados', 'em C-SAT (visão da equipe), o Top 10 das tabulações do mês, com a % das avaliações, o volume estimado e o C-SAT de cada assunto. Geral e por fila.'],
       ['Atendimento da Sol', 'em Lançamentos, um cartão para lançar, por semana, o número geral do setor e quantos a Sol resolveu. No Comparativo › Volume (aba Geral), a fatia da Sol semana a semana e mês a mês.'],
+      ['Tabelas que ordenam', 'em qualquer tabela, clique no título da coluna: do maior para o menor, do menor para o maior e, no terceiro clique, a ordem original.'],
       ['Cores novas', 'a paleta do Dashboard iGreen nos dois temas, e as mesmas cores para cada métrica em todos os gráficos.'],
       ['Comparativo › Geral', 'atendimentos × avaliações, C-SAT, monitoria e pontos mês a mês, com gráficos; e, em C-SAT, os atendimentos lançados × avaliações da equipe.'],
     ],

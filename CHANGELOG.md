@@ -35,10 +35,11 @@ para o Performance.
 
 ---
 
-## Performance 3.9.0
+## Performance 3.9.0 e Monitorias 6.3.0
 
 Migração **99** (`supabase/99-assuntos-e-volume-da-sol.sql`), aditiva.
-Monitorias e Agenda sem mudança. Pensado para qualquer setor da árvore: tudo
+Agenda sem mudança. As Monitorias sobem só pela ordenação das tabelas, que
+é do painel compartilhado (a regra: o que é dos dois sobe os dois). Pensado para qualquer setor da árvore: tudo
 vai pelo número da fila, e as abas são as filas do setor escolhido no menu.
 
 - **Assuntos mais tratados** (C-SAT, visão da equipe): o Top 10 das
@@ -58,6 +59,14 @@ vai pelo número da fila, e as abas são as filas do setor escolhido no menu.
   Geral, em colunas empilhadas nas cores da paleta (Sol em ciano, equipe e
   demais em verde): números do mês, a fatia da Sol, semana a semana e mês a
   mês, com os finalizados da equipe para comparar.
+- **Ordenar qualquer tabela pelo título da coluna** (Performance e
+  Monitorias): 1º clique, do maior para o menor (▼); 2º, do menor para o maior
+  (▲); 3º, volta à ordem original. Entende 1.234,5 · 95,1% · 2:46 · datas ·
+  R$; vazio ("—") sempre no fim; as linhas de total ficam embaixo. Tabelas
+  de formulário e com linhas agrupadas ficam de fora. Um componente só no
+  layout (`OrdenarTabelas`), sem mexer em cada tabela.
+- **C-SAT abre com o resumo**: os números do mês e o assunto mais tratado no
+  geral e em cada fila; o ranking completo fica no fim da tela.
 - Novidades da gestão atualizadas (3.7 a 3.9).
 
 ---
