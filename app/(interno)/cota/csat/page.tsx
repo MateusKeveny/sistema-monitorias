@@ -6,7 +6,7 @@ import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
 import { Painel, Secao, Vazio } from '@/componentes/ui';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { resolverCompetencia } from '@/lib/competencia';
-import { mesRotulo, periodoDaSemana } from '@/lib/formatar';
+import { mesRotulo, percentual, periodoDaSemana } from '@/lib/formatar';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,6 +64,23 @@ export default async function MeuCsat({
   for (const v of (volumes ?? []) as { canal_id: number | null; finalizados: number }[]) {
     if (v.canal_id != null) finalizadosPorFila[v.canal_id] = (finalizadosPorFila[v.canal_id] ?? 0) + Number(v.finalizados);
   }
+  // O assunto mais tratado no geral e em cada fila (3.9.0), para o resumo do topo.
+  const topoDe = (ls: AssuntoDoMes[]) => {
+    const porAssunto = new Map<string, { avaliacoes: number; positivas: number }>();
+    for (const l of ls) {
+      const a = porAssunto.get(l.assunto) ?? { avaliacoes: 0, positivas: 0 };
+      a.avaliacoes += Number(l.avaliacoes); a.positivas += Number(l.positivas);
+      porAssunto.set(l.assunto, a);
+    }
+    const total = [...porAssunto.values()].reduce((t, a) => t + a.avaliacoes, 0);
+    const [assunto, a] = [...porAssunto.entries()].sort((x, y) => y[1].avaliacoes - x[1].avaliacoes)[0] ?? [];
+    return assunto && a ? { assunto, avaliacoes: a.avaliacoes, fatia: total ? a.avaliacoes / total : 0, csat: a.avaliacoes ? a.positivas / a.avaliacoes : 0 } : null;
+  };
+  const maisTratados = [
+    { chave: 'geral', rotulo: 'Geral', linhas: assuntos },
+    ...filasDoSetor.map((f) => ({ chave: String(f.id), rotulo: f.nome, linhas: assuntos.filter((a) => a.canal_id === f.id) })),
+  ].map((x) => ({ chave: x.chave, rotulo: x.rotulo, ...topoDe(x.linhas) }))
+    .filter((x): x is { chave: string; rotulo: string; assunto: string; avaliacoes: number; fatia: number; csat: number } => 'assunto' in x && !!x.assunto);
   const semanasComDados = [1, 2, 3, 4].filter((sem) => vols.some((v) => v.semana === sem) || notasEquipe.some((n) => n.semana === sem));
   const pessoaId = veOTime ? (pedida && todas.some((p) => p.id === pedida) ? pedida : null) : perfil.id;
 
@@ -116,15 +133,28 @@ export default async function MeuCsat({
         )}
       </div>
 
-      {/* As principais tabulações no topo (3.9.0), na visão da equipe. */}
+      {veOTime && (
+        <CsatDaEquipe pessoas={todas} volumes={vols} notas={notasEquipe} filas={filas} competencia={competencia}
+                      pessoaId={pessoaId} semanasComDados={semanasComDados}
+                      resumoExtra={!pessoaId && maisTratados.length ? (
+                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                          {maisTratados.map((m) => (
+                            <div key={m.chave} className="rounded-2xl bg-superficie px-5 py-4 shadow-sm">
+                              <p className="text-sm text-slate-500">Mais tratado · {m.rotulo}</p>
+                              <p className="mt-0.5 line-clamp-2 text-lg font-semibold leading-snug tracking-tight text-slate-900" title={m.assunto}>{m.assunto}</p>
+                              <p className="mt-1 text-xs text-slate-500">
+                                {m.avaliacoes.toLocaleString('pt-BR')} avaliações · {percentual(m.fatia)} da {m.chave === 'geral' ? 'equipe' : 'fila'} · C-SAT {percentual(m.csat)}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : undefined} />
+      )}
+
+      {/* O ranking completo dos assuntos (3.9.0), no fim da visão da equipe. */}
       {veOTime && !pessoaId && (
         <AssuntosDoMes linhas={assuntos} finalizados={finalizadosPorFila} filas={filasDoSetor}
                        mes={mesRotulo(competencia).split(' ')[0].toLowerCase()} />
-      )}
-
-      {veOTime && (
-        <CsatDaEquipe pessoas={todas} volumes={vols} notas={notasEquipe} filas={filas} competencia={competencia}
-                      pessoaId={pessoaId} semanasComDados={semanasComDados} />
       )}
 
       {!pessoaId ? null : canais.length === 0 ? (

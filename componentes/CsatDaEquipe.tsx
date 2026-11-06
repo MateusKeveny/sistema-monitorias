@@ -18,7 +18,9 @@ const num = (v: number) => v.toLocaleString('pt-BR');
  * avaliação mostra isso lado a lado, por pessoa, por fila e por semana.
  * Os números são os mesmos do cálculo: volume_semanal e vw_csat_semanal.
  */
-export default function CsatDaEquipe({ pessoas, volumes, notas, filas, competencia, pessoaId, semanasComDados }: {
+export default function CsatDaEquipe({ pessoas, volumes, notas, filas, competencia, pessoaId, semanasComDados, resumoExtra }: {
+  /** 3.9.0: o assunto mais tratado (geral e por fila), logo abaixo dos números do mês. */
+  resumoExtra?: React.ReactNode;
   pessoas: { id: string; nome: string }[];
   volumes: VolumeCsat[];
   notas: NotasCsat[];
@@ -78,6 +80,7 @@ export default function CsatDaEquipe({ pessoas, volumes, notas, filas, competenc
                    tom={total.avaliacoes - total.positivas ? 'alerta' : 'neutro'}
                    detalhe={total.avaliacoes ? `${percentual((total.avaliacoes - total.positivas) / total.avaliacoes)} das avaliações` : undefined} />
       </div>
+      {resumoExtra}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Quadro titulo="Por fila" subtitulo="Quanto de cada fila foi avaliado.">
