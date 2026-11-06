@@ -10,6 +10,7 @@ import { normalizarSetor, type Canal, type Setor } from '@/lib/setores';
 import { MONITORIAS_PADRAO, type MonitoriasDoSetor } from '@/lib/monitoriasDoSetor';
 import NovoSetorEmPagina from '@/componentes/NovoSetorEmPagina';
 import type { ContextoMetas } from '@/lib/metasPorLista';
+import AcoesDoSetor, { type HistoricoDoSetor } from '@/componentes/AcoesDoSetor';
 
 export type SetorDoHubVisto = { setor: string; atendimentos: number; ultima_vez: string };
 
@@ -26,7 +27,9 @@ type Regras = { copiar: string; tme: boolean };
  * fila diz como pontua: copiando as métricas de outra (e acompanhando as
  * mudanças dela) ou com regras próprias, com peso zero até o gestor preencher.
  */
-export default function SetoresECanais({ setores, canais, vistos, monitorias = {}, administrador = false, metasPorSetor = {} }: {
+export default function SetoresECanais({ setores, canais, vistos, monitorias = {}, administrador = false, metasPorSetor = {}, historicos = {} }: {
+  /** Excluir ou desativar (4.1.0): o histórico de cada setor, para o administrador. */
+  historicos?: Record<number, HistoricoDoSetor>;
   setores: Setor[]; canais: Canal[]; vistos: SetorDoHubVisto[];
   /** Cargos, métricas e pesos de cada setor: a base do passo "Cargos e metas" do novo setor (4.0.0). */
   metasPorSetor?: Record<number, ContextoMetas>;
@@ -264,6 +267,12 @@ export default function SetoresECanais({ setores, canais, vistos, monitorias = {
                   <input value={rascunho[`s${s.id}`]} disabled={ocupado} aria-label="Nome do setor"
                          onChange={(e) => setRascunho((r) => ({ ...r, [`s${s.id}`]: e.target.value }))}
                          className={`${entrada} w-64 font-semibold`} />
+                  {administrador && historicos[s.id] && (
+                    <AcoesDoSetor setor={{ id: s.id, nome: s.nome, ativo: s.ativo !== false }} historico={historicos[s.id]} />
+                  )}
+                  {!administrador && s.ativo === false && (
+                    <span className="rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-semibold text-slate-600">Desativado</span>
+                  )}
                   <label className="ml-auto flex items-center gap-1.5 text-sm text-slate-700"
                          title="Desligadas: a monitoria não pontua neste setor e ele some do Monitorias">
                     <input type="checkbox" checked={s.monitorias !== false} disabled={ocupado}

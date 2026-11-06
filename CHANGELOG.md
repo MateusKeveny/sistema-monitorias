@@ -35,6 +35,23 @@ para o Performance.
 
 ---
 
+## Performance 4.1.0
+
+Migração **100** (`supabase/100-excluir-e-desativar-setor.sql`), só funções
+novas. Monitorias e Agenda sem mudança.
+
+- **Excluir ou desativar um setor** (Usuários e setores › Setores e filas, só o
+  administrador). **Sem histórico** (nenhuma pessoa, fechamento, monitoria,
+  valor, volume, avaliação, lançamento ou métrica desligada) e sem outro setor
+  usando filas, regras ou cargos dele: **Excluir setor** apaga de vez, com as
+  filas, os cargos, os pesos e as configurações, digitando o nome para
+  confirmar. **Com histórico**: não exclui — **Desativar** tira do menu, do
+  seletor e das listas e guarda tudo, e **Reativar** traz de volta; só com
+  ninguém ativo no setor. O último setor ativo não pode sair. O banco confere
+  tudo de novo (`historico_do_setor`, `excluir_setor`, `desativar_setor`).
+
+---
+
 ## Performance 4.0.0 e Monitorias 6.3.1
 
 **Exceção à regra de numeração, decidida pelo gestor (04/11/2026)**, como foi a

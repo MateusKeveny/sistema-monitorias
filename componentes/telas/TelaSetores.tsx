@@ -4,6 +4,7 @@ import { MONITORIAS_PADRAO } from '@/lib/monitoriasDoSetor';
 import type { Canal, Setor } from '@/lib/setores';
 import type { PesoCargo, RegraCota } from '@/lib/tipos';
 import { contextoDasMetas, type ContextoMetas } from '@/lib/metasPorLista';
+import type { HistoricoDoSetor } from '@/componentes/AcoesDoSetor';
 
 /**
  * Setores e filas (aba de "Usuários e setores", 3.0; era uma aba da
@@ -25,6 +26,11 @@ export default async function TelaSetores() {
   ]);
   const { data: pesos } = await db.from('pesos_por_cargo').select('cargo_id, regra, peso, ativo');
   const lista = (setores ?? []) as Setor[];
+  // Excluir ou desativar (4.1.0, migração 100): o histórico de cada setor, só para o administrador.
+  const historicos: Record<number, HistoricoDoSetor> = perfil.administrador
+    ? Object.fromEntries((await Promise.all(lista.map((s) => db.rpc('historico_do_setor', { p_setor: s.id })
+        .then((r) => [s.id, r.data as HistoricoDoSetor] as const)))).filter(([, h]) => h))
+    : {};
   const monitorias = Object.fromEntries(lista.map((s) => {
     const regua = ((reguas ?? []) as Pick<RegraCota, 'chave' | 'faixa_min'>[]).find((r) => r.chave === s.regra_monitoria);
     return [s.id, {
@@ -45,5 +51,6 @@ export default async function TelaSetores() {
   }));
   return <SetoresECanais setores={lista} canais={(canais ?? []) as Canal[]}
                          vistos={(vistos ?? []) as SetorDoHubVisto[]} monitorias={monitorias}
-                         administrador={!!perfil.administrador} contagens={contagens} metasPorSetor={metasPorSetor} />;
+                         administrador={!!perfil.administrador} contagens={contagens} metasPorSetor={metasPorSetor}
+                         historicos={historicos} />;
 }
