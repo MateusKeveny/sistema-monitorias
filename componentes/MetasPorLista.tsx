@@ -95,6 +95,14 @@ export default function MetasPorLista({ setorId, setorNome, ctx }: {
         </div>
       </div>
 
+      {!ctx.metricas.length && (
+        <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900 ring-1 ring-amber-600/20 dark:bg-amber-500/10 dark:text-amber-200">
+          Este setor ainda não tem métricas{ctx.cargos.length ? '' : ' nem cargos'}: ele foi criado do zero, sem copiar de outro setor.
+          O modelo traz só a Meta{ctx.cargos.length ? '' : ' e colunas vagas para nomear os cargos'}. As métricas nascem com as filas
+          (Usuários e setores › Setores e filas) e em Faixas e nomes. Para começar com tudo igual a outro setor, exclua este e crie de
+          novo escolhendo &ldquo;Copiar de&rdquo;.
+        </p>
+      )}
       {feito && <p className="surgir mt-3 rounded-lg bg-marca-50 px-3 py-2 text-sm text-marca-800 ring-1 ring-marca-600/20 dark:bg-marca-500/10 dark:text-marca-300">{feito}</p>}
       {erro && <p className="surgir mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800 ring-1 ring-rose-600/20">{erro}</p>}
 

@@ -60,6 +60,8 @@ export type Plano = {
   fora: string[];
 };
 
+/** Cabeçalho das colunas vagas do modelo de um setor sem cargos: troque pelo nome do cargo. */
+const PREFIXO_VAGO = 'Nome do cargo';
 export const ROTULO_META = 'Meta do mês';
 export const ROTULO_MEDIA = 'Média da equipe (×)';
 const NAO_PONTUA = 'não pontua';
@@ -136,6 +138,8 @@ export function modeloXlsx(ctx: ContextoMetas, nomeDaAba = 'Metas'): Uint8Array 
     { cabecalho: 'Como pontua', chave: 'tipo', largura: 44, formato: 'quebra' as const },
     { cabecalho: 'Faixa', chave: 'faixa', largura: 20 },
     ...cargos.map((c, i) => ({ cabecalho: c.nome, chave: `c${i}`, formato: 'numero' as const, largura: Math.max(16, c.nome.length + 3), destaque: true })),
+    // Setor ainda sem cargos (criado do zero): colunas prontas para dar nome ao cargo e a meta.
+    ...(cargos.length ? [] : [1, 2, 3].map((n) => ({ cabecalho: `${PREFIXO_VAGO} ${n}`, chave: `v${n}`, formato: 'numero' as const, largura: 22, destaque: true }))),
   ];
   const info: Record<Item, { tipo: string; faixa: string }> = {
     meta: { tipo: 'Pontos para bater a cota no mês (maior que zero)', faixa: '' },
@@ -168,6 +172,8 @@ export function modeloXlsx(ctx: ContextoMetas, nomeDaAba = 'Metas'): Uint8Array 
       ],
       linhas: [
         { item: 'Onde preencher', regra: `Na aba "${nomeDaAba}", só nas colunas amarelas (${nomes || 'uma por cargo'}): uma linha por métrica, a pontuação no cruzamento com o cargo. Métrica, Como pontua e Faixa são só para leitura.` },
+        ...(cargos.length ? [] : [{ item: 'Setor sem cargos', regra: `Troque "${PREFIXO_VAGO} 1, 2, 3" pelo nome de cada cargo e preencha a Meta do mês: cada coluna vira um cargo. Coluna que continuar "${PREFIXO_VAGO}" é ignorada.` }]),
+        ...(ctx.metricas.length ? [] : [{ item: 'Setor sem métricas', regra: 'Este setor ainda não tem métricas (foi criado do zero, sem copiar de outro setor). As métricas nascem com as filas e em Configuração › Faixas e nomes; depois disso, baixe o modelo de novo e as linhas aparecem aqui.' }]),
         { item: 'Número', regra: 'A pontuação da métrica no cargo. Negativo desconta (ex.: -50). Decimal com vírgula (ex.: 0,25).' },
         { item: 'não pontua', regra: 'A métrica não conta para o cargo. Trocar por um número liga; escrever "não pontua" desliga.' },
         { item: 'Célula vazia', regra: 'Não muda nada naquele cargo.' },
@@ -239,7 +245,7 @@ export function planejar(grade: string[][], ctx: ContextoMetas): Plano {
   // As colunas de leitura do modelo (Como pontua, Faixa...) não são cargos.
   const leitura = ['como pontua', 'faixa', 'grupo', 'tipo', 'unidade', 'chave no sistema'];
   const cargosDaLista = g[0].slice(1).map((c) => String(c ?? '').trim())
-    .map((c) => (leitura.includes(normal(c)) ? '' : c));
+    .map((c) => (leitura.includes(normal(c)) || normal(c).startsWith(normal(PREFIXO_VAGO)) ? '' : c));
   if (!cargosDaLista.some(Boolean)) return { ...vazio, erro: 'Nenhum cargo no cabeçalho da lista.' };
 
   // Cada linha: Meta, Média ou uma métrica do setor (pelo nome da tela ou pela chave).

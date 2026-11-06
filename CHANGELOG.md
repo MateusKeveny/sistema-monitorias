@@ -66,6 +66,9 @@ usa as regras deste. Monitorias e Agenda sem mudança.
   Cada célula vem com a pontuação de hoje, e métrica desligada vem escrita
   **não pontua** (antes saía vazia e parecia faltar a pontuação). Aba
   **Como preencher** com as regras. Subir o modelo sem mexer não muda nada.
+  Setor criado do zero (sem cargos nem métricas): o modelo traz colunas vagas
+  **Nome do cargo 1, 2, 3** para nomear e dar a meta, e a tela avisa que as
+  métricas nascem com as filas e em Faixas e nomes.
 
 ---
 
