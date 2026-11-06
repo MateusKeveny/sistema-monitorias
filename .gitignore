@@ -24,3 +24,4 @@ dados/
 # Build da apresentação local (banco-local/apresentacao.ps1)
 /.next-apresentacao/
 /.next-online/
+/.next-teste/

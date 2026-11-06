@@ -23,17 +23,21 @@ const ITENS = {
     ],
   },
   gestao: {
-    versao: '3.2',
-    titulo: 'O que mudou na 3.1 e na 3.2',
+    versao: '3.9',
+    titulo: 'O que mudou da 3.7 à 3.9',
     itens: [
-      ['Cada um no seu setor', 'gestão e qualidade veem e mexem só no setor em que estão; o banco recusa qualquer gravação em outro setor.'],
-      ['Árvore dos setores', 'em Usuários e setores › Árvore, a operação desenhada como organograma: gestão, qualidade, filas e atendentes de cada setor.'],
-      ['Configuração por setor e cargo', 'primeiro o setor, depois um cargo por vez nos pesos (com "Todos lado a lado" para comparar).'],
+      ['Assuntos mais tratados', 'em C-SAT (visão da equipe), o Top 10 das tabulações do mês, com a % das avaliações, o volume estimado e o C-SAT de cada assunto. Geral e por fila.'],
+      ['Atendimento da Sol', 'em Lançamentos, um cartão por fila para lançar, por semana, o número geral e quantos a Sol resolveu. No Comparativo › Volume, a evolução mês a mês, em Geral e por fila.'],
+      ['Cores novas', 'a paleta do Dashboard iGreen nos dois temas, e as mesmas cores para cada métrica em todos os gráficos.'],
+      ['Comparativo › Geral', 'atendimentos × avaliações, C-SAT, monitoria e pontos mês a mês, com gráficos; e, em C-SAT, os atendimentos lançados × avaliações da equipe.'],
     ],
     administrador: [
       ['Administrador', 'você vê e ajusta todos os setores, cria setor (em etapas: nome e base, filas, monitorias e revisão) e move atendentes entre setores pela Árvore.'],
     ],
     anteriores: [
+      ['Cada um no seu setor', 'gestão e qualidade veem e mexem só no setor em que estão; o banco recusa qualquer gravação em outro setor.'],
+      ['Árvore dos setores', 'em Usuários e setores › Árvore, a operação desenhada como organograma: gestão, qualidade, filas e atendentes de cada setor.'],
+      ['Configuração por setor e cargo', 'primeiro o setor, depois um cargo por vez nos pesos (com "Todos lado a lado" para comparar).'],
       ['Setores e filas', 'a operação agora é organizada em setores, cada um com as suas filas, cargos, métricas, monitorias e fechamento. O seletor de setor no topo do menu vale para todas as telas.'],
       ['Usuários e setores', 'pessoas, logins e setores num só lugar. O login pode ser por nome de usuário.'],
       ['Ciclo do mês', 'Importar, Lançamentos, Métricas da semana, Conferência e Fechamento, no menu, na ordem do trabalho.'],

@@ -2,6 +2,7 @@ import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
 import { setorDoCookie } from '@/lib/setorEscolhido';
 import FormularioLancamentos from '@/componentes/FormularioLancamentos';
 import VolumeSemanal, { type LinhaVolume } from '@/componentes/VolumeSemanal';
+import VolumeDaSol, { type LinhaDaSol } from '@/componentes/VolumeDaSol';
 import LancamentosPendentes, { type Pendente } from '@/componentes/RealocacaoDeLancamentos';
 import DemandasExtrasPendentes, { type AtendimentoOutroSetor } from '@/componentes/DemandasExtrasPendentes';
 import BypassOutroSetor, { type VolumeOutroSetor } from '@/componentes/BypassOutroSetor';
@@ -213,6 +214,35 @@ export default async function LancamentosDeCota({
     };
   });
 
+  // Atendimento da Sol (3.9.0, migração 99): número geral e resolvidos pela IA,
+  // por semana, na fila escolhida. Só informação; vale para qualquer fila.
+  const { data: solDb } = fila.id > 0
+    ? await db.from('volume_ia').select('semana, total, resolvidos_ia, salvo_por_nome, salvo_em')
+        .eq('canal_id', fila.id).eq('mes_competencia', competencia)
+    : { data: [] };
+  const linhasSol = (solDb ?? []) as LinhaDaSol[];
+  if (fila.id > 0) {
+    const totalSol = linhasSol.reduce((t, l) => t + (l.total ?? 0), 0);
+    const resolvidosSol = linhasSol.reduce((t, l) => t + (l.resolvidos_ia ?? 0), 0);
+    destaques.push({
+      chave: 'sol',
+      bloco: (
+        <>
+          <p className="text-[13px] text-slate-500">Atendimento da Sol</p>
+          <p className="text-[1.65rem] font-semibold tracking-tight tabular-nums text-slate-900">
+            {totalSol ? `${Math.round((resolvidosSol / totalSol) * 1000) / 10}%`.replace('.', ',') : '—'}
+          </p>
+          <p className="mt-1 text-xs text-slate-600">
+            {linhasSol.length
+              ? `resolvidos pela Sol · ${numero(resolvidosSol)} de ${numero(totalSol)} · ${linhasSol.length} de 4 semanas`
+              : 'nada lançado'}
+          </p>
+        </>
+      ),
+      detalhe: <VolumeDaSol key={`sol-${competencia}-${fila.id}`} canalId={fila.id} nomeFila={fila.nome} competencia={competencia} linhas={linhasSol} />,
+    });
+  }
+
   const aConferir = listaConferencia.length;
   destaques.push({
     chave: 'conferir',
@@ -360,7 +390,7 @@ export default async function LancamentosDeCota({
                                pessoas={(pessoas.data ?? []) as Pessoa[]} regras={(regras.data ?? []) as RegraCota[]} />
 
       <SeletorDeDetalhe key={`${competencia}-${canal}`} destaques={destaques} inicial={inicial} alternar
-                        rotulo="Situação do mês" grade="sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5" />
+                        rotulo="Situação do mês" grade="sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6" />
 
       <FormularioLancamentos
         canal={canal}

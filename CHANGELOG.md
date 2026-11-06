@@ -35,6 +35,31 @@ para o Performance.
 
 ---
 
+## Performance 3.9.0
+
+Migração **99** (`supabase/99-assuntos-e-volume-da-sol.sql`), aditiva.
+Monitorias e Agenda sem mudança. Pensado para qualquer setor da árvore: tudo
+vai pelo número da fila, e as abas são as filas do setor escolhido no menu.
+
+- **Assuntos mais tratados** (C-SAT, visão da equipe): o Top 10 das
+  tabulações do mês — a tabulação completa, como vem no relatório do C-SAT, e
+  que já era gravada em cada avaliação (vale também para os meses já
+  importados). Para cada assunto: avaliações, % do total, **volume estimado**
+  (a fatia do assunto nas avaliações da fila aplicada aos finalizados da
+  equipe) e o C-SAT do assunto (positiva a partir da nota 4, a regra do
+  cálculo). Abas Geral e por fila; "Ver todos" abre a lista inteira. Função
+  `assuntos_do_mes`.
+- **Atendimento da Sol** (a IA): em Lançamentos, um cartão por fila para a
+  gestão lançar, por semana, o **número geral** de atendimentos e quantos **a
+  Sol resolveu** (tabela `volume_ia`; quem salvou fica registrado). Só
+  informação: não entra na pontuação. No **Comparativo › Volume**, abas
+  **Geral** e uma por fila, cada uma com o atendimento da Sol mês a mês
+  (número geral, resolvidos pela Sol, % da Sol e os finalizados da equipe) e
+  os finalizados por atendente.
+- Novidades da gestão atualizadas (3.7 a 3.9).
+
+---
+
 ## Performance 3.8.0
 
 Sem migração. Monitorias e Agenda sem mudança. A 4.0.0 (aprovação da CEO,

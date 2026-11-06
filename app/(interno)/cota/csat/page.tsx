@@ -1,10 +1,12 @@
 import AvaliacoesDeUmACinco, { type AvaliacaoDoAtendente } from '@/componentes/AvaliacoesDeUmACinco';
 import CsatDaEquipe, { type NotasCsat, type VolumeCsat } from '@/componentes/CsatDaEquipe';
+import AssuntosDoMes, { type AssuntoDoMes } from '@/componentes/AssuntosDoMes';
+import { setorDoCookie } from '@/lib/setorEscolhido';
 import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
 import { Painel, Secao, Vazio } from '@/componentes/ui';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { resolverCompetencia } from '@/lib/competencia';
-import { periodoDaSemana } from '@/lib/formatar';
+import { mesRotulo, periodoDaSemana } from '@/lib/formatar';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,13 +33,17 @@ export default async function MeuCsat({
   const vazio = Promise.resolve({ data: [] as never[] });
   // Visão do gestor (3.7.0): atendimentos lançados × avaliações, do mesmo
   // volume e do mesmo C-SAT do cálculo.
-  const [{ data: pessoas }, { data: volumes }, { data: notasDoMes }, { data: filasDb }] = await Promise.all([
+  const [{ data: pessoas }, { data: volumes }, { data: notasDoMes }, { data: filasDb }, { data: assuntosDb }, { data: setoresDb }, setorEscolhido] = await Promise.all([
     // Todos, não só os avaliados: Pleno e Analista também têm notas; o
     // desligado no mês ainda aparece no resumo do mês.
     veOTime ? db.from('pessoas').select('id, nome, papel, ativo, desligado_em, perfil_de_teste').order('nome') : vazio,
-    veOTime ? db.from('volume_semanal').select('pessoa_id, canal, semana, finalizados').eq('mes_competencia', competencia) : vazio,
+    veOTime ? db.from('volume_semanal').select('pessoa_id, canal, canal_id, semana, finalizados').eq('mes_competencia', competencia) : vazio,
     veOTime ? db.from('vw_csat_semanal').select('pessoa_id, origem, semana, avaliacoes, positivas').eq('mes_competencia', competencia) : vazio,
-    veOTime ? db.from('canais_do_setor').select('apelido, nome, ordem').eq('ativo', true).order('ordem') : vazio,
+    veOTime ? db.from('canais_do_setor').select('id, apelido, nome, ordem, setor_id').eq('ativo', true).order('ordem') : vazio,
+    // Assuntos mais tratados (3.9.0, migração 99): a tabulação das avaliações do mês, por fila.
+    veOTime ? db.rpc('assuntos_do_mes', { p_mes: competencia }) : vazio,
+    veOTime ? db.from('setores').select('id').eq('ativo', true).order('ordem') : vazio,
+    setorDoCookie(),
   ]);
   type P = { id: string; nome: string; papel: string; ativo: boolean; desligado_em: string | null; perfil_de_teste?: boolean };
   const todas = ((pessoas ?? []) as P[]).filter((p) => !p.perfil_de_teste && p.papel !== 'administrador');
@@ -47,6 +53,17 @@ export default async function MeuCsat({
   const notasEquipe = (notasDoMes ?? []) as NotasCsat[];
   const filas = ((filasDb ?? []) as { apelido: string | null; nome: string }[])
     .filter((x) => x.apelido).map((x) => [x.apelido!, x.nome] as [string, string]);
+  // As filas do setor escolhido no menu (vale para qualquer equipe da árvore).
+  const setorId = ((setoresDb ?? []) as { id: number }[]).find((x) => String(x.id) === setorEscolhido)?.id
+    ?? ((setoresDb ?? []) as { id: number }[])[0]?.id ?? 1;
+  const filasDoSetor = ((filasDb ?? []) as { id: number; nome: string; setor_id?: number }[])
+    .filter((f) => (f.setor_id ?? 1) === setorId).map((f) => ({ id: f.id, nome: f.nome }));
+  const idsDoSetor = new Set(filasDoSetor.map((f) => f.id));
+  const assuntos = ((assuntosDb ?? []) as AssuntoDoMes[]).filter((a) => idsDoSetor.has(a.canal_id));
+  const finalizadosPorFila: Record<number, number> = {};
+  for (const v of (volumes ?? []) as { canal_id: number | null; finalizados: number }[]) {
+    if (v.canal_id != null) finalizadosPorFila[v.canal_id] = (finalizadosPorFila[v.canal_id] ?? 0) + Number(v.finalizados);
+  }
   const semanasComDados = [1, 2, 3, 4].filter((sem) => vols.some((v) => v.semana === sem) || notasEquipe.some((n) => n.semana === sem));
   const pessoaId = veOTime ? (pedida && todas.some((p) => p.id === pedida) ? pedida : null) : perfil.id;
 
@@ -102,6 +119,11 @@ export default async function MeuCsat({
       {veOTime && (
         <CsatDaEquipe pessoas={todas} volumes={vols} notas={notasEquipe} filas={filas} competencia={competencia}
                       pessoaId={pessoaId} semanasComDados={semanasComDados} />
+      )}
+
+      {veOTime && !pessoaId && (
+        <AssuntosDoMes linhas={assuntos} finalizados={finalizadosPorFila} filas={filasDoSetor}
+                       mes={mesRotulo(competencia).split(' ')[0].toLowerCase()} />
       )}
 
       {!pessoaId ? null : canais.length === 0 ? (

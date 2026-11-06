@@ -11,6 +11,8 @@ import { fonteDoMes, situacaoDoResumo } from '@/lib/resumo';
 import { todas } from '@/lib/consultas';
 import { MONITORIAS_PADRAO, monitoriasPorSetor, setorDasPessoas, textoDoPiso } from '@/lib/monitoriasDoSetor';
 import { SERIES } from '@/lib/cores';
+import AbasLocais from '@/componentes/AbasLocais';
+import { setorDoCookie } from '@/lib/setorEscolhido';
 
 export const dynamic = 'force-dynamic';
 
@@ -101,6 +103,20 @@ export default async function Comparativo({
   const de = meses[0];
 
   const db = await criarClienteServidor();
+  // Aba Volume (3.9.0): as filas do setor escolhido no menu e o volume da Sol
+  // (migração 99). Vale para qualquer setor da árvore, pelo número da fila.
+  const [filasDb, setoresDb, setorEscolhido, solDb] = await todas([
+    db.from('canais_do_setor').select('id, apelido, nome, ordem, setor_id').eq('ativo', true).order('ordem').then((r) => r.data ?? []),
+    db.from('setores').select('id').eq('ativo', true).order('ordem').then((r) => r.data ?? []),
+    setorDoCookie(),
+    veOTime ? db.from('volume_ia').select('canal_id, mes_competencia, total, resolvidos_ia')
+      .gte('mes_competencia', de).lte('mes_competencia', fim).then((r) => r.data ?? []) : Promise.resolve([]),
+  ]);
+  const setorDaAba = (setoresDb as { id: number }[]).find((x) => String(x.id) === setorEscolhido)?.id
+    ?? (setoresDb as { id: number }[])[0]?.id ?? 1;
+  const filasDoSetor = (filasDb as { id: number; apelido: string | null; nome: string; setor_id?: number }[])
+    .filter((f) => f.apelido && (f.setor_id ?? 1) === setorDaAba) as { id: number; apelido: string; nome: string }[];
+  const todoSol = solDb as { canal_id: number; mes_competencia: string; total: number | null; resolvidos_ia: number | null }[];
   const [pessoas, fechados, csat, volume, monitorias, lancados, presenciais, chamados] = await todas([
     db.from('pessoas').select('id, nome, exibir_no_painel, conta_nas_medias'),
     db.from('fechamentos_cota').select('pessoa_id, mes_competencia, resultado, meta')
@@ -615,16 +631,43 @@ export default async function Comparativo({
     },
     {
       chave: 'vol', rotulo: 'Volume',
-      conteudo: porCanal((c) => {
-        const equipe = meses.map((m) => volDe(c, EQUIPE, m));
-        const med = media(semNulos(equipe));
-        return (
-          <Vista k="vol" formatar={inteiro} tom={() => 'neutro'} equipe={equipe}
-                 titulo="Finalizados da equipe por mês" subtitulo="Total da fila. Linha tracejada: a média do período."
-                 referencia={med != null ? { valor: med, rotulo: `média ${inteiro(med)}` } : undefined}
-                 pessoas={series(ids(todoVolume.filter((x) => x.canal === c)), (id, m) => volDe(c, id, m))} />
-        );
-      }),
+      // 3.9.0: Geral (as filas somadas) e uma aba por fila do setor, cada uma
+      // com o atendimento da Sol (lançado em Lançamentos) e os finalizados.
+      conteudo: (
+        <AbasLocais rotulo="Fila" abas={[
+          { chave: 'geral', rotulo: 'Geral', filas: filasDoSetor },
+          ...filasDoSetor.map((f) => ({ chave: String(f.id), rotulo: f.nome, filas: [f] })),
+        ].map((aba) => {
+          const equipe = meses.map((m) => {
+            const vs = aba.filas.map((f) => volDe(f.apelido as Canal, EQUIPE, m)).filter((v): v is number => v != null);
+            return vs.length ? vs.reduce((a, b) => a + b, 0) : null;
+          });
+          const med = media(semNulos(equipe));
+          const idsDaAba = new Set(aba.filas.map((f) => f.id));
+          const solDoMes = meses.map((m) => {
+            const ls = todoSol.filter((x) => idsDaAba.has(x.canal_id) && x.mes_competencia === m);
+            if (!ls.length) return null;
+            return { total: ls.reduce((t, x) => t + (x.total ?? 0), 0), sol: ls.reduce((t, x) => t + (x.resolvidos_ia ?? 0), 0) };
+          });
+          const apelidos = new Set(aba.filas.map((f) => f.apelido));
+          return {
+            chave: aba.chave, rotulo: aba.rotulo,
+            conteudo: (
+              <div className="space-y-4">
+                {veOTime && <QuadroDaSol rotulos={meses.map(rotuloMes)} sol={solDoMes} equipe={equipe} />}
+                <Vista k="vol" formatar={inteiro} tom={() => 'neutro'} equipe={equipe}
+                       titulo={aba.chave === 'geral' ? 'Finalizados da equipe por mês, todas as filas' : 'Finalizados da equipe por mês'}
+                       subtitulo="Os finalizados lançados da equipe. Linha tracejada: a média do período."
+                       referencia={med != null ? { valor: med, rotulo: `média ${inteiro(med)}` } : undefined}
+                       pessoas={series(ids(todoVolume.filter((x) => apelidos.has(x.canal))), (id, m) => {
+                         const vs = aba.filas.map((f) => volDe(f.apelido as Canal, id, m)).filter((v): v is number => v != null);
+                         return vs.length ? vs.reduce((a, b) => a + b, 0) : null;
+                       })} />
+              </div>
+            ),
+          };
+        })} />
+      ),
     },
     {
       chave: 'tme', rotulo: 'TME',
@@ -684,5 +727,62 @@ export default async function Comparativo({
         <Abas itens={itens} inicial={cat} />
       </div>
     </ProvedorDeCanal>
+  );
+}
+
+/**
+ * Atendimento da Sol (3.9.0, migração 99), mês a mês: o número geral que a
+ * gestão lança, quantos a Sol resolveu, a % dela e, para comparar, os
+ * finalizados da equipe (da importação). Só informação: não pontua.
+ */
+function QuadroDaSol({ rotulos, sol, equipe }: {
+  rotulos: string[];
+  sol: ({ total: number; sol: number } | null)[];
+  equipe: (number | null)[];
+}) {
+  const inteiroSol = (v: number) => Math.round(v).toLocaleString('pt-BR');
+  if (!sol.some((x) => x)) {
+    return (
+      <Painel><Secao titulo="Atendimento da Sol">
+        <Vazio>Nada lançado ainda. A gestão lança por semana em Lançamentos › Atendimento da Sol: o número geral e quantos a Sol resolveu.</Vazio>
+      </Secao></Painel>
+    );
+  }
+  const pct = sol.map((x) => (x && x.total ? x.sol / x.total : null));
+  const linhas: [string, (number | null)[], (v: number) => string][] = [
+    ['Número geral', sol.map((x) => x?.total ?? null), inteiroSol],
+    ['Resolvidos pela Sol', sol.map((x) => x?.sol ?? null), inteiroSol],
+    ['% da Sol', pct, (v) => percentual(v)],
+    ['Finalizados pela equipe', equipe, inteiroSol],
+  ];
+  return (
+    <Painel>
+      <Secao titulo="Atendimento da Sol" subtitulo="Lançado pela gestão em Lançamentos. Barras: número geral e resolvidos pela Sol. Linha: a % da Sol, no eixo da direita.">
+        <GraficoBarrasELinha largura={1400} rotulos={rotulos} formatar={inteiroSol} formatarDir={percentual} minDir={0} maxDir={1}
+          barras={[
+            { nome: 'Número geral', cor: 'var(--color-slate-400)', valores: sol.map((x) => x?.total ?? null) },
+            { nome: 'Resolvidos pela Sol', cor: SERIES[1], valores: sol.map((x) => x?.sol ?? null) },
+          ]}
+          linhas={[{ nome: '% da Sol', cor: SERIES[2], direita: true, valores: pct }]} />
+        <div className="-mx-6 mt-4 overflow-x-auto sm:-mx-7">
+          <table className="w-full text-sm tabular-nums">
+            <thead>
+              <tr className="text-xs text-slate-500">
+                <th className="py-2 pl-6 pr-3 text-left font-medium sm:pl-7" />
+                {rotulos.map((r, i) => <th key={r} className={`px-2 py-2 text-right ${i === rotulos.length - 1 ? 'font-semibold text-slate-800' : 'font-medium'}`}>{r}</th>)}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {linhas.map(([rotulo, valores, fmt]) => (
+                <tr key={rotulo}>
+                  <td className="whitespace-nowrap py-2 pl-6 pr-3 text-slate-600 sm:pl-7">{rotulo}</td>
+                  {valores.map((v, i) => <td key={i} className="px-2 py-2 text-right text-slate-800">{v == null ? <span className="text-slate-300">—</span> : fmt(v)}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Secao>
+    </Painel>
   );
 }
