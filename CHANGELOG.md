@@ -38,7 +38,10 @@ para o Performance.
 ## Performance 4.1.0
 
 Migração **100** (`supabase/100-excluir-e-desativar-setor.sql`), só funções
-novas. Monitorias e Agenda sem mudança.
+novas, e **101** (`supabase/101-corrige-excluir-setor.sql`): a exclusão
+parava na régua de monitoria do setor (`setores_regra_monitoria_fkey`); agora
+solta essa ligação antes de apagar as regras e também barra quando outro setor
+usa as regras deste. Monitorias e Agenda sem mudança.
 
 - **Excluir ou desativar um setor** (Usuários e setores › Setores e filas, só o
   administrador). **Sem histórico** (nenhuma pessoa, fechamento, monitoria,
