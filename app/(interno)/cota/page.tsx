@@ -13,6 +13,7 @@ import { fonteDoMes, situacaoDoResumo } from '@/lib/resumo';
 import CarimboDoResumo from '@/componentes/CarimboDoResumo';
 import { todas } from '@/lib/consultas';
 import VerComoAtendente from '@/componentes/VerComoAtendente';
+import { setorDoCookie } from '@/lib/setorEscolhido';
 
 export const dynamic = 'force-dynamic';
 
@@ -184,7 +185,7 @@ export default async function InicioCota({
         <div className="space-y-6">
           {copiaDeTeste && <VerComoAtendente />}
           <Topo selo={<SeloDoGestor competencia={competencia} atual={atual} />} direita={<AbasDeCanal />} />
-          <PainelGestor competencia={competencia} atual={atual} />
+          <PainelGestor competencia={competencia} atual={atual} fonte={fonte} setorPedido={await setorDoCookie()} />
         </div>
       </ProvedorDeCanal>
     );
@@ -274,7 +275,8 @@ export default async function InicioCota({
                 </h2>
                 <AbasDeCanal />
               </div>
-              <PainelGestor competencia={competencia} atual={atual} comPendencias={false} />
+              <PainelGestor competencia={competencia} atual={atual} comPendencias={false}
+                            fonte={fonte} setorPedido={await setorDoCookie()} />
             </>
           )}
         </div>

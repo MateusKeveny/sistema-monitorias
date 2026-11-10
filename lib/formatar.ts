@@ -1,9 +1,24 @@
 /** Formatações de exibição, todas em pt-BR. */
 
+/**
+ * Formatador de número guardado (4.1.0, erro 1102): `toLocaleString` com
+ * opções monta um formatador novo a cada número, e numa tabela isso são
+ * centenas por tela — CPU contada no limite da Cloudflare. Aqui cada combinação
+ * de casas é montada uma vez e reaproveitada. Mesmo texto de antes.
+ */
+const formatadores = new Map<string, Intl.NumberFormat>();
+export function numeroBR(v: number, maximo = 3, minimo = 0): string {
+  const chave = `${minimo}|${maximo}`;
+  let f = formatadores.get(chave);
+  if (!f) {
+    f = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: minimo, maximumFractionDigits: maximo });
+    formatadores.set(chave, f);
+  }
+  return f.format(v);
+}
+
 export const nota = (v: number | null | undefined) =>
-  v == null ? '—' : (v * 100).toLocaleString('pt-BR', {
-    minimumFractionDigits: 0, maximumFractionDigits: 1,
-  }) + '%';
+  v == null ? '—' : numeroBR(v * 100, 1) + '%';
 
 export const percentual = nota;
 
@@ -34,8 +49,17 @@ export const data = (iso: string | null | undefined) => {
  */
 const FUSO = 'America/Sao_Paulo';
 
-const partes = (d: Date, opcoes: Intl.DateTimeFormatOptions) =>
-  new Intl.DateTimeFormat('pt-BR', { timeZone: FUSO, ...opcoes }).formatToParts(d);
+// Guardado pelo mesmo motivo do numeroBR: montar um DateTimeFormat é caro.
+const formatadoresDeData = new Map<string, Intl.DateTimeFormat>();
+const partes = (d: Date, opcoes: Intl.DateTimeFormatOptions) => {
+  const chave = JSON.stringify(opcoes);
+  let f = formatadoresDeData.get(chave);
+  if (!f) {
+    f = new Intl.DateTimeFormat('pt-BR', { timeZone: FUSO, ...opcoes });
+    formatadoresDeData.set(chave, f);
+  }
+  return f.formatToParts(d);
+};
 
 const pegar = (p: Intl.DateTimeFormatPart[], tipo: string) =>
   p.find((x) => x.type === tipo)?.value ?? '';
@@ -212,7 +236,7 @@ export function mesDeCompetencia(iso: string): string {
 export function umaCasa(v: number): string {
   const n = Number(v);
   const arredondado = (Math.sign(n) * Math.round(Number((Math.abs(n) * 10).toFixed(6)))) / 10;
-  return arredondado.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  return numeroBR(arredondado, 1, 1);
 }
 
 /**

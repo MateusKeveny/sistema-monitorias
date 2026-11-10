@@ -1,18 +1,26 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import Link from '@/componentes/Link';
 import { NoCanal, type Canal } from '@/componentes/Canal';
 import GraficoDeLinha, { type PontoDaLinha } from '@/componentes/GraficoDeLinha';
 import SeletorDeDetalhe, { type Destaque } from '@/componentes/SeletorDeDetalhe';
 import { BarraDeMeta, Painel, Secao, Vazio } from '@/componentes/ui';
-import { criarClienteServidor } from '@/lib/supabase/servidor';
-import { corDoCsat, hojeNoBrasil, mesRotulo, percentual, semanaDoCiclo } from '@/lib/formatar';
-import { mesAnterior } from '@/lib/competencia';
-import { fonteDoMes } from '@/lib/resumo';
+import { criarClienteNavegador } from '@/lib/supabase/cliente';
+import { corDoCsat, hojeNoBrasil, mesRotulo, percentual, semanaDoCiclo, numeroBR } from '@/lib/formatar';
+import type { FonteDoMes } from '@/lib/fonteDoMes';
 import ProjecaoDaCota from '@/componentes/ProjecaoDaCota';
 import { limiteDeRenovacao, pessoasComLeituraPendente, type LeituraDiario } from '@/lib/diario';
 import { todas } from '@/lib/consultas';
 import { conferirNumerosDoMes, pendentesDaConferencia } from '@/lib/conferenciaDoMes';
-import { setorDoCookie } from '@/lib/setorEscolhido';
 import { MONITORIAS_PADRAO, monitoriasPorSetor, setorDaTela, textoDoPiso } from '@/lib/monitoriasDoSetor';
+
+/** O mês anterior de '2026-09-01' → '2026-08-01' (o de lib/competencia, que é só do servidor). */
+function mesAnterior(c: string): string {
+  const [a, m] = c.split('-').map(Number);
+  return m === 1 ? `${a - 1}-12-01` : `${a}-${String(m - 1).padStart(2, '0')}-01`;
+}
 
 const CANAIS: Canal[] = ['huggy', 'diretores'];
 const META_CSAT = 0.95;
@@ -27,7 +35,7 @@ type Cota = {
 type Fechado = { pessoa_id: string; mes_competencia: string; resultado: number; meta: number | null; cargo: string | null };
 type Monitoria = { operador_id: string; nota_final: number; mes_referencia: string };
 
-const inteiro = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
+const inteiro = (v: number) => numeroBR(v, 0);
 const nomeCurto = (nome: string) => nome.trim().split(/\s+/).slice(0, 2).join(' ');
 const primeiroNome = (nome: string) => nome.trim().split(/\s+/)[0];
 const media = (l: number[]) => (l.length ? l.reduce((a, b) => a + b, 0) / l.length : null);
@@ -69,25 +77,32 @@ const TONS_SEMANA = ['bg-emerald-300', 'bg-emerald-500', 'bg-emerald-700', 'bg-e
  * Tudo é SVG ou barra de CSS montado no servidor — nada de biblioteca de
  * gráfico no navegador.
  */
-export default async function PainelGestor({
-  competencia, atual, comPendencias = true,
-}: {
+type Props = {
   competencia: string;
   atual: string;
   /** A faixa "Precisa de você" leva a telas só do gestor; o Pleno vê o painel sem ela. */
   comPendencias?: boolean;
-}) {
+  /** De onde ler o cálculo do mês (resumo ou ao vivo), decidido pela página. */
+  fonte: FonteDoMes;
+  /** O setor escolhido no menu (cookie), lido pela página no servidor. */
+  setorPedido?: string;
+};
+
+/**
+ * Os dados vêm direto do banco, pelo navegador (4.1.0, erro 1102): montar este
+ * painel no servidor da Cloudflare era a tela mais pesada do plano gratuito.
+ * As mesmas consultas, com a mesma regra de acesso (RLS) — o navegador entra
+ * com a sessão de quem está logado, como o servidor entrava.
+ */
+async function carregar(db: SupabaseClient, { competencia, atual, comPendencias = true, fonte, setorPedido }: Props) {
   const anterior = mesAnterior(competencia);
   const meses = [competencia, anterior];
-  const db = await criarClienteServidor();
   // O piso da monitoria: o do setor da equipe (Monitorias 6.0).
-  const [porSetorMon, { setorId: setorDaEquipe }] = await Promise.all([monitoriasPorSetor(db), setorDaTela(db, await setorDoCookie())]);
+  const [porSetorMon, { setorId: setorDaEquipe }] = await Promise.all([monitoriasPorSetor(db), setorDaTela(db, setorPedido)]);
   const piso = porSetorMon.get(setorDaEquipe)?.piso ?? MONITORIAS_PADRAO.piso;
-  const tomDaNota = (v: number) => tomDaNotaCom(v, piso);
-  // O resultado de todos no mês: do resumo (migração 58), que era ~2 s ao vivo.
-  const fonte = await fonteDoMes(competencia);
 
-  const [pessoas, csat, volume, criterios, cota, cargos, fechados, monitorias, valores, semCargo, conferir, diario, vencendo, leituras, privados, reportes, atrasos]
+  const [pessoas, csat, volume, criterios, cota, cargos, fechados, monitorias, valores, semCargo, conferir, diario, vencendo, leituras, privados, reportes, atrasos,
+    { data: semanasDeChamados }, { data: mesesComRh }, { data: conferencia }, { data: recusas }]
     = await todas([
     db.from('pessoas').select('id, nome, exibir_no_painel, conta_nas_medias'),
     db.from('vw_csat_semanal').select('pessoa_id, origem, semana, avaliacoes, positivas, mes_competencia')
@@ -120,7 +135,84 @@ export default async function PainelGestor({
     db.from('chamados_elo').select('protocolo', { count: 'exact', head: true })
       .gte('tempo_util', 3).not('concluido_em', 'is', null).neq('status', 'Cancelado')
       .not('pessoa_id', 'is', null).is('decisao', null),
+    // Estas quatro saíam uma atrás da outra no servidor; aqui vão juntas.
+    // Sem a migração de cada uma, o erro é ignorado e a pendência não aparece
+    // (como antes): por isso não passam pela conferência do todas().
+    (comPendencias ? db.rpc('chamados_por_semana', { p_mes: competencia }) : Promise.resolve({ data: null }))
+      .then((r) => ({ data: r.data })),
+    db.from('valores_rh').select('mes_competencia').in('mes_competencia', meses).then((r) => ({ data: r.data })),
+    db.from('conferencias_calculo').select('falhas').order('rodada_em', { ascending: false }).limit(1).maybeSingle()
+      .then((r) => ({ data: r.data })),
+    db.from('vw_aprovacao_atual').select('mes_competencia').eq('situacao', 'recusado').then((r) => ({ data: r.data })),
   ]);
+
+  // Conferência dos números (3.5.0): a mesma do Fechamento, enquanto o mês não fecha.
+  const semanasEsperadas = competencia < atual ? 4 : Math.max(0, semanaDoCiclo(hojeNoBrasil()) - 1);
+  const fechado = ((fechados.data ?? []) as Fechado[]).some((f) => f.mes_competencia === competencia);
+  const alertas = fechado ? [] : pendentesDaConferencia(await conferirNumerosDoMes(db, {
+    competencia, semanasEncerradas: semanasEsperadas,
+    pessoas: ((cota.data ?? []) as Cota[]).map((c) => ({ pessoa_id: c.pessoa_id, pessoa: c.pessoa })),
+    volumes: ((volume.data ?? []) as Volume[]).filter((v) => v.mes_competencia === competencia),
+    csats: ((csat.data ?? []) as Csat[]).filter((c) => c.mes_competencia === competencia),
+  }));
+
+  return { piso, pessoas, csat, volume, criterios, cota, cargos, fechados, monitorias, valores, semCargo, conferir, diario,
+    vencendo, leituras, privados, reportes, atrasos, semanasDeChamados, mesesComRh, conferencia, recusas, alertas };
+}
+
+type Dados = Awaited<ReturnType<typeof carregar>>;
+
+export default function PainelGestor(props: Props) {
+  const [dados, setDados] = useState<Dados | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+  const { competencia, atual, comPendencias = true, fonte, setorPedido } = props;
+
+  useEffect(() => {
+    let vivo = true;
+    const db = criarClienteNavegador();
+    const ler = () => carregar(db, { competencia, atual, comPendencias, fonte, setorPedido })
+      .then((d) => { if (vivo) { setDados(d); setErro(null); } })
+      .catch((e: Error) => { if (vivo) setErro(e.message); });
+    ler();
+    // A atualização automática (4.0.0) avisa quando algo mudou no banco.
+    window.addEventListener('dados-mudaram', ler);
+    return () => { vivo = false; window.removeEventListener('dados-mudaram', ler); };
+  }, [competencia, atual, comPendencias, fonte.mensal, fonte.semCargo, fonte.extrato, setorPedido]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (erro && !dados) {
+    return (
+      <Painel>
+        <p className="text-sm text-rose-700">Não foi possível carregar o painel: {erro}</p>
+        <button type="button" onClick={() => location.reload()}
+                className="mt-3 rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 hover:border-marca-600">
+          Tentar de novo
+        </button>
+      </Painel>
+    );
+  }
+  if (!dados) return <Carregando />;
+  return <Visao {...props} dados={dados} />;
+}
+
+/** Enquanto os dados chegam: o contorno da faixa de destaques. */
+function Carregando() {
+  return (
+    <div className="space-y-4" aria-busy="true" aria-label="Carregando o painel">
+      <div className="h-8 w-72 animate-pulse rounded-xl bg-slate-200/60" />
+      <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-5">
+        {[0, 1, 2, 3, 4].map((i) => <div key={i} className="h-36 animate-pulse rounded-2xl bg-slate-200/60" />)}
+      </div>
+      <div className="h-72 animate-pulse rounded-2xl bg-slate-200/60" />
+    </div>
+  );
+}
+
+function Visao({ competencia, atual, comPendencias = true, fonte, dados }: Props & { dados: Dados }) {
+  const anterior = mesAnterior(competencia);
+  const meses = [competencia, anterior];
+  const { piso, pessoas, csat, volume, criterios, cota, cargos, fechados, monitorias, valores, semCargo, conferir, diario,
+    vencendo, leituras, privados, reportes, atrasos, semanasDeChamados, mesesComRh, conferencia, recusas } = dados;
+  const tomDaNota = (v: number) => tomDaNotaCom(v, piso);
 
   const nome = new Map((pessoas.data ?? []).map((p) => [p.id as string, nomeCurto(p.nome as string)]));
 
@@ -183,11 +275,8 @@ export default async function PainelGestor({
       acao: 'Importar', href: '/cota/importar',
     });
   }
-  // Semanas sem chamados importados (migração 60). Fora do `todas`: antes da
-  // migração a função não existe, e a tela segue sem esta pendência.
-  const { data: semanasDeChamados } = comPendencias
-    ? await db.rpc('chamados_por_semana', { p_mes: competencia })
-    : { data: null };
+  // Semanas sem chamados importados (migração 60). Sem a migração, a função
+  // não existe, e a tela segue sem esta pendência.
   const semChamados = ((semanasDeChamados ?? []) as { semana: number; quantidade: number; encerrada: boolean; marcada: boolean }[])
     .filter((s) => s.encerrada && s.quantidade === 0 && !s.marcada).map((s) => s.semana);
   if (semChamados.length) {
@@ -205,7 +294,6 @@ export default async function PainelGestor({
   }
   // Com o valor do RH informado (migração 73), o valor por ponto é só para
   // conferir: não vira pendência (2.3.1).
-  const { data: mesesComRh } = await db.from('valores_rh').select('mes_competencia').in('mes_competencia', meses);
   const temRh = (m: string) => (mesesComRh ?? []).some((v) => v.mes_competencia === m);
   for (const m of meses) {
     if (fechadoEm(m) && !temValor(m) && !temRh(m)) {
@@ -215,10 +303,8 @@ export default async function PainelGestor({
       });
     }
   }
-  // Conferência do cálculo (migração 72): divergência na última rodada. Fora
-  // do todas(): sem a migração, a tabela não existe e a tela segue.
-  const { data: conferencia } = await db.from('conferencias_calculo').select('falhas')
-    .order('rodada_em', { ascending: false }).limit(1).maybeSingle();
+  // Conferência do cálculo (migração 72): divergência na última rodada. Sem a
+  // migração, a tabela não existe e a tela segue.
   if (conferencia?.falhas) {
     pendencias.push({
       texto: `Conferência do cálculo: ${conferencia.falhas} divergência${conferencia.falhas > 1 ? 's' : ''}`,
@@ -228,7 +314,6 @@ export default async function PainelGestor({
   // Cota recusada pela diretoria (4.0.0, migração 98), em qualquer mês: fica
   // aqui até o gestor reabrir e fechar de novo. Sem a migração, a view não
   // existe e não há pendência.
-  const { data: recusas } = await db.from('vw_aprovacao_atual').select('mes_competencia').eq('situacao', 'recusado');
   for (const m of [...new Set((recusas ?? []).map((r) => r.mes_competencia as string))].sort()) {
     const n = (recusas ?? []).filter((r) => r.mes_competencia === m).length;
     pendencias.push({
@@ -240,12 +325,7 @@ export default async function PainelGestor({
   // o mês não fecha — o volume de 3 no lugar de 197 (out/2026) só apareceu no
   // fim do mês.
   if (!fechadoEm(competencia)) {
-    const alertas = pendentesDaConferencia(await conferirNumerosDoMes(db, {
-      competencia, semanasEncerradas: semanasEsperadas,
-      pessoas: todasAsCotas.map((c) => ({ pessoa_id: c.pessoa_id, pessoa: c.pessoa })),
-      volumes: todoVolume.filter((v) => v.mes_competencia === competencia),
-      csats: todoCsat.filter((c) => c.mes_competencia === competencia),
-    }));
+    const { alertas } = dados;
     const graves = alertas.filter((a) => a.grave).length;
     if (alertas.length) {
       pendencias.push({
@@ -408,13 +488,13 @@ export default async function PainelGestor({
       blocoCsat: <Bloco rotulo="C-SAT" nota="meta 95%" min={0.7} max={1}
                         valor={agora.csatMes != null ? percentual(agora.csatMes) : '—'}
                         comparacao={<Comparacao melhor={(dCsat ?? 0) >= 0}
-                          texto={dCsat == null ? null : `${seta(dCsat)} ${Math.abs(dCsat).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} pt`} />}
+                          texto={dCsat == null ? null : `${seta(dCsat)} ${numeroBR(Math.abs(dCsat), 1)} pt`} />}
                         barras={agora.csatSemanas.map((s) => s && {
                           v: s.valor, cor: { bom: 'bg-marca-600', atencao: 'bg-amber-500', ruim: 'bg-rose-500' }[tomDoCsat(s.valor)] })} />,
       blocoVol: <Bloco rotulo="Volume" nota="finalizados"
                        valor={agora.volTotal ? inteiro(agora.volTotal) : '—'}
                        comparacao={<Comparacao melhor={(dVol ?? 0) >= 0}
-                         texto={dVol == null ? null : `${seta(dVol)} ${Math.abs(dVol * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`} />}
+                         texto={dVol == null ? null : `${seta(dVol)} ${numeroBR(Math.abs(dVol * 100), 1)}%`} />}
                        barras={agora.volSemanas.map((v) => v == null ? null : { v, cor: 'bg-marca-600' })} />,
       // TME: subir é piorar.
       blocoTme: <Bloco rotulo="TME" nota="média da equipe"
@@ -691,7 +771,7 @@ export default async function PainelGestor({
                valor={notaMes != null ? percentual(notaMes) : '—'}
                comparacao={<>
                  <Comparacao melhor={(dNota ?? 0) >= 0}
-                             texto={dNota == null ? null : `${seta(dNota)} ${Math.abs(dNota).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} pt`} />
+                             texto={dNota == null ? null : `${seta(dNota)} ${numeroBR(Math.abs(dNota), 1)} pt`} />
                  <p className="mt-0.5 text-xs text-slate-500">{totalMonitorias} monitoria{totalMonitorias === 1 ? '' : 's'} no mês</p>
                </>} />
       ),

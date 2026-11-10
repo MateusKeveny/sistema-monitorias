@@ -10,7 +10,7 @@ import SeletorDeDetalhe, { type Destaque } from '@/componentes/SeletorDeDetalhe'
 import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
 import { Quadro, Tabela, Th, Td } from '@/componentes/ui';
 import Link from '@/componentes/Link';
-import { diaMes, hojeNoBrasil, periodoDaSemana } from '@/lib/formatar';
+import { diaMes, hojeNoBrasil, periodoDaSemana, numeroBR } from '@/lib/formatar';
 import { mesAnterior, resolverCompetencia } from '@/lib/competencia';
 import { CANAIS_PADRAO, type Canal as Fila } from '@/lib/setores';
 import type {
@@ -20,7 +20,7 @@ import type {
 export const dynamic = 'force-dynamic';
 
 const SEMANAS = [1, 2, 3, 4];
-const numero = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+const numero = (v: number) => numeroBR(v, 2);
 
 /**
  * Lançamentos (1.19.0): o topo diz o que falta no mês.

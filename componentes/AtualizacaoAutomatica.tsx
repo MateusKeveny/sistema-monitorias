@@ -36,6 +36,9 @@ export default function AtualizacaoAutomatica({ segundos = 30 }: { segundos?: nu
         // Digitando: não guarda a marca nova, para atualizar na próxima rodada.
         if (digitando()) return;
         router.refresh();
+        // Telas que buscam os dados no navegador (4.1.0: Início e Comparativo)
+        // não se refazem com o refresh: este aviso faz elas buscarem de novo.
+        window.dispatchEvent(new Event('dados-mudaram'));
       }
       ultima = data;
     };

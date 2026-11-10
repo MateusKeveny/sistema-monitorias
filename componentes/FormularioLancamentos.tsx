@@ -7,6 +7,7 @@ import { Quadro, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import type { CargoDaPessoa, Lancamento, PesoCargo, Pessoa, RegraCota } from '@/lib/tipos';
 import { mensagemDoErro } from '@/lib/erro-amigavel';
 import { MoverPara } from '@/componentes/RealocacaoDeLancamentos';
+import { numeroBR } from '@/lib/formatar';
 
 const entrada = `w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm outline-none
                  focus:border-marca-600 disabled:bg-slate-50`;
@@ -14,7 +15,7 @@ const rotuloCampo = 'mb-1 block text-xs font-medium text-slate-600';
 const botaoPrimario = `rounded-lg bg-marca-600 px-4 py-2 text-sm font-semibold text-white
                        hover:bg-marca-700 disabled:opacity-40`;
 
-const numero = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+const numero = (v: number) => numeroBR(v, 2);
 
 type Props = {
   competencia: string;

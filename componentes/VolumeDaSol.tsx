@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Quadro } from '@/componentes/ui';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { mensagemDoErro } from '@/lib/erro-amigavel';
-import { dataHora, diaMes, percentual, periodoDaSemana } from '@/lib/formatar';
+import { dataHora, diaMes, percentual, periodoDaSemana, numeroBR } from '@/lib/formatar';
 
 export type LinhaDaSol = {
   semana: number; total: number | null; resolvidos_ia: number | null;
@@ -96,8 +96,8 @@ export default function VolumeDaSol({ setorId, nomeSetor, competencia, linhas }:
             })}
             <tr className="border-t-2 border-slate-200 font-semibold text-slate-900">
               <td className="py-2 pl-6 pr-3 sm:pl-7">No mês</td>
-              <td className="px-3 py-2 text-right">{totalMes ? totalMes.toLocaleString('pt-BR') : '—'}</td>
-              <td className="px-3 py-2 text-right">{solMes ? solMes.toLocaleString('pt-BR') : '—'}</td>
+              <td className="px-3 py-2 text-right">{totalMes ? numeroBR(totalMes) : '—'}</td>
+              <td className="px-3 py-2 text-right">{solMes ? numeroBR(solMes) : '—'}</td>
               <td className="px-3 py-2 text-right">{totalMes ? percentual(solMes / totalMes) : '—'}</td>
               <td />
             </tr>

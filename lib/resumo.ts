@@ -1,5 +1,6 @@
 import { cache } from 'react';
 import { criarClienteServidor } from '@/lib/supabase/servidor';
+import { fonteDaSituacao, type FonteDoMes, type SituacaoDoResumo } from '@/lib/fonteDoMes';
 
 /**
  * Resumo do mês aberto (migração 58): o cálculo da cota guardado pronto.
@@ -12,18 +13,10 @@ import { criarClienteServidor } from '@/lib/supabase/servidor';
  * As tabelas têm as mesmas colunas das views, então trocar a fonte é trocar
  * o nome em `.from()`. A exportação continua nas views; o Fechamento usa o
  * resumo para a prévia (2.8.1) — fechar calcula no banco.
+ *
+ * A regra da escolha está em lib/fonteDoMes.ts (4.1.0), que o navegador também usa.
  */
-export type SituacaoDoResumo = { mes_competencia: string; atualizado_em: string | null; pendente: boolean };
-
-export type FonteDoMes = {
-  extrato: 'resumo_extrato' | 'vw_extrato_cota';
-  mensal: 'resumo_cota_mensal' | 'vw_cota_mensal';
-  semCargo: 'resumo_sem_cargo' | 'vw_sem_cargo';
-  /** Quando o resumo foi calculado e se há mudança pendente; null = cálculo ao vivo. */
-  resumo: { atualizadoEm: string; pendente: boolean } | null;
-};
-
-const VALIDADE_MS = 40 * 60 * 1000;
+export type { FonteDoMes, SituacaoDoResumo };
 
 /** Uma consulta por renderização, dividida por todas as telas e componentes. */
 export const situacaoDoResumo = cache(async (): Promise<SituacaoDoResumo[]> => {
@@ -34,10 +27,5 @@ export const situacaoDoResumo = cache(async (): Promise<SituacaoDoResumo[]> => {
 
 /** De onde ler o cálculo de uma competência. */
 export async function fonteDoMes(competencia: string): Promise<FonteDoMes> {
-  const s = (await situacaoDoResumo()).find((r) => r.mes_competencia === competencia);
-  const valido = s?.atualizado_em && Date.now() - Date.parse(s.atualizado_em) < VALIDADE_MS;
-  return valido
-    ? { extrato: 'resumo_extrato', mensal: 'resumo_cota_mensal', semCargo: 'resumo_sem_cargo',
-        resumo: { atualizadoEm: s.atualizado_em!, pendente: s.pendente } }
-    : { extrato: 'vw_extrato_cota', mensal: 'vw_cota_mensal', semCargo: 'vw_sem_cargo', resumo: null };
+  return fonteDaSituacao(await situacaoDoResumo(), competencia);
 }

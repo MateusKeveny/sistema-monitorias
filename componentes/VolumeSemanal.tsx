@@ -8,6 +8,7 @@ import type { Pessoa } from '@/lib/tipos';
 import { mensagemDoErro } from '@/lib/erro-amigavel';
 import { MoverPara } from '@/componentes/RealocacaoDeLancamentos';
 import { lerColagemDoHub, type LinhaDoHub } from '@/lib/colar-do-hub';
+import { numeroBR } from '@/lib/formatar';
 
 export type LinhaVolume = {
   id?: number;
@@ -289,7 +290,7 @@ export default function VolumeSemanal({
                             </span>
                           )}
                         </td>
-                        <td className={`py-1.5 text-right font-semibold ${outra ? 'text-slate-400 line-through' : ''}`}>{l.resolvidos.toLocaleString('pt-BR')}</td>
+                        <td className={`py-1.5 text-right font-semibold ${outra ? 'text-slate-400 line-through' : ''}`}>{numeroBR(l.resolvidos)}</td>
                         <td className="py-1.5 text-right">{paraTempo(l.tmaSeg) || '—'}</td>
                         <td className="py-1.5 text-right">{paraTempo(l.tmeUtilSeg) || '—'}</td>
                         <td className="py-1.5 pl-2 text-xs text-amber-700 dark:text-amber-300">{antes ? `substitui ${antes.finalizados}` : ''}</td>
@@ -392,7 +393,7 @@ export default function VolumeSemanal({
             <tr className="border-t border-slate-200 font-semibold text-slate-800">
               <td className="px-4 py-2.5">Equipe · {preenchidas} de {esperadosOuPreenchidos} preenchidos</td>
               <td className={`px-4 py-2.5 text-right tabular-nums ${semana > 1 ? 'pr-[8.5rem]' : ''}`}>
-                {total.toLocaleString('pt-BR')}
+                {numeroBR(total)}
               </td>
               <td /><td />
               <td />

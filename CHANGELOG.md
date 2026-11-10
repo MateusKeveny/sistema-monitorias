@@ -35,13 +35,14 @@ para o Performance.
 
 ---
 
-## Performance 4.1.0
+## Performance 4.1.0 e Monitorias 6.3.2
 
 Migração **100** (`supabase/100-excluir-e-desativar-setor.sql`), só funções
 novas, e **101** (`supabase/101-corrige-excluir-setor.sql`): a exclusão
 parava na régua de monitoria do setor (`setores_regra_monitoria_fkey`); agora
 solta essa ligação antes de apagar as regras e também barra quando outro setor
-usa as regras deste. Monitorias e Agenda sem mudança.
+usa as regras deste. Monitorias: só a formatação de números guardada (6.3.2,
+correção, abaixo). Agenda sem mudança.
 
 - **Excluir ou desativar um setor** (Usuários e setores › Setores e filas, só o
   administrador). **Sem histórico** (nenhuma pessoa, fechamento, monitoria,
@@ -91,6 +92,22 @@ usa as regras deste. Monitorias e Agenda sem mudança.
   **Criar setor**, a tela final abre o cadastro em lote com o mesmo arquivo, já
   com os cargos criados e o Setor em branco valendo o setor novo; nada é gravado
   antes de **Cadastrar**. O gabarito explica isso em Como preencher.
+- **Menos processamento no servidor (erro 1102 do plano gratuito)**: o
+  **Início** do gestor (e a equipe no Início do Pleno) e o **Comparativo**
+  passam a buscar os dados direto do banco pelo navegador, com a mesma regra de
+  acesso (RLS); o servidor da Cloudflare só confere quem é e qual o mês. Medido
+  no PC com perfil de CPU (o JavaScript que conta no limite): Início de 44 para
+  16 ms por abertura e Comparativo de 57 para 13 ms; a página responde em cerca
+  de 280 ms em vez de 1,1 s, e os números aparecem logo depois (um contorno
+  cinza enquanto chegam). A tela fica igual — conferido pelo texto inteiro das
+  duas versões, com as abas e as duas filas, no Início e no Comparativo de 6 e
+  12 meses. A atualização automática avisa essas telas para buscarem de novo
+  (`dados-mudaram`). A regra de resumo ou cálculo ao vivo passou para
+  `lib/fonteDoMes.ts`, que o navegador também usa.
+- **Formatação de números e datas guardada** (Performance e Monitorias 6.3.2):
+  cada formato é montado uma vez e reaproveitado (`numeroBR` em
+  `lib/formatar.ts`), em vez de um novo a cada número — no Comparativo, a
+  formatação caiu de 66 para 13 ms em 8 aberturas. Mesmo texto de antes.
 
 ---
 
