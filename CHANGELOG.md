@@ -35,7 +35,7 @@ para o Performance.
 
 ---
 
-## Performance 4.2.0 (ainda não publicada)
+## Performance 4.2.0
 
 Migração **103** (`supabase/103-tma-em-faixas.sql`): coluna `grupo_tma` nas
 filas, o bloco do TMA no fim de `vw_extrato_quantidades` (o resto da view é o
