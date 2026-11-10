@@ -25,16 +25,31 @@ const chaveDoNome = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').tr
  * Nome parecido (4.2.0): a linha "NPS Nota 1" e a métrica "Nota 1" são a
  * mesma? Cada pergunta é respondida antes de gravar.
  */
-export function PerguntasDeNome({ perguntas, responder }: {
-  perguntas: { linha: string; opcoes: string[] }[];
+export function PerguntasDeNome({ perguntas, responder, aceitarSugestoes }: {
+  perguntas: { linha: string; opcoes: string[]; sugerida?: string }[];
   responder: (linha: string, resposta: string) => void;
+  /** Responde de uma vez todas as que têm sugestão (a de mesma faixa). */
+  aceitarSugestoes?: (pares: [string, string][]) => void;
 }) {
   if (!perguntas.length) return null;
+  const comSugestao = perguntas.filter((p) => p.sugerida).map((p) => [p.linha, p.sugerida!] as [string, string]);
   return (
     <div className="mt-3 space-y-2 rounded-xl bg-amber-50 px-4 py-3 text-sm ring-1 ring-amber-600/20 dark:bg-amber-500/10">
       <p className="font-semibold text-amber-900 dark:text-amber-200">
         {perguntas.length === 1 ? 'Um nome parecido' : `${perguntas.length} nomes parecidos`} com métricas que já existem: é a mesma coisa?
       </p>
+      {aceitarSugestoes && comSugestao.length > 0 && (
+        <div className="rounded-lg bg-superficie px-3 py-2 ring-1 ring-amber-600/20">
+          <p className="text-xs text-slate-600">Pela faixa, {comSugestao.length} linha(s) parecem ser:</p>
+          <ul className="my-1 space-y-0.5 text-xs text-slate-700">
+            {comSugestao.map(([l, s]) => <li key={l}>&quot;{l}&quot; → <b>{s}</b></li>)}
+          </ul>
+          <button type="button" onClick={() => aceitarSugestoes(comSugestao)}
+                  className="rounded-full bg-marca-600 px-3 py-1 text-xs font-semibold text-white hover:bg-marca-700">
+            Sim, são as mesmas ({comSugestao.length})
+          </button>
+        </div>
+      )}
       {perguntas.map((p) => (
         <label key={p.linha} className="flex flex-wrap items-center gap-2 text-slate-800">
           <b>&quot;{p.linha}&quot;</b> é
@@ -51,6 +66,8 @@ export function PerguntasDeNome({ perguntas, responder }: {
   );
 }
 export const responderPergunta = (r: Record<string, string>, linha: string, resposta: string) => ({ ...r, [chaveDoNome(linha)]: resposta });
+export const responderVarias = (r: Record<string, string>, pares: [string, string][]) =>
+  pares.reduce((acc, [l, s]) => responderPergunta(acc, l, s), r);
 
 export const nomeDoArquivo = (setor: string) =>
   `metas-${setor.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}.xlsx`;
@@ -171,7 +188,8 @@ export default function MetasPorLista({ setorId, setorNome, ctx }: {
 
       {plano && !plano.erro && (
         <div className="surgir mt-4">
-          <PerguntasDeNome perguntas={plano.perguntas ?? []} responder={(l, r) => setRespostas((x) => responderPergunta(x, l, r))} />
+          <PerguntasDeNome perguntas={plano.perguntas ?? []} responder={(l, r) => setRespostas((x) => responderPergunta(x, l, r))}
+                           aceitarSugestoes={(pares) => setRespostas((x) => responderVarias(x, pares))} />
           <div className="mb-3 flex flex-wrap gap-2 text-xs font-semibold">
             <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">{colunasOk.length} {colunasOk.length === 1 ? 'cargo' : 'cargos'} na lista</span>
             {nMud > 0 && <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">{nMud} {nMud === 1 ? 'valor muda' : 'valores mudam'}</span>}

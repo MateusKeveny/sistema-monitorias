@@ -25,6 +25,8 @@ export type MetricaDaLista = {
   tipo?: string; faixa?: string; grupo?: string;
   /** O grupo como o banco guarda (tme_s8, nota_s8...), para trocar as faixas. */
   grupoChave?: string;
+  /** 4.2.0: o tipo (tme, tma, csat, nota, atendimento...) e os limites no banco, para reconhecer pela faixa. */
+  tipoBase?: string; faixaMin?: number | null; faixaMax?: number | null;
 };
 type RegraDaLista = {
   chave: string; rotulo: string; ordem: number; ativo: boolean; grupo: string;
@@ -105,8 +107,11 @@ export type Plano = {
    * e "Nota 1"), ainda sem resposta. Enquanto houver pergunta, a linha fica de
    * fora e não se grava.
    */
-  perguntas?: { linha: string; opcoes: string[] }[];
+  perguntas?: Pergunta[];
 };
+
+/** Uma pergunta de nome parecido; `sugerida` = a de mesma faixa (TME, TMA, C-SAT, nota) ou o único finalizado. */
+export type Pergunta = { linha: string; opcoes: string[]; sugerida?: string };
 
 /**
  * Respostas às perguntas de nome parecido: o nome da linha (normalizado) →
@@ -115,7 +120,46 @@ export type Plano = {
 export type Respostas = Record<string, string>;
 
 const PALAVRAS_VAZIAS = new Set(['de', 'da', 'do', 'das', 'dos', 'a', 'o', 'e', 'com', 'no', 'na', 'em', 'para', 'por', 'pts', 'pontos']);
-const palavras = (s: string) => new Set(normal(s).split(/[^a-z0-9%]+/).filter((p) => p && !PALAVRAS_VAZIAS.has(p)));
+// Plural simples vira singular ("finalizados" = "finalizado").
+const palavras = (s: string) => new Set(normal(s).split(/[^a-z0-9%]+/).filter((p) => p && !PALAVRAS_VAZIAS.has(p))
+  .map((p) => (p.length > 4 && p.endsWith('s') && !/\d/.test(p) ? p.slice(0, -1) : p)));
+
+/** O tipo automático de uma linha: pelo "Como pontua" ou pelo começo do nome ("TME —", "NPS Nota 1", "C-SAT entre..."). */
+function tipoDaLinha(rotulo: string, comoPontua: string): 'tme' | 'tma' | 'csat' | 'nota' | 'finalizado' | null {
+  const t = tipoDoTexto(comoPontua).tipo;
+  if (t === 'tme' || t === 'tma' || t === 'csat' || t === 'nota' || t === 'finalizado') return t;
+  const r = normal(rotulo);
+  if (/^tme\b/.test(r)) return 'tme';
+  if (/^tma\b/.test(r)) return 'tma';
+  if (/^c-?sat\b/.test(r)) return 'csat';
+  if (/^(nps\s+)?nota\s*\d\b|^avaliacao\s+nota\s*\d\b/.test(r)) return 'nota';
+  if (/^finalizad/.test(r)) return 'finalizado';
+  return null;
+}
+
+/**
+ * A métrica do setor com a mesma faixa (4.2.0): "TME — até 20 min" com Faixa
+ * "de 11 a 20" é a "TME de 10 a 20 min" (encosta 1 min ou 1%); "C-SAT entre
+ * 94% e 100%" é a "C-SAT a partir de 94%"; "NPS Nota 1" é a "nota 1".
+ */
+function mesmaFaixa(rotulo: string, comoPontua: string, faixaTxt: string, ctx: ContextoMetas): MetricaDaLista[] {
+  const tipo = tipoDaLinha(rotulo, comoPontua);
+  if (!tipo) return [];
+  const doTipo = ctx.metricas.filter((m) => (tipo === 'finalizado' ? m.tipoBase === 'atendimento' && /finaliz/i.test(m.rotulo) : m.tipoBase === tipo));
+  if (tipo === 'finalizado') return doTipo;
+  const f = lerFaixa(faixaTxt) ?? lerFaixa(rotulo);
+  if (!f) return [];
+  if (tipo === 'nota') { const n = f.min ?? f.max; return doTipo.filter((m) => Number(m.faixaMin) === n); }
+  const conv = (v: number | null) => (v == null ? null : tipo === 'csat' ? (v > 1 ? v / 100 : v) : v * 60);
+  let min = conv(f.min), max = conv(f.max);
+  if (tipo === 'csat' && max != null && max >= 1) max = null; // "até 100%" = sem teto
+  if (min === 0 && tipo !== 'csat') min = 0;
+  const tol = tipo === 'csat' ? 0.0100001 : 60.001;
+  const perto = (a: number | null | undefined, b: number | null) =>
+    (a == null && b == null) || (tipo !== 'csat' && a === 0 && b == null) || (tipo !== 'csat' && a == null && b === 0)
+    || (a != null && b != null && Math.abs(Number(a) - b) <= tol);
+  return doTipo.filter((m) => perto(m.faixaMin, min) && perto(m.faixaMax, max));
+}
 
 /**
  * Dois nomes "parecidos" (4.2.0): os mesmos números e as palavras de um
@@ -164,7 +208,8 @@ export function contextoDasMetas(
     metricas: regras.filter((r) => r.ativo && r.chave !== REGRA_META && r.chave !== REGRA_MEDIA && r.grupo !== 'config')
       .sort((a, b) => a.ordem - b.ordem)
       .map((r) => ({ chave: r.chave, rotulo: r.rotulo, tipo: tipoDaRegra(r), faixa: faixaDaRegra(r),
-        grupo: NOME_DO_GRUPO[grupoBase(r.grupo)] ?? r.grupo, grupoChave: r.grupo })),
+        grupo: NOME_DO_GRUPO[grupoBase(r.grupo)] ?? r.grupo, grupoChave: r.grupo,
+        tipoBase: r.valor_manual ? 'manual' : grupoBase(r.grupo), faixaMin: r.faixa_min ?? null, faixaMax: r.faixa_max ?? null })),
     pesos,
     ...(setor ? { setorId: setor.setorId, filas: setor.filas } : {}),
     chaves: regras.map((r) => r.chave),
@@ -503,7 +548,7 @@ export function planejar(grade: string[][], ctx: ContextoMetas, respostas: Respo
   const usadas = new Set<string>();
   const repontar: Repontar = {};
   const repontarFila: Record<number, Repontar> = {};
-  const perguntas: { linha: string; opcoes: string[] }[] = [];
+  const perguntas: Pergunta[] = [];
   const rotulos = new Map<Item, string>([['meta', 'Meta'], ['media', 'Média'], ...ctx.metricas.map((m) => [m.chave, m.rotulo] as [string, string])]);
   for (const linha of g.slice(1)) {
     const rot = normal(linha[0]);
@@ -514,11 +559,17 @@ export function planejar(grade: string[][], ctx: ContextoMetas, respostas: Respo
       const m = ctx.metricas.find((x) => normal(x.rotulo) === rot || normal(x.chave) === rot);
       if (m) { itens.push({ item: m.chave, linha }); continue; }
       if (novas.some((n) => normal(n.rotulo) === rot)) { ignoradas.push(`${String(linha[0]).trim()} (repetida)`); continue; }
-      // Nome parecido com uma métrica que já existe (4.2.0): pergunta antes de criar outra.
-      const parecidas = ctx.metricas.filter((x) => nomesParecidos(String(linha[0]), x.rotulo));
+      // Nome parecido com uma métrica que já existe, ou a mesma faixa com outro
+      // nome (4.2.0): pergunta antes de criar outra, sugerindo a de mesma faixa.
+      const porFaixa = mesmaFaixa(String(linha[0]), iComo > 0 ? linha[iComo] ?? '' : '', iFaixa > 0 ? linha[iFaixa] ?? '' : '', ctx);
+      const parecidas = [...new Map([...porFaixa, ...ctx.metricas.filter((x) => nomesParecidos(String(linha[0]), x.rotulo))]
+        .map((x) => [x.chave, x])).values()];
       if (parecidas.length) {
         const r = respostas[rot];
-        if (r === undefined) { perguntas.push({ linha: String(linha[0]).trim(), opcoes: parecidas.map((x) => x.rotulo) }); continue; }
+        if (r === undefined) {
+          perguntas.push({ linha: String(linha[0]).trim(), opcoes: parecidas.map((x) => x.rotulo), sugerida: porFaixa.length === 1 ? porFaixa[0].rotulo : undefined });
+          continue;
+        }
         const escolhida = r ? parecidas.find((x) => normal(x.rotulo) === normal(r)) : undefined;
         if (escolhida) { itens.push({ item: escolhida.chave, linha }); continue; }
       }

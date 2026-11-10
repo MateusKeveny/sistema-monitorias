@@ -67,7 +67,11 @@ local). Monitorias e Agenda sem mudança.
   que já existe ("NPS Nota 1" e "Nota 1"; "C-SAT acima de 95%" e "C-SAT a partir
   de 95%") pergunta se é a mesma antes de criar outra; até responder, a lista
   não é gravada. Tipos diferentes (TME × TMA) e números diferentes (nota 1 ×
-  nota 2) não perguntam.
+  nota 2) não perguntam. **Pela faixa**: linha de TME, TMA, C-SAT ou nota com
+  outro nome, mas a mesma faixa de uma métrica do setor (encostando 1 min ou
+  1%; "até 100%" = sem teto), vem com a sugestão ("TME — até 20 min", Faixa
+  "de 11 a 20" → "TME de 10 a 20 min"; "NPS Nota 1" → "Avaliação nota 1";
+  "Finalizados Hub" → "Finalizado"), e um botão aceita todas de uma vez.
 - **Assistente**: o modelo da planilha já vem com os cargos da tabela e as
   métricas escolhidas no passo Métricas, também num setor do zero.
 

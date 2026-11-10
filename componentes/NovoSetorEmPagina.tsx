@@ -8,7 +8,7 @@ import {
   aplicarPlano, contextoDasMetas, descricaoDaNova, gradeDoArquivo, gradeDoTexto, modeloXlsx, planejar, valorAtual,
   type ContextoMetas, type FilaDaLista, type Plano,
 } from '@/lib/metasPorLista';
-import { PerguntasDeNome, baixarArquivo, nomeDoArquivo, responderPergunta } from '@/componentes/MetasPorLista';
+import { PerguntasDeNome, baixarArquivo, nomeDoArquivo, responderVarias } from '@/componentes/MetasPorLista';
 import CadastroEmLote, { cargosDoGabarito } from '@/componentes/CadastroEmLote';
 import { lerPlanilha, type Linha } from '@/lib/xlsx-navegador';
 import type { Cargo, PesoCargo, Pessoa } from '@/lib/tipos';
@@ -74,8 +74,9 @@ export default function NovoSetorEmPagina({
   const [metricas, setMetricas] = useState<ConfigDasMetricas>(() => ({ geral: copiarRegua(REGUA_PADRAO), filas: [] }));
   // Nomes parecidos na lista de metas (4.2.0): a resposta de cada pergunta.
   const [respostas, setRespostas] = useState<Record<string, string>>({});
-  function responder(linha: string, resposta: string) {
-    const r = responderPergunta(respostas, linha, resposta);
+  function responder(linha: string, resposta: string) { responderTodas([[linha, resposta]]); }
+  function responderTodas(pares: [string, string][]) {
+    const r = responderVarias(respostas, pares);
     setRespostas(r);
     setLista((l) => (l ? { ...l, plano: planejar(l.grade, ctxPrevia, r) } : l));
   }
@@ -124,7 +125,7 @@ export default function NovoSetorEmPagina({
   const ctxPrevia: ContextoMetas = useMemo(() => {
     const ja = new Set(ctxBase.metricas.map((m) => chave(m.rotulo)));
     const planejadas = metricasPlanejadas(metricas).filter((m) => !ja.has(chave(m.rotulo)))
-      .map((m) => ({ chave: `nova:${m.rotulo}`, rotulo: m.rotulo, tipo: m.tipo, faixa: m.faixa }));
+      .map((m) => ({ chave: `nova:${m.rotulo}`, rotulo: m.rotulo, tipo: m.tipo, faixa: m.faixa, tipoBase: m.tipoBase, faixaMin: m.faixaMin, faixaMax: m.faixaMax }));
     return { ...ctxBase, metricas: [...ctxBase.metricas, ...planejadas] };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ctxBase, metricas]);
@@ -517,7 +518,7 @@ export default function NovoSetorEmPagina({
                     {lista.plano.erro ? <p className="text-rose-700">{lista.plano.erro}</p> : (
                       <>
                         <p className="font-semibold text-slate-800">Lista {lista.arquivo}: {lista.plano.colunas.length} cargos, {lista.plano.mudancas.length} valor(es) muda(m){novos ? `, ${novos} cargo(s) novo(s)` : ''}.</p>
-                        <PerguntasDeNome perguntas={lista.plano.perguntas ?? []} responder={responder} />
+                        <PerguntasDeNome perguntas={lista.plano.perguntas ?? []} responder={responder} aceitarSugestoes={responderTodas} />
                         {lista.plano.colunas.filter((c) => c.erros.length).map((c) => <p key={c.cargo} className="text-rose-700">{c.cargo}: {c.erros.join('; ')} — fica de fora.</p>)}
                         {lista.plano.novas.length > 0 && (
                           <details className="mt-1">

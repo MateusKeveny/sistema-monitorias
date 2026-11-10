@@ -104,10 +104,13 @@ export function conferirRegua(tipo: Tipo, regua: Regua): string | null {
 
 // ------------------------------------------------------------------ Planejado
 /** As métricas que a configuração dá ao setor (para o modelo da planilha antes de criar). */
-export function metricasPlanejadas(cfg: ConfigDasMetricas): { rotulo: string; tipo: string; faixa: string }[] {
-  const lista: { rotulo: string; tipo: string; faixa: string }[] = [];
+export type MetricaPlanejada = { rotulo: string; tipo: string; faixa: string; tipoBase: string; faixaMin: number | null; faixaMax: number | null };
+export function metricasPlanejadas(cfg: ConfigDasMetricas): MetricaPlanejada[] {
+  const lista: MetricaPlanejada[] = [];
   const vistos = new Set<string>();
-  const add = (rotulo: string, tipo: string, faixa = '') => { if (!vistos.has(rotulo)) { vistos.add(rotulo); lista.push({ rotulo, tipo, faixa }); } };
+  const add = (rotulo: string, tipo: string, faixa = '', tipoBase = 'atendimento', lim: { min: number | null; max: number | null } = { min: null, max: null }) => {
+    if (!vistos.has(rotulo)) { vistos.add(rotulo); lista.push({ rotulo, tipo, faixa, tipoBase, faixaMin: lim.min, faixaMax: lim.max }); }
+  };
   const como: Record<Tipo, string> = {
     tme: 'pontos por atendimento, conforme a faixa de TME', tma: 'pontos por atendimento, conforme a faixa de TMA',
     csat: 'pontos por atendimento, conforme a faixa de C-SAT', nota: 'pontos por avaliação com esta nota',
@@ -121,7 +124,7 @@ export function metricasPlanejadas(cfg: ConfigDasMetricas): { rotulo: string; ti
       const t = m.chave;
       const regua = quem ? quem.propria : cfg.geral;
       const itens = t === 'nota' ? regua.nota : regua[t];
-      for (const f of itens as (Faixa | number)[]) add(rotuloDaFaixa(t, f, fila), como[t]);
+      for (const f of itens as (Faixa | number)[]) add(rotuloDaFaixa(t, f, fila), como[t], '', t, limites(t, f));
     }
   }
   return lista;
