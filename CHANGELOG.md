@@ -74,6 +74,11 @@ local). Monitorias e Agenda sem mudança.
   "Finalizados Hub" → "Finalizado"), e um botão aceita todas de uma vez.
 - **Assistente**: o modelo da planilha já vem com os cargos da tabela e as
   métricas escolhidas no passo Métricas, também num setor do zero.
+- **Assistente — faixas da planilha**: no passo Métricas, **⬆ Puxar as faixas
+  da planilha de metas** lê do arquivo os limites de TME, TMA e C-SAT, as notas
+  e se há finalizados, e monta a régua geral; o que a planilha mede fica
+  "Geral" em todas as filas e o resto, "Não mede". O mesmo arquivo já fica
+  como a lista do passo Cargos e metas.
 
 - **O cadastro de pessoas por planilha cria os cargos que faltam** (Pessoas ›
   Cadastrar várias pessoas, e o fim do assistente de novo setor). Cargo que o

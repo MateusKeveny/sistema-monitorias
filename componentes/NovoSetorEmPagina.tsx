@@ -5,7 +5,7 @@ import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { mensagemDoErro } from '@/lib/erro-amigavel';
 import { normalizarSetor, type Canal, type Setor } from '@/lib/setores';
 import {
-  aplicarPlano, contextoDasMetas, descricaoDaNova, gradeDoArquivo, gradeDoTexto, modeloXlsx, planejar, valorAtual,
+  aplicarPlano, contextoDasMetas, descricaoDaNova, faixasDaLista, gradeDoArquivo, gradeDoTexto, modeloXlsx, planejar, valorAtual,
   type ContextoMetas, type FilaDaLista, type Plano,
 } from '@/lib/metasPorLista';
 import { PerguntasDeNome, baixarArquivo, nomeDoArquivo, responderVarias } from '@/componentes/MetasPorLista';
@@ -14,7 +14,8 @@ import { lerPlanilha, type Linha } from '@/lib/xlsx-navegador';
 import type { Cargo, PesoCargo, Pessoa } from '@/lib/tipos';
 import { MetricasPorFilaEditor, escolhaDeFilaNova, problemasDaConfig } from '@/componentes/MetricasPorFila';
 import {
-  MEDIDAS, REGUA_PADRAO, aplicarMetricas, copiarRegua, metricasPlanejadas, type ConfigDasMetricas, type FilaReal,
+  MEDIDAS, REGUA_PADRAO, aplicarMetricas, copiarRegua, metricasPlanejadas, type ConfigDasMetricas, type Escolha, type Faixa,
+  type FilaReal, type Medida,
 } from '@/lib/metricasPorFila';
 
 type Regras = { copiar: string; tme: boolean };
@@ -130,6 +131,43 @@ export default function NovoSetorEmPagina({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ctxBase, metricas]);
 
+  // A planilha de metas no passo Métricas (4.2.0): as faixas da planilha viram
+  // a régua geral; o que ela mede passa a "Geral" em todas as filas (fila que
+  // copia outra fica como está) e o que ela não traz, "Não mede". O mesmo
+  // arquivo já fica para o passo Cargos e metas.
+  const [faixasLidas, setFaixasLidas] = useState<{ arquivo: string; avisos: string[] } | null>(null);
+  async function faixasDaPlanilha(f: File) {
+    setErro(null);
+    let grade: string[][];
+    try { grade = await gradeDoArquivo(f); } catch { setErro('Não consegui ler esta planilha. Salve como .xlsx no Excel e tente de novo.'); return; }
+    const r = faixasDaLista(grade);
+    const tem: Record<Medida, boolean> = {
+      finalizado: r.finalizado, tme: !!r.cortes.tme?.length, tma: !!r.cortes.tma?.length, csat: !!r.cortes.csat?.length, nota: r.notas.length > 0,
+    };
+    if (!Object.values(tem).some(Boolean)) { setErro('A planilha não tem linhas de finalizado, TME, TMA, C-SAT ou notas.'); return; }
+    const deCortes = (t: 'tme' | 'tma' | 'csat', cs: number[]): Faixa[] => {
+      const lista: Faixa[] = [];
+      for (let i = 0; i <= cs.length; i++) lista.push({ de: i === 0 ? (t === 'csat' ? null : 0) : cs[i - 1], ate: i < cs.length ? cs[i] : null });
+      return lista;
+    };
+    setMetricas((m) => {
+      const geral = copiarRegua(m.geral);
+      for (const t of ['tme', 'tma', 'csat'] as const) if (r.cortes[t]?.length) geral[t] = deCortes(t, r.cortes[t]!);
+      if (r.notas.length) geral.nota = r.notas;
+      return {
+        geral,
+        filas: m.filas.map((fc) => ({
+          ...fc, propria: copiarRegua(geral),
+          escolha: Object.fromEntries(MEDIDAS.map((x) => [x.chave, fc.copia && fc.escolha[x.chave] === 'manter' && !tem[x.chave] ? 'manter'
+            : tem[x.chave] ? 'geral' : 'nao'])) as Record<Medida, Escolha>,
+        })),
+      };
+    });
+    setRespostas({});
+    setLista({ grade, plano: planejar(grade, ctxPrevia), arquivo: f.name });
+    setFaixasLidas({ arquivo: f.name, avisos: r.avisos });
+  }
+
   // O modelo da planilha antes de criar: os cargos da tabela (os copiados com
   // os pontos da base; os novos com a meta digitada) e as métricas previstas.
   function ctxDoModelo(): ContextoMetas {
@@ -150,6 +188,8 @@ export default function NovoSetorEmPagina({
   function irPara(p: number) {
     setErro(null); setDirecao(p > passo ? 'dir' : 'esq');
     if (p === P_METRICAS) sincronizarMetricas();
+    // A conferência da lista com as métricas como ficaram no passo anterior.
+    if (p === P_CARGOS && lista) setLista({ ...lista, plano: planejar(lista.grade, ctxPrevia, respostas) });
     setPasso(p);
   }
 
@@ -448,6 +488,20 @@ export default function NovoSetorEmPagina({
                   Finalizado, TME, TMA, C-SAT e notas vêm do Hub. Escolha em cada fila a régua <b>geral</b> do setor, uma <b>própria</b> ou
                   &quot;não mede&quot;, e as faixas logo abaixo. Os pontos de cada faixa por cargo vêm no próximo passo.
                 </p>
+                {metricas.filas.length > 0 && (
+                  <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl bg-slate-50 px-4 py-3 text-sm ring-1 ring-slate-200">
+                    <label className="cursor-pointer rounded-full bg-marca-600 px-3.5 py-1 font-semibold text-white hover:bg-marca-700">
+                      ⬆ Puxar as faixas da planilha de metas
+                      <input type="file" accept=".xlsx,.csv" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) faixasDaPlanilha(f); e.target.value = ''; }} />
+                    </label>
+                    <span className="text-slate-600">
+                      {faixasLidas
+                        ? <>Faixas de <b>{faixasLidas.arquivo}</b> aplicadas abaixo (confira). O arquivo já fica para o próximo passo.</>
+                        : 'Já tem a planilha preenchida? As faixas de TME, TMA, C-SAT e as notas vêm dela.'}
+                    </span>
+                    {faixasLidas?.avisos.map((a) => <p key={a} className="w-full text-xs text-amber-700">{a}</p>)}
+                  </div>
+                )}
                 {metricas.filas.length
                   ? <MetricasPorFilaEditor cfg={metricas} mudar={setMetricas} ocupado={ocupado} assistente />
                   : <p className="text-sm text-slate-500">Sem filas no passo 3: o setor começa sem métricas automáticas (só as de lançamento).</p>}

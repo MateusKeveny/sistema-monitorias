@@ -138,6 +138,50 @@ function tipoDaLinha(rotulo: string, comoPontua: string): 'tme' | 'tma' | 'csat'
 }
 
 /**
+ * As faixas que a planilha de metas traz (4.2.0), para o passo Métricas do
+ * assistente começar igual à planilha: os limites de TME e TMA (min), de
+ * C-SAT (%), as notas e se há linha de finalizados. Faixas com buraco de até
+ * 1 min ou 1% se encostam ("de 11 a 20" depois de "de 0 a 10" vira 10–20);
+ * "até 100%" é sem teto.
+ */
+export function faixasDaLista(grade: string[][]): {
+  cortes: Partial<Record<'tme' | 'tma' | 'csat', number[]>>; notas: number[]; finalizado: boolean; avisos: string[];
+} {
+  const cab = (grade[0] ?? []).map(normal);
+  const iComo = cab.indexOf('como pontua'), iFaixa = cab.indexOf('faixa');
+  const porTipo: Record<'tme' | 'tma' | 'csat', { min: number | null; max: number | null; rotulo: string }[]> = { tme: [], tma: [], csat: [] };
+  const notas = new Set<number>();
+  let finalizado = false;
+  for (const linha of grade.slice(1)) {
+    const rotulo = String(linha[0] ?? '').trim();
+    if (!rotulo) continue;
+    const tipo = tipoDaLinha(rotulo, iComo > 0 ? linha[iComo] ?? '' : '');
+    if (!tipo) continue;
+    if (tipo === 'finalizado') { finalizado = true; continue; }
+    const f = lerFaixa(iFaixa > 0 ? linha[iFaixa] ?? '' : '') ?? lerFaixa(rotulo);
+    if (!f) continue;
+    if (tipo === 'nota') { const n = f.min ?? f.max; if (n != null && Number.isInteger(n) && n >= 1 && n <= 5) notas.add(n); continue; }
+    const max = tipo === 'csat' && f.max != null && f.max >= 100 ? null : f.max;
+    porTipo[tipo].push({ min: f.min, max, rotulo });
+  }
+  const avisos: string[] = [];
+  const cortes: Partial<Record<'tme' | 'tma' | 'csat', number[]>> = {};
+  for (const t of ['tme', 'tma', 'csat'] as const) {
+    const fs = porTipo[t].sort((a, b) => (a.min ?? -1) - (b.min ?? -1));
+    if (!fs.length) continue;
+    const cs: number[] = [];
+    for (const [i, f] of fs.entries()) {
+      if (f.max == null) { if (i < fs.length - 1) avisos.push(`${f.rotulo}: faixa sem teto antes de outras`); continue; }
+      cs.push(f.max);
+      const prox = fs[i + 1];
+      if (prox && prox.min != null && Math.abs(prox.min - f.max) > 1.0001) avisos.push(`buraco entre "${f.rotulo}" e "${prox.rotulo}"`);
+    }
+    cortes[t] = [...new Set(cs)].sort((a, b) => a - b);
+  }
+  return { cortes, notas: [...notas].sort(), finalizado, avisos };
+}
+
+/**
  * A métrica do setor com a mesma faixa (4.2.0): "TME — até 20 min" com Faixa
  * "de 11 a 20" é a "TME de 10 a 20 min" (encosta 1 min ou 1%); "C-SAT entre
  * 94% e 100%" é a "C-SAT a partir de 94%"; "NPS Nota 1" é a "nota 1".
