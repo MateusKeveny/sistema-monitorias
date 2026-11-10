@@ -10,6 +10,7 @@ import NotasGuardadas, { type NotaGuardada } from '@/componentes/NotasGuardadas'
 import SemanasDeChamados, { type SemanaDeChamados } from '@/componentes/SemanasDeChamados';
 import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
 import { Quadro } from '@/componentes/ui';
+import { lerPrazoDoSla } from '@/lib/sla';
 import { mesAnterior , resolverCompetencia } from '@/lib/competencia';
 import { dataHora, diaMes, hojeNoBrasil, mesDeCompetencia, mesRotulo, periodoDaSemana, mesValido } from '@/lib/formatar';
 import type { Pessoa } from '@/lib/tipos';
@@ -97,8 +98,10 @@ export default async function ImportarAvaliacoes({
     // Semanas sem chamados (migração 60): o mês corrente e, enquanto não
     // fechado, o anterior — os mesmos que a pendência olha.
     const anterior = mesAnterior(atual);
+    // 4.3.0: o prazo vem das faixas do SLA (migração 104).
+    const prazoSla = await lerPrazoDoSla(db);
     const [{ data: pendentes }, { data: decididos }, { count: anteriorFechado }, semanasAtual, semanasAnterior] = await Promise.all([
-      db.from('chamados_elo').select(campos).gte('tempo_util', 3).not('concluido_em', 'is', null)
+      db.from('chamados_elo').select(campos).gte('tempo_util', prazoSla).not('concluido_em', 'is', null)
         .neq('status', 'Cancelado').not('pessoa_id', 'is', null).is('decisao', null).order('aberto_em'),
       db.from('chamados_elo').select(campos).not('decisao', 'is', null).eq('mes_competencia', atual)
         .order('decidido_em', { ascending: false }),
@@ -119,7 +122,7 @@ export default async function ImportarAvaliacoes({
         </div>
         <ImportadorChamados />
         {meses.length > 0 && <SemanasDeChamados meses={meses} />}
-        <FilaDeAtrasos pendentes={(pendentes ?? []) as ChamadoAtrasado[]} decididos={(decididos ?? []) as ChamadoAtrasado[]} />
+        <FilaDeAtrasos prazo={prazoSla} pendentes={(pendentes ?? []) as ChamadoAtrasado[]} decididos={(decididos ?? []) as ChamadoAtrasado[]} />
       </div>
     );
   }

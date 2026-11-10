@@ -8,6 +8,7 @@ import GraficoDeLinha, { type PontoDaLinha } from '@/componentes/GraficoDeLinha'
 import SeletorDeDetalhe, { type Destaque } from '@/componentes/SeletorDeDetalhe';
 import { BarraDeMeta, Painel, Secao, Vazio } from '@/componentes/ui';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
+import { lerPrazoDoSla } from '@/lib/sla';
 import { corDoCsat, hojeNoBrasil, mesRotulo, percentual, semanaDoCiclo, numeroBR } from '@/lib/formatar';
 import type { FonteDoMes } from '@/lib/fonteDoMes';
 import ProjecaoDaCota from '@/componentes/ProjecaoDaCota';
@@ -98,7 +99,8 @@ async function carregar(db: SupabaseClient, { competencia, atual, comPendencias 
   const anterior = mesAnterior(competencia);
   const meses = [competencia, anterior];
   // O piso da monitoria: o do setor da equipe (Monitorias 6.0).
-  const [porSetorMon, { setorId: setorDaEquipe }] = await Promise.all([monitoriasPorSetor(db), setorDaTela(db, setorPedido)]);
+  // 4.3.0: o prazo do SLA vem das faixas (migração 104).
+  const [porSetorMon, { setorId: setorDaEquipe }, prazoSla] = await Promise.all([monitoriasPorSetor(db), setorDaTela(db, setorPedido), lerPrazoDoSla(db)]);
   const piso = porSetorMon.get(setorDaEquipe)?.piso ?? MONITORIAS_PADRAO.piso;
 
   const [pessoas, csat, volume, criterios, cota, cargos, fechados, monitorias, valores, semCargo, conferir, diario, vencendo, leituras, privados, reportes, atrasos,
@@ -133,7 +135,7 @@ async function carregar(db: SupabaseClient, { competencia, atual, comPendencias 
     db.from('reportes').select('id', { count: 'exact', head: true }).eq('situacao', 'novo'),
     // Chamados fora do prazo esperando decisão da gestão (migração 53).
     db.from('chamados_elo').select('protocolo', { count: 'exact', head: true })
-      .gte('tempo_util', 3).not('concluido_em', 'is', null).neq('status', 'Cancelado')
+      .gte('tempo_util', prazoSla).not('concluido_em', 'is', null).neq('status', 'Cancelado')
       .not('pessoa_id', 'is', null).is('decisao', null),
     // Estas quatro saíam uma atrás da outra no servidor; aqui vão juntas.
     // Sem a migração de cada uma, o erro é ignorado e a pendência não aparece

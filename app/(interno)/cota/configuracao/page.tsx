@@ -5,6 +5,8 @@ import MetasPorLista from '@/componentes/MetasPorLista';
 import { contextoDasMetas } from '@/lib/metasPorLista';
 import ReguasDeFaixa from '@/componentes/ReguasDeFaixa';
 import PainelRegras from '@/componentes/PainelRegras';
+import SlaDosChamados from '@/componentes/SlaDosChamados';
+import { SLA_PRIMEIRA } from '@/lib/sla';
 import Abas from '@/componentes/Abas';
 import AvisosTeams, { type SituacaoAviso } from '@/componentes/AvisosTeams';
 import SubcategoriasDiario from '@/componentes/SubcategoriasDiario';
@@ -106,6 +108,8 @@ export default async function ConfiguracaoDaCota({
     .filter((p) => p.cargo_id === base?.id)
     .map((p) => [p.regra, p.ativo ? Number(p.peso) : null]));
 
+  const cargoDoSla = listaCargos.find((c) => listaPesos.some((p) => p.cargo_id === c.id && p.regra === SLA_PRIMEIRA && p.ativo));
+
   return (
     <div className="space-y-6">
       <div>
@@ -185,6 +189,11 @@ export default async function ConfiguracaoDaCota({
                                tmePorPessoa={Object.fromEntries(((canais ?? []) as Canal[])
                                  .filter((c) => c.grupo_tme && doSetor(c))
                                  .map((c) => [c.grupo_tme!, c.tme_por_pessoa_desde ?? null]))} />
+                {/* 4.3.0 (migração 104): o SLA dos chamados em faixas. Os pesos mostrados são os do cargo que recebe o SLA. */}
+                <SlaDosChamados key={`sla-${setorId}`} regras={listaRegras}
+                                pesosBase={Object.fromEntries(listaPesos.filter((p) => p.cargo_id === cargoDoSla?.id)
+                                  .map((p) => [p.regra, p.ativo ? Number(p.peso) : null]))}
+                                nomeBase={(cargoDoSla?.nome ?? '').replace(/^Atendente\s+/, '')} />
                 <PainelRegras regras={listaRegras} setorId={setorId} />
               </div>
             ),

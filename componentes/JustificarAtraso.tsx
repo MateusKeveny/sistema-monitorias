@@ -39,7 +39,7 @@ export default function JustificarAtraso({ protocolo, atual }: { protocolo: numb
   return (
     <div className="space-y-2">
       <textarea value={texto} onChange={(e) => setTexto(e.target.value)} rows={3} autoFocus
-                placeholder="Por que o chamado passou de 2 dias úteis?"
+                placeholder="Por que o chamado passou do prazo?"
                 className="w-full rounded-lg border border-slate-300 bg-superficie px-3 py-2 text-sm" />
       {erro && <p className="text-xs text-rose-700">{erro}</p>}
       <div className="flex gap-2">

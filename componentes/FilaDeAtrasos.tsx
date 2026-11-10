@@ -6,6 +6,7 @@ import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { Quadro, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import { dataHora, tempoUtil } from '@/lib/formatar';
 import { mensagemDoErro } from '@/lib/erro-amigavel';
+import { PRAZO_PADRAO_DIAS, textoDoPrazo } from '@/lib/sla';
 
 export type ChamadoAtrasado = {
   protocolo: number;
@@ -26,21 +27,26 @@ export type ChamadoAtrasado = {
   decidido_em: string | null;
 };
 
-/** A barra vai até 5 dias úteis; o traço marca o fim do prazo (3,0). */
+/**
+ * A barra vai até 5 dias úteis (ou além, se o prazo for maior); o traço marca
+ * o fim do prazo, que desde a 4.3.0 vem das faixas do SLA (migração 104).
+ */
 const ESCALA = 5;
-const LIMITE = 3;
 
 /** Onde o tempo do chamado ficou: com o Analista (até o ClickUp) ou com o TI. */
-export function BarraDoTempo({ total, interno, ti }: { total: number; interno: number | null; ti: number | null }) {
+export function BarraDoTempo({ total, interno, ti, prazo = PRAZO_PADRAO_DIAS }: {
+  total: number; interno: number | null; ti: number | null; prazo?: number;
+}) {
   // Sem ClickUp, o tempo todo é do Analista.
   const doAnalista = interno ?? (ti == null ? total : 0);
   const doTi = ti ?? 0;
-  const pct = (v: number) => `${Math.min(100, (v / ESCALA) * 100)}%`;
+  const escala = Math.max(ESCALA, Math.ceil(prazo * 5 / 3));
+  const pct = (v: number) => `${Math.min(100, (v / escala) * 100)}%`;
   return (
     <span className="relative flex h-2.5 w-52 overflow-hidden rounded-full bg-slate-100">
       <span className="h-full bg-marca-600" style={{ width: pct(doAnalista) }} />
       <span className="h-full bg-indigo-500" style={{ width: pct(doTi) }} />
-      <span aria-hidden className="absolute -inset-y-1 w-0.5 bg-slate-500" style={{ left: pct(LIMITE) }} />
+      <span aria-hidden className="absolute -inset-y-1 w-0.5 bg-slate-500" style={{ left: pct(prazo) }} />
     </span>
   );
 }
@@ -59,9 +65,11 @@ export function LegendaDoTempo() {
  * úteis completos. A gestão decide se o desconto vale; enquanto não decide, o
  * chamado não soma nem desconta.
  */
-export default function FilaDeAtrasos({ pendentes, decididos }: {
+export default function FilaDeAtrasos({ pendentes, decididos, prazo = PRAZO_PADRAO_DIAS }: {
   pendentes: ChamadoAtrasado[];
   decididos: ChamadoAtrasado[];
+  /** O prazo em dias úteis do Elo (sla_prazo_dias). */
+  prazo?: number;
 }) {
   const router = useRouter();
   const [enviando, setEnviando] = useState<number | null>(null);
@@ -87,7 +95,7 @@ export default function FilaDeAtrasos({ pendentes, decididos }: {
       </Td>
       <Td className="whitespace-nowrap tabular-nums">{tempoUtil(c.tempo_util)}</Td>
       <Td>
-        <BarraDoTempo total={c.tempo_util} interno={c.tempo_interno} ti={c.tempo_ti} />
+        <BarraDoTempo total={c.tempo_util} interno={c.tempo_interno} ti={c.tempo_ti} prazo={prazo} />
         <span className="mt-1 block text-xs tabular-nums text-slate-500">
           Analista {tempoUtil(c.tempo_interno ?? (c.tempo_ti == null ? c.tempo_util : 0))}
           {c.tempo_ti != null && ` · TI ${tempoUtil(c.tempo_ti)}`}
@@ -136,7 +144,7 @@ export default function FilaDeAtrasos({ pendentes, decididos }: {
 
   return (
     <Quadro titulo={`Fila de atrasos · ${pendentes.length} esperando decisão`}
-            subtitulo="Resolvidos depois de 2 dias úteis completos. A gestão decide se o desconto do prazo vale; enquanto não decide, o chamado não soma nem desconta."
+            subtitulo={`Resolvidos depois de ${textoDoPrazo(prazo)}. A gestão decide se o desconto do prazo vale; enquanto não decide, o chamado não soma nem desconta.`}
             acao={<LegendaDoTempo />}>
       {erro && <p className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800 ring-1 ring-rose-600/20">{erro}</p>}
       {pendentes.length === 0 ? (

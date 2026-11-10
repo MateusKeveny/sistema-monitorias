@@ -35,6 +35,30 @@ para o Performance.
 
 ---
 
+## Performance 4.3.0
+
+Migração **104** (`supabase/104-sla-em-faixas.sql`): o SLA dos chamados em
+faixas configuráveis. As faixas são as regras `chamados_sla_*`, com os limites
+em horas (o tempo do Elo vem em dias úteis de 24 h). As visões
+`vw_extrato_quantidades` e `vw_lancamentos_a_conferir` e as funções
+`agenda_pendencias_internas`, `conferir_chamados` e `justificar_atraso_chamado`
+trocam só o trecho do prazo fixo (3 dias). Quem passa a decidir o prazo é
+`sla_prazo_dias()`, o começo da última faixa. Com as duas faixas de hoje (até
+72 h e acima de 72 h), o cálculo fica idêntico (md5 das duas visões igual,
+ensaiado no banco local). Monitorias e Agenda sem mudança.
+
+- **SLA dos chamados** em Configuração › Faixas e nomes das métricas: quantas
+  faixas (de 2 a 6) e os limites, cada um na sua unidade, horas ou dias úteis
+  (ex.: até 12 h, de 12 h a 2 dias úteis). Cada faixa vira uma
+  linha em Pesos por cargo; a última é o fora do prazo, que vai para a Fila de
+  atrasos e só conta quando a gestão mantém o desconto. Vale já no mês em
+  aberto; os meses fechados não mudam.
+- O prazo da Fila de atrasos, da aba Chamados do extrato, da justificativa e do
+  aviso no Início passa a ser o das faixas, e não mais os 2 dias úteis fixos.
+- Faixas do meio que entrarem no mês aparecem na exportação como colunas no
+  fim, como as outras métricas sem coluna no modelo.
+- Próxima etapa: horas úteis pela escala de cada pessoa, com feriados.
+
 ## Performance 4.2.0
 
 Migração **103** (`supabase/103-tma-em-faixas.sql`): coluna `grupo_tma` nas

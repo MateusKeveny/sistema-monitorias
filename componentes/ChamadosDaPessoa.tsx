@@ -3,6 +3,7 @@ import { Indicador, Quadro, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import { BarraDoTempo, LegendaDoTempo } from '@/componentes/FilaDeAtrasos';
 import JustificarAtraso from '@/componentes/JustificarAtraso';
 import { dataHora, diaMes, periodoDaSemana, tempoUtil } from '@/lib/formatar';
+import { lerPrazoDoSla, textoDoPrazo } from '@/lib/sla';
 
 type Chamado = {
   protocolo: number; titulo: string | null; status: string; semana: number;
@@ -13,8 +14,6 @@ type Chamado = {
   decisao: 'manter' | 'retirar' | null; decidido_por_nome: string | null;
 };
 
-/** O prazo: menos de 3,0 dias úteis (2 dias úteis completos). */
-const LIMITE = 3;
 const media = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
 
 /**
@@ -26,6 +25,8 @@ export default async function ChamadosDaPessoa({ pessoaId, competencia, podeJust
   pessoaId: string; competencia: string; podeJustificar: boolean;
 }) {
   const db = await criarClienteServidor();
+  // O prazo (4.3.0): onde começa a última faixa do SLA (migração 104).
+  const LIMITE = await lerPrazoDoSla(db);
   const { data } = await db.from('chamados_elo')
     .select('protocolo, titulo, status, semana, aberto_em, concluido_em, tempo_util, tempo_interno, tempo_ti, motivo_atraso, observacao, justificativa, justificado_em, decisao, decidido_por_nome')
     .eq('pessoa_id', pessoaId).eq('mes_competencia', competencia).order('aberto_em', { ascending: false });
@@ -83,7 +84,7 @@ export default async function ChamadosDaPessoa({ pessoaId, competencia, podeJust
                   <Td>
                     {daSemana.length ? (
                       <>
-                        <BarraDoTempo total={(interno ?? 0) + (ti ?? 0)} interno={interno} ti={ti} />
+                        <BarraDoTempo total={(interno ?? 0) + (ti ?? 0)} interno={interno} ti={ti} prazo={LIMITE} />
                         <span className="mt-1 block text-xs tabular-nums text-slate-500">
                           {tempoUtil(interno)} de quem trata · {tempoUtil(ti)} do TI
                         </span>
@@ -101,7 +102,7 @@ export default async function ChamadosDaPessoa({ pessoaId, competencia, podeJust
       </Quadro>
 
       <Quadro titulo={`Atrasos · ${atrasados.length}`}
-              subtitulo="Resolvidos depois de 2 dias úteis completos. A justificativa vai para a gestão na hora, sem esperar a próxima importação.">
+              subtitulo={`Resolvidos depois de ${textoDoPrazo(LIMITE)}. A justificativa vai para a gestão na hora, sem esperar a próxima importação.`}>
         {atrasados.length === 0 ? (
           <Vazio>Nenhum chamado fora do prazo neste mês.</Vazio>
         ) : (
@@ -114,7 +115,7 @@ export default async function ChamadosDaPessoa({ pessoaId, competencia, podeJust
                   <p className="mt-1 text-xs font-medium text-slate-700">{situacao(c)}</p>
                 </div>
                 <div>
-                  <BarraDoTempo total={c.tempo_util ?? 0} interno={c.tempo_interno} ti={c.tempo_ti} />
+                  <BarraDoTempo total={c.tempo_util ?? 0} interno={c.tempo_interno} ti={c.tempo_ti} prazo={LIMITE} />
                   <p className="mt-1 text-xs tabular-nums text-slate-500">
                     {tempoUtil(c.tempo_util)} no total · {tempoUtil(doAnalista(c))} de quem trata
                     {c.tempo_ti != null && ` · ${tempoUtil(c.tempo_ti)} do TI`}
