@@ -37,7 +37,7 @@ export type AjustesDaMedia = { congelados: Map<string, number>; atestado: Map<st
 export async function ajustesDaMedia(
   db: Db, competencia: string, congelado: boolean,
   /** De onde vem o atestado do mês aberto: o resumo (migração 58) ou a view. */
-  extrato: 'resumo_extrato' | 'vw_extrato_cota' = 'vw_extrato_cota',
+  extrato: 'resumo_extrato' | 'vw_extrato_cota' | 'vw_extrato_vigente' = 'vw_extrato_cota',
 ): Promise<AjustesDaMedia> {
   const congelados = new Map<string, number>();
   const atestado = new Map<string, number>();

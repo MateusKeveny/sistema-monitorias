@@ -83,6 +83,16 @@ correção, abaixo). Agenda sem mudança.
   Setor criado do zero (sem cargos nem métricas): o modelo traz colunas vagas
   **Nome do cargo 1, 2, 3** para nomear e dar a meta, e a tela avisa que as
   métricas nascem com as filas e em Faixas e nomes.
+- **Mês fechado mostra os pontos do fechamento** (migração **102**, só duas
+  views novas de leitura: `vw_cota_mensal_vigente` e `vw_extrato_vigente`). O
+  cálculo ao vivo e o resumo usam os pesos de hoje: os pesos do Atendente
+  Júnior trocados em 06/11 para novembro (Finalizado 4 → 2, C-SAT em dobro)
+  faziam o Início mostrar outubro, fechado em 03/11, com os pesos novos
+  (Denise: 5.394 no fechamento, 4.202 na tela). Agora, num mês com fechamento,
+  quem fechou vem do fechamento e quem não fechou, do cálculo ao vivo — no
+  Início do gestor, do atendente e do Pleno (inclusive o "vs mês anterior"),
+  Simulação, Métricas, Conferência, relatório do fechamento e exportação.
+  Reabrir um fechamento avisa que fechar de novo usa os pesos de hoje.
 - **Novo setor com o gabarito de pessoas**: no passo Cargos e metas,
   **⬆ Cargos do gabarito de pessoas** lê a coluna Cargo das linhas de Atendente
   com o Setor em branco ou com o nome do setor novo e monta a tabela de cargos

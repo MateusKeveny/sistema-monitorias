@@ -25,7 +25,19 @@ export const situacaoDoResumo = cache(async (): Promise<SituacaoDoResumo[]> => {
   return (data ?? []) as SituacaoDoResumo[];
 });
 
+/**
+ * O mês tem fechamento que quem está logado enxerga (102, 4.1.0)? Uma
+ * consulta leve por mês e por renderização.
+ */
+const mesTemFechamento = cache(async (competencia: string): Promise<boolean> => {
+  const db = await criarClienteServidor();
+  const { count } = await db.from('fechamentos_cota').select('id', { count: 'exact', head: true })
+    .eq('mes_competencia', competencia);
+  return (count ?? 0) > 0;
+});
+
 /** De onde ler o cálculo de uma competência. */
 export async function fonteDoMes(competencia: string): Promise<FonteDoMes> {
-  return fonteDaSituacao(await situacaoDoResumo(), competencia);
+  const [situacoes, fechado] = await Promise.all([situacaoDoResumo(), mesTemFechamento(competencia)]);
+  return fonteDaSituacao(situacoes, competencia, fechado);
 }

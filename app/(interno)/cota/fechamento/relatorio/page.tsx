@@ -41,8 +41,9 @@ export default async function RelatorioDetalhado({ searchParams }: {
 
   const db = await criarClienteServidor();
   const [cotas, extrato, csat, volume, fechados, setorDb, setorDe, monitorias, filas] = await Promise.all([
-    db.from('vw_cota_mensal').select('pessoa_id, pessoa, cargo, resultado, meta').eq('mes_competencia', mes).order('pessoa'),
-    db.from('vw_extrato_cota').select('pessoa_id, semana, origem, regra, rotulo, grupo, ordem, quantidade, peso, cota')
+    // "Vigente" (102): quem fechou sai com os pontos do fechamento (pesos da época).
+    db.from('vw_cota_mensal_vigente').select('pessoa_id, pessoa, cargo, resultado, meta').eq('mes_competencia', mes).order('pessoa'),
+    db.from('vw_extrato_vigente').select('pessoa_id, semana, origem, regra, rotulo, grupo, ordem, quantidade, peso, cota')
       .eq('mes_competencia', mes).order('ordem'),
     db.from('vw_csat_semanal').select('pessoa_id, semana, avaliacoes, positivas').eq('mes_competencia', mes),
     db.from('volume_semanal').select('pessoa_id, semana, canal, finalizados, tme_seg').eq('mes_competencia', mes),

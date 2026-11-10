@@ -125,10 +125,11 @@ export async function GET(requisicao: NextRequest) {
 
   const db = await criarClienteServidor();
   const [extrato, cotas, csat, filasDb, setorDb, setorDe] = await Promise.all([
-    db.from('vw_extrato_cota')
+    // "Vigente" (102): quem fechou sai com os pontos do fechamento (pesos da época).
+    db.from('vw_extrato_vigente')
       .select('pessoa_id, semana, origem, regra, rotulo, grupo, ordem, cargo, quantidade, peso, cota')
       .eq('mes_competencia', competencia).order('ordem'),
-    db.from('vw_cota_mensal').select('pessoa_id, pessoa, cargo, resultado, meta')
+    db.from('vw_cota_mensal_vigente').select('pessoa_id, pessoa, cargo, resultado, meta')
       .eq('mes_competencia', competencia).order('pessoa'),
     db.from('vw_csat_semanal').select('pessoa_id, origem, avaliacoes, positivas')
       .eq('mes_competencia', competencia),

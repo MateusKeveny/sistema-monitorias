@@ -54,7 +54,8 @@ export default function AjusteDeFechamento({
     if (!motivo.trim()) { setErro('Escreva o motivo da reabertura.'); return; }
     if (!confirm(`Reabrir o fechamento de ${pessoa}?\n\n`
       + `O valor entregue (${num(resultado)} pts) sai do congelamento e fica só no histórico. `
-      + 'Fechar de novo grava o extrato como estiver naquele momento.')) return;
+      + 'Fechar de novo grava o extrato como estiver naquele momento — com os pesos de HOJE: '
+      + 'se algum peso mudou depois deste fechamento, os pontos do mês mudam.')) return;
 
     setOcupado(true); setErro(null);
     const { error } = await criarClienteNavegador().rpc('reabrir_fechamento', {
