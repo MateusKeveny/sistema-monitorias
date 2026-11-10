@@ -11,6 +11,8 @@ import SubcategoriasDiario from '@/componentes/SubcategoriasDiario';
 import QuemVeODiario, { type VisibilidadeDoDiario } from '@/componentes/QuemVeODiario';
 import HistoricoDePesos, { type AlteracaoDePeso } from '@/componentes/HistoricoDePesos';
 import RegrasPorFila from '@/componentes/RegrasPorFila';
+import MetricasPorFila from '@/componentes/MetricasPorFila';
+import type { FilaReal, RegraReal } from '@/lib/metricasPorFila';
 import PassoDoSetor, { type ResumoDoSetor } from '@/componentes/PassoDoSetor';
 import type { Canal, Setor } from '@/lib/setores';
 import type { Subcategoria } from '@/lib/diario';
@@ -132,9 +134,11 @@ export default async function ConfiguracaoDaCota({
                                ctx={contextoDasMetas(listaCargos, listaRegras, listaPesos, {
                                  setorId,
                                  // As filas ativas do setor: de onde saem as métricas automáticas criadas pela lista.
-                                 filas: ((canais ?? []) as Canal[]).filter((c) => c.setor_id === setorId && c.ativo).map((c) => ({
+                                 filas: ((canais ?? []) as (Canal & { grupo_tma?: string | null })[]).filter((c) => c.setor_id === setorId && c.ativo).map((c) => ({
                                    grupo_tme: c.grupo_tme ?? null, grupo_csat: c.grupo_csat ?? null,
                                    grupo_nota: c.grupo_nota ?? null, regra_finalizado: c.regra_finalizado ?? null,
+                                   // 4.2.0: TMA e a fila, para a métrica "· Fila" valer só nela.
+                                   grupo_tma: c.grupo_tma ?? null, id: c.id, apelido: c.apelido ?? undefined, nome: c.nome,
                                  })),
                                })} />
                 <MatrizDePesos
@@ -146,6 +150,17 @@ export default async function ConfiguracaoDaCota({
                   pessoasPorCargo={pessoasPorCargo}
                 />
               </div>
+            ),
+          },
+          {
+            // 4.2.0 (migração 103): o que cada fila mede e as faixas de TME, TMA e C-SAT.
+            chave: 'metricas',
+            rotulo: 'Métricas por fila',
+            conteudo: (
+              <MetricasPorFila key={`metricas-${setorId}`} setorId={setorId}
+                               setorNome={listaSetores.find((s) => s.id === setorId)?.nome ?? 'setor'}
+                               filas={((canais ?? []) as FilaReal[]).filter((c) => c.setor_id === setorId && (c as { ativo?: boolean }).ativo !== false)}
+                               regras={(regras ?? []) as RegraReal[]} />
             ),
           },
           {

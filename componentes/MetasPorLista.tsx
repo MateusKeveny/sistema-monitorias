@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { mensagemDoErro } from '@/lib/erro-amigavel';
@@ -19,6 +19,39 @@ export function baixarArquivo(bytes: Uint8Array, nome: string) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
+const chaveDoNome = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
+
+/**
+ * Nome parecido (4.2.0): a linha "NPS Nota 1" e a métrica "Nota 1" são a
+ * mesma? Cada pergunta é respondida antes de gravar.
+ */
+export function PerguntasDeNome({ perguntas, responder }: {
+  perguntas: { linha: string; opcoes: string[] }[];
+  responder: (linha: string, resposta: string) => void;
+}) {
+  if (!perguntas.length) return null;
+  return (
+    <div className="mt-3 space-y-2 rounded-xl bg-amber-50 px-4 py-3 text-sm ring-1 ring-amber-600/20 dark:bg-amber-500/10">
+      <p className="font-semibold text-amber-900 dark:text-amber-200">
+        {perguntas.length === 1 ? 'Um nome parecido' : `${perguntas.length} nomes parecidos`} com métricas que já existem: é a mesma coisa?
+      </p>
+      {perguntas.map((p) => (
+        <label key={p.linha} className="flex flex-wrap items-center gap-2 text-slate-800">
+          <b>&quot;{p.linha}&quot;</b> é
+          <select defaultValue="" onChange={(e) => { if (e.target.value !== '?') responder(p.linha, e.target.value === '+' ? '' : e.target.value); }}
+                  className="rounded-md border border-slate-300 bg-superficie px-2 py-1 text-sm">
+            <option value="" disabled>escolha…</option>
+            {p.opcoes.map((o) => <option key={o} value={o}>a mesma que &quot;{o}&quot;</option>)}
+            <option value="+">outra métrica (criar)</option>
+          </select>
+        </label>
+      ))}
+      <p className="text-xs text-amber-800 dark:text-amber-300">Enquanto houver pergunta, a lista não é gravada.</p>
+    </div>
+  );
+}
+export const responderPergunta = (r: Record<string, string>, linha: string, resposta: string) => ({ ...r, [chaveDoNome(linha)]: resposta });
+
 export const nomeDoArquivo = (setor: string) =>
   `metas-${setor.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}.xlsx`;
 
@@ -32,7 +65,10 @@ export default function MetasPorLista({ setorId, setorNome, ctx }: {
 }) {
   const router = useRouter();
   const [aberto, setAberto] = useState(false);
-  const [plano, setPlano] = useState<Plano | null>(null);
+  const [grade, setGrade] = useState<string[][] | null>(null);
+  const [respostas, setRespostas] = useState<Record<string, string>>({});
+  const plano: Plano | null = useMemo(() => (grade ? planejar(grade, ctx, respostas) : null), [grade, ctx, respostas]);
+  const setPlano = (p: null) => { setGrade(p); setRespostas({}); };
   const [motivo, setMotivo] = useState('');
   const [sobre, setSobre] = useState(false);
   const [ocupado, setOcupado] = useState(false);
@@ -41,13 +77,14 @@ export default function MetasPorLista({ setorId, setorNome, ctx }: {
 
   async function lerArquivo(f: File) {
     setErro(null); setFeito(null);
-    try { setPlano(planejar(await gradeDoArquivo(f), ctx)); }
+    try { setRespostas({}); setGrade(await gradeDoArquivo(f)); }
     catch { setErro('Não consegui ler esta planilha. Salve como .xlsx no Excel e tente de novo.'); }
   }
-  function lerTexto(t: string) { if (t.trim()) { setErro(null); setFeito(null); setPlano(planejar(gradeDoTexto(t), ctx)); } }
+  function lerTexto(t: string) { if (t.trim()) { setErro(null); setFeito(null); setRespostas({}); setGrade(gradeDoTexto(t)); } }
 
   async function aplicar() {
     if (!plano) return;
+    if (plano.perguntas?.length) { setErro('Responda antes se os nomes parecidos são a mesma métrica.'); return; }
     if (!motivo.trim()) { setErro('Escreva o motivo da alteração: ele vai para o histórico.'); return; }
     const novos = plano.colunas.filter((c) => c.id == null && !c.erros.length).length;
     const metr = plano.novas.filter((n) => !n.erro).length;
@@ -134,6 +171,7 @@ export default function MetasPorLista({ setorId, setorNome, ctx }: {
 
       {plano && !plano.erro && (
         <div className="surgir mt-4">
+          <PerguntasDeNome perguntas={plano.perguntas ?? []} responder={(l, r) => setRespostas((x) => responderPergunta(x, l, r))} />
           <div className="mb-3 flex flex-wrap gap-2 text-xs font-semibold">
             <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">{colunasOk.length} {colunasOk.length === 1 ? 'cargo' : 'cargos'} na lista</span>
             {nMud > 0 && <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">{nMud} {nMud === 1 ? 'valor muda' : 'valores mudam'}</span>}
@@ -214,7 +252,7 @@ export default function MetasPorLista({ setorId, setorNome, ctx }: {
               <input value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ex.: metas de 2027 aprovadas pela diretoria"
                      className="w-full rounded-lg border border-slate-300 bg-superficie px-2.5 py-1.5 text-sm outline-none focus:border-marca-600" />
             </label>
-            <button type="button" disabled={ocupado || (!nMud && !nNovos && !nMetricas)} onClick={aplicar}
+            <button type="button" disabled={ocupado || (!nMud && !nNovos && !nMetricas) || !!plano.perguntas?.length} onClick={aplicar}
                     className={`${botao} bg-marca-600 py-2 text-white hover:bg-marca-700`}>
               {ocupado ? 'Gravando…' : 'Aplicar'}
             </button>

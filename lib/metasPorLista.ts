@@ -33,6 +33,8 @@ type RegraDaLista = {
 /** De cada fila do setor, de onde saem as métricas automáticas. */
 export type FilaDaLista = {
   grupo_tme: string | null; grupo_csat: string | null; grupo_nota: string | null; regra_finalizado: string | null;
+  /** 4.2.0: TMA (migração 103) e, para a métrica "· Fila" valer só nela, a fila. */
+  grupo_tma?: string | null; id?: number; apelido?: string; nome?: string;
 };
 export type ContextoMetas = {
   cargos: { id: number; nome: string; ordem: number }[];
@@ -52,10 +54,10 @@ export type ContextoMetas = {
 };
 
 /** As filas do setor passam a usar o grupo próprio que a lista criou. */
-export type Repontar = Partial<Record<'grupo_tme' | 'grupo_csat' | 'grupo_nota' | 'regra_finalizado', string>>;
+export type Repontar = Partial<Record<'grupo_tme' | 'grupo_tma' | 'grupo_csat' | 'grupo_nota' | 'regra_finalizado', string>>;
 
 /** Métrica que a lista cria (4.1.0): linha com nome que o setor ainda não tem. */
-export type TipoNovo = 'manual' | 'valor' | 'finalizado' | 'tme' | 'csat' | 'nota';
+export type TipoNovo = 'manual' | 'valor' | 'finalizado' | 'tme' | 'tma' | 'csat' | 'nota';
 export type MetricaNova = {
   rotulo: string; tipo: TipoNovo; chave: string;
   grupo: string | null; faixa_min: number | null; faixa_max: number | null;
@@ -96,7 +98,48 @@ export type Plano = {
   desativar: { chave: string; rotulo: string }[];
   /** Filas do setor que passam a usar os grupos próprios criados pela lista. */
   repontar: Repontar;
+  /** 4.2.0: métrica com "· Fila" no nome vale só naquela fila (id da fila → o que ela passa a usar). */
+  repontarFila?: Record<number, Repontar>;
+  /**
+   * 4.2.0: linha com nome parecido com uma métrica que já existe ("NPS Nota 1"
+   * e "Nota 1"), ainda sem resposta. Enquanto houver pergunta, a linha fica de
+   * fora e não se grava.
+   */
+  perguntas?: { linha: string; opcoes: string[] }[];
 };
+
+/**
+ * Respostas às perguntas de nome parecido: o nome da linha (normalizado) →
+ * o nome da métrica que já existe, ou '' para "é outra, criar".
+ */
+export type Respostas = Record<string, string>;
+
+const PALAVRAS_VAZIAS = new Set(['de', 'da', 'do', 'das', 'dos', 'a', 'o', 'e', 'com', 'no', 'na', 'em', 'para', 'por', 'pts', 'pontos']);
+const palavras = (s: string) => new Set(normal(s).split(/[^a-z0-9%]+/).filter((p) => p && !PALAVRAS_VAZIAS.has(p)));
+
+/**
+ * Dois nomes "parecidos" (4.2.0): os mesmos números e as palavras de um
+ * contidas no outro ("Nota 1" ⊂ "NPS Nota 1"), ou quase as mesmas palavras.
+ * "Nota 1" e "Nota 2" não são parecidos (números diferentes).
+ */
+export function nomesParecidos(a: string, b: string): boolean {
+  if (normal(a) === normal(b)) return false;
+  // "X · Fila" e "X": é a régua própria da fila, de propósito — não pergunta.
+  if (normal(a).startsWith(`${normal(b)} ·`) || normal(b).startsWith(`${normal(a)} ·`)) return false;
+  const pa = palavras(a.replace(/\s·\s.*$/, '')), pb = palavras(b.replace(/\s·\s.*$/, ''));
+  const numeros = (p: Set<string>) => [...p].filter((x) => /\d/.test(x)).sort().join('|');
+  if (numeros(pa) !== numeros(pb)) return false;
+  // Tipos diferentes (TME × TMA × C-SAT × nota) nunca são a mesma métrica.
+  const tipo = (p: Set<string>) => (['tme', 'tma', 'sat', 'csat', 'nota', 'finalizado'].find((k) => p.has(k)) ?? '').replace('csat', 'sat');
+  if (tipo(pa) && tipo(pb) && tipo(pa) !== tipo(pb)) return false;
+  const texto = (p: Set<string>) => [...p].filter((x) => !/\d/.test(x));
+  if (!texto(pa).length || !texto(pb).length) return false;
+  const [menor, maior] = pa.size <= pb.size ? [pa, pb] : [pb, pa];
+  if ([...menor].every((x) => maior.has(x))) return true;
+  const comunsTexto = texto(pa).filter((x) => pb.has(x)).length;
+  const comuns = [...pa].filter((x) => pb.has(x)).length;
+  return comunsTexto >= 1 && comuns >= 2 && comuns / new Set([...pa, ...pb]).size >= 0.5;
+}
 
 /** Cabeçalho das colunas vagas do modelo de um setor sem cargos: troque pelo nome do cargo. */
 const PREFIXO_VAGO = 'Nome do cargo';
@@ -121,7 +164,7 @@ export function contextoDasMetas(
     metricas: regras.filter((r) => r.ativo && r.chave !== REGRA_META && r.chave !== REGRA_MEDIA && r.grupo !== 'config')
       .sort((a, b) => a.ordem - b.ordem)
       .map((r) => ({ chave: r.chave, rotulo: r.rotulo, tipo: tipoDaRegra(r), faixa: faixaDaRegra(r),
-        grupo: NOME_DO_GRUPO[r.grupo.replace(/_s\d+$/, '')] ?? r.grupo, grupoChave: r.grupo })),
+        grupo: NOME_DO_GRUPO[grupoBase(r.grupo)] ?? r.grupo, grupoChave: r.grupo })),
     pesos,
     ...(setor ? { setorId: setor.setorId, filas: setor.filas } : {}),
     chaves: regras.map((r) => r.chave),
@@ -131,17 +174,29 @@ export function contextoDasMetas(
 }
 
 const NOME_DO_GRUPO: Record<string, string> = {
-  atendimento: 'Atendimento', tme: 'TME', tme_diretores: 'TME Diretores', csat: 'C-SAT',
+  atendimento: 'Atendimento', tme: 'TME', tma: 'TMA', csat: 'C-SAT',
   nota: 'Notas do C-SAT', monitoria: 'Monitoria', manual: 'Lançamento manual',
 };
 
+/**
+ * O tipo do grupo, sem o setor nem a fila: "tme_s9", "tme_fila_11" e
+ * "tme_diretores" são TME (4.2.0: antes, a régua de uma fila virava
+ * "lançamento" no modelo).
+ */
+export function grupoBase(grupo: string): string {
+  const g = grupo.replace(/_s\d+$/, '');
+  const m = /^(tme|tma|csat|nota)(_|$)/.exec(g);
+  return m ? m[1] : g;
+}
+
 /** Como a métrica conta — o mesmo texto da tabela de Pesos por cargo. */
 function tipoDaRegra(r: RegraDaLista): string {
-  const g = r.grupo.replace(/_s\d+$/, '');
+  const g = grupoBase(r.grupo);
   if (r.valor_manual) return 'valor digitado no lançamento (o peso multiplica o valor)';
   if (g === 'atendimento') return 'pontos por atendimento finalizado';
-  if (g === 'tme' || g === 'tme_diretores') return 'pontos por atendimento, conforme a faixa de TME';
-  if (g === 'csat') return 'pontos por atendimento, conforme a faixa de C-SAT (os dois canais)';
+  if (g === 'tme') return 'pontos por atendimento, conforme a faixa de TME';
+  if (g === 'tma') return 'pontos por atendimento, conforme a faixa de TMA';
+  if (g === 'csat') return 'pontos por atendimento, conforme a faixa de C-SAT';
   if (g === 'nota') return 'pontos por avaliação com esta nota';
   if (g === 'monitoria') return 'pontos por ponto percentual acima do mínimo da monitoria';
   return 'pontos por lançamento (quantidade lançada × peso)';
@@ -149,8 +204,9 @@ function tipoDaRegra(r: RegraDaLista): string {
 
 /** A faixa da régua, na unidade da tela (minutos ou %). */
 function faixaDaRegra(r: RegraDaLista): string {
-  const g = r.grupo.replace(/_s\d+$/, '');
-  const conv = (v: number) => g === 'tme' || g === 'tme_diretores' ? `${Math.round((v / 60) * 100) / 100} min`
+  const g = grupoBase(r.grupo);
+  if (g === 'nota' && r.faixa_min != null) return `nota ${r.faixa_min}`;
+  const conv = (v: number) => g === 'tme' || g === 'tma' ? `${Math.round((v / 60) * 100) / 100} min`
     : g === 'csat' || g === 'monitoria' ? `${Math.round(v * 10000) / 100}%` : String(v);
   const min = r.faixa_min != null ? conv(Number(r.faixa_min)) : null;
   const max = r.faixa_max != null ? conv(Number(r.faixa_max)) : null;
@@ -222,7 +278,8 @@ export function modeloXlsx(ctx: ContextoMetas, nomeDaAba = 'Metas'): Uint8Array 
         { item: 'não pontua', regra: 'A métrica não conta para o cargo. Trocar por um número liga; escrever "não pontua" desliga.' },
         { item: 'Célula vazia', regra: 'Não muda nada naquele cargo.' },
         { item: 'Cargo novo', regra: 'Acrescente uma coluna com o nome do cargo: ele é criado com a meta preenchida, e o que ficar vazio é copiado do Atendente Júnior.' },
-        { item: 'Métrica nova', regra: 'Acrescente uma linha com um nome que o setor não tem: ela é criada. O tipo vem de "Como pontua": "faixa de TME", "faixa de C-SAT", "avaliação com esta nota" ou "atendimento finalizado" são automáticas (vêm do Hub e pedem uma fila no setor); qualquer outro texto vira lançamento manual. A faixa vem de "Faixa" (ex.: "de 0 a 10 min", "a partir de 30", "de 5 a 5" para a nota).' },
+        { item: 'Métrica nova', regra: 'Acrescente uma linha com um nome que o setor não tem: ela é criada. O tipo vem de "Como pontua": "faixa de TME", "faixa de TMA", "faixa de C-SAT", "avaliação com esta nota" ou "atendimento finalizado" são automáticas (vêm do Hub e pedem uma fila no setor); qualquer outro texto vira lançamento manual. A faixa vem de "Faixa" (ex.: "de 0 a 10 min", "a partir de 30", "de 5 a 5" para a nota).' },
+        { item: 'Uma fila ou todas', regra: 'Métrica automática com " · " e o nome da fila no fim (ex.: "TME até 15 min · Logística") vale só para aquela fila. Sem o nome da fila, vale para todas as filas do setor que não têm a própria. Para escolher sem planilha: Configuração › Métricas por fila.' },
         { item: 'Faixas novas', regra: 'Faixas de TME, C-SAT ou notas trazidas pela lista substituem as antigas do setor (que são desligadas), para o mesmo atendimento não pontuar duas vezes.' },
         { item: 'Nomes', regra: 'Não mude o texto da coluna Métrica das que já existem nem os nomes dos cargos: é por eles que o sistema reconhece cada linha e coluna.' },
       ],
@@ -285,11 +342,12 @@ const chaveDe = (rotulo: string) => normal(rotulo).replace(/[^a-z0-9]+/g, '_').r
 function tipoDoTexto(comoPontua: string): { tipo: TipoNovo; aviso?: string } {
   const t = normal(comoPontua);
   if (t.includes('faixa de tme')) return { tipo: 'tme' };
+  // 4.2.0 (migração 103): o TMA vem do Hub, por pessoa e semana.
+  if (t.includes('faixa de tma')) return { tipo: 'tma' };
   if (t.includes('faixa de c-sat') || t.includes('faixa de csat')) return { tipo: 'csat' };
   if (/com (esta|essa) nota/.test(t)) return { tipo: 'nota' };
   if (t.includes('atendimento finalizado')) return { tipo: 'finalizado' };
   if (t.includes('valor digitado')) return { tipo: 'valor' };
-  if (t.includes('tma')) return { tipo: 'manual', aviso: 'o TMA não vem do Hub: entra por lançamento' };
   return { tipo: 'manual' };
 }
 
@@ -304,9 +362,9 @@ function lerFaixa(texto: string): { min: number | null; max: number | null } | n
   return null;
 }
 
-const UNIDADE: Partial<Record<TipoNovo, number>> = { tme: 60, csat: 0.01 };
+const UNIDADE: Partial<Record<TipoNovo, number>> = { tme: 60, tma: 60, csat: 0.01 };
 const textoFaixa = (m: Pick<MetricaNova, 'tipo' | 'faixa_min' | 'faixa_max'>) => {
-  const f = (v: number) => m.tipo === 'tme' ? `${Math.round((v / 60) * 100) / 100} min` : m.tipo === 'csat' ? `${Math.round(v * 10000) / 100}%` : String(v);
+  const f = (v: number) => m.tipo === 'tme' || m.tipo === 'tma' ? `${Math.round((v / 60) * 100) / 100} min` : m.tipo === 'csat' ? `${Math.round(v * 10000) / 100}%` : String(v);
   if (m.tipo === 'nota') return `nota ${m.faixa_min}`;
   if (m.faixa_min != null && m.faixa_max != null) return `de ${f(m.faixa_min)} a ${f(m.faixa_max)}`;
   if (m.faixa_min != null) return `a partir de ${f(m.faixa_min)}`;
@@ -315,14 +373,15 @@ const textoFaixa = (m: Pick<MetricaNova, 'tipo' | 'faixa_min' | 'faixa_max'>) =>
 };
 const NOME_DO_TIPO: Record<TipoNovo, string> = {
   manual: 'lançamento', valor: 'valor digitado', finalizado: 'finalizados da fila',
-  tme: 'faixa de TME', csat: 'faixa de C-SAT', nota: 'nota do C-SAT',
+  tme: 'faixa de TME', tma: 'faixa de TMA', csat: 'faixa de C-SAT', nota: 'nota do C-SAT',
 };
 /** Como a conferência descreve a métrica nova: "faixa de TME · de 0 a 10 min". */
 export const descricaoDaNova = (m: MetricaNova) =>
   [NOME_DO_TIPO[m.tipo], textoFaixa(m)].filter(Boolean).join(' · ');
 
 /** Monta a métrica nova de uma linha. O grupo das automáticas sai das filas do setor. */
-function novaMetrica(rotulo: string, comoPontua: string, faixaTxt: string, ctx: ContextoMetas, usadas: Set<string>, repontar: Repontar): MetricaNova {
+function novaMetrica(rotulo: string, comoPontua: string, faixaTxt: string, ctx: ContextoMetas, usadas: Set<string>, repontar: Repontar,
+  repontarFila: Record<number, Repontar> = {}): MetricaNova {
   const { tipo, aviso } = tipoDoTexto(comoPontua);
   const sufixo = ctx.setorId == null ? '_novo' : ctx.setorId === 1 ? '' : `_s${ctx.setorId}`;
   const base = chaveDe(rotulo) || 'metrica';
@@ -335,13 +394,36 @@ function novaMetrica(rotulo: string, comoPontua: string, faixaTxt: string, ctx: 
   // Automática: de qual grupo das filas ela faz parte. Grupo de OUTRO setor
   // (fila que copiou a da Expansão num setor do zero aponta para as regras de
   // lá) nunca é mexido: a lista cria um grupo próprio e as filas passam a usá-lo.
-  const campo = ({ tme: 'grupo_tme', csat: 'grupo_csat', nota: 'grupo_nota', finalizado: 'regra_finalizado' } as const)[tipo as 'tme'];
+  const campo = ({ tme: 'grupo_tme', tma: 'grupo_tma', csat: 'grupo_csat', nota: 'grupo_nota', finalizado: 'regra_finalizado' } as const)[tipo as 'tme'];
   const doSetor = (x: string) => tipo === 'finalizado' ? (ctx.chaves ?? []).includes(x) : (ctx.gruposDoSetor ?? []).includes(x);
+  // 4.2.0: "TME até 15 min · Logística" vale só na fila Logística; sem fila no
+  // nome, vale para todas as filas do setor (as que não têm a própria).
+  const nomeDaFila = /\s·\s(.+)$/.exec(rotulo)?.[1];
+  const fila = nomeDaFila ? ctx.filas?.find((f) => f.nome && normal(f.nome) === normal(nomeDaFila)) : undefined;
+  if (nomeDaFila && ctx.filas !== undefined && !fila) { m.erro = `a fila "${nomeDaFila}" não existe no setor`; return m; }
   if (ctx.filas === undefined) { m.pendente = true; }
+  else if (fila) {
+    if (fila.id == null || !fila.apelido) m.erro = 'fila sem identificação: recarregue a tela';
+    else if (tipo === 'finalizado') {
+      const atual = fila.regra_finalizado;
+      if (atual && doSetor(atual) && atual.startsWith(`${fila.apelido}_`)) m.daFila = atual;
+      else { m.grupo = 'atendimento'; (repontarFila[fila.id] ??= {}).regra_finalizado = chave; }
+    } else {
+      m.grupo = `${tipo}_${fila.apelido}`;
+      const atual = fila[campo as 'grupo_tme'];
+      (repontarFila[fila.id] ??= {})[campo] = m.grupo;
+      m.substitui = atual && atual !== m.grupo && doSetor(atual) && atual.endsWith(fila.apelido) ? [atual] : [];
+    }
+  }
   else {
     const filas = tipo === 'tme' ? ctx.filas.filter((f) => f.grupo_tme) : ctx.filas;
     const opcoes = [...new Set(filas.map((f) => f[campo]).filter((x): x is string => !!x))];
-    if (!opcoes.length) m.erro = `${NOME_DO_TIPO[tipo]} precisa de uma fila do Hub no setor${tipo === 'tme' ? ' que pontue TME' : ''} (Setores e filas › + Fila)`;
+    if (!opcoes.length && tipo === 'tma' && ctx.filas.length && ctx.setorId != null) {
+      // Nenhuma fila mede TMA ainda (4.2.0): a régua nasce no setor e vale para todas as filas.
+      m.grupo = ctx.setorId === 1 ? 'tma' : `tma_s${ctx.setorId}`;
+      repontar.grupo_tma = m.grupo;
+    }
+    else if (!opcoes.length) m.erro = `${NOME_DO_TIPO[tipo]} precisa de uma fila do Hub no setor${tipo === 'tme' ? ' que pontue TME' : ''} (Setores e filas › + Fila)`;
     else if (opcoes.length === 1 && doSetor(opcoes[0])) { if (tipo === 'finalizado') m.daFila = opcoes[0]; else m.grupo = opcoes[0]; }
     else if (ctx.setorId == null || ctx.setorId === 1) m.erro = `as filas do setor usam ${NOME_DO_TIPO[tipo]} diferentes: ajuste esta em Configuração › Faixas e nomes`;
     else if (tipo === 'finalizado') {
@@ -363,7 +445,7 @@ function novaMetrica(rotulo: string, comoPontua: string, faixaTxt: string, ctx: 
     return m;
   }
   if (!faixa) { m.erro ??= `falta a faixa (ex.: ${tipo === 'tme' ? '"de 0 a 10 min"' : '"de 90 a 95"'})`; return m; }
-  const conv = (v: number | null) => v == null ? null : tipo === 'tme' ? v * 60 : v > 1 ? v / 100 : v;
+  const conv = (v: number | null) => v == null ? null : tipo === 'tme' || tipo === 'tma' ? v * 60 : v > 1 ? v / 100 : v;
   m.faixa_min = conv(faixa.min); m.faixa_max = conv(faixa.max);
   return m;
 }
@@ -374,8 +456,11 @@ function novaMetrica(rotulo: string, comoPontua: string, faixaTxt: string, ctx: 
  * fica como veio, com aviso.
  */
 function encostarFaixas(novas: MetricaNova[]) {
-  for (const tipo of ['tme', 'csat'] as const) {
-    const lista = novas.filter((n) => n.tipo === tipo && !n.erro).sort((a, b) => (a.faixa_min ?? -Infinity) - (b.faixa_min ?? -Infinity));
+  // Por tipo e por régua: a geral e a de cada fila se encostam separadas.
+  const reguas = new Set(novas.filter((n) => ['tme', 'tma', 'csat'].includes(n.tipo) && !n.erro).map((n) => `${n.tipo}|${n.grupo ?? ''}`));
+  for (const chave of reguas) {
+    const [tipo, grupo] = chave.split('|') as ['tme' | 'tma' | 'csat', string];
+    const lista = novas.filter((n) => n.tipo === tipo && (n.grupo ?? '') === grupo && !n.erro).sort((a, b) => (a.faixa_min ?? -Infinity) - (b.faixa_min ?? -Infinity));
     for (let i = 1; i < lista.length; i++) {
       const ant = lista[i - 1], m = lista[i];
       if (ant.faixa_max == null || m.faixa_min == null) continue;
@@ -387,7 +472,7 @@ function encostarFaixas(novas: MetricaNova[]) {
 }
 
 // ------------------------------------------------------------------ Conferência
-export function planejar(grade: string[][], ctx: ContextoMetas): Plano {
+export function planejar(grade: string[][], ctx: ContextoMetas, respostas: Respostas = {}): Plano {
   const vazio: Plano = { colunas: [], mudancas: [], ignoradas: [], fora: [], novas: [], desativar: [], repontar: {} };
   if (grade.length < 2) return { ...vazio, erro: 'A lista precisa do cabeçalho e de pelo menos uma linha.' };
 
@@ -417,6 +502,8 @@ export function planejar(grade: string[][], ctx: ContextoMetas): Plano {
   const novas: MetricaNova[] = [];
   const usadas = new Set<string>();
   const repontar: Repontar = {};
+  const repontarFila: Record<number, Repontar> = {};
+  const perguntas: { linha: string; opcoes: string[] }[] = [];
   const rotulos = new Map<Item, string>([['meta', 'Meta'], ['media', 'Média'], ...ctx.metricas.map((m) => [m.chave, m.rotulo] as [string, string])]);
   for (const linha of g.slice(1)) {
     const rot = normal(linha[0]);
@@ -427,7 +514,15 @@ export function planejar(grade: string[][], ctx: ContextoMetas): Plano {
       const m = ctx.metricas.find((x) => normal(x.rotulo) === rot || normal(x.chave) === rot);
       if (m) { itens.push({ item: m.chave, linha }); continue; }
       if (novas.some((n) => normal(n.rotulo) === rot)) { ignoradas.push(`${String(linha[0]).trim()} (repetida)`); continue; }
-      const nova = novaMetrica(String(linha[0]).trim(), iComo > 0 ? linha[iComo] ?? '' : '', iFaixa > 0 ? linha[iFaixa] ?? '' : '', ctx, usadas, repontar);
+      // Nome parecido com uma métrica que já existe (4.2.0): pergunta antes de criar outra.
+      const parecidas = ctx.metricas.filter((x) => nomesParecidos(String(linha[0]), x.rotulo));
+      if (parecidas.length) {
+        const r = respostas[rot];
+        if (r === undefined) { perguntas.push({ linha: String(linha[0]).trim(), opcoes: parecidas.map((x) => x.rotulo) }); continue; }
+        const escolhida = r ? parecidas.find((x) => normal(x.rotulo) === normal(r)) : undefined;
+        if (escolhida) { itens.push({ item: escolhida.chave, linha }); continue; }
+      }
+      const nova = novaMetrica(String(linha[0]).trim(), iComo > 0 ? linha[iComo] ?? '' : '', iFaixa > 0 ? linha[iFaixa] ?? '' : '', ctx, usadas, repontar, repontarFila);
       novas.push(nova);
       if (nova.erro) continue;
       const item = nova.daFila ?? nova.chave;
@@ -481,7 +576,7 @@ export function planejar(grade: string[][], ctx: ContextoMetas): Plano {
   });
 
   const fora = ctx.cargos.filter((c) => !vistos.has(normal(c.nome))).map((c) => c.nome);
-  return { colunas, mudancas, ignoradas, fora, novas, desativar, repontar };
+  return { colunas, mudancas, ignoradas, fora, novas, desativar, repontar, repontarFila, perguntas };
 }
 
 /** Texto curto de uma mudança, para a conferência: "5.000 → 5.500". */
@@ -531,13 +626,26 @@ export async function aplicarPlano(db: Banco, plano: Plano, ctx: ContextoMetas, 
 
   // As filas do setor passam a usar os grupos próprios (e deixam de acompanhar
   // a fila copiada). O TME só nas filas que pontuam TME.
+  // 4.2.0: a fila com a métrica própria ("· Fila") fica com a dela; a geral vale para as outras.
+  const proprias = Object.entries(plano.repontarFila ?? {});
   for (const [campo, valor] of Object.entries(plano.repontar) as [keyof Repontar, string][]) {
     const nova = plano.novas.find((n) => n.chave === valor || n.grupo === valor);
     if (nova && semRegra.has(nova.chave) && campo === 'regra_finalizado') continue;
     let q = db.from('canais_do_setor').update({ [campo]: valor, copia_de: null }).eq('setor_id', setorId).eq('ativo', true);
     if (campo === 'grupo_tme') q = q.not('grupo_tme', 'is', null);
+    const fora = proprias.filter(([, r]) => r[campo]).map(([id]) => id);
+    if (fora.length) q = q.not('id', 'in', `(${fora.join(',')})`);
     const { error } = await q;
     if (error) falhas.push(`filas (${campo}): ${error.message}`);
+  }
+  for (const [id, r] of proprias) {
+    const campos = Object.fromEntries(Object.entries(r).filter(([campo, valor]) => {
+      const nova = plano.novas.find((n) => n.chave === valor || n.grupo === valor);
+      return !(nova && semRegra.has(nova.chave) && campo === 'regra_finalizado');
+    }));
+    if (!Object.keys(campos).length) continue;
+    const { error } = await db.from('canais_do_setor').update({ ...campos, copia_de: null }).eq('id', Number(id));
+    if (error) falhas.push(`fila ${id}: ${error.message}`);
   }
 
   // 1. Cargos novos.

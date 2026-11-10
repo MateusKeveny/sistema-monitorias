@@ -37,7 +37,39 @@ para o Performance.
 
 ## Performance 4.2.0 (ainda não publicada)
 
-Sem migração. Monitorias e Agenda sem mudança.
+Migração **103** (`supabase/103-tma-em-faixas.sql`): coluna `grupo_tma` nas
+filas, o bloco do TMA no fim de `vw_extrato_quantidades` (o resto da view é o
+mesmo texto) e `grupo_csat`/`grupo_nota` aceitando vazio ("não mede"). Sem
+fila com TMA, o cálculo de todos os meses fica idêntico (ensaiado no banco
+local). Monitorias e Agenda sem mudança.
+
+- **Métricas por fila** (Configuração › Métricas por fila, e o passo novo
+  **Métricas** do assistente de novo setor, que passa a ter 7 passos). Em cada
+  fila, Finalizado, TME, **TMA**, C-SAT e Notas escolhem: **Geral** (a régua do
+  setor, igual em todas as filas que a escolhem; o nome não leva a fila),
+  **Própria** (só da fila; o nome leva a fila, ex.: "TME até 15 min ·
+  Logística"), **Não mede** ou **Manter** (como está). Para TME, TMA e C-SAT
+  se escolhe **quantas faixas** e onde cada uma termina (minutos ou %); para
+  as notas, quais (1 a 5). Faixa com os mesmos limites é reaproveitada com os
+  pontos que tem; faixa nova começa sem pontos (Pesos por cargo ou planilha).
+  Régua de outro setor nunca é alterada: a fila que a usava passa a usar a do
+  próprio setor. Antes, cada fila nova do setor do zero ganhava as mesmas
+  três faixas de TME com o mesmo nome, e a lista de metas caía só na primeira
+  (Conexão Telecom: tudo em `tme_fila_11`).
+- **TMA em faixas**: vem do Hub, por pessoa e semana (o TMA é da pessoa; o TME
+  segue o da equipe). As semanas com métrica desligada (lentidão do Hub) ficam
+  de fora, como no TME. Na planilha: "faixa de TMA" em Como pontua.
+- **Lista de metas — uma fila ou todas**: métrica automática com " · " e o nome
+  da fila no fim vale só para aquela fila; sem o nome, vale para todas as que
+  não têm a própria. O modelo reconhece as réguas por fila (antes, "TME" de uma
+  fila do zero saía como lançamento).
+- **Lista de metas — nomes parecidos**: linha com nome parecido com uma métrica
+  que já existe ("NPS Nota 1" e "Nota 1"; "C-SAT acima de 95%" e "C-SAT a partir
+  de 95%") pergunta se é a mesma antes de criar outra; até responder, a lista
+  não é gravada. Tipos diferentes (TME × TMA) e números diferentes (nota 1 ×
+  nota 2) não perguntam.
+- **Assistente**: o modelo da planilha já vem com os cargos da tabela e as
+  métricas escolhidas no passo Métricas, também num setor do zero.
 
 - **O cadastro de pessoas por planilha cria os cargos que faltam** (Pessoas ›
   Cadastrar várias pessoas, e o fim do assistente de novo setor). Cargo que o

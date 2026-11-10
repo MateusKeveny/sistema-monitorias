@@ -8,17 +8,23 @@ import {
   aplicarPlano, contextoDasMetas, descricaoDaNova, gradeDoArquivo, gradeDoTexto, modeloXlsx, planejar, valorAtual,
   type ContextoMetas, type FilaDaLista, type Plano,
 } from '@/lib/metasPorLista';
-import { baixarArquivo, nomeDoArquivo } from '@/componentes/MetasPorLista';
+import { PerguntasDeNome, baixarArquivo, nomeDoArquivo, responderPergunta } from '@/componentes/MetasPorLista';
 import CadastroEmLote, { cargosDoGabarito } from '@/componentes/CadastroEmLote';
 import { lerPlanilha, type Linha } from '@/lib/xlsx-navegador';
 import type { Cargo, PesoCargo, Pessoa } from '@/lib/tipos';
+import { MetricasPorFilaEditor, escolhaDeFilaNova, problemasDaConfig } from '@/componentes/MetricasPorFila';
+import {
+  MEDIDAS, REGUA_PADRAO, aplicarMetricas, copiarRegua, metricasPlanejadas, type ConfigDasMetricas, type FilaReal,
+} from '@/lib/metricasPorFila';
 
 type Regras = { copiar: string; tme: boolean };
 type CamposMonitoria = { qtd: string; piso: string; de?: string };
 type FilaNova = { nome: string; hub: string; regras: Regras };
 type CargoNovo = { nome: string; meta: string; copiado: boolean };
 
-const PASSOS = ['Nome', 'Base', 'Filas', 'Cargos e metas', 'Monitorias', 'Revisar'];
+const PASSOS = ['Nome', 'Base', 'Filas', 'Métricas', 'Cargos e metas', 'Monitorias', 'Revisar'];
+// Os passos pelo nome (4.2.0: entrou "Métricas" depois de "Filas").
+const P_FILAS = 3, P_METRICAS = 4, P_CARGOS = 5, P_MONITORIAS = 6, P_REVISAR = 7, P_CRIADO = 8;
 const campo = `w-full rounded-xl border border-slate-300 bg-superficie px-3 py-2.5 text-sm outline-none transition
                focus:border-marca-600 focus:ring-4 focus:ring-marca-600/15`;
 const inteiro = (v: number) => Math.round(v).toLocaleString('pt-BR');
@@ -47,7 +53,7 @@ export default function NovoSetorEmPagina({
   aoFechar: () => void;
   aoCriar: (aviso: string) => void;
 }) {
-  const [passo, setPasso] = useState(0); // 0 = abertura; 7 = criado
+  const [passo, setPasso] = useState(0); // 0 = abertura; P_CRIADO = criado
   const [direcao, setDirecao] = useState<'dir' | 'esq'>('dir');
   const [nome, setNome] = useState('');
   const [origem, setOrigem] = useState(setores[0] ? String(setores[0].id) : '');
@@ -64,6 +70,15 @@ export default function NovoSetorEmPagina({
   const [gabarito, setGabarito] = useState<{ arquivo: string; abas: Map<string, Linha[]>; cargos: string[]; pessoas: number; deOutroSetor: number } | null>(null);
   const [cadastro, setCadastro] = useState<{ pessoas: Pessoa[]; setores: Setor[]; cargos: Cargo[]; setor: Setor } | null>(null);
   const chave = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase().replace(/\s+/g, ' ');
+  // Métricas por fila (4.2.0): o que cada fila mede e as réguas. Montada ao entrar no passo.
+  const [metricas, setMetricas] = useState<ConfigDasMetricas>(() => ({ geral: copiarRegua(REGUA_PADRAO), filas: [] }));
+  // Nomes parecidos na lista de metas (4.2.0): a resposta de cada pergunta.
+  const [respostas, setRespostas] = useState<Record<string, string>>({});
+  function responder(linha: string, resposta: string) {
+    const r = responderPergunta(respostas, linha, resposta);
+    setRespostas(r);
+    setLista((l) => (l ? { ...l, plano: planejar(l.grade, ctxPrevia, r) } : l));
+  }
 
   const separar = (t: string) => [...new Set(t.split(',').map((x) => x.trim()).filter(Boolean))];
   const base = setores.find((s) => String(s.id) === origem);
@@ -90,14 +105,59 @@ export default function NovoSetorEmPagina({
     if (novos.length) setCargos([...cargosDoPasso.filter((c) => c.copiado || c.nome.trim()), ...novos.map((n) => ({ nome: n, meta: '', copiado: false }))]);
   }
 
-  function irPara(p: number) { setErro(null); setDirecao(p > passo ? 'dir' : 'esq'); setPasso(p); }
+  // As filas do passo 3 no passo de métricas: a mesma fila (pela posição e
+  // nome) guarda o que já foi escolhido; fila nova entra com o padrão.
+  function sincronizarMetricas() {
+    setMetricas((m) => ({
+      ...m,
+      filas: filasValidas.map((f, i) => {
+        const antes = m.filas.find((x) => x.chave === String(i) && x.nome === f.nome.trim());
+        const copia = !!f.regras.copiar;
+        return antes && antes.copia === copia ? antes
+          : { chave: String(i), nome: f.nome.trim(), escolha: escolhaDeFilaNova(copia), propria: copiarRegua(m.geral), copia };
+      }),
+    }));
+  }
+
+  // O que a lista de metas encontra antes de criar: as métricas da base mais as
+  // que o passo de métricas vai criar (pelo nome, como depois de criar).
+  const ctxPrevia: ContextoMetas = useMemo(() => {
+    const ja = new Set(ctxBase.metricas.map((m) => chave(m.rotulo)));
+    const planejadas = metricasPlanejadas(metricas).filter((m) => !ja.has(chave(m.rotulo)))
+      .map((m) => ({ chave: `nova:${m.rotulo}`, rotulo: m.rotulo, tipo: m.tipo, faixa: m.faixa }));
+    return { ...ctxBase, metricas: [...ctxBase.metricas, ...planejadas] };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ctxBase, metricas]);
+
+  // O modelo da planilha antes de criar: os cargos da tabela (os copiados com
+  // os pontos da base; os novos com a meta digitada) e as métricas previstas.
+  function ctxDoModelo(): ContextoMetas {
+    const cargos = cargosDoPasso.filter((c) => c.nome.trim()).map((c, i) => {
+      const daBase = c.copiado ? ctxBase.cargos.find((x) => x.nome === c.nome) : undefined;
+      return { id: daBase?.id ?? -(i + 1), nome: c.nome.trim(), ordem: i, meta: c.meta };
+    });
+    const pesos = [
+      ...ctxBase.pesos.filter((p) => cargos.some((c) => c.id === p.cargo_id && c.id > 0) && p.regra !== 'meta'),
+      ...cargos.flatMap((c) => {
+        const m = Number(c.meta.replace(/\./g, '').replace(',', '.'));
+        return m > 0 ? [{ cargo_id: c.id, regra: 'meta', peso: m, ativo: true } as PesoCargo] : [];
+      }),
+    ];
+    return { ...ctxPrevia, cargos: cargos.map(({ id, nome: n, ordem }) => ({ id, nome: n, ordem })), pesos };
+  }
+
+  function irPara(p: number) {
+    setErro(null); setDirecao(p > passo ? 'dir' : 'esq');
+    if (p === P_METRICAS) sincronizarMetricas();
+    setPasso(p);
+  }
 
   function validar(): string | null {
     if (passo === 1) {
       if (!nome.trim()) return 'Dê um nome ao setor.';
       if (setores.some((s) => s.nome.trim().toLowerCase() === nome.trim().toLowerCase())) return `Já existe o setor "${nome.trim()}".`;
     }
-    if (passo === 3) {
+    if (passo === P_FILAS) {
       const ocupados = new Map(canais.flatMap((c) => c.nomes_no_hub.map((n) => [normalizarSetor(n), c.nome] as const)));
       const daqui = new Set<string>();
       for (const f of filasValidas) for (const n of separar(f.hub || f.nome)) {
@@ -107,7 +167,11 @@ export default function NovoSetorEmPagina({
         daqui.add(k);
       }
     }
-    if (passo === 4) {
+    if (passo === P_METRICAS) {
+      const p = problemasDaConfig(metricas);
+      if (p.length) return p[0];
+    }
+    if (passo === P_CARGOS) {
       for (const c of cargosDoPasso) {
         if (!c.nome.trim()) return 'Todo cargo precisa de nome.';
         // Copiado sem meta (cargo sem cota, como Diretora) fica como na base.
@@ -118,15 +182,17 @@ export default function NovoSetorEmPagina({
         if (!(m > 0)) return `A meta de ${c.nome} precisa ser maior que zero.`;
       }
       if (new Set(cargosDoPasso.map((c) => c.nome.trim().toLowerCase())).size < cargosDoPasso.length) return 'Há dois cargos com o mesmo nome.';
+      if (lista?.plano.perguntas?.length) return 'Responda na lista de metas se os nomes parecidos são a mesma métrica.';
     }
-    if (passo === 5 && comMonitorias) { const l = lerCampos(campos); if (typeof l === 'string') return l; }
+    if (passo === P_MONITORIAS && comMonitorias) { const l = lerCampos(campos); if (typeof l === 'string') return l; }
     return null;
   }
 
   async function lerLista(fonte: File | string) {
     try {
       const grade = typeof fonte === 'string' ? gradeDoTexto(fonte) : await gradeDoArquivo(fonte);
-      setLista({ grade, plano: planejar(grade, ctxBase), arquivo: typeof fonte === 'string' ? 'colada do Excel' : fonte.name });
+      setRespostas({});
+      setLista({ grade, plano: planejar(grade, ctxPrevia), arquivo: typeof fonte === 'string' ? 'colada do Excel' : fonte.name });
     } catch { setErro('Não consegui ler esta planilha. Salve como .xlsx no Excel e tente de novo.'); }
   }
 
@@ -141,13 +207,30 @@ export default function NovoSetorEmPagina({
     if (error) { setOcupado(false); setErro(await mensagemDoErro(error)); return; }
     const setorId = Number(id);
     const falhas: string[] = [];
+    // As filas na ordem do passo 3 (null = não criada), para as métricas do passo 4.
+    const criadas: (FilaReal | null)[] = [];
     for (const [i, f] of filasValidas.entries()) {
       const { data: fila, error: e1 } = await db.from('canais_do_setor')
         .insert({ setor_id: setorId, nome: f.nome.trim(), nomes_no_hub: separar(f.hub || f.nome), ordem: i + 1 }).select('id').single();
-      if (e1) { falhas.push(`${f.nome}: ${await mensagemDoErro(e1)}`); continue; }
-      const { error: e2 } = await db.rpc('definir_regras_da_fila', {
-        p_fila: fila.id, p_copiar_de: f.regras.copiar ? Number(f.regras.copiar) : null, p_tme: f.regras.tme });
-      if (e2) falhas.push(`${f.nome} (regras): ${await mensagemDoErro(e2)}`);
+      if (e1 || !fila) { criadas.push(null); falhas.push(`${f.nome}: ${await mensagemDoErro(e1!)}`); continue; }
+      // Fila que copia outra: aponta para as regras dela (como antes). Fila
+      // própria (4.2.0): as métricas vêm do passo Métricas, sem as faixas de
+      // TME repetidas em cada fila.
+      if (f.regras.copiar) {
+        const { error: e2 } = await db.rpc('definir_regras_da_fila', { p_fila: fila.id, p_copiar_de: Number(f.regras.copiar), p_tme: f.regras.tme });
+        if (e2) falhas.push(`${f.nome} (regras): ${await mensagemDoErro(e2)}`);
+      }
+      const { data: real } = await db.from('canais_do_setor').select('*').eq('id', fila.id).single();
+      criadas.push((real as FilaReal | null) ?? null);
+    }
+    // As métricas de cada fila (as que não foram criadas ficam de fora).
+    {
+      const pares = metricas.filas.map((fc, i) => [fc, criadas[i]] as const).filter(([, r]) => r);
+      if (pares.length) {
+        const r = await aplicarMetricas(db, setorId, { ...metricas, filas: pares.map(([fc, real]) => ({ ...fc, chave: String(real!.id) })) },
+          pares.map(([, real]) => real!));
+        falhas.push(...r.falhas);
+      }
     }
 
     // As metas do passo 4 e a lista, sobre os cargos que o setor novo acabou de ganhar.
@@ -156,7 +239,7 @@ export default function NovoSetorEmPagina({
         db.from('cargos').select('id, nome, ordem').eq('setor_id', setorId).eq('ativo', true),
         db.from('regras').select('chave, rotulo, ordem, ativo, grupo, faixa_min, faixa_max, valor_manual').eq('setor_id', setorId),
         // As filas que o passo 3 acabou de criar: as métricas automáticas da lista entram nelas.
-        db.from('canais_do_setor').select('grupo_tme, grupo_csat, grupo_nota, regra_finalizado').eq('setor_id', setorId).eq('ativo', true),
+        db.from('canais_do_setor').select('id, apelido, nome, grupo_tme, grupo_tma, grupo_csat, grupo_nota, regra_finalizado').eq('setor_id', setorId).eq('ativo', true),
       ]);
       const ids = (cs ?? []).map((c) => c.id as number);
       const { data: ps } = ids.length ? await db.from('pesos_por_cargo').select('cargo_id, regra, peso, ativo').in('cargo_id', ids) : { data: [] };
@@ -170,7 +253,7 @@ export default function NovoSetorEmPagina({
     for (const grade of [digitadas, lista?.grade].filter(Boolean) as string[][][]) {
       try {
         const ctx = await lerCtx();
-        const r = await aplicarPlano(db, planejar(grade, ctx), ctx, setorId, motivo);
+        const r = await aplicarPlano(db, planejar(grade, ctx, respostas), ctx, setorId, motivo);
         falhas.push(...r.falhas);
       } catch (e) { falhas.push(`metas: ${(e as Error).message}`); }
     }
@@ -190,7 +273,7 @@ export default function NovoSetorEmPagina({
 
     setOcupado(false);
     setCriado({ nome: nome.trim(), id: setorId, falhas });
-    irPara(7);
+    irPara(P_CRIADO);
     aoCriar(falhas.length
       ? `Setor "${nome.trim()}" criado, mas parte não foi gravada: ${falhas.join('; ')}. Ajuste abaixo.`
       : gabarito ? `Setor "${nome.trim()}" criado. Confira e cadastre as pessoas do gabarito abaixo.`
@@ -204,7 +287,7 @@ export default function NovoSetorEmPagina({
         <div>
           <p className="sobe text-xs font-bold uppercase tracking-[.08em] text-marca-700 dark:text-marca-400" style={atraso(1)}>Novo setor</p>
           <h1 className="sobe mt-2 text-4xl font-semibold leading-[1.08] tracking-[-.035em] text-slate-900" style={atraso(2)}>
-            Uma equipe nova,<br /><span className="text-marca-700 dark:text-marca-400">pronta em 6 passos.</span>
+            Uma equipe nova,<br /><span className="text-marca-700 dark:text-marca-400">pronta em {PASSOS.length} passos.</span>
           </h1>
           <p className="sobe mt-3 max-w-xl text-base text-slate-600" style={atraso(3)}>
             Dê um nome, escolha de onde vêm as regras, cadastre as filas do Hub e as metas de cada cargo.
@@ -213,6 +296,7 @@ export default function NovoSetorEmPagina({
           <ul className="mt-5 space-y-2.5">
             {['Copie as regras de um setor que já funciona, ou comece do zero',
               'Filas e nomes do Hub: os atendimentos já chegam no lugar certo',
+              'O que cada fila mede: finalizado, TME, TMA, C-SAT e notas, com as faixas que quiser',
               'Metas por cargo digitadas ou por lista, direto da planilha'].map((t, i) => (
               <li key={t} className="sobe flex items-center gap-2.5 text-slate-600" style={atraso(4 + i)}>
                 <span className="grid h-6 w-6 place-items-center rounded-lg bg-marca-600/15 text-xs font-bold text-marca-700 dark:text-marca-400">{i + 1}</span>{t}
@@ -245,7 +329,7 @@ export default function NovoSetorEmPagina({
   }
 
   // ------------------------------------------------------------- Criado
-  if (passo === 7 && criado) {
+  if (passo === P_CRIADO && criado) {
     return (
       <section className="sobe rounded-[26px] bg-superficie px-6 py-14 text-center shadow-sm ring-1 ring-slate-200">
         <svg viewBox="0 0 110 110" className="mx-auto h-28 w-28" aria-hidden="true">
@@ -335,10 +419,10 @@ export default function NovoSetorEmPagina({
                 </div>
               </>
             )}
-            {passo === 3 && (
+            {passo === P_FILAS && (
               <>
                 <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Quais filas o setor atende?</h2>
-                <p className="mb-6 mt-1 text-slate-500">Como o Hub separa os atendimentos. O nome no Hub liga os relatórios importados à fila certa. Dá para criar depois.</p>
+                <p className="mb-6 mt-1 text-slate-500">Como o Hub separa os atendimentos. O nome no Hub liga os relatórios importados à fila certa. Dá para criar depois. O que cada fila mede se escolhe no próximo passo.</p>
                 <div className="space-y-2">
                   {filas.map((f, i) => (
                     <div key={i} className="estala flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 px-3 py-2.5">
@@ -356,7 +440,19 @@ export default function NovoSetorEmPagina({
                 </div>
               </>
             )}
-            {passo === 4 && (
+            {passo === P_METRICAS && (
+              <>
+                <h2 className="text-2xl font-semibold tracking-tight text-slate-900">O que cada fila mede?</h2>
+                <p className="mb-5 mt-1 text-slate-500">
+                  Finalizado, TME, TMA, C-SAT e notas vêm do Hub. Escolha em cada fila a régua <b>geral</b> do setor, uma <b>própria</b> ou
+                  &quot;não mede&quot;, e as faixas logo abaixo. Os pontos de cada faixa por cargo vêm no próximo passo.
+                </p>
+                {metricas.filas.length
+                  ? <MetricasPorFilaEditor cfg={metricas} mudar={setMetricas} ocupado={ocupado} assistente />
+                  : <p className="text-sm text-slate-500">Sem filas no passo 3: o setor começa sem métricas automáticas (só as de lançamento).</p>}
+              </>
+            )}
+            {passo === P_CARGOS && (
               <>
                 <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Cargos e metas</h2>
                 <p className="mb-5 mt-1 text-slate-500">
@@ -385,10 +481,9 @@ export default function NovoSetorEmPagina({
                 <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
                   <button type="button" onClick={() => setCargos([...cargosDoPasso, { nome: '', meta: '5000', copiado: false }])}
                           className="font-medium text-marca-700 hover:underline dark:text-marca-400">+ cargo</button>
-                  {ctxBase.cargos.length > 0 && (
-                    <button type="button" onClick={() => baixarArquivo(modeloXlsx(ctxBase), nomeDoArquivo(nome || 'setor-novo'))}
-                            className="rounded-full border border-slate-300 px-3.5 py-1 font-semibold text-slate-700 hover:bg-slate-50">⬇ Baixar modelo</button>
-                  )}
+                  {/* 4.2.0: o modelo já vem com os cargos desta tabela e as métricas do passo anterior. */}
+                  <button type="button" onClick={() => baixarArquivo(modeloXlsx(ctxDoModelo()), nomeDoArquivo(nome || 'setor-novo'))}
+                          className="rounded-full border border-slate-300 px-3.5 py-1 font-semibold text-slate-700 hover:bg-slate-50">⬇ Baixar modelo</button>
                   <label className="cursor-pointer rounded-full bg-marca-600 px-3.5 py-1 font-semibold text-white hover:bg-marca-700">
                     ⬆ Subir por lista<input type="file" accept=".xlsx,.csv" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) lerLista(f); e.target.value = ''; }} />
                   </label>
@@ -422,6 +517,7 @@ export default function NovoSetorEmPagina({
                     {lista.plano.erro ? <p className="text-rose-700">{lista.plano.erro}</p> : (
                       <>
                         <p className="font-semibold text-slate-800">Lista {lista.arquivo}: {lista.plano.colunas.length} cargos, {lista.plano.mudancas.length} valor(es) muda(m){novos ? `, ${novos} cargo(s) novo(s)` : ''}.</p>
+                        <PerguntasDeNome perguntas={lista.plano.perguntas ?? []} responder={responder} />
                         {lista.plano.colunas.filter((c) => c.erros.length).map((c) => <p key={c.cargo} className="text-rose-700">{c.cargo}: {c.erros.join('; ')} — fica de fora.</p>)}
                         {lista.plano.novas.length > 0 && (
                           <details className="mt-1">
@@ -450,7 +546,7 @@ export default function NovoSetorEmPagina({
                 )}
               </>
             )}
-            {passo === 5 && (
+            {passo === P_MONITORIAS && (
               <>
                 <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Monitorias</h2>
                 <p className="mb-6 mt-1 text-slate-500">Com monitorias, o setor aparece no sistema de Monitorias e a nota pontua na cota.</p>
@@ -465,7 +561,7 @@ export default function NovoSetorEmPagina({
                 {comMonitorias && <div className="estala mt-4 flex flex-wrap items-center gap-2 text-sm text-slate-600"><CamposDeMonitoria c={campos} mudar={setCampos} ocupado={ocupado} /></div>}
               </>
             )}
-            {passo === 6 && (
+            {passo === P_REVISAR && (
               <>
                 <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Tudo certo?</h2>
                 <p className="mb-5 mt-1 text-slate-500">Confira antes de criar. Depois disso, cada coisa se ajusta na própria tela.</p>
@@ -474,6 +570,8 @@ export default function NovoSetorEmPagina({
                     ['Setor', nome.trim()],
                     ['Regras', base ? `cópia de ${base.nome}` : 'do zero'],
                     ['Filas', filasValidas.map((f) => f.nome.trim()).join(', ') || 'nenhuma por enquanto'],
+                    ['Métricas', metricas.filas.map((f) => `${f.nome}: ${MEDIDAS.filter((m) => f.escolha[m.chave] !== 'nao')
+                      .map((m) => `${m.nome}${f.escolha[m.chave] === 'propria' ? ' (própria)' : f.escolha[m.chave] === 'manter' ? ' (da copiada)' : ''}`).join(', ') || 'nada'}`).join(' · ') || 'sem filas'],
                     ['Cargos', cargosDoPasso.map((c) => `${c.nome} (${c.meta ? `${inteiro(Number(c.meta.replace(/\./g, '').replace(',', '.')) || 0)} pts` : metaVemDaLista(c) ? 'meta da lista' : 'sem meta'})`).join(' · ') || 'nenhum'],
                     ['Lista de metas', lista && !lista.plano.erro ? `${lista.arquivo}, aplicada ao criar` : 'não'],
                     ['Pessoas', gabarito ? `${gabarito.pessoas} do gabarito ${gabarito.arquivo}: conferidas e cadastradas logo depois de criar` : 'depois, em Pessoas'],
@@ -495,7 +593,7 @@ export default function NovoSetorEmPagina({
                     className="rounded-full border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
               {passo === 1 ? 'Cancelar' : '← Voltar'}
             </button>
-            {passo < 6 ? (
+            {passo < P_REVISAR ? (
               <button type="button" onClick={() => { const v = validar(); if (v) setErro(v); else irPara(passo + 1); }}
                       className="rounded-full bg-marca-600 px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-marca-600/25 transition hover:-translate-y-px hover:bg-marca-700">
                 Continuar →
@@ -516,17 +614,19 @@ export default function NovoSetorEmPagina({
           <div className="mt-3 space-y-3 border-l-2 border-slate-200 pl-4">
             <Galho titulo="Regras" itens={passo > 2 ? [base ? `Cópia de ${base.nome}` : 'Do zero'] : []} vazio={base ? `Cópia de ${base.nome}` : 'Do zero'} />
             <Galho titulo="Filas" itens={filasValidas.map((f) => f.nome.trim())} vazio="nenhuma ainda" />
+            <Galho titulo="Métricas" itens={passo >= P_METRICAS ? MEDIDAS.filter((m) => metricas.filas.some((f) => f.escolha[m.chave] !== 'nao')).map((m) => m.nome) : []}
+                   vazio={`no passo ${P_METRICAS}`} />
             <div>
               <p className="mb-1 text-xs font-semibold text-slate-500">Cargos e metas</p>
-              {passo >= 4 && cargosDoPasso.length
+              {passo >= P_CARGOS && cargosDoPasso.length
                 ? cargosDoPasso.map((c, i) => (
                   <div key={i} className="estala flex justify-between border-b border-dashed border-slate-200 py-1 text-[13px]">
                     <span>{c.nome || '—'}</span><b className="tabular-nums">{c.meta ? `${inteiro(Number(c.meta.replace(/\./g, '').replace(',', '.')) || 0)} pts` : metaVemDaLista(c) ? 'da lista' : '—'}</b>
                   </div>
                 ))
-                : <span className="inline-block rounded-full border border-dashed border-slate-300 px-2.5 py-0.5 text-xs text-slate-400">no passo 4</span>}
+                : <span className="inline-block rounded-full border border-dashed border-slate-300 px-2.5 py-0.5 text-xs text-slate-400">no passo {P_CARGOS}</span>}
             </div>
-            <Galho titulo="Monitorias" itens={passo >= 5 ? [comMonitorias ? `${campos.qtd}/semana · a partir de ${campos.piso}%` : 'sem monitorias'] : []} vazio="no passo 5" />
+            <Galho titulo="Monitorias" itens={passo >= P_MONITORIAS ? [comMonitorias ? `${campos.qtd}/semana · a partir de ${campos.piso}%` : 'sem monitorias'] : []} vazio={`no passo ${P_MONITORIAS}`} />
           </div>
           <div className="mt-4 flex items-center gap-3 border-t border-slate-100 pt-3 text-xs text-slate-500">
             <svg viewBox="0 0 42 42" className="h-10 w-10" aria-hidden="true">
