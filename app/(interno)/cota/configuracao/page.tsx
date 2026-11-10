@@ -129,7 +129,14 @@ export default async function ConfiguracaoDaCota({
                 {/* A matriz numa planilha (4.0.0): baixar, editar no Excel, subir com conferência. */}
                 <MetasPorLista key={`lista-${setorId}`} setorId={setorId}
                                setorNome={listaSetores.find((s) => s.id === setorId)?.nome ?? 'setor'}
-                               ctx={contextoDasMetas(listaCargos, listaRegras, listaPesos)} />
+                               ctx={contextoDasMetas(listaCargos, listaRegras, listaPesos, {
+                                 setorId,
+                                 // As filas ativas do setor: de onde saem as métricas automáticas criadas pela lista.
+                                 filas: ((canais ?? []) as Canal[]).filter((c) => c.setor_id === setorId && c.ativo).map((c) => ({
+                                   grupo_tme: c.grupo_tme ?? null, grupo_csat: c.grupo_csat ?? null,
+                                   grupo_nota: c.grupo_nota ?? null, regra_finalizado: c.regra_finalizado ?? null,
+                                 })),
+                               })} />
                 <MatrizDePesos
                   setorId={setorId}
                   cargos={listaCargos}

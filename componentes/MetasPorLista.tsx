@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { mensagemDoErro } from '@/lib/erro-amigavel';
 import {
-  aplicarPlano, cargoBase, formatarValor, gradeDoArquivo, gradeDoTexto, modeloXlsx, planejar, valorAtual,
+  aplicarPlano, cargoBase, descricaoDaNova, formatarValor, gradeDoArquivo, gradeDoTexto, modeloXlsx, planejar, valorAtual,
   ROTULO_MEDIA, ROTULO_META, type ContextoMetas, type Item, type Plano,
 } from '@/lib/metasPorLista';
 
@@ -50,12 +50,14 @@ export default function MetasPorLista({ setorId, setorNome, ctx }: {
     if (!plano) return;
     if (!motivo.trim()) { setErro('Escreva o motivo da alteração: ele vai para o histórico.'); return; }
     const novos = plano.colunas.filter((c) => c.id == null && !c.erros.length).length;
-    if (!confirm(`Aplicar ${plano.mudancas.length} alteração(ões)${novos ? ` e criar ${novos} cargo(s)` : ''} em ${setorNome}?\n\nOs meses em aberto são recalculados; os fechados não mudam.`)) return;
+    const metr = plano.novas.filter((n) => !n.erro).length;
+    if (!confirm(`Aplicar ${plano.mudancas.length} alteração(ões)${novos ? `, criar ${novos} cargo(s)` : ''}${metr ? `, criar ${metr} métrica(s)` : ''}`
+      + `${plano.desativar.length ? ` e desligar ${plano.desativar.length} faixa(s) antiga(s)` : ''} em ${setorNome}?\n\nOs meses em aberto são recalculados; os fechados não mudam.`)) return;
     setOcupado(true); setErro(null);
     try {
       const r = await aplicarPlano(criarClienteNavegador(), plano, ctx, setorId, motivo.trim());
       if (r.falhas.length) setErro(`Parte não foi gravada: ${r.falhas.join('; ')}`);
-      setFeito(`${r.alteracoes} alteração(ões) gravada(s)${r.cargosNovos ? ` e ${r.cargosNovos} cargo(s) criado(s)` : ''}. Está no histórico de pesos.`);
+      setFeito(`${r.alteracoes} alteração(ões) gravada(s)${r.cargosNovos ? `, ${r.cargosNovos} cargo(s) criado(s)` : ''}${r.metricasNovas ? `, ${r.metricasNovas} métrica(s) criada(s)` : ''}. Está no histórico de pesos.`);
       setPlano(null); setMotivo('');
       router.refresh();
     } catch (e) {
@@ -68,9 +70,12 @@ export default function MetasPorLista({ setorId, setorNome, ctx }: {
   const nNovos = colunasOk.filter((c) => c.id == null && !c.erros.length).length;
   const nErros = colunasOk.filter((c) => c.erros.length).length;
   const base = cargoBase(ctx);
-  const itens: { item: Item; rotulo: string }[] = [
+  const novasOk = (plano?.novas ?? []).filter((n) => !n.erro && !n.daFila);
+  const nMetricas = (plano?.novas ?? []).filter((n) => !n.erro).length;
+  const itens: { item: Item; rotulo: string; nova?: boolean }[] = [
     { item: 'meta', rotulo: ROTULO_META }, { item: 'media', rotulo: ROTULO_MEDIA },
-    ...ctx.metricas.map((m) => ({ item: m.chave, rotulo: m.rotulo })),
+    ...ctx.metricas.map((m) => ({ item: m.chave, rotulo: (plano?.novas ?? []).find((n) => n.daFila === m.chave)?.rotulo ?? m.rotulo })),
+    ...novasOk.map((n) => ({ item: n.chave, rotulo: n.rotulo, nova: true })),
   ];
 
   return (
@@ -133,8 +138,9 @@ export default function MetasPorLista({ setorId, setorNome, ctx }: {
             <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">{colunasOk.length} {colunasOk.length === 1 ? 'cargo' : 'cargos'} na lista</span>
             {nMud > 0 && <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">{nMud} {nMud === 1 ? 'valor muda' : 'valores mudam'}</span>}
             {nNovos > 0 && <span className="rounded-full bg-marca-50 px-3 py-1 text-marca-800 dark:bg-marca-500/15 dark:text-marca-300">{nNovos} {nNovos === 1 ? 'cargo novo' : 'cargos novos'}</span>}
+            {nMetricas > 0 && <span className="rounded-full bg-marca-50 px-3 py-1 text-marca-800 dark:bg-marca-500/15 dark:text-marca-300">{nMetricas} {nMetricas === 1 ? 'métrica nova' : 'métricas novas'}</span>}
             {nErros > 0 && <span className="rounded-full bg-rose-50 px-3 py-1 text-rose-800 dark:bg-rose-500/15 dark:text-rose-300">{nErros} com erro (fica{nErros > 1 ? 'm' : ''} de fora)</span>}
-            {!nMud && !nNovos && !nErros && <span className="rounded-full bg-marca-50 px-3 py-1 text-marca-800">Nada muda</span>}
+            {!nMud && !nNovos && !nErros && !nMetricas && <span className="rounded-full bg-marca-50 px-3 py-1 text-marca-800">Nada muda</span>}
           </div>
 
           <div className="overflow-x-auto rounded-xl border border-slate-200">
@@ -150,9 +156,14 @@ export default function MetasPorLista({ setorId, setorNome, ctx }: {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {itens.map(({ item, rotulo }) => (
+                {itens.map(({ item, rotulo, nova }) => (
                   <tr key={item} className={item === 'media' ? 'border-b-2 border-slate-200' : ''}>
-                    <td className="sticky left-0 bg-superficie px-3 py-1.5 text-slate-700">{rotulo}</td>
+                    <td className="sticky left-0 bg-superficie px-3 py-1.5 text-slate-700">
+                      {rotulo}
+                      {nova && (() => { const n = novasOk.find((x) => x.chave === item)!; return (
+                        <span className="ml-1.5 text-xs font-semibold text-marca-700 dark:text-marca-400">· nova ({descricaoDaNova(n)})</span>
+                      ); })()}
+                    </td>
                     {colunasOk.map((c) => {
                       if (c.erros.length) return <td key={c.cargo} className="bg-rose-50/60 px-3 py-1.5 text-right text-slate-400">—</td>;
                       if (c.id == null) {
@@ -183,7 +194,16 @@ export default function MetasPorLista({ setorId, setorNome, ctx }: {
             {colunasOk.filter((c) => c.erros.length).map((c) => <p key={c.cargo} className="text-rose-700 dark:text-rose-300">{c.cargo}: {c.erros.join('; ')} — fica de fora.</p>)}
             {colunasOk.filter((c) => c.avisos.length).map((c) => <p key={c.cargo} className="text-amber-700 dark:text-amber-300">{c.cargo}: {c.avisos.join('; ')}.</p>)}
             {nNovos > 0 && base && <p>* Cargo novo: o que não veio na lista é copiado de {base.nome} (a média, não).</p>}
-            {plano.ignoradas.length > 0 && <p>Linhas ignoradas (não são métricas deste setor): {plano.ignoradas.join(', ')}.</p>}
+            {plano.novas.filter((n) => n.erro).map((n) => <p key={n.chave} className="text-rose-700 dark:text-rose-300">{n.rotulo}: {n.erro} — não é criada.</p>)}
+            {plano.novas.filter((n) => n.aviso && !n.erro).map((n) => <p key={n.chave} className="text-amber-700 dark:text-amber-300">{n.rotulo}: {n.aviso}.</p>)}
+            {plano.novas.filter((n) => n.daFila && !n.erro).map((n) => <p key={n.chave}>{n.rotulo}: é a métrica de finalizados da fila, que passa a ter este nome.</p>)}
+            {plano.desativar.length > 0 && (
+              <p className="text-amber-700 dark:text-amber-300">
+                Faixas antigas desligadas (as novas da lista ficam no lugar, para não pontuar duas vezes): {plano.desativar.map((d) => d.rotulo).join(', ')}.
+              </p>
+            )}
+            {nMetricas > 0 && <p>O tipo de cada métrica nova vem da coluna &quot;Como pontua&quot; (faixa de TME, faixa de C-SAT, nota, atendimento finalizado; o resto é lançamento) e a faixa, da coluna &quot;Faixa&quot;.</p>}
+            {plano.ignoradas.length > 0 && <p>Linhas ignoradas: {plano.ignoradas.join(', ')}.</p>}
             {plano.fora.length > 0 && <p>Fora da lista, ficam como estão: {plano.fora.join(', ')}.</p>}
             <p>Célula vazia não muda nada; &quot;não pontua&quot; desliga a métrica no cargo.</p>
           </div>
@@ -194,7 +214,7 @@ export default function MetasPorLista({ setorId, setorNome, ctx }: {
               <input value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ex.: metas de 2027 aprovadas pela diretoria"
                      className="w-full rounded-lg border border-slate-300 bg-superficie px-2.5 py-1.5 text-sm outline-none focus:border-marca-600" />
             </label>
-            <button type="button" disabled={ocupado || (!nMud && !nNovos)} onClick={aplicar}
+            <button type="button" disabled={ocupado || (!nMud && !nNovos && !nMetricas)} onClick={aplicar}
                     className={`${botao} bg-marca-600 py-2 text-white hover:bg-marca-700`}>
               {ocupado ? 'Gravando…' : 'Aplicar'}
             </button>

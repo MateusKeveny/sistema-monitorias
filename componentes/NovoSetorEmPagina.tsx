@@ -5,8 +5,8 @@ import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { mensagemDoErro } from '@/lib/erro-amigavel';
 import { normalizarSetor, type Canal, type Setor } from '@/lib/setores';
 import {
-  aplicarPlano, contextoDasMetas, gradeDoArquivo, gradeDoTexto, modeloXlsx, planejar, valorAtual,
-  type ContextoMetas, type Plano,
+  aplicarPlano, contextoDasMetas, descricaoDaNova, gradeDoArquivo, gradeDoTexto, modeloXlsx, planejar, valorAtual,
+  type ContextoMetas, type FilaDaLista, type Plano,
 } from '@/lib/metasPorLista';
 import { baixarArquivo, nomeDoArquivo } from '@/componentes/MetasPorLista';
 import type { PesoCargo } from '@/lib/tipos';
@@ -127,13 +127,16 @@ export default function NovoSetorEmPagina({
 
     // As metas do passo 4 e a lista, sobre os cargos que o setor novo acabou de ganhar.
     const lerCtx = async (): Promise<ContextoMetas> => {
-      const [{ data: cs }, { data: rs }] = await Promise.all([
+      const [{ data: cs }, { data: rs }, { data: fs }] = await Promise.all([
         db.from('cargos').select('id, nome, ordem').eq('setor_id', setorId).eq('ativo', true),
-        db.from('regras').select('chave, rotulo, ordem, ativo, grupo').eq('setor_id', setorId),
+        db.from('regras').select('chave, rotulo, ordem, ativo, grupo, faixa_min, faixa_max, valor_manual').eq('setor_id', setorId),
+        // As filas que o passo 3 acabou de criar: as métricas automáticas da lista entram nelas.
+        db.from('canais_do_setor').select('grupo_tme, grupo_csat, grupo_nota, regra_finalizado').eq('setor_id', setorId).eq('ativo', true),
       ]);
       const ids = (cs ?? []).map((c) => c.id as number);
       const { data: ps } = ids.length ? await db.from('pesos_por_cargo').select('cargo_id, regra, peso, ativo').in('cargo_id', ids) : { data: [] };
-      return contextoDasMetas((cs ?? []) as ContextoMetas['cargos'], (rs ?? []) as Parameters<typeof contextoDasMetas>[1], (ps ?? []) as PesoCargo[]);
+      return contextoDasMetas((cs ?? []) as ContextoMetas['cargos'], (rs ?? []) as Parameters<typeof contextoDasMetas>[1], (ps ?? []) as PesoCargo[],
+        { setorId, filas: (fs ?? []) as FilaDaLista[] });
     };
     const motivo = `Setor ${nome.trim()} criado no assistente`;
     const digitadas = [['Métrica', ...cargosDoPasso.map((c) => c.nome.trim())], ['Meta do mês', ...cargosDoPasso.map((c) => c.meta)]];
@@ -349,6 +352,25 @@ export default function NovoSetorEmPagina({
                       <>
                         <p className="font-semibold text-slate-800">Lista {lista.arquivo}: {lista.plano.colunas.length} cargos, {lista.plano.mudancas.length} valor(es) muda(m){novos ? `, ${novos} cargo(s) novo(s)` : ''}.</p>
                         {lista.plano.colunas.filter((c) => c.erros.length).map((c) => <p key={c.cargo} className="text-rose-700">{c.cargo}: {c.erros.join('; ')} — fica de fora.</p>)}
+                        {lista.plano.novas.length > 0 && (
+                          <details className="mt-1">
+                            <summary className="cursor-pointer text-slate-700">
+                              {lista.plano.novas.filter((n) => !n.erro).length} métrica(s) nova(s) criada(s) com o setor
+                              {lista.plano.novas.some((n) => n.pendente) ? ' — as automáticas (TME, C-SAT, notas, finalizados) entram nas filas do passo 3' : ''}
+                              {lista.plano.novas.some((n) => n.erro) ? `; ${lista.plano.novas.filter((n) => n.erro).length} com erro` : ''}
+                            </summary>
+                            <ul className="mt-1 max-h-56 space-y-0.5 overflow-y-auto text-xs">
+                              {lista.plano.novas.map((n) => (
+                                <li key={n.chave} className={n.erro ? 'text-rose-700' : 'text-slate-600'}>
+                                  <b>{n.rotulo}</b> · {descricaoDaNova(n)}{n.erro ? ` — ${n.erro}` : n.aviso ? ` — ${n.aviso}` : ''}
+                                </li>
+                              ))}
+                            </ul>
+                          </details>
+                        )}
+                        {filasValidas.length === 0 && lista.plano.novas.some((n) => n.pendente) && (
+                          <p className="text-amber-700">Sem fila no passo 3, as métricas automáticas não são criadas (só as de lançamento).</p>
+                        )}
                         <p className="mt-1 text-xs text-slate-500">É aplicada depois das metas acima, ao criar o setor (com motivo no histórico de pesos).</p>
                         <button type="button" onClick={() => setLista(null)} className="mt-1 text-xs text-slate-500 hover:underline">tirar a lista</button>
                       </>

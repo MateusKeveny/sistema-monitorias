@@ -66,6 +66,19 @@ usa as regras deste. Monitorias e Agenda sem mudança.
   Cada célula vem com a pontuação de hoje, e métrica desligada vem escrita
   **não pontua** (antes saía vazia e parecia faltar a pontuação). Aba
   **Como preencher** com as regras. Subir o modelo sem mexer não muda nada.
+- **A lista de metas cria métricas** (Configuração › Pesos por cargo e o passo
+  Cargos e metas do novo setor). Linha com nome que o setor não tem vira
+  métrica nova; o tipo vem de **Como pontua** e a faixa, de **Faixa**:
+  "faixa de TME", "faixa de C-SAT", "avaliação com esta nota" e "atendimento
+  finalizado" são automáticas (pedem uma fila no setor); o resto é lançamento
+  (o TMA, que não vem do Hub, também). Faixas com buraco de 1 min ou 1% são
+  encostadas ("de 0 a 10" e "de 11 a 20" viram 0–10 e 10–20). Faixas novas
+  desligam as antigas do mesmo grupo, para não pontuar duas vezes. Fila que
+  aponta para as métricas de **outro setor** (copiou a da Expansão num setor do
+  zero) nunca mexe nelas: a lista cria o grupo próprio do setor e as filas
+  passam a usá-lo. A conferência mostra cada métrica nova com o tipo e a faixa.
+- Subir o gabarito de pessoas na lista de metas (ou o de metas no cadastro de
+  pessoas) agora avisa que o arquivo está trocado.
   Setor criado do zero (sem cargos nem métricas): o modelo traz colunas vagas
   **Nome do cargo 1, 2, 3** para nomear e dar a meta, e a tela avisa que as
   métricas nascem com as filas e em Faixas e nomes.
