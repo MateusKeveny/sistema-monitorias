@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { Quadro, Tabela, Td, Th } from '@/componentes/ui';
@@ -58,6 +58,7 @@ function gabaritoXlsx(setores: Setor[], cargos: Cargo[]): Uint8Array {
       { coluna: 'E-mail', obrigatoria: 'Não', oque: 'Com e-mail (ou nome de usuário), o acesso já é criado e a senha temporária aparece no fim. Em branco: só a ficha, sem acesso.', exemplo: 'maria.souza@empresa.com.br' },
       { coluna: 'Setor', obrigatoria: umSetor ? 'Não' : 'Sim', oque: `O setor exatamente como na aba Setores e cargos.${umSetor ? ` Em branco: ${exemploSetor}.` : ''}`, exemplo: exemploSetor },
       { coluna: 'Cargo', obrigatoria: 'Não', oque: 'Só para Atendente: um cargo do setor da pessoa, como na aba Setores e cargos. Gestão e qualidade ficam sem cargo (deixe em branco).', exemplo: exemploCargo },
+      { coluna: 'Setor novo', obrigatoria: '—', oque: 'Para um setor que ainda vai ser criado: escreva o nome dele em Setor (ou deixe em branco) e os cargos que ele terá em Cargo. No assistente de Novo setor, o passo "Cargos e metas" cria os cargos a partir desta coluna, e no fim as pessoas são cadastradas com este mesmo arquivo.', exemplo: '' },
       { coluna: 'Nome no Hub', obrigatoria: 'Não', oque: 'Como a pessoa aparece nos relatórios do Hub, para ligar volume e avaliações a ela. Não pode repetir o de outra pessoa.', exemplo: 'Maria Souza' },
       { coluna: 'Entrada', obrigatoria: 'Não', oque: 'A data de entrada (dd/mm/aaaa). Setor e cargo valem a partir do mês dessa data. Em branco: o mês aberto.', exemplo: '01/11/2026' },
       { coluna: 'Papel', obrigatoria: 'Não', oque: 'Atendente, Qualidade ou Gestor. Em branco: Atendente. Gestão e qualidade ficam fora das listas, das médias e das monitorias.', exemplo: 'Atendente' },
@@ -79,6 +80,58 @@ function gabaritoXlsx(setores: Setor[], cargos: Cargo[]): Uint8Array {
 const PAPEIS: Record<string, PapelUsuario> = {
   operador: 'operador', atendente: 'operador', qualidade: 'qualidade', monitor: 'qualidade', gestor: 'gestor',
 };
+
+type Colunas = Record<keyof typeof COLUNAS, string | undefined>;
+
+/**
+ * A aba "Pessoas" do gabarito (senão, a primeira com dados, fora as de
+ * consulta) e onde está cada coluna. Usada aqui e no assistente de novo setor.
+ */
+export function linhasDoGabarito(abas: Map<string, Linha[]>): { col: Colunas; dados: Linha[] } | string {
+  const consulta = ['como preencher', 'setores e cargos'];
+  const [, linhas] = [...abas].find(([nome, l]) => normalizar(nome) === 'pessoas' && l.length > 1)
+    ?? [...abas].find(([nome, l]) => l.length > 1 && !consulta.includes(normalizar(nome))) ?? ['', []];
+  if (!linhas.length) return 'A planilha está vazia.';
+  const [cabecalho, ...dados] = linhas;
+  const por = new Map(Object.entries(cabecalho).map(([c, v]) => [normalizar(v), c]));
+  const col = Object.fromEntries(Object.entries(COLUNAS)
+    .map(([k, nomes]) => [k, nomes.map((n) => por.get(n)).find(Boolean)])) as Colunas;
+  if (!col.nome) {
+    return por.has('metrica')
+      ? 'Este arquivo é a lista de metas (Métrica por linha, cargo por coluna), não o cadastro de pessoas. Use o gabarito de pessoas (Pessoas › Cadastrar várias pessoas › Baixar gabarito).'
+      : 'Falta a coluna "Nome" no cabeçalho.';
+  }
+  return { col, dados };
+}
+
+/**
+ * Os cargos que o gabarito de pessoas dá a um setor que ainda não existe
+ * (4.1.0, assistente de novo setor): os da coluna Cargo das linhas de
+ * Atendente com o Setor em branco ou igual ao nome do setor novo, sem repetir
+ * (fica a grafia da primeira vez).
+ */
+export function cargosDoGabarito(abas: Map<string, Linha[]>, nomeDoSetor: string):
+  { cargos: string[]; pessoas: number; deOutroSetor: number } | string {
+  const g = linhasDoGabarito(abas);
+  if (typeof g === 'string') return g;
+  const { col, dados } = g;
+  if (!col.cargo) return 'O gabarito não tem a coluna "Cargo".';
+  const alvo = normalizar(nomeDoSetor);
+  const vistos = new Map<string, string>();
+  let pessoas = 0;
+  let deOutroSetor = 0;
+  for (const l of dados) {
+    if (!String(l[col.nome!] ?? '').trim()) continue;
+    const setor = col.setor ? normalizar(l[col.setor]) : '';
+    if (setor && setor !== alvo) { deOutroSetor++; continue; }
+    pessoas++;
+    const papel = col.papel ? normalizar(l[col.papel]) : '';
+    if (papel && PAPEIS[papel] !== 'operador') continue;
+    const cargo = String(l[col.cargo] ?? '').trim().replace(/\s+/g, ' ');
+    if (cargo && !vistos.has(normalizar(cargo))) vistos.set(normalizar(cargo), cargo);
+  }
+  return { cargos: [...vistos.values()], pessoas, deOutroSetor };
+}
 
 type Planejada = {
   linha: number; nome: string; email: string | null; papel: PapelUsuario;
@@ -104,11 +157,15 @@ function lerData(v: unknown): string | null {
  * gravado antes da conferência; linha com problema fica de fora. As senhas
  * aparecem uma vez só, nesta tela.
  */
-export default function CadastroEmLote({ pessoas, setores, cargos }: {
+export default function CadastroEmLote({ pessoas, setores, cargos, inicial, setorPadrao }: {
   pessoas: Pessoa[]; setores: Setor[]; cargos: Cargo[];
+  /** O gabarito já subido (assistente de novo setor, 4.1.0): abre conferindo este arquivo. */
+  inicial?: { arquivo: string; abas: Map<string, Linha[]> };
+  /** O setor de quem está com a coluna Setor em branco (o setor recém-criado). */
+  setorPadrao?: Setor;
 }) {
   const router = useRouter();
-  const [aberto, setAberto] = useState(false);
+  const [aberto, setAberto] = useState(!!inicial);
   const [plano, setPlano] = useState<Planejada[] | null>(null);
   const [arquivo, setArquivo] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState<string | null>(null);
@@ -121,6 +178,11 @@ export default function CadastroEmLote({ pessoas, setores, cargos }: {
   const hubs = useMemo(() => new Set(pessoas.flatMap((p) => [p.nome_hub, ...(p.nomes_hub_extras ?? [])])
     .map(normalizar).filter(Boolean)), [pessoas]);
 
+  // O gabarito que veio do assistente: confere assim que a tela abre.
+  useEffect(() => {
+    if (inicial) { setArquivo(inicial.arquivo); conferir(inicial.abas); }
+  }, [inicial?.abas]); // só um arquivo novo dispara (o objeto `inicial` muda a cada desenho)
+
   async function escolher(f: File | undefined) {
     setPlano(null); setErro(null); setResultado(null);
     if (!f) return;
@@ -129,22 +191,13 @@ export default function CadastroEmLote({ pessoas, setores, cargos }: {
     try { abas = await lerPlanilha(f); } catch (e) {
       setErro(e instanceof Error ? e.message : 'Não foi possível ler a planilha.'); return;
     }
-    // A aba "Pessoas" do gabarito; senão, a primeira com dados (fora as de consulta).
-    const consulta = ['como preencher', 'setores e cargos'];
-    const [, linhas] = [...abas].find(([nome, l]) => normalizar(nome) === 'pessoas' && l.length > 1)
-      ?? [...abas].find(([nome, l]) => l.length > 1 && !consulta.includes(normalizar(nome))) ?? ['', []];
-    if (!linhas.length) { setErro('A planilha está vazia.'); return; }
+    conferir(abas);
+  }
 
-    const [cabecalho, ...dados] = linhas;
-    const por = new Map(Object.entries(cabecalho).map(([col, v]) => [normalizar(v), col]));
-    const col = Object.fromEntries(Object.entries(COLUNAS)
-      .map(([k, nomes]) => [k, nomes.map((n) => por.get(n)).find(Boolean)])) as Record<keyof typeof COLUNAS, string | undefined>;
-    if (!col.nome) {
-      setErro(por.has('metrica')
-        ? 'Este arquivo é a lista de metas (Métrica por linha, cargo por coluna), não o cadastro de pessoas. Use "⬇ Baixar gabarito" desta tela.'
-        : 'Falta a coluna "Nome" no cabeçalho.');
-      return;
-    }
+  function conferir(abas: Map<string, Linha[]>) {
+    const g = linhasDoGabarito(abas);
+    if (typeof g === 'string') { setErro(g); return; }
+    const { col, dados } = g;
 
     const vistosEmail = new Set<string>();
     const vistosHub = new Set<string>();
@@ -168,7 +221,7 @@ export default function CadastroEmLote({ pessoas, setores, cargos }: {
 
       const textoSetor = col.setor ? normalizar(l[col.setor]) : '';
       const setor = textoSetor ? setores.find((s) => normalizar(s.nome) === textoSetor) ?? null
-        : setores.length === 1 ? setores[0] : null;
+        : setorPadrao ?? (setores.length === 1 ? setores[0] : null);
       if (!setor) problemas.push(textoSetor ? `setor "${String(l[col.setor!])}" não existe` : 'falta o setor');
 
       const textoCargo = col.cargo ? normalizar(l[col.cargo]) : '';
@@ -261,7 +314,7 @@ export default function CadastroEmLote({ pessoas, setores, cargos }: {
                           className="text-sm text-slate-500 hover:underline">Fechar</button>}>
       <p className="mb-3 text-sm text-slate-600">
         Colunas pelo nome do cabeçalho, em qualquer ordem: <b>Nome</b> (obrigatória), <b>E-mail</b> (com e-mail, o acesso é
-        criado), <b>Setor</b>{setores.length === 1 ? ` (em branco: ${setores[0].nome})` : ''}, <b>Cargo</b>, <b>Nome no Hub</b>,{' '}
+        criado), <b>Setor</b>{setorPadrao ? ` (em branco: ${setorPadrao.nome})` : setores.length === 1 ? ` (em branco: ${setores[0].nome})` : ''}, <b>Cargo</b>, <b>Nome no Hub</b>,{' '}
         <b>Entrada</b> (dd/mm/aaaa; setor e cargo valem desse mês) e <b>Papel</b> (Atendente, Qualidade ou Gestor; em branco:
         Atendente). Gestão e qualidade entram sem cargo e fora das listas, das médias e das monitorias. Na coluna E-mail
         vale também um nome de usuário, como &ldquo;admin&rdquo;.

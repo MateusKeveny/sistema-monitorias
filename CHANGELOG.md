@@ -82,6 +82,15 @@ usa as regras deste. Monitorias e Agenda sem mudança.
   Setor criado do zero (sem cargos nem métricas): o modelo traz colunas vagas
   **Nome do cargo 1, 2, 3** para nomear e dar a meta, e a tela avisa que as
   métricas nascem com as filas e em Faixas e nomes.
+- **Novo setor com o gabarito de pessoas**: no passo Cargos e metas,
+  **⬆ Cargos do gabarito de pessoas** lê a coluna Cargo das linhas de Atendente
+  com o Setor em branco ou com o nome do setor novo e monta a tabela de cargos
+  (sem repetir). A meta se digita ali ou vem da lista de metas, quando ela tem
+  uma coluna para o cargo. A conferência mostra o cargo sem meta, o cargo sem
+  ninguém no gabarito e o cargo do gabarito tirado da tabela. Depois de
+  **Criar setor**, a tela final abre o cadastro em lote com o mesmo arquivo, já
+  com os cargos criados e o Setor em branco valendo o setor novo; nada é gravado
+  antes de **Cadastrar**. O gabarito explica isso em Como preencher.
 
 ---
 

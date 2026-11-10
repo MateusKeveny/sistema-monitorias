@@ -9,7 +9,9 @@ import {
   type ContextoMetas, type FilaDaLista, type Plano,
 } from '@/lib/metasPorLista';
 import { baixarArquivo, nomeDoArquivo } from '@/componentes/MetasPorLista';
-import type { PesoCargo } from '@/lib/tipos';
+import CadastroEmLote, { cargosDoGabarito } from '@/componentes/CadastroEmLote';
+import { lerPlanilha, type Linha } from '@/lib/xlsx-navegador';
+import type { Cargo, PesoCargo, Pessoa } from '@/lib/tipos';
 
 type Regras = { copiar: string; tme: boolean };
 type CamposMonitoria = { qtd: string; piso: string; de?: string };
@@ -58,6 +60,10 @@ export default function NovoSetorEmPagina({
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [criado, setCriado] = useState<{ nome: string; id: number; falhas: string[] } | null>(null);
+  // Gabarito de pessoas (4.1.0): dá os cargos no passo 4 e, depois de criar, as pessoas.
+  const [gabarito, setGabarito] = useState<{ arquivo: string; abas: Map<string, Linha[]>; cargos: string[]; pessoas: number; deOutroSetor: number } | null>(null);
+  const [cadastro, setCadastro] = useState<{ pessoas: Pessoa[]; setores: Setor[]; cargos: Cargo[]; setor: Setor } | null>(null);
+  const chave = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase().replace(/\s+/g, ' ');
 
   const separar = (t: string) => [...new Set(t.split(',').map((x) => x.trim()).filter(Boolean))];
   const base = setores.find((s) => String(s.id) === origem);
@@ -66,6 +72,23 @@ export default function NovoSetorEmPagina({
   // Os cargos do passo 4 nascem da base (com a meta dela); dá para mudar a meta e acrescentar cargos.
   const cargosDoPasso = useMemo<CargoNovo[]>(() => cargos ?? [...ctxBase.cargos].sort((a, b) => a.ordem - b.ordem)
     .map((c) => ({ nome: c.nome, meta: String(valorAtual(ctxBase, c.id, 'meta') ?? ''), copiado: true })), [cargos, ctxBase]);
+
+  // Cargos que a lista de metas traz como coluna: a meta deles vem dela.
+  const naLista = new Set(lista && !lista.plano.erro ? lista.plano.colunas.filter((c) => !c.erros.length).map((c) => chave(c.cargo)) : []);
+  const metaVemDaLista = (c: CargoNovo) => !c.copiado && !c.meta.trim() && naLista.has(chave(c.nome));
+
+  async function lerGabarito(f: File) {
+    setErro(null);
+    let abas: Map<string, Linha[]>;
+    try { abas = await lerPlanilha(f); } catch { setErro('Não consegui ler o gabarito. Salve como .xlsx no Excel e tente de novo.'); return; }
+    const r = cargosDoGabarito(abas, nome);
+    if (typeof r === 'string') { setErro(r); return; }
+    setGabarito({ arquivo: f.name, abas, ...r });
+    // Os cargos que ainda não estão na tabela entram sem meta: digite aqui ou venha da lista de metas.
+    const ja = new Set(cargosDoPasso.map((c) => chave(c.nome)));
+    const novos = r.cargos.filter((c) => !ja.has(chave(c)));
+    if (novos.length) setCargos([...cargosDoPasso.filter((c) => c.copiado || c.nome.trim()), ...novos.map((n) => ({ nome: n, meta: '', copiado: false }))]);
+  }
 
   function irPara(p: number) { setErro(null); setDirecao(p > passo ? 'dir' : 'esq'); setPasso(p); }
 
@@ -89,6 +112,8 @@ export default function NovoSetorEmPagina({
         if (!c.nome.trim()) return 'Todo cargo precisa de nome.';
         // Copiado sem meta (cargo sem cota, como Diretora) fica como na base.
         if (c.copiado && !c.meta.trim()) continue;
+        // Do gabarito, com a meta na lista de metas.
+        if (metaVemDaLista(c)) continue;
         const m = Number(c.meta.replace(/\./g, '').replace(',', '.'));
         if (!(m > 0)) return `A meta de ${c.nome} precisa ser maior que zero.`;
       }
@@ -139,7 +164,9 @@ export default function NovoSetorEmPagina({
         { setorId, filas: (fs ?? []) as FilaDaLista[] });
     };
     const motivo = `Setor ${nome.trim()} criado no assistente`;
-    const digitadas = [['Métrica', ...cargosDoPasso.map((c) => c.nome.trim())], ['Meta do mês', ...cargosDoPasso.map((c) => c.meta)]];
+    // Os cargos com a meta na lista de metas ficam para ela (criados por ela).
+    const digitaveis = cargosDoPasso.filter((c) => !metaVemDaLista(c));
+    const digitadas = [['Métrica', ...digitaveis.map((c) => c.nome.trim())], ['Meta do mês', ...digitaveis.map((c) => c.meta)]];
     for (const grade of [digitadas, lista?.grade].filter(Boolean) as string[][][]) {
       try {
         const ctx = await lerCtx();
@@ -148,12 +175,26 @@ export default function NovoSetorEmPagina({
       } catch (e) { falhas.push(`metas: ${(e as Error).message}`); }
     }
 
+    // O gabarito de pessoas: o cadastro em lote abre na tela final, já com os
+    // cargos criados, e confere tudo antes de gravar.
+    if (gabarito) {
+      const [{ data: ps }, { data: ss }, { data: cs }] = await Promise.all([
+        db.from('pessoas').select('*').order('nome'),
+        db.from('setores').select('*').eq('ativo', true).order('ordem'),
+        db.from('cargos').select('*').eq('ativo', true).order('ordem'),
+      ]);
+      const setor = ((ss ?? []) as Setor[]).find((s) => s.id === setorId);
+      if (setor) setCadastro({ pessoas: (ps ?? []) as Pessoa[], setores: (ss ?? []) as Setor[], cargos: (cs ?? []) as Cargo[], setor });
+      else falhas.push('o cadastro das pessoas não abriu: faça em Pessoas › Cadastrar várias pessoas');
+    }
+
     setOcupado(false);
     setCriado({ nome: nome.trim(), id: setorId, falhas });
     irPara(7);
     aoCriar(falhas.length
       ? `Setor "${nome.trim()}" criado, mas parte não foi gravada: ${falhas.join('; ')}. Ajuste abaixo.`
-      : `Setor "${nome.trim()}" criado. Próximo passo: cadastrar o gestor do setor em Pessoas › + Novo usuário.`);
+      : gabarito ? `Setor "${nome.trim()}" criado. Confira e cadastre as pessoas do gabarito abaixo.`
+        : `Setor "${nome.trim()}" criado. Próximo passo: cadastrar o gestor do setor em Pessoas › + Novo usuário.`);
   }
 
   // ------------------------------------------------------------- Abertura
@@ -224,6 +265,12 @@ export default function NovoSetorEmPagina({
           <a href="/cota/usuarios" className="rounded-full border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cadastrar o gestor e as pessoas</a>
           <button type="button" onClick={aoFechar} className="rounded-full border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Voltar aos setores</button>
         </div>
+        {cadastro && gabarito && (
+          <div className="sobe mx-auto mt-8 max-w-5xl text-left" style={atraso(11)}>
+            <CadastroEmLote pessoas={cadastro.pessoas} setores={cadastro.setores} cargos={cadastro.cargos}
+                            setorPadrao={cadastro.setor} inicial={{ arquivo: gabarito.arquivo, abas: gabarito.abas }} />
+          </div>
+        )}
       </section>
     );
   }
@@ -278,7 +325,7 @@ export default function NovoSetorEmPagina({
                   {[...setores.map((s) => ({ id: String(s.id), titulo: `Copiar de ${s.nome}`, texto: `${metasPorSetor[s.id]?.cargos.length ?? 0} cargos com metas e pesos` })),
                     { id: '', titulo: 'Do zero', texto: 'Sem cargos nem pesos: tudo se cadastra depois' }].map((o, i) => (
                     <button key={o.id || 'zero'} type="button" style={atraso(i)}
-                            onClick={() => { setOrigem(o.id); setCampos(camposDe(o.id ? Number(o.id) : undefined)); setCargos(null); setLista(null); }}
+                            onClick={() => { setOrigem(o.id); setCampos(camposDe(o.id ? Number(o.id) : undefined)); setCargos(null); setLista(null); setGabarito(null); }}
                             className={`sobe rounded-2xl border-[1.5px] p-4 text-left transition hover:-translate-y-0.5 ${origem === o.id
                               ? 'border-marca-600 bg-marca-600/10' : 'border-slate-200 hover:border-marca-600/50'}`}>
                       <b className="block text-slate-900">{o.titulo}</b>
@@ -325,7 +372,7 @@ export default function NovoSetorEmPagina({
                             : <input value={c.nome} placeholder="Nome do cargo" onChange={(e) => setCargos(cargosDoPasso.map((x, j) => (j === i ? { ...x, nome: e.target.value } : x)))} className={`${campo} py-1.5`} />}
                         </td>
                         <td className="py-1.5 text-right">
-                          <input value={c.meta} inputMode="numeric" placeholder={c.copiado ? 'sem meta' : ''}
+                          <input value={c.meta} inputMode="numeric" placeholder={c.copiado ? 'sem meta' : metaVemDaLista(c) ? 'da lista' : ''}
                                  title={c.copiado && !c.meta ? 'Cargo sem meta na base (sem cota): fica assim' : undefined}
                                  onChange={(e) => setCargos(cargosDoPasso.map((x, j) => (j === i ? { ...x, meta: e.target.value } : x)))}
                                  className={`${campo} w-32 py-1.5 text-right tabular-nums`} />
@@ -345,7 +392,31 @@ export default function NovoSetorEmPagina({
                   <label className="cursor-pointer rounded-full bg-marca-600 px-3.5 py-1 font-semibold text-white hover:bg-marca-700">
                     ⬆ Subir por lista<input type="file" accept=".xlsx,.csv" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) lerLista(f); e.target.value = ''; }} />
                   </label>
+                  <label className="cursor-pointer rounded-full border border-marca-600 px-3.5 py-1 font-semibold text-marca-700 hover:bg-marca-600/10 dark:text-marca-400">
+                    ⬆ Cargos do gabarito de pessoas<input type="file" accept=".xlsx" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) lerGabarito(f); e.target.value = ''; }} />
+                  </label>
                 </div>
+                {gabarito && (() => {
+                  const daTabela = new Set(cargosDoPasso.map((c) => chave(c.nome)));
+                  const doGab = new Set(gabarito.cargos.map(chave));
+                  const semNinguem = cargosDoPasso.filter((c) => c.nome.trim() && !doGab.has(chave(c.nome))).map((c) => c.nome.trim());
+                  const tirados = gabarito.cargos.filter((c) => !daTabela.has(chave(c)));
+                  const semMeta = cargosDoPasso.filter((c) => !c.copiado && !c.meta.trim() && !metaVemDaLista(c)).map((c) => c.nome.trim());
+                  return (
+                    <div className="estala mt-4 rounded-xl bg-slate-50 px-4 py-3 text-sm ring-1 ring-slate-200">
+                      <p className="font-semibold text-slate-800">
+                        Gabarito {gabarito.arquivo}: {gabarito.pessoas} pessoa(s) e {gabarito.cargos.length} cargo(s){gabarito.cargos.length ? ` — ${gabarito.cargos.join(', ')}` : ''}.
+                      </p>
+                      <p className="text-slate-600">As pessoas são cadastradas depois de &quot;Criar setor&quot;, com a mesma conferência do cadastro em lote (nada é gravado antes).</p>
+                      {gabarito.deOutroSetor > 0 && <p className="text-amber-700">{gabarito.deOutroSetor} linha(s) com outro setor na coluna Setor ficam de fora dos cargos (no cadastro, vão para o setor escrito, se ele existir).</p>}
+                      {semMeta.length > 0 && <p className="text-amber-700">Falta a meta de {semMeta.join(', ')}: digite acima ou suba a lista de metas com uma coluna para cada um.</p>}
+                      {semNinguem.length > 0 && <p className="text-slate-600">Sem ninguém no gabarito: {semNinguem.join(', ')} (o cargo é criado mesmo assim).</p>}
+                      {tirados.length > 0 && <p className="text-amber-700">Tirados da tabela, mas no gabarito: {tirados.join(', ')} — essas pessoas vão dar &quot;cargo não existe&quot; no cadastro.</p>}
+                      {gabarito.cargos.length === 0 && <p className="text-amber-700">Nenhum cargo na coluna Cargo das linhas de Atendente deste setor.</p>}
+                      <button type="button" onClick={() => setGabarito(null)} className="mt-1 text-xs text-slate-500 hover:underline">tirar o gabarito</button>
+                    </div>
+                  );
+                })()}
                 {lista && (
                   <div className="estala mt-4 rounded-xl bg-slate-50 px-4 py-3 text-sm ring-1 ring-slate-200">
                     {lista.plano.erro ? <p className="text-rose-700">{lista.plano.erro}</p> : (
@@ -403,8 +474,9 @@ export default function NovoSetorEmPagina({
                     ['Setor', nome.trim()],
                     ['Regras', base ? `cópia de ${base.nome}` : 'do zero'],
                     ['Filas', filasValidas.map((f) => f.nome.trim()).join(', ') || 'nenhuma por enquanto'],
-                    ['Cargos', cargosDoPasso.map((c) => `${c.nome} (${c.meta ? `${inteiro(Number(c.meta.replace(/\./g, '').replace(',', '.')) || 0)} pts` : 'sem meta'})`).join(' · ') || 'nenhum'],
+                    ['Cargos', cargosDoPasso.map((c) => `${c.nome} (${c.meta ? `${inteiro(Number(c.meta.replace(/\./g, '').replace(',', '.')) || 0)} pts` : metaVemDaLista(c) ? 'meta da lista' : 'sem meta'})`).join(' · ') || 'nenhum'],
                     ['Lista de metas', lista && !lista.plano.erro ? `${lista.arquivo}, aplicada ao criar` : 'não'],
+                    ['Pessoas', gabarito ? `${gabarito.pessoas} do gabarito ${gabarito.arquivo}: conferidas e cadastradas logo depois de criar` : 'depois, em Pessoas'],
                     ['Monitorias', comMonitorias ? `${campos.qtd} por semana, pontua a partir de ${campos.piso}%` : 'sem monitorias'],
                   ].map(([k, v], i) => (
                     <div key={k} className="sobe grid grid-cols-[130px_1fr] gap-3 py-2.5" style={atraso(i)}>
@@ -449,7 +521,7 @@ export default function NovoSetorEmPagina({
               {passo >= 4 && cargosDoPasso.length
                 ? cargosDoPasso.map((c, i) => (
                   <div key={i} className="estala flex justify-between border-b border-dashed border-slate-200 py-1 text-[13px]">
-                    <span>{c.nome || '—'}</span><b className="tabular-nums">{c.meta ? `${inteiro(Number(c.meta.replace(/\./g, '').replace(',', '.')) || 0)} pts` : '—'}</b>
+                    <span>{c.nome || '—'}</span><b className="tabular-nums">{c.meta ? `${inteiro(Number(c.meta.replace(/\./g, '').replace(',', '.')) || 0)} pts` : metaVemDaLista(c) ? 'da lista' : '—'}</b>
                   </div>
                 ))
                 : <span className="inline-block rounded-full border border-dashed border-slate-300 px-2.5 py-0.5 text-xs text-slate-400">no passo 4</span>}
