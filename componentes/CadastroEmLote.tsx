@@ -57,11 +57,11 @@ function gabaritoXlsx(setores: Setor[], cargos: Cargo[]): Uint8Array {
       { coluna: 'Nome', obrigatoria: 'Sim', oque: 'O nome completo. Uma pessoa por linha, na aba Pessoas (as outras abas são só de consulta).', exemplo: 'Maria da Silva Souza' },
       { coluna: 'E-mail', obrigatoria: 'Não', oque: 'Com e-mail (ou nome de usuário), o acesso já é criado e a senha temporária aparece no fim. Em branco: só a ficha, sem acesso.', exemplo: 'maria.souza@empresa.com.br' },
       { coluna: 'Setor', obrigatoria: umSetor ? 'Não' : 'Sim', oque: `O setor exatamente como na aba Setores e cargos.${umSetor ? ` Em branco: ${exemploSetor}.` : ''}`, exemplo: exemploSetor },
-      { coluna: 'Cargo', obrigatoria: 'Não', oque: 'Só para Atendente: um cargo do setor da pessoa, como na aba Setores e cargos. Gestão e qualidade ficam sem cargo (deixe em branco).', exemplo: exemploCargo },
+      { coluna: 'Cargo', obrigatoria: 'Não', oque: 'Só para Atendente: o cargo da pessoa no setor, como na aba Setores e cargos. Cargo que o setor ainda não tem é criado no cadastro, sem meta (a meta e os pesos se definem em Configuração › Pesos por cargo). Gestão e qualidade ficam sem cargo (em branco, ou "Gestão").', exemplo: exemploCargo },
       { coluna: 'Setor novo', obrigatoria: '—', oque: 'Para um setor que ainda vai ser criado: escreva o nome dele em Setor (ou deixe em branco) e os cargos que ele terá em Cargo. No assistente de Novo setor, o passo "Cargos e metas" cria os cargos a partir desta coluna, e no fim as pessoas são cadastradas com este mesmo arquivo.', exemplo: '' },
       { coluna: 'Nome no Hub', obrigatoria: 'Não', oque: 'Como a pessoa aparece nos relatórios do Hub, para ligar volume e avaliações a ela. Não pode repetir o de outra pessoa.', exemplo: 'Maria Souza' },
       { coluna: 'Entrada', obrigatoria: 'Não', oque: 'A data de entrada (dd/mm/aaaa). Setor e cargo valem a partir do mês dessa data. Em branco: o mês aberto.', exemplo: '01/11/2026' },
-      { coluna: 'Papel', obrigatoria: 'Não', oque: 'Atendente, Qualidade ou Gestor. Em branco: Atendente. Gestão e qualidade ficam fora das listas, das médias e das monitorias.', exemplo: 'Atendente' },
+      { coluna: 'Papel', obrigatoria: 'Não', oque: 'Atendente, Qualidade ou Gestor (Gestão vale como Gestor). Em branco: Atendente. Gestão e qualidade ficam fora das listas, das médias e das monitorias.', exemplo: 'Atendente' },
     ] },
     { nome: 'Setores e cargos', colunas: [
       { cabecalho: 'Setor', chave: 'setor', largura: 28 },
@@ -79,7 +79,25 @@ function gabaritoXlsx(setores: Setor[], cargos: Cargo[]): Uint8Array {
 
 const PAPEIS: Record<string, PapelUsuario> = {
   operador: 'operador', atendente: 'operador', qualidade: 'qualidade', monitor: 'qualidade', gestor: 'gestor',
+  // Gestão = Gestor (4.1.1).
+  gestao: 'gestor', gestora: 'gestor',
 };
+
+/** "Cargo" de quem é da gestão ou da qualidade: só repete o papel, não é cargo (4.1.1). */
+const CARGO_DO_PAPEL = new Set(['gestao', 'gestor', 'gestora', 'qualidade', 'monitor']);
+
+/**
+ * O papel da linha (4.1.1). Papel que não é Atendente, Qualidade nem Gestor,
+ * numa linha com Cargo, é um cargo escrito na coluna errada (ex.: "Analista"):
+ * a pessoa entra como Atendente, com aviso. Sem Cargo, continua erro.
+ */
+function papelDaLinha(textoPapel: string, textoCargo: string): { papel: PapelUsuario | null; aviso: string | null } {
+  if (!textoPapel) return { papel: 'operador', aviso: null };
+  const papel = PAPEIS[textoPapel];
+  if (papel) return { papel, aviso: null };
+  if (textoCargo && !CARGO_DO_PAPEL.has(textoCargo)) return { papel: 'operador', aviso: 'papel lido como Atendente' };
+  return { papel: null, aviso: null };
+}
 
 type Colunas = Record<keyof typeof COLUNAS, string | undefined>;
 
@@ -125,9 +143,9 @@ export function cargosDoGabarito(abas: Map<string, Linha[]>, nomeDoSetor: string
     const setor = col.setor ? normalizar(l[col.setor]) : '';
     if (setor && setor !== alvo) { deOutroSetor++; continue; }
     pessoas++;
-    const papel = col.papel ? normalizar(l[col.papel]) : '';
-    if (papel && PAPEIS[papel] !== 'operador') continue;
     const cargo = String(l[col.cargo] ?? '').trim().replace(/\s+/g, ' ');
+    const { papel } = papelDaLinha(col.papel ? normalizar(l[col.papel]) : '', normalizar(cargo));
+    if (papel !== 'operador') continue;
     if (cargo && !vistos.has(normalizar(cargo))) vistos.set(normalizar(cargo), cargo);
   }
   return { cargos: [...vistos.values()], pessoas, deOutroSetor };
@@ -136,7 +154,10 @@ export function cargosDoGabarito(abas: Map<string, Linha[]>, nomeDoSetor: string
 type Planejada = {
   linha: number; nome: string; email: string | null; papel: PapelUsuario;
   setor: Setor | null; cargo: Cargo | null; hub: string | null; entrada: string | null;
+  /** Cargo que ainda não existe no setor: é criado no cadastro, sem meta (4.1.1). */
+  cargoNovo: string | null;
   problemas: string[];
+  avisos: string[];
 };
 type Resultado = { nome: string; email: string | null; senha: string | null; erro: string | null };
 
@@ -215,20 +236,27 @@ export default function CadastroEmLote({ pessoas, setores, cargos, inicial, seto
         else if (vistosEmail.has(email)) problemas.push('e-mail repetido na planilha');
         vistosEmail.add(email);
       }
-      const textoPapel = col.papel ? normalizar(l[col.papel]) : '';
-      const papel = textoPapel ? PAPEIS[textoPapel] : 'operador';
+      const avisos: string[] = [];
+      const textoCargo = col.cargo ? normalizar(l[col.cargo]) : '';
+      const { papel, aviso } = papelDaLinha(col.papel ? normalizar(l[col.papel]) : '', textoCargo);
       if (!papel) problemas.push(`papel "${String(l[col.papel!])}" desconhecido (use Atendente, Qualidade ou Gestor)`);
+      if (aviso) avisos.push(`papel "${String(l[col.papel!]).trim()}" lido como Atendente`);
 
       const textoSetor = col.setor ? normalizar(l[col.setor]) : '';
       const setor = textoSetor ? setores.find((s) => normalizar(s.nome) === textoSetor) ?? null
         : setorPadrao ?? (setores.length === 1 ? setores[0] : null);
       if (!setor) problemas.push(textoSetor ? `setor "${String(l[col.setor!])}" não existe` : 'falta o setor');
 
-      const textoCargo = col.cargo ? normalizar(l[col.cargo]) : '';
-      const cargo = textoCargo && setor
+      const cargo = textoCargo && setor && papel === 'operador'
         ? cargos.find((c) => (c.setor_id ?? 1) === setor.id && normalizar(c.nome) === textoCargo) ?? null : null;
-      if (textoCargo && papel && papel !== 'operador') problemas.push('gestão e qualidade não têm cargo (deixe a coluna Cargo em branco)');
-      else if (textoCargo && setor && !cargo) problemas.push(`cargo "${String(l[col.cargo!])}" não existe em ${setor.nome}`);
+      let cargoNovo: string | null = null;
+      // Gestão e qualidade não têm cargo; "Gestão"/"Gestor" na coluna Cargo só repete o papel.
+      if (textoCargo && papel && papel !== 'operador') {
+        if (!CARGO_DO_PAPEL.has(textoCargo)) problemas.push('gestão e qualidade não têm cargo (deixe a coluna Cargo em branco)');
+      } else if (textoCargo && setor && !cargo) {
+        cargoNovo = String(l[col.cargo!]).trim().replace(/\s+/g, ' ');
+        avisos.push(`cria o cargo "${cargoNovo}" em ${setor.nome} (sem meta: defina em Configuração › Pesos por cargo)`);
+      }
 
       const hub = col.hub ? String(l[col.hub] ?? '').trim() || null : null;
       if (hub) {
@@ -240,7 +268,7 @@ export default function CadastroEmLote({ pessoas, setores, cargos, inicial, seto
       if (col.entrada && l[col.entrada] != null && String(l[col.entrada]).trim() && !entrada) {
         problemas.push('data de entrada inválida (use dd/mm/aaaa)');
       }
-      lista.push({ linha: i + 2, nome, email, papel: papel ?? 'operador', setor, cargo, hub, entrada, problemas });
+      lista.push({ linha: i + 2, nome, email, papel: papel ?? 'operador', setor, cargo, cargoNovo, hub, entrada, problemas, avisos });
     });
     if (!lista.length) { setErro('Nenhuma linha com nome.'); return; }
     setPlano(lista);
@@ -251,11 +279,32 @@ export default function CadastroEmLote({ pessoas, setores, cargos, inicial, seto
   async function cadastrar() {
     if (!prontas.length) return;
     const comAcesso = prontas.filter((p) => p.email).length;
+    // Os cargos que faltam (4.1.1), um por setor e nome.
+    const faltam = new Map<string, { setor: Setor; nome: string }>();
+    for (const p of prontas) if (p.cargoNovo && p.setor) faltam.set(`${p.setor.id}|${normalizar(p.cargoNovo)}`, { setor: p.setor, nome: p.cargoNovo });
+    const listaFaltam = [...faltam.values()].map((c) => `${c.nome} (${c.setor.nome})`).join(', ');
     if (!confirm(`Cadastrar ${prontas.length} pessoa(s)${comAcesso ? ` e criar ${comAcesso} acesso(s)` : ''}?`
+      + (faltam.size ? `\n\nCria ${faltam.size} cargo(s) sem meta: ${listaFaltam}. A meta e os pesos se definem em Configuração › Pesos por cargo.` : '')
       + '\n\nAs senhas temporárias aparecem uma vez só, no fim.')) return;
     const db = criarClienteNavegador();
     const feitos: Resultado[] = [];
-    for (const [i, p] of prontas.entries()) {
+
+    const criados = new Map<string, Cargo | string>(); // chave → cargo criado ou o erro
+    for (const [k, c] of faltam) {
+      setOcupado(`Criando o cargo ${c.nome} em ${c.setor.nome}…`);
+      const ordem = Math.max(0, ...cargos.filter((x) => (x.setor_id ?? 1) === c.setor.id).map((x) => x.ordem),
+        ...[...criados.values()].filter((x): x is Cargo => typeof x !== 'string' && x.setor_id === c.setor.id).map((x) => x.ordem)) + 1;
+      const { data, error } = await db.from('cargos').insert({ nome: c.nome, ordem, setor_id: c.setor.id }).select('*').single();
+      criados.set(k, error || !data ? await mensagemDoErro(error!) : (data as Cargo));
+    }
+
+    for (const [i, original] of prontas.entries()) {
+      let p = original;
+      if (p.cargoNovo && p.setor) {
+        const c = criados.get(`${p.setor.id}|${normalizar(p.cargoNovo)}`);
+        if (typeof c === 'string' || !c) { feitos.push({ nome: p.nome, email: p.email, senha: null, erro: `o cargo ${p.cargoNovo} não foi criado: ${c ?? ''}` }); continue; }
+        p = { ...p, cargo: c };
+      }
       setOcupado(`Cadastrando ${i + 1} de ${prontas.length}: ${p.nome}…`);
       const { data: criada, error } = await db.from('pessoas').insert({
         nome: p.nome, email: p.email, papel: p.papel, nome_hub: p.hub, admitido_em: p.entrada,
@@ -349,13 +398,16 @@ export default function CadastroEmLote({ pessoas, setores, cargos, inicial, seto
                   <Td className="text-xs text-slate-500">{p.linha}</Td>
                   <Td className="font-medium text-slate-800">{p.nome}</Td>
                   <Td className="text-xs">{p.email ?? <span className="text-slate-400">sem acesso</span>}</Td>
-                  <Td className="text-xs">{p.setor?.nome ?? '—'} · {p.cargo?.nome ?? <span className="text-slate-400">sem cargo</span>}</Td>
+                  <Td className="text-xs">{p.setor?.nome ?? '—'} · {p.cargo?.nome ?? p.cargoNovo ?? <span className="text-slate-400">sem cargo</span>}</Td>
                   <Td className="text-xs">{p.hub ?? '—'}</Td>
                   <Td className="whitespace-nowrap text-xs">{mesRotulo(p.entrada ? mesDeCompetencia(p.entrada) : competencia)}</Td>
                   <Td className="text-xs">
                     {p.problemas.length
                       ? <span className="text-rose-700 dark:text-rose-300">{p.problemas.join('; ')}</span>
                       : <span className="font-semibold text-marca-700 dark:text-marca-400">✓ pronta</span>}
+                    {!p.problemas.length && p.avisos.length > 0 && (
+                      <span className="block text-amber-700 dark:text-amber-300">{p.avisos.join('; ')}</span>
+                    )}
                   </Td>
                 </tr>
               ))}

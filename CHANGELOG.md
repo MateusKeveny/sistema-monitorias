@@ -35,6 +35,25 @@ para o Performance.
 
 ---
 
+## Performance 4.2.0 (ainda não publicada)
+
+Sem migração. Monitorias e Agenda sem mudança.
+
+- **O cadastro de pessoas por planilha cria os cargos que faltam** (Pessoas ›
+  Cadastrar várias pessoas, e o fim do assistente de novo setor). Cargo que o
+  setor ainda não tem deixa de ser erro: a linha fica pronta com o aviso "cria
+  o cargo X", e **Cadastrar** cria o cargo no setor (sem meta — a meta e os
+  pesos se definem em Configuração › Pesos por cargo) antes de cadastrar as
+  pessoas. A confirmação lista os cargos que serão criados.
+- **Gestão = Gestor**: "Gestão" na coluna Papel vale como Gestor, e "Gestão" ou
+  "Gestor" na coluna Cargo de quem é da gestão (ou "Qualidade" de quem é da
+  qualidade) só repete o papel — não é mais erro.
+- **Cargo na coluna Papel**: papel que não é Atendente, Qualidade nem Gestor,
+  numa linha com Cargo (ex.: "Analista", "Logística"), é lido como Atendente,
+  com aviso. No assistente, esses cargos também entram no passo Cargos e metas.
+
+---
+
 ## Performance 4.1.0 e Monitorias 6.3.2
 
 Migração **100** (`supabase/100-excluir-e-desativar-setor.sql`), só funções
