@@ -242,6 +242,11 @@ export function planejar(grade: string[][], ctx: ContextoMetas): Plano {
     const n = Math.max(...g.map((r) => r.length));
     g = Array.from({ length: n }, (_, j) => g.map((r) => r[j] ?? ''));
   }
+  // Arquivo trocado: o gabarito de cadastro de pessoas (Nome, E-mail, Setor...) não é lista de metas.
+  const cab = g[0].map(normal);
+  if (cab[0] === 'nome' || ['e-mail', 'email', 'nome no hub', 'papel'].some((c) => cab.includes(c))) {
+    return { ...vazio, erro: 'Este arquivo é o gabarito de cadastro de pessoas, não o de metas. Use "⬇ Baixar modelo" desta tela: a primeira coluna é "Métrica" e cada cargo é uma coluna.' };
+  }
   // As colunas de leitura do modelo (Como pontua, Faixa...) não são cargos.
   const leitura = ['como pontua', 'faixa', 'grupo', 'tipo', 'unidade', 'chave no sistema'];
   const cargosDaLista = g[0].slice(1).map((c) => String(c ?? '').trim())

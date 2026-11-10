@@ -139,7 +139,12 @@ export default function CadastroEmLote({ pessoas, setores, cargos }: {
     const por = new Map(Object.entries(cabecalho).map(([col, v]) => [normalizar(v), col]));
     const col = Object.fromEntries(Object.entries(COLUNAS)
       .map(([k, nomes]) => [k, nomes.map((n) => por.get(n)).find(Boolean)])) as Record<keyof typeof COLUNAS, string | undefined>;
-    if (!col.nome) { setErro('Falta a coluna "Nome" no cabeçalho.'); return; }
+    if (!col.nome) {
+      setErro(por.has('metrica')
+        ? 'Este arquivo é a lista de metas (Métrica por linha, cargo por coluna), não o cadastro de pessoas. Use "⬇ Baixar gabarito" desta tela.'
+        : 'Falta a coluna "Nome" no cabeçalho.');
+      return;
+    }
 
     const vistosEmail = new Set<string>();
     const vistosHub = new Set<string>();
