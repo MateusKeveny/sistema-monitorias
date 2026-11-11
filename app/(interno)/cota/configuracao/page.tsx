@@ -1,217 +1,63 @@
+import { redirect } from 'next/navigation';
 import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
-import { setorDoCookie } from '@/lib/setorEscolhido';
-import MatrizDePesos from '@/componentes/MatrizDePesos';
-import MetasPorLista from '@/componentes/MetasPorLista';
-import { contextoDasMetas } from '@/lib/metasPorLista';
-import ReguasDeFaixa from '@/componentes/ReguasDeFaixa';
-import PainelRegras from '@/componentes/PainelRegras';
-import SlaDosChamados from '@/componentes/SlaDosChamados';
-import { SLA_PRIMEIRA } from '@/lib/sla';
-import Abas from '@/componentes/Abas';
 import AvisosTeams, { type SituacaoAviso } from '@/componentes/AvisosTeams';
 import SubcategoriasDiario from '@/componentes/SubcategoriasDiario';
 import QuemVeODiario, { type VisibilidadeDoDiario } from '@/componentes/QuemVeODiario';
-import HistoricoDePesos, { type AlteracaoDePeso } from '@/componentes/HistoricoDePesos';
-import RegrasPorFila from '@/componentes/RegrasPorFila';
-import MetricasPorFila from '@/componentes/MetricasPorFila';
-import type { FilaReal, RegraReal } from '@/lib/metricasPorFila';
-import PassoDoSetor, { type ResumoDoSetor } from '@/componentes/PassoDoSetor';
-import type { Canal, Setor } from '@/lib/setores';
 import type { Subcategoria } from '@/lib/diario';
-import { hojeNoBrasil, mesDeCompetencia } from '@/lib/formatar';
-import type { Cargo, CargoDaPessoa, PesoCargo, Pessoa, ReferenciaCargo, RegraCota } from '@/lib/tipos';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * Configuração (1.20.0): só as regras da cota.
- *
- * "Pesos por cargo" é a tabela da planilha — métrica na linha, cargo na
- * coluna. "Faixas e nomes" tem as réguas das métricas com faixa e o nome de
- * cada métrica. O cargo de cada pessoa e o que aparece na tela inicial foram
- * para a ficha da pessoa, em Atendentes.
+ * As abas de antes da 4.4.0 e para onde foram: os links antigos (e os
+ * favoritos) continuam chegando ao lugar certo.
+ */
+const MUDOU_PARA: Record<string, string> = {
+  pesos: '/cota/metas',
+  filas: '/cota/metas',
+  metricas: '/cota/metricas-e-faixas',
+  faixas: '/cota/metricas-e-faixas',
+  historico: '/cota/alteracoes',
+};
+
+/**
+ * Configuração (4.4.0): o que é do sistema e quase não se mexe — os avisos no
+ * Teams e as regras do diário de bordo. As regras da cota (pesos, métricas,
+ * faixas, SLA e o histórico) saíram daqui para o grupo "Metas e métricas" do
+ * menu, cada uma na sua tela.
  */
 export default async function ConfiguracaoDaCota({
   searchParams,
 }: {
   searchParams: Promise<{ cat?: string; setor?: string }>;
 }) {
-  const perfil = await exigirGestor();
-  const { cat, setor: setorPedido } = await searchParams;
-  const escolhido = await setorDoCookie();
-  const db = await criarClienteServidor();
+  await exigirGestor();
+  const { cat, setor } = await searchParams;
+  if (cat && MUDOU_PARA[cat]) redirect(`${MUDOU_PARA[cat]}${setor ? `?setor=${setor}` : ''}`);
 
-  const [
-    { data: pessoas }, { data: cargos }, { data: regras },
-    { data: pesos }, { data: referencias }, { data: historico }, { data: avisos }, { data: subcategorias }, { data: usosSub }, { data: alteracoes },
-    { data: visibilidade }, { data: setores }, { data: canais }, { data: setoresDaPessoa },
-  ] = await Promise.all([
-    db.from('pessoas').select('id, ativo, desligado_em, perfil_de_teste'),
-    db.from('cargos').select('*').eq('ativo', true).order('ordem'),
-    db.from('regras').select('*').order('ordem'),
-    db.from('pesos_por_cargo').select('cargo_id, regra, peso, ativo'),
-    db.from('cargos_referencia').select('*'),
-    db.from('cargos_da_pessoa').select('*'),
+  const db = await criarClienteServidor();
+  const [{ data: avisos }, { data: subcategorias }, { data: usosSub }, { data: visibilidade }] = await Promise.all([
     // Avisos no Teams (migração 40).
     db.rpc('situacao_dos_avisos'),
     // Subcategorias de problema operacional e quantos registros usam cada uma (migração 46).
     db.from('diario_subcategorias').select('*').order('ordem'),
     db.from('diario_registros').select('subcategoria_id').not('subcategoria_id', 'is', null),
-    // Histórico de alteração de pesos (migração 56).
-    db.from('pesos_historico').select('*').order('alterado_em', { ascending: false }).limit(300),
     // Quem vê cada tipo de registro do diário (migração 67).
     db.from('diario_visibilidade').select('*'),
-    // Setores e canais (migração 79).
-    db.from('setores').select('*').order('ordem'),
-    db.from('canais_do_setor').select('*').order('ordem'),
-    // O setor de cada pessoa, para o passo ① (3.2.0).
-    db.from('setores_da_pessoa').select('pessoa_id, setor_id, desde'),
   ]);
-
   const usos: Record<number, number> = {};
   for (const u of (usosSub ?? []) as { subcategoria_id: number }[]) usos[u.subcategoria_id] = (usos[u.subcategoria_id] ?? 0) + 1;
-
-  // Um setor por vez (etapa 4): cargos, pesos e métricas são do setor.
-  const listaSetores = (setores ?? []) as Setor[];
-  const setorId = listaSetores.find((s) => String(s.id) === (setorPedido ?? escolhido))?.id ?? listaSetores[0]?.id ?? 1;
-  const doSetor = (x: { setor_id?: number }) => (x.setor_id ?? 1) === setorId;
-  const listaCargos = ((cargos ?? []) as Cargo[]).filter(doSetor);
-  const idsDosCargos = new Set(listaCargos.map((c) => c.id));
-  const listaPesos = ((pesos ?? []) as PesoCargo[]).filter((p) => idsDosCargos.has(p.cargo_id));
-  const listaRegras = ((regras ?? []) as RegraCota[]).filter(doSetor);
-
-  // Quantas pessoas na operação estão em cada cargo agora: é o "afeta N
-  // pessoas" da barra de salvar.
-  const competencia = mesDeCompetencia(hojeNoBrasil());
-  const naOperacao = ((pessoas ?? []) as Pick<Pessoa, 'id' | 'ativo' | 'desligado_em'>[]).filter((p) => !p.desligado_em);
-  const pessoasPorCargo: Record<number, number> = {};
-  for (const p of naOperacao) {
-    const vigente = ((historico ?? []) as CargoDaPessoa[])
-      .filter((h) => h.pessoa_id === p.id && h.desde <= competencia)
-      .sort((a, b) => b.desde.localeCompare(a.desde))[0];
-    if (vigente) pessoasPorCargo[vigente.cargo_id] = (pessoasPorCargo[vigente.cargo_id] ?? 0) + 1;
-  }
-
-  // ① Os setores, com quantas pessoas (no mês) e cargos cada um tem.
-  const setorAtualDe = new Map<string, number>();
-  for (const h of ((setoresDaPessoa ?? []) as { pessoa_id: string; setor_id: number; desde: string }[])
-    .filter((h) => h.desde <= competencia).sort((a, b) => a.desde.localeCompare(b.desde))) setorAtualDe.set(h.pessoa_id, h.setor_id);
-  const resumoDosSetores: ResumoDoSetor[] = listaSetores.map((s) => ({
-    id: s.id, nome: s.nome, monitorias: s.monitorias !== false,
-    // O perfil de teste (migração 39) não conta: é um usuário fantasma.
-    pessoas: naOperacao.filter((p) => !(p as { perfil_de_teste?: boolean }).perfil_de_teste && setorAtualDe.get(p.id) === s.id).length,
-    cargos: ((cargos ?? []) as Cargo[]).filter((c) => (c.setor_id ?? 1) === s.id).length,
-  }));
-
-  const base = listaCargos.find((c) => c.nome === 'Atendente Júnior') ?? listaCargos[0];
-  const pesosBase = Object.fromEntries(listaPesos
-    .filter((p) => p.cargo_id === base?.id)
-    .map((p) => [p.regra, p.ativo ? Number(p.peso) : null]));
-
-  const cargoDoSla = listaCargos.find((c) => listaPesos.some((p) => p.cargo_id === c.id && p.regra === SLA_PRIMEIRA && p.ativo));
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">Configuração</h1>
         <p className="mt-1 text-sm text-sobre-fundo-suave">
-          As regras da cota. Mudar algo recalcula os meses em aberto; os fechados guardam o valor da época.
+          Os avisos no Teams e as regras do diário de bordo. Pesos, métricas e faixas ficam em Metas e métricas, no menu.
         </p>
       </div>
-
-      <PassoDoSetor setores={resumoDosSetores} atual={setorId} administrador={!!perfil.administrador}
-                    caminho='/cota/configuracao' cat={cat} />
-
-      {/* `key`: o atalho "+ Métrica manual" troca só o ?cat= e precisa reabrir na aba certa. */}
-      <Abas
-        key={`${setorId}-${cat ?? 'pesos'}`}
-        inicial={cat}
-        itens={[
-          {
-            chave: 'pesos',
-            rotulo: 'Pesos por cargo',
-            conteudo: (
-              <div className="space-y-4">
-                {/* A matriz numa planilha (4.0.0): baixar, editar no Excel, subir com conferência. */}
-                <MetasPorLista key={`lista-${setorId}`} setorId={setorId}
-                               setorNome={listaSetores.find((s) => s.id === setorId)?.nome ?? 'setor'}
-                               ctx={contextoDasMetas(listaCargos, listaRegras, listaPesos, {
-                                 setorId,
-                                 // As filas ativas do setor: de onde saem as métricas automáticas criadas pela lista.
-                                 filas: ((canais ?? []) as (Canal & { grupo_tma?: string | null })[]).filter((c) => c.setor_id === setorId && c.ativo).map((c) => ({
-                                   grupo_tme: c.grupo_tme ?? null, grupo_csat: c.grupo_csat ?? null,
-                                   grupo_nota: c.grupo_nota ?? null, regra_finalizado: c.regra_finalizado ?? null,
-                                   // 4.2.0: TMA e a fila, para a métrica "· Fila" valer só nela.
-                                   grupo_tma: c.grupo_tma ?? null, id: c.id, apelido: c.apelido ?? undefined, nome: c.nome,
-                                 })),
-                               })} />
-                <MatrizDePesos
-                  setorId={setorId}
-                  cargos={listaCargos}
-                  regras={listaRegras}
-                  pesos={listaPesos}
-                  referencias={(referencias ?? []) as ReferenciaCargo[]}
-                  pessoasPorCargo={pessoasPorCargo}
-                />
-              </div>
-            ),
-          },
-          {
-            // 4.2.0 (migração 103): o que cada fila mede e as faixas de TME, TMA e C-SAT.
-            chave: 'metricas',
-            rotulo: 'Métricas por fila',
-            conteudo: (
-              <MetricasPorFila key={`metricas-${setorId}`} setorId={setorId}
-                               setorNome={listaSetores.find((s) => s.id === setorId)?.nome ?? 'setor'}
-                               filas={((canais ?? []) as FilaReal[]).filter((c) => c.setor_id === setorId && (c as { ativo?: boolean }).ativo !== false)}
-                               regras={(regras ?? []) as RegraReal[]} />
-            ),
-          },
-          {
-            chave: 'filas',
-            rotulo: 'Regras por fila',
-            conteudo: (
-              <RegrasPorFila setores={listaSetores.filter((s) => s.id === setorId)} filas={(canais ?? []) as Canal[]} regras={listaRegras} pesos={listaPesos} cargos={listaCargos} />
-            ),
-          },
-          {
-            chave: 'historico',
-            rotulo: 'Histórico de alterações',
-            conteudo: <HistoricoDePesos alteracoes={(alteracoes ?? []) as AlteracaoDePeso[]} />,
-          },
-          {
-            chave: 'faixas',
-            rotulo: 'Faixas e nomes das métricas',
-            conteudo: (
-              <div className="space-y-6">
-                <ReguasDeFaixa regras={listaRegras} pesosBase={pesosBase}
-                               nomeBase={(base?.nome ?? '').replace(/^Atendente\s+/, '')}
-                               tmePorPessoa={Object.fromEntries(((canais ?? []) as Canal[])
-                                 .filter((c) => c.grupo_tme && doSetor(c))
-                                 .map((c) => [c.grupo_tme!, c.tme_por_pessoa_desde ?? null]))} />
-                {/* 4.3.0 (migração 104): o SLA dos chamados em faixas. Os pesos mostrados são os do cargo que recebe o SLA. */}
-                <SlaDosChamados key={`sla-${setorId}`} regras={listaRegras}
-                                pesosBase={Object.fromEntries(listaPesos.filter((p) => p.cargo_id === cargoDoSla?.id)
-                                  .map((p) => [p.regra, p.ativo ? Number(p.peso) : null]))}
-                                nomeBase={(cargoDoSla?.nome ?? '').replace(/^Atendente\s+/, '')} />
-                <PainelRegras regras={listaRegras} setorId={setorId} />
-              </div>
-            ),
-          },
-          // O que quase não se mexe (3.0): os avisos no Teams e o diário de bordo, numa aba só.
-          {
-            chave: 'outros',
-            rotulo: 'Outros',
-            conteudo: (
-              <div className="space-y-6">
-                <AvisosTeams situacao={(avisos ?? []) as SituacaoAviso[]} />
-                <QuemVeODiario configuracao={(visibilidade ?? []) as VisibilidadeDoDiario[]} />
-                <SubcategoriasDiario subcategorias={(subcategorias ?? []) as Subcategoria[]} usos={usos} />
-              </div>
-            ),
-          },
-        ]}
-      />
+      <AvisosTeams situacao={(avisos ?? []) as SituacaoAviso[]} />
+      <QuemVeODiario configuracao={(visibilidade ?? []) as VisibilidadeDoDiario[]} />
+      <SubcategoriasDiario subcategorias={(subcategorias ?? []) as Subcategoria[]} usos={usos} />
     </div>
   );
 }

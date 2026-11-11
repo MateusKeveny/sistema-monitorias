@@ -14,6 +14,7 @@ import CarimboDoResumo from '@/componentes/CarimboDoResumo';
 import { todas } from '@/lib/consultas';
 import VerComoAtendente from '@/componentes/VerComoAtendente';
 import { setorDoCookie } from '@/lib/setorEscolhido';
+import { filasDoSetor, setorDaPessoa, setorDoPerformance } from '@/lib/filasDoSetor';
 
 export const dynamic = 'force-dynamic';
 
@@ -116,14 +117,16 @@ export default async function InicioCota({
    */
   // Na 3.0 o topo vira a faixa verde do protótipo: a arte de fundo só aqui,
   // com o texto claro por cima (globals.css, .faixa-inicio e .sobre-arte).
+  // 4.4.0: a mesma abertura do Início do gestor (PainelGestor), no jeito da
+  // criação de setores — superfície lisa, título grande e o mês embaixo.
   const Topo = ({ selo, direita }: { selo?: React.ReactNode; direita?: React.ReactNode }) => (
-    <div className="faixa-inicio sobre-arte relative overflow-hidden rounded-[22px] px-8 py-7">
+    <div className="abertura sobe relative overflow-hidden rounded-[26px] bg-superficie px-7 py-8 shadow-sm ring-1 ring-slate-200 sm:px-9">
     <div className="relative flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 className="text-[1.9rem] font-bold tracking-tight text-sobre-fundo">
-          {saudacao()}, {nomeCurto(perfil.nome).split(' ')[0]}
+        <h1 className="text-[2.15rem] font-semibold leading-[1.08] tracking-[-.035em] text-slate-900 sm:text-[2.5rem]">
+          {saudacao()}, <span className="text-marca-700 dark:text-marca-400">{nomeCurto(perfil.nome).split(' ')[0]}</span>.
         </h1>
-        <div className="mt-1.5">
+        <div className="mt-2.5">
           <SetasDeCompetencia competencia={competencia} atual={atual} caminho="/cota" compacto
                               manter={{ canal: canalPedido }} />
         </div>
@@ -180,12 +183,31 @@ export default async function InicioCota({
   }
 
   if (perfil.papel === 'gestor') {
+    // 4.4.0: as filas do setor escolhido no menu (o Telecom tem quatro).
+    const setorPedido = await setorDoCookie();
+    const dbSetor = await criarClienteServidor();
+    const { setorId } = await setorDoPerformance(dbSetor, setorPedido);
+    const filas = await filasDoSetor(dbSetor, setorId);
     return (
-      <ProvedorDeCanal inicial={canalPedido === 'diretores' ? 'diretores' : 'huggy'}>
+      <ProvedorDeCanal inicial={canalPedido} canais={filas.map((f) => ({ chave: f.apelido, rotulo: f.nome }))}>
         <div className="space-y-6">
           {copiaDeTeste && <VerComoAtendente />}
-          <Topo selo={<SeloDoGestor competencia={competencia} atual={atual} />} direita={<AbasDeCanal />} />
-          <PainelGestor competencia={competencia} atual={atual} fonte={fonte} setorPedido={await setorDoCookie()} />
+          {/* 4.4.0: a abertura no jeito da criação de setores, desenhada pelo
+              painel (a frase da meta e os passos dependem dos dados dele). */}
+          <PainelGestor competencia={competencia} atual={atual} fonte={fonte} setorPedido={String(setorId)}
+                        abertura={{
+                          saudacao: `${saudacao()}, ${nomeCurto(perfil.nome).split(' ')[0]}`,
+                          abas: <AbasDeCanal />,
+                          cabecalho: (
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                              <SetasDeCompetencia competencia={competencia} atual={atual} caminho="/cota" compacto
+                                                  manter={{ canal: canalPedido }} />
+                              <SeloDoGestor competencia={competencia} atual={atual} />
+                              {carimbo && <span className="text-xs text-slate-500">{carimbo}</span>}
+                              {emAberto && <span className="text-xs text-slate-500">{mesRotulo(atual)} ainda sem lançamentos</span>}
+                            </div>
+                          ),
+                        }} />
         </div>
       </ProvedorDeCanal>
     );
@@ -243,8 +265,11 @@ export default async function InicioCota({
       vencendo && { texto: `${vencendo} registro${vencendo > 1 ? 's' : ''} do diário vence${vencendo > 1 ? 'm' : ''} em até 7 dias`,
                     acao: 'Renovar', href: '/cota/diario?filtro=vencendo' },
     ].filter(Boolean) as { texto: string; acao: string; href: string }[];
+    // 4.4.0: a equipe que o Pleno acompanha é a do setor dele.
+    const setorDoPleno = await setorDaPessoa(db, perfil.id, competencia);
+    const filasDoPleno = await filasDoSetor(db, setorDoPleno);
     return (
-      <ProvedorDeCanal inicial={canalPedido === 'diretores' ? 'diretores' : 'huggy'}>
+      <ProvedorDeCanal inicial={canalPedido} canais={filasDoPleno.map((f) => ({ chave: f.apelido, rotulo: f.nome }))}>
         <div className="space-y-6">
           <Topo selo={seloOperador} />
           {pendenciasDoDiario.length > 0 && (
@@ -276,7 +301,7 @@ export default async function InicioCota({
                 <AbasDeCanal />
               </div>
               <PainelGestor competencia={competencia} atual={atual} comPendencias={false}
-                            fonte={fonte} setorPedido={await setorDoCookie()} />
+                            fonte={fonte} setorPedido={String(setorDoPleno)} />
             </>
           )}
         </div>

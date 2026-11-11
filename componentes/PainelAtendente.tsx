@@ -13,14 +13,8 @@ import { hojeNoBrasil, periodoDaSemana } from '@/lib/formatar';
 import ListaDeMonitorias from '@/componentes/ListaDeMonitorias';
 import { todas, conferida } from '@/lib/consultas';
 import { MONITORIAS_PADRAO, monitoriasPorSetor, setorDasPessoas, textoDoPiso } from '@/lib/monitoriasDoSetor';
+import { faixaDoCsat, faixasDeCsat, filasDoSetor as lerFilasDoSetor, metaDoCsat, textoDaMeta } from '@/lib/filasDoSetor';
 
-const CANAIS: { chave: Canal; rotulo: string }[] = [
-  { chave: 'huggy', rotulo: 'Expansão' },
-  { chave: 'diretores', rotulo: 'Diretores-Expansão' },
-];
-const META_CSAT = 0.95;
-/** Faixas de C-SAT na ordem em que se sobe. */
-const DEGRAUS_CSAT = [0.80, 0.85, 0.90, 0.95];
 
 type CsatSemana = { origem: Canal; semana: number; avaliacoes: number; positivas: number; mes_competencia: string };
 type Volume = { canal: Canal; semana: number; finalizados: number; tme_seg: number | null; mes_competencia: string };
@@ -101,6 +95,16 @@ export default async function PainelAtendente({
     .some((f) => f.apelido === fila && !!f.tme_por_pessoa_desde && f.tme_por_pessoa_desde <= competencia);
   const piso = porSetorMon.get(setorNoMes.get(pessoaId) ?? 1)?.piso ?? MONITORIAS_PADRAO.piso;
   const tomDaNota = (v: number) => tomDaNotaCom(v, piso);
+  // 4.4.0: as filas do setor da pessoa (o Telecom tem quatro) e, de cada uma,
+  // a regra de finalizado, as faixas de TME, C-SAT e nota e a meta de C-SAT.
+  // Até a 4.3 eram as duas da Expansão, escritas aqui.
+  const filasDaPessoa = await lerFilasDoSetor(db, setorNoMes.get(pessoaId) ?? 1);
+  const CANAIS = filasDaPessoa.map((f) => ({ chave: f.apelido as Canal, rotulo: f.nome }));
+  const filaDe = (c: Canal) => filasDaPessoa.find((f) => f.apelido === c);
+  const faixasCsat = await faixasDeCsat(db, filasDaPessoa.map((f) => f.grupoCsat));
+  const faixasDaFila = (c: Canal) => faixasCsat[filaDe(c)?.grupoCsat ?? ''] ?? [];
+  const metaDaFila = (c: Canal) => metaDoCsat(faixasDaFila(c));
+  const rotuloDaFila = (c: Canal) => CANAIS.find((x) => x.chave === c)?.rotulo ?? c;
   // O mês aberto e o anterior vêm do resumo quando ele está em dia (migração 58).
   const [fonte, fonteAntes] = await todas([fonteDoMes(competencia), fonteDoMes(anterior)]);
 
@@ -151,7 +155,7 @@ export default async function PainelAtendente({
   const avaliacoesDo = (c: Canal) => semanasCsat.filter((s) => s.origem === c).reduce((a, s) => a + s.avaliacoes, 0);
   const canalInicial: Canal = CANAIS.some((c) => c.chave === canalPedido)
     ? canalPedido as Canal
-    : avaliacoesDo('diretores') > avaliacoesDo('huggy') ? 'diretores' : 'huggy';
+    : [...CANAIS].sort((a, b) => avaliacoesDo(b.chave) - avaliacoesDo(a.chave))[0]?.chave ?? 'huggy';
 
   const resultado = linhas.reduce((a, l) => a + Number(l.cota), 0);
   const meta = peso.get('meta') ?? null;
@@ -183,18 +187,22 @@ export default async function PainelAtendente({
 
   // ------------------------------------------------------- quanto falta
   const falta = meta != null ? meta - resultado : null;
-  const canalPrincipal: Canal = volumes.filter((v) => v.canal === 'diretores').reduce((a, v) => a + v.finalizados, 0)
-    > volumes.filter((v) => v.canal === 'huggy').reduce((a, v) => a + v.finalizados, 0) ? 'diretores' : 'huggy';
-  const pesoDoAtendimento = peso.get(canalPrincipal === 'huggy' ? 'huggy_atendimento' : 'diretores_atendimento') ?? 0;
+  // A fila em que a pessoa mais finalizou no mês; sem volume, a primeira do setor.
+  const finalizadosDo = (c: Canal) => volumes.filter((v) => v.canal === c).reduce((a, v) => a + v.finalizados, 0);
+  const canalPrincipal: Canal = [...CANAIS].sort((a, b) => finalizadosDo(b.chave) - finalizadosDo(a.chave))[0]?.chave ?? 'huggy';
+  const pesoDoAtendimento = peso.get(filaDe(canalPrincipal)?.regraFinalizado ?? '') ?? 0;
   const finalizadosQueFaltam = falta != null && falta > 0 && pesoDoAtendimento > 0 ? Math.ceil(falta / pesoDoAtendimento) : null;
 
   // O próximo degrau de C-SAT e o que ele acrescentaria, no canal principal.
   const doPrincipal = semanasCsat.filter((s) => s.origem === canalPrincipal);
   const avalPrincipal = doPrincipal.reduce((a, s) => a + s.avaliacoes, 0);
   const csatPrincipal = avalPrincipal ? doPrincipal.reduce((a, s) => a + s.positivas, 0) / avalPrincipal : null;
-  const proximoDegrau = csatPrincipal != null ? DEGRAUS_CSAT.find((d) => d > csatPrincipal) ?? null : null;
-  const faixaDe = (v: number) => (v >= 0.95 ? 'csat_95' : v >= 0.90 ? 'csat_90_95'
-    : v >= 0.85 ? 'csat_85_90' : v >= 0.80 ? 'csat_80_85' : 'csat_abaixo_80');
+  // Os degraus e as faixas são os da fila principal (Expansão 80/85/90/95, Telecom 94).
+  const faixasPrincipal = faixasDaFila(canalPrincipal);
+  const proximoDegrau = csatPrincipal != null
+    ? faixasPrincipal.map((f) => f.min).filter((m): m is number => m != null).find((d) => d > csatPrincipal) ?? null : null;
+  const faixaDe = (v: number) => faixaDoCsat(faixasPrincipal, v)?.chave ?? '';
+  const faixaDoTopo = faixasPrincipal.find((f) => f.max == null && f.min != null);
   const finalizadosPrincipal = volumes.filter((v) => v.canal === canalPrincipal).reduce((a, v) => a + v.finalizados, 0);
   const ganhoDoDegrau = csatPrincipal != null && proximoDegrau != null
     ? ((peso.get(faixaDe(proximoDegrau)) ?? 0) - (peso.get(faixaDe(csatPrincipal)) ?? 0)) * finalizadosPrincipal
@@ -226,16 +234,17 @@ export default async function PainelAtendente({
     });
     const ultimaCsat = [...semanasDoQuadro].reverse().find((s) => s.csat != null)?.csat ?? csatPrincipal;
     // TME da própria pessoa: só quando a fila avalia por pessoa (migração 90).
-    const faixasTmeDoCanal = todasRegras.filter((r) => r.grupo === (canalPrincipal === 'huggy' ? 'tme' : 'tme_diretores'))
+    const faixasTmeDoCanal = todasRegras.filter((r) => r.grupo === filaDe(canalPrincipal)?.grupoTme)
       .sort((x, y) => Number(x.faixa_min ?? 0) - Number(y.faixa_min ?? 0));
     const ultimoTme = [...semanasDoQuadro].reverse().find((s) => s.tme != null)?.tme ?? null;
     const faixaTmeAtual = ultimoTme == null ? null : [...faixasTmeDoCanal].reverse().find((f) => Number(f.faixa_min ?? 0) <= ultimoTme) ?? null;
     const regraMonitoria = [...peso.keys()].find((k) => /^monitoria(_s\d+)?$/.test(k));
     dadosDoQuadro = {
-      fila: CANAIS.find((c) => c.chave === canalPrincipal)!.rotulo,
+      fila: rotuloDaFila(canalPrincipal),
       semanas: semanasDoQuadro,
       pesoAtendimento: pesoDoAtendimento,
-      csat: ultimaCsat != null ? { pesoAtual: peso.get(faixaDe(ultimaCsat)) ?? 0, pesoTopo: peso.get('csat_95') ?? 0, rotuloTopo: 'a partir de 95%' } : null,
+      csat: ultimaCsat != null ? { pesoAtual: peso.get(faixaDe(ultimaCsat)) ?? 0, pesoTopo: peso.get(faixaDoTopo?.chave ?? '') ?? 0,
+                                   rotuloTopo: `a partir de ${textoDaMeta(metaDaFila(canalPrincipal))}` } : null,
       tme: tmePorPessoa(canalPrincipal) && faixaTmeAtual && faixasTmeDoCanal[0] ? {
         pesoAtual: peso.get(faixaTmeAtual.chave) ?? 0,
         pesoMelhor: peso.get(faixasTmeDoCanal[0].chave) ?? 0,
@@ -268,9 +277,10 @@ export default async function PainelAtendente({
   const perdas = porRegra.filter((r) => r.cota < 0).sort((a, b) => a.cota - b.cota);
 
   // Quanto vale cada coisa no cargo da pessoa.
-  const regraDaNota = (n: number) => todasRegras.find((r) => r.grupo === 'nota' && Number(r.faixa_min) === n)?.chave;
+  const grupoDaNota = filaDe(canalPrincipal)?.grupoNota ?? 'nota';
+  const regraDaNota = (n: number) => todasRegras.find((r) => r.grupo === grupoDaNota && Number(r.faixa_min) === n)?.chave;
   const valeQuanto = [
-    { rotulo: `Cada atendimento finalizado em ${CANAIS.find((c) => c.chave === canalPrincipal)!.rotulo}`, peso: pesoDoAtendimento },
+    { rotulo: `Cada atendimento finalizado em ${rotuloDaFila(canalPrincipal)}`, peso: pesoDoAtendimento },
     { rotulo: 'Cada nota 5', peso: peso.get(regraDaNota(5) ?? '') },
     { rotulo: 'Cada nota 1', peso: peso.get(regraDaNota(1) ?? '') },
   ].filter((v): v is { rotulo: string; peso: number } => v.peso != null && v.peso !== 0);
@@ -320,14 +330,15 @@ export default async function PainelAtendente({
       const v = vol(anterior).find((x) => x.semana === s);
       return v && (v.tme_seg ?? 0) > 0 ? v.tme_seg! : null;
     });
-    const faixasTme = todasRegras.filter((r) => r.grupo === (c === 'huggy' ? 'tme' : 'tme_diretores'));
+    const faixasTme = todasRegras.filter((r) => r.grupo === filaDe(c)?.grupoTme);
+    const metaC = metaDaFila(c);
 
     const dCsat = csatMes != null && csatAntes != null ? (csatMes - csatAntes) * 100 : null;
     const dVol = volTotal && volAntes ? (volTotal - volAntes) / volAntes : null;
     const dTme = tmeMes != null && tmeAntes != null ? tmeMes - tmeAntes : null;
 
     return [c, {
-      blocoCsat: <Bloco rotulo="Meu C-SAT" nota="meta 95%" min={0.7} max={1}
+      blocoCsat: <Bloco rotulo="Meu C-SAT" nota={`meta ${textoDaMeta(metaC)}`} min={0.7} max={1}
                         valor={csatMes != null ? percentual(csatMes) : '—'}
                         comparacao={dCsat == null ? null : { texto: `${seta(dCsat)} ${num(Math.abs(dCsat), 1)} pt`, melhor: dCsat >= 0, vs }}
                         barras={csatSemanas.map((s) => s && { v: s.valor, cor: BARRA[tomDoCsat(s.valor)] })} />,
@@ -348,7 +359,7 @@ export default async function PainelAtendente({
             <Secao titulo={`Seu C-SAT por semana · ${rotulo}`} acao={<Link href="/cota/comparativo?cat=csat" className="whitespace-nowrap rounded-full border border-slate-200 px-2.5 py-0.5 text-xs text-slate-600 hover:border-marca-600">comparar meses ›</Link>} subtitulo="Positivas sobre avaliações. Escala de 75% a 100%.">
               {csatMes == null ? <Vazio>Sem avaliações nesta fila.</Vazio> : (
                 <GraficoDeLinha min={0.75} max={1} formatar={percentual}
-                                referencia={{ valor: META_CSAT, rotulo: 'meta 95%' }}
+                                referencia={{ valor: metaC, rotulo: `meta ${textoDaMeta(metaC)}` }}
                                 comparacao={{ pontos: csatSemanasAntes, ...nomes }}
                                 pontos={csatSemanas.map((s): PontoDaLinha => s && { valor: s.valor, tom: tomDoCsat(s.valor) })} />
               )}
@@ -454,7 +465,7 @@ export default async function PainelAtendente({
   const doCanal = (chave: string) => CANAIS.map(({ chave: c }) => <NoCanal key={c} canal={c}>{porCanal[c][chave]}</NoCanal>);
 
   // --------------------------------------------------- como chegar à meta
-  const nomeCanalPrincipal = CANAIS.find((c) => c.chave === canalPrincipal)!.rotulo;
+  const nomeCanalPrincipal = rotuloDaFila(canalPrincipal);
   const passos: { texto: React.ReactNode; tom: 'bom' | 'atencao' }[] = [];
   if (meta != null && falta != null && falta > 0) {
     passos.push({ tom: 'atencao', texto: <>Faltam <b>{num(falta)} pts</b></> });
@@ -619,7 +630,7 @@ export default async function PainelAtendente({
   ];
 
   return (
-    <ProvedorDeCanal inicial={canalInicial}>
+    <ProvedorDeCanal inicial={canalInicial} canais={CANAIS}>
       <div className="space-y-6">
         {topo}
         <div className="space-y-4">

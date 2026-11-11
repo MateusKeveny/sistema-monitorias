@@ -30,8 +30,6 @@ type LinhaFechada = {
 };
 
 const NOME_CANAL: Record<string, string> = {
-  huggy: 'Expansão',
-  diretores: 'Diretores-Expansão',
   geral: 'Monitoria e lançamentos',
 };
 
@@ -67,8 +65,9 @@ export default async function Historico({
   const db = await criarClienteServidor();
   // Fila nova (3.0) aparece pelo nome do cadastro; as de sempre, como antes.
   const { data: nomesDasFilas } = await db.from('canais_do_setor').select('apelido, nome');
-  const nomeDaOrigem = (o: string) => NOME_CANAL[o]
-    ?? (nomesDasFilas ?? []).find((f) => f.apelido === o)?.nome ?? o;
+  // 4.4.0: o nome do cadastro primeiro (cada setor tem as suas filas).
+  const nomeDaOrigem = (o: string) => (nomesDasFilas ?? []).find((f) => f.apelido === o)?.nome
+    ?? NOME_CANAL[o] ?? o;
 
   const { data: pessoas } = veOTime
     ? await conferida(db.from('pessoas').select('id, nome').order('nome'))

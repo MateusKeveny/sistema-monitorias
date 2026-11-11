@@ -2,6 +2,7 @@ import AvaliacoesDeUmACinco, { type AvaliacaoDoAtendente } from '@/componentes/A
 import CsatDaEquipe, { type NotasCsat, type VolumeCsat } from '@/componentes/CsatDaEquipe';
 import AssuntosDoMes, { type AssuntoDoMes } from '@/componentes/AssuntosDoMes';
 import { setorDoCookie } from '@/lib/setorEscolhido';
+import { setorDasPessoas } from '@/lib/monitoriasDoSetor';
 import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
 import { Painel, Secao, Vazio } from '@/componentes/ui';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
@@ -10,7 +11,6 @@ import { mesRotulo, percentual, periodoDaSemana } from '@/lib/formatar';
 
 export const dynamic = 'force-dynamic';
 
-const CANAIS = [['huggy', 'Expansão'], ['diretores', 'Diretores-Expansão']] as const;
 
 /**
  * Meu C-SAT (2.10.0): as avaliações do Hub de 1 a 5, as mesmas do cálculo do
@@ -39,14 +39,20 @@ export default async function MeuCsat({
     veOTime ? db.from('pessoas').select('id, nome, papel, ativo, desligado_em, perfil_de_teste').order('nome') : vazio,
     veOTime ? db.from('volume_semanal').select('pessoa_id, canal, canal_id, semana, finalizados').eq('mes_competencia', competencia) : vazio,
     veOTime ? db.from('vw_csat_semanal').select('pessoa_id, origem, semana, avaliacoes, positivas').eq('mes_competencia', competencia) : vazio,
-    veOTime ? db.from('canais_do_setor').select('id, apelido, nome, ordem, setor_id').eq('ativo', true).order('ordem') : vazio,
+    // 4.4.0: as filas vêm para todos — o atendente também precisa do nome da fila dele.
+    db.from('canais_do_setor').select('id, apelido, nome, ordem, setor_id').eq('ativo', true).order('ordem'),
     // Assuntos mais tratados (3.9.0, migração 99): a tabulação das avaliações do mês, por fila.
     veOTime ? db.rpc('assuntos_do_mes', { p_mes: competencia }) : vazio,
     veOTime ? db.from('setores').select('id').eq('ativo', true).order('ordem') : vazio,
     setorDoCookie(),
   ]);
   type P = { id: string; nome: string; papel: string; ativo: boolean; desligado_em: string | null; perfil_de_teste?: boolean };
-  const todas = ((pessoas ?? []) as P[]).filter((p) => !p.perfil_de_teste && p.papel !== 'administrador' && p.papel !== 'diretoria');
+  // 4.4.0: só quem está no setor escolhido no menu (antes vinham os dois setores).
+  const setorDe = veOTime ? await setorDasPessoas(db, competencia) : new Map<string, number>();
+  const setorDaTelaCsat = ((setoresDb ?? []) as { id: number }[]).find((x) => String(x.id) === setorEscolhido)?.id
+    ?? ((setoresDb ?? []) as { id: number }[])[0]?.id ?? 1;
+  const todas = ((pessoas ?? []) as P[]).filter((p) => !p.perfil_de_teste && p.papel !== 'administrador' && p.papel !== 'diretoria'
+    && (setorDe.get(p.id) ?? 1) === setorDaTelaCsat);
   // No seletor, quem está na operação.
   const lista = todas.filter((p) => p.ativo && !p.desligado_em);
   const vols = (volumes ?? []) as VolumeCsat[];
@@ -90,8 +96,9 @@ export default async function MeuCsat({
     ? await db.from('avaliacoes').select('origem, data, protocolo, nota, tabulacao')
       .eq('pessoa_id', pessoaId).gte('data', inicio).lte('data', fim).gte('nota', 1).lte('nota', 5)
     : { data: [] };
-  const notas = (data ?? []) as (AvaliacaoDoAtendente & { origem: 'huggy' | 'diretores' })[];
-  const canais = CANAIS.filter(([c]) => notas.some((a) => a.origem === c));
+  const notas = (data ?? []) as (AvaliacaoDoAtendente & { origem: string })[];
+  // As filas em que a pessoa tem avaliação, com o nome do cadastro (4.4.0).
+  const canais = filas.filter(([c]) => notas.some((a) => a.origem === c));
   const nome = todas.find((p) => p.id === pessoaId)?.nome;
 
   return (

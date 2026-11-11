@@ -15,7 +15,8 @@ import ProjecaoDaCota from '@/componentes/ProjecaoDaCota';
 import { limiteDeRenovacao, pessoasComLeituraPendente, type LeituraDiario } from '@/lib/diario';
 import { todas } from '@/lib/consultas';
 import { conferirNumerosDoMes, pendentesDaConferencia } from '@/lib/conferenciaDoMes';
-import { MONITORIAS_PADRAO, monitoriasPorSetor, setorDaTela, textoDoPiso } from '@/lib/monitoriasDoSetor';
+import { MONITORIAS_PADRAO, monitoriasPorSetor, setorDasPessoas, textoDoPiso } from '@/lib/monitoriasDoSetor';
+import { faixasDeCsat, filasDoSetor, metaDoCsat, setorDoPerformance, textoDaMeta } from '@/lib/filasDoSetor';
 
 /** O mês anterior de '2026-09-01' → '2026-08-01' (o de lib/competencia, que é só do servidor). */
 function mesAnterior(c: string): string {
@@ -23,8 +24,6 @@ function mesAnterior(c: string): string {
   return m === 1 ? `${a - 1}-12-01` : `${a}-${String(m - 1).padStart(2, '0')}-01`;
 }
 
-const CANAIS: Canal[] = ['huggy', 'diretores'];
-const META_CSAT = 0.95;
 
 type Csat = { pessoa_id: string; origem: Canal; semana: number; avaliacoes: number; positivas: number; mes_competencia: string };
 type Volume = { pessoa_id: string; canal: Canal; semana: number; finalizados: number; tme_seg: number | null; mes_competencia: string };
@@ -87,6 +86,13 @@ type Props = {
   fonte: FonteDoMes;
   /** O setor escolhido no menu (cookie), lido pela página no servidor. */
   setorPedido?: string;
+  /**
+   * Abertura do Início (4.4.0, no jeito da criação de setores): com ela, o
+   * painel desenha a faixa de cima — saudação, a frase da meta em verde e o
+   * "Precisa de você" como passos — no lugar da faixa da página. `cabecalho`
+   * é o mês com as setas e o selo; `abas`, os canais.
+   */
+  abertura?: { saudacao: string; cabecalho: React.ReactNode; abas?: React.ReactNode };
 };
 
 /**
@@ -100,8 +106,15 @@ async function carregar(db: SupabaseClient, { competencia, atual, comPendencias 
   const meses = [competencia, anterior];
   // O piso da monitoria: o do setor da equipe (Monitorias 6.0).
   // 4.3.0: o prazo do SLA vem das faixas (migração 104).
-  const [porSetorMon, { setorId: setorDaEquipe }, prazoSla] = await Promise.all([monitoriasPorSetor(db), setorDaTela(db, setorPedido), lerPrazoDoSla(db)]);
+  // 4.4.0: o setor do menu sem depender de ter monitoria (o Telecom não tem),
+  // as filas dele e quem está nele no mês — a tela mostra só esse setor.
+  const [porSetorMon, { setorId: setorDaEquipe }, prazoSla, setorDe] = await Promise.all([
+    monitoriasPorSetor(db), setorDoPerformance(db, setorPedido), lerPrazoDoSla(db), setorDasPessoas(db, competencia)]);
   const piso = porSetorMon.get(setorDaEquipe)?.piso ?? MONITORIAS_PADRAO.piso;
+  const filas = await filasDoSetor(db, setorDaEquipe);
+  const faixas = await faixasDeCsat(db, filas.map((f) => f.grupoCsat));
+  const metaCsat = Object.fromEntries(filas.map((f) => [f.apelido, metaDoCsat(faixas[f.grupoCsat ?? ''])])) as Record<string, number>;
+  const doSetor = (id: string) => (setorDe.get(id) ?? 1) === setorDaEquipe;
 
   const [pessoas, csat, volume, criterios, cota, cargos, fechados, monitorias, valores, semCargo, conferir, diario, vencendo, leituras, privados, reportes, atrasos,
     { data: semanasDeChamados }, { data: mesesComRh }, { data: conferencia }, { data: recusas }]
@@ -158,7 +171,13 @@ async function carregar(db: SupabaseClient, { competencia, atual, comPendencias 
     csats: ((csat.data ?? []) as Csat[]).filter((c) => c.mes_competencia === competencia),
   }));
 
-  return { piso, pessoas, csat, volume, criterios, cota, cargos, fechados, monitorias, valores, semCargo, conferir, diario,
+  // Só o setor da tela (4.4.0): antes vinham as pessoas de todos os setores que o gestor enxerga.
+  const soDoSetor = <T extends { data: unknown }>(r: T, campo: string): T =>
+    ({ ...r, data: ((r.data ?? []) as Record<string, unknown>[]).filter((x) => doSetor(String(x[campo]))) });
+  return { piso, filas, metaCsat,
+    pessoas: soDoSetor(pessoas, 'id'), csat: soDoSetor(csat, 'pessoa_id'), volume: soDoSetor(volume, 'pessoa_id'),
+    criterios, cota: soDoSetor(cota, 'pessoa_id'), cargos, fechados: soDoSetor(fechados, 'pessoa_id'),
+    monitorias: soDoSetor(monitorias, 'operador_id'), valores, semCargo, conferir, diario,
     vencendo, leituras, privados, reportes, atrasos, semanasDeChamados, mesesComRh, conferencia, recusas, alertas };
 }
 
@@ -192,14 +211,88 @@ export default function PainelGestor(props: Props) {
       </Painel>
     );
   }
-  if (!dados) return <Carregando />;
+  if (!dados) return <Carregando abertura={props.abertura} />;
   return <Visao {...props} dados={dados} />;
 }
 
+/**
+ * A faixa de abertura do Início (4.4.0): à esquerda o mês, a saudação e a
+ * frase em verde; à direita os passos do que precisa do gestor, numerados como
+ * os passos da criação de setores. Sem passos, um visto de "tudo em dia".
+ */
+function Abertura({ saudacao, cabecalho, frase, detalhe, passos }: {
+  saudacao: string;
+  cabecalho: React.ReactNode;
+  frase?: string | null;
+  detalhe?: string | null;
+  /** null = carregando. */
+  passos: { texto: string; acao: string; href: string; grave?: boolean }[] | null;
+}) {
+  const MAX = 5;
+  return (
+    <section className="abertura sobe relative grid gap-8 overflow-hidden rounded-[26px] bg-superficie px-7 py-8 shadow-sm ring-1 ring-slate-200
+                        sm:px-9 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] lg:items-center">
+      <div>
+        <div className="text-sm">{cabecalho}</div>
+        <h1 className="mt-3 text-[2.15rem] font-semibold leading-[1.08] tracking-[-.035em] text-slate-900 sm:text-[2.5rem]">
+          {saudacao}.
+          {frase !== undefined && (
+            <>
+              <br />
+              {frase == null
+                ? <span className="inline-block h-[0.9em] w-72 max-w-full animate-pulse rounded-lg bg-slate-200/70 align-middle" />
+                : <span className="text-marca-700 dark:text-marca-400">{frase}</span>}
+            </>
+          )}
+        </h1>
+        {detalhe && <p className="mt-3 max-w-xl text-base text-slate-600">{detalhe}</p>}
+      </div>
+
+      <div className="rounded-2xl bg-slate-50 p-5 ring-1 ring-slate-200/70">
+        <p className="text-xs font-bold uppercase tracking-[.08em] text-marca-700 dark:text-marca-400">Precisa de você</p>
+        {passos == null ? (
+          <div className="mt-3 space-y-2.5">
+            {[0, 1, 2].map((i) => <div key={i} className="h-6 animate-pulse rounded-lg bg-slate-200/70" />)}
+          </div>
+        ) : passos.length === 0 ? (
+          <p className="mt-3 flex items-center gap-2.5 text-sm text-slate-700">
+            <span className="estala grid h-7 w-7 place-items-center rounded-lg bg-marca-600 text-white" aria-hidden>
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 12.5l4.5 4.5L19 7.5" pathLength={1} strokeDasharray={1} strokeDashoffset={1} className="traco" />
+              </svg>
+            </span>
+            Tudo em dia neste mês.
+          </p>
+        ) : (
+          <ol className="mt-3 space-y-1.5">
+            {passos.slice(0, MAX).map((p, i) => (
+              <li key={p.texto} className="sobe" style={{ animationDelay: `${120 + i * 60}ms` }}>
+                <Link href={p.href}
+                      className="group flex items-center gap-3 rounded-xl px-2 py-1.5 text-sm text-slate-700 transition hover:bg-superficie hover:shadow-sm">
+                  <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-lg text-xs font-bold ${p.grave
+                    ? 'bg-rose-500/15 text-rose-700' : 'bg-marca-600/15 text-marca-700 dark:text-marca-400'}`}>{i + 1}</span>
+                  <span className="min-w-0 flex-1">{p.texto}</span>
+                  <span className="shrink-0 text-xs font-semibold text-marca-700 opacity-70 transition group-hover:opacity-100 dark:text-marca-400">
+                    {p.acao} ›
+                  </span>
+                </Link>
+              </li>
+            ))}
+            {passos.length > MAX && (
+              <li className="px-2 pt-1 text-xs text-slate-500">e mais {passos.length - MAX}</li>
+            )}
+          </ol>
+        )}
+      </div>
+    </section>
+  );
+}
+
 /** Enquanto os dados chegam: o contorno da faixa de destaques. */
-function Carregando() {
+function Carregando({ abertura }: { abertura?: Props['abertura'] }) {
   return (
     <div className="space-y-4" aria-busy="true" aria-label="Carregando o painel">
+      {abertura && <Abertura saudacao={abertura.saudacao} cabecalho={abertura.cabecalho} frase={null} passos={null} />}
       <div className="h-8 w-72 animate-pulse rounded-xl bg-slate-200/60" />
       <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-5">
         {[0, 1, 2, 3, 4].map((i) => <div key={i} className="h-36 animate-pulse rounded-2xl bg-slate-200/60" />)}
@@ -209,10 +302,10 @@ function Carregando() {
   );
 }
 
-function Visao({ competencia, atual, comPendencias = true, fonte, dados }: Props & { dados: Dados }) {
+function Visao({ competencia, atual, comPendencias = true, fonte, dados, abertura }: Props & { dados: Dados }) {
   const anterior = mesAnterior(competencia);
   const meses = [competencia, anterior];
-  const { piso, pessoas, csat, volume, criterios, cota, cargos, fechados, monitorias, valores, semCargo, conferir, diario,
+  const { piso, filas, metaCsat, pessoas, csat, volume, criterios, cota, cargos, fechados, monitorias, valores, semCargo, conferir, diario,
     vencendo, leituras, privados, reportes, atrasos, semanasDeChamados, mesesComRh, conferencia, recusas } = dados;
   const tomDaNota = (v: number) => tomDaNotaCom(v, piso);
 
@@ -285,7 +378,7 @@ function Visao({ competencia, atual, comPendencias = true, fonte, dados }: Props
     pendencias.push({
       texto: semChamados.length === 1 ? `Semana ${semChamados[0]} sem chamados importados`
         : `Semanas ${semChamados.join(', ').replace(/, (\d)$/, ' e $1')} sem chamados importados`,
-      acao: 'Importar', href: '/cota/importar?aba=chamados',
+      acao: 'Importar', href: '/cota/importar?cat=chamados',
     });
   }
   if (competencia < atual && !fechadoEm(competencia)) {
@@ -375,7 +468,7 @@ function Visao({ competencia, atual, comPendencias = true, fonte, dados }: Props
   if (atrasos.count) {
     pendencias.push({
       texto: `${atrasos.count} chamado${atrasos.count > 1 ? 's' : ''} fora do prazo esperando decisão`,
-      acao: 'Decidir', href: '/cota/importar?aba=chamados',
+      acao: 'Decidir', href: '/cota/importar?cat=chamados',
     });
   }
   if ((conferir.data ?? []).length) {
@@ -450,7 +543,10 @@ function Visao({ competencia, atual, comPendencias = true, fonte, dados }: Props
     );
   };
 
+  // As filas do setor da tela (4.4.0); a meta de C-SAT é a da faixa de cada uma.
+  const CANAIS: Canal[] = filas.map((f) => f.apelido);
   const porCanal = Object.fromEntries(CANAIS.map((c) => {
+    const metaDaFila = metaCsat[c] ?? 0.95;
     const agora = canal(c, competencia);
     const antes = canal(c, anterior);
     // Nomes da legenda dos gráficos semanais (1.41.0): o mês da tela e o anterior.
@@ -487,7 +583,7 @@ function Visao({ competencia, atual, comPendencias = true, fonte, dados }: Props
     const mediaVolSemanal = media(agora.volSemanas.filter((v): v is number => v != null));
 
     return [c, {
-      blocoCsat: <Bloco rotulo="C-SAT" nota="meta 95%" min={0.7} max={1}
+      blocoCsat: <Bloco rotulo="C-SAT" nota={`meta ${textoDaMeta(metaDaFila)}`} min={0.7} max={1}
                         valor={agora.csatMes != null ? percentual(agora.csatMes) : '—'}
                         comparacao={<Comparacao melhor={(dCsat ?? 0) >= 0}
                           texto={dCsat == null ? null : `${seta(dCsat)} ${numeroBR(Math.abs(dCsat), 1)} pt`} />}
@@ -513,7 +609,7 @@ function Visao({ competencia, atual, comPendencias = true, fonte, dados }: Props
               {agora.csatMes == null ? <Vazio>Sem avaliações nesta fila.</Vazio> : (
                 <>
                   <GraficoDeLinha min={0.75} max={1} formatar={percentual}
-                                  referencia={{ valor: META_CSAT, rotulo: 'meta 95%' }}
+                                  referencia={{ valor: metaDaFila, rotulo: `meta ${textoDaMeta(metaDaFila)}` }}
                                   comparacao={{ pontos: antes.csatSemanas.map((s) => s?.valor ?? null), ...nomes }}
                                   pontos={agora.csatSemanas.map((s): PontoDaLinha => s && { valor: s.valor, tom: tomDoCsat(s.valor) })} />
                   {/* O tamanho da amostra: 100% de duas avaliações não é 100% de duzentas. */}
@@ -832,6 +928,70 @@ function Visao({ competencia, atual, comPendencias = true, fonte, dados }: Props
       ),
     },
   ];
+
+  // Abertura (4.4.0): a frase da meta e quem está abaixo dela.
+  if (abertura) {
+    const frase = comDireito.length === 0 ? null
+      : abaixo.length === 0 ? 'Todos com direito estão na meta.'
+        : `${naMeta} de ${comDireito.length} estão na meta.`;
+    const detalhe = !comPendencias ? null : pendencias.length === 0
+      ? 'Nenhuma pendência: é só acompanhar a equipe.'
+      : `${pendencias.length === 1 ? 'Falta 1 coisa' : `Faltam ${pendencias.length} coisas`} para o mês ficar sem pendência.`;
+    const atencao = abaixo.filter((c) => exibe.has(c.pessoa_id))
+      .map((c) => ({ ...c, ating: Number(c.resultado) / Number(c.meta) }))
+      .sort((a, b) => a.ating - b.ating);
+    const iniciais = (n: string) => nomeCurto(n).split(' ').map((p) => p[0]).join('').toUpperCase();
+    return (
+      <div className="space-y-5">
+        <Abertura saudacao={abertura.saudacao} cabecalho={abertura.cabecalho}
+                  frase={frase ?? 'Acompanhe a equipe do mês.'} detalhe={detalhe}
+                  passos={comPendencias ? pendencias : []} />
+
+        {atencao.length > 0 && (
+          <section className="sobe rounded-[22px] bg-superficie px-6 py-5 shadow-sm ring-1 ring-slate-200" style={{ animationDelay: '80ms' }}>
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="text-base font-semibold text-slate-900">Quem está abaixo da meta</h2>
+              <span className="text-xs text-slate-500">
+                {competencia === atual ? 'até agora, no mês em andamento' : 'no mês'} · basta um abaixo para o bônus de equipe não sair
+              </span>
+            </div>
+            <ul className="mt-4 grid gap-x-8 gap-y-3 md:grid-cols-2">
+              {atencao.map((c, i) => (
+                <li key={c.pessoa_id} className="sobe grid grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-3"
+                    style={{ animationDelay: `${140 + i * 50}ms` }}>
+                  <span className="grid h-9 w-9 place-items-center rounded-xl bg-marca-600/15 text-xs font-bold text-marca-700 dark:text-marca-400">
+                    {iniciais(c.pessoa)}
+                  </span>
+                  {/* Nome à esquerda; % da meta e o que falta juntos à direita,
+                      numa linha só; a barra embaixo vai até a meta (cheia = 100%). */}
+                  <div className="min-w-0">
+                    <div className="flex items-baseline justify-between gap-3 text-sm">
+                      <Link href={`/cota/extrato?pessoa=${c.pessoa_id}&mes=${mes}`}
+                            className="truncate font-medium text-slate-800 hover:text-marca-700 dark:hover:text-marca-400">
+                        {nomeCurto(c.pessoa)}
+                      </Link>
+                      <span className="shrink-0 whitespace-nowrap text-xs tabular-nums text-slate-500">
+                        <b className="font-semibold text-amber-700">{percentual(c.ating)}</b> da meta
+                        <span className="mx-1.5 text-slate-300">·</span>
+                        faltam <b className="font-semibold text-slate-700">{inteiro(Number(c.meta) - Number(c.resultado))}</b> pts
+                      </span>
+                    </div>
+                    <span className="mt-1.5 block h-2 overflow-hidden rounded-full bg-slate-100">
+                      <span className="crescer-x block h-full origin-left rounded-full bg-amber-500"
+                            style={{ transform: `scaleX(${Math.max(0.01, Math.min(1, c.ating))})` }} />
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {abertura.abas && <div className="flex justify-end">{abertura.abas}</div>}
+        <SeletorDeDetalhe destaques={destaques} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

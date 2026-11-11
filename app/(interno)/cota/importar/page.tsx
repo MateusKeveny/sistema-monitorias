@@ -28,10 +28,12 @@ const SEMANAS = [1, 2, 3, 4];
 export default async function ImportarAvaliacoes({
   searchParams,
 }: {
-  searchParams: Promise<{ mes?: string; aba?: string }>;
+  searchParams: Promise<{ mes?: string; aba?: string; cat?: string }>;
 }) {
   const perfil = await exigirGestor();
-  const { mes, aba } = await searchParams;
+  // 4.4.0: ?cat= como nas outras telas; ?aba= continua valendo (links antigos).
+  const { mes, aba: abaAntiga, cat } = await searchParams;
+  const aba = cat ?? abaAntiga;
   const hoje = hojeNoBrasil();
   // O mesmo mês das outras telas (3.0): o escolhido, ou o mês em trabalho.
   const { competencia, atual } = await resolverCompetencia(mes);
@@ -48,7 +50,7 @@ export default async function ImportarAvaliacoes({
           // <a> e não Link: carrega a página inteira. Pelo Link, a troca de aba
             // não completava no navegador do Analista (1.38.1); o endereço direto abria.
             <a key={chave} role="tab" aria-selected={ativa}
-                href={chave === 'hub' ? '/cota/importar' : `/cota/importar?aba=${chave}`}
+                href={chave === 'hub' ? '/cota/importar' : `/cota/importar?cat=${chave}`}
                 className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${ativa
                   ? 'bg-marca-600 font-semibold text-white' : 'text-slate-600 hover:text-slate-900'}`}>
             {rotulo}

@@ -50,6 +50,10 @@ const ICONES: Record<string, React.ReactNode> = {
   // Cronômetro: as métricas de tempo da semana (migração 66).
   '/cota/conferencia': <><path d="M4 10.5l3.5 3.5L16 5.5" /><path d="M4 4h6M4 16h12" /></>,
   '/cota/simulacao': <><path d="M7 3h6M8 3v5l-4.5 7.5A1 1 0 0 0 4.4 17h11.2a1 1 0 0 0 .9-1.5L12 8V3" /><path d="M6 12.5h8" /></>,
+  // 4.4.0: as telas de Metas e métricas (eram abas da Configuração).
+  '/cota/metas': <><circle cx="10" cy="10" r="7" /><circle cx="10" cy="10" r="3.5" /><circle cx="10" cy="10" r=".6" /></>,
+  '/cota/metricas-e-faixas': <><path d="M3 16h14" /><path d="M5 13v-3M9 13V6M13 13V9M17 13V4" /></>,
+  '/cota/alteracoes': <><path d="M3.5 10a6.5 6.5 0 1 0 2-4.7L3.5 7.2" /><path d="M3.5 3.5v3.7h3.7M10 6.5V10l2.5 1.5" /></>,
   '/cota/metricas': <><circle cx="10" cy="11" r="6" /><path d="M10 8v3l2 1.5M8.5 3h3M10 3v2" /></>,
   '/cota/acessos': <><circle cx="10" cy="10" r="6.5" /><path d="M10 6.5V10l2.5 1.5" /></>,
   '/reportes': <path d="M5 17V3.5M5 4h9l-2 3.5 2 3.5H5" />,
@@ -68,7 +72,7 @@ const ICONES: Record<string, React.ReactNode> = {
  * Fechamento e Relatórios não têm grupo no menu do topo — cabem sozinhos —,
  * mas aqui ganham o seu: um é etapa do mês, o outro é consulta.
  */
-export default function MenuLateral({ perfil, versao, sistema, avisosReporte = 0, pendentes = 0, veFerias = false, setores = [], setorAtual = 1, apresentacao = false }: {
+export default function MenuLateral({ perfil, versao, sistema, avisosReporte = 0, pendentes = 0, veFerias = false, vePresencial = true, setores = [], setorAtual = 1, apresentacao = false }: {
   /** Cópia da apresentação (APRESENTACAO=1): o botão de voltar ao início, para a gestão (gestor e administrador). */
   apresentacao?: boolean;
   /** Setores do seletor do menu (3.0) e o escolhido; com um só, o seletor não aparece. */
@@ -76,6 +80,8 @@ export default function MenuLateral({ perfil, versao, sistema, avisosReporte = 0
   setorAtual?: number;
   /** Vê a tela de Férias (ve_ferias, migração 62). */
   veFerias?: boolean;
+  /** Presencial no menu só para quem pontua nele (4.4.0): o Telecom não tem a regra. */
+  vePresencial?: boolean;
   perfil: Perfil;
   versao: string;
   sistema: Sistema;
@@ -92,7 +98,7 @@ export default function MenuLateral({ perfil, versao, sistema, avisosReporte = 0
     router.refresh();
   }
 
-  const visiveis = ITENS[sistema].filter((i) => (i.href === '/cota/ferias' ? veFerias : i.papeis.includes(perfil.papel)));
+  const visiveis = ITENS[sistema].filter((i) => (i.href === '/cota/ferias' ? veFerias : i.href === '/cota/presencial' ? vePresencial && i.papeis.includes(perfil.papel) : i.papeis.includes(perfil.papel)));
 
   // Vence o endereço mais específico que casa com a página. Sem isso,
   // "/monitorias" e "/monitorias/nova" acendiam juntos — duas linhas acesas no

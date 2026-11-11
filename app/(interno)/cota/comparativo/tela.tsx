@@ -13,6 +13,7 @@ import { percentual, numeroBR } from '@/lib/formatar';
 import { fonteDaSituacao, type SituacaoDoResumo } from '@/lib/fonteDoMes';
 import { todas } from '@/lib/consultas';
 import { MONITORIAS_PADRAO, monitoriasPorSetor, setorDasPessoas, textoDoPiso } from '@/lib/monitoriasDoSetor';
+import { faixasDeCsat, metaDoCsat, textoDaMeta } from '@/lib/filasDoSetor';
 import { SERIES } from '@/lib/cores';
 import AbasLocais from '@/componentes/AbasLocais';
 
@@ -28,7 +29,6 @@ const PERIODOS = [3, 6, 12];
  *  a não ser os meses importados das planilhas (migração 69), que adiantam o início. */
 const PRIMEIRO_MES = '2026-08-01';
 const NOMES_MES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-const CANAIS: Canal[] = ['huggy', 'diretores'];
 
 const inteiro = (v: number) => numeroBR(Math.round(v));
 const nomeCurto = (nome: string) => nome.trim().split(/\s+/).slice(0, 2).join(' ');
@@ -119,7 +119,7 @@ async function carregar(db: SupabaseClient, { n, perfil, fim, situacoes, setorPe
   // Aba Volume (3.9.0): as filas do setor escolhido no menu e o volume da Sol
   // (migração 99). Vale para qualquer setor da árvore, pelo número da fila.
   const [filasDb, setoresDb, setorEscolhido, solDb] = await todas([
-    db.from('canais_do_setor').select('id, apelido, nome, ordem, setor_id').eq('ativo', true).order('ordem').then((r) => r.data ?? []),
+    db.from('canais_do_setor').select('id, apelido, nome, ordem, setor_id, grupo_csat').eq('ativo', true).order('ordem').then((r) => r.data ?? []),
     db.from('setores').select('id').eq('ativo', true).order('ordem').then((r) => r.data ?? []),
     Promise.resolve(setorPedido),
     veOTime ? db.from('volume_ia').select('setor_id, mes_competencia, semana, total, resolvidos_ia')
@@ -175,7 +175,17 @@ async function carregar(db: SupabaseClient, { n, perfil, fim, situacoes, setorPe
   ]);
   const pontuacoes = [...doFechamento, ...((resumidos ?? []) as Ponto[]), ...((aoVivo ?? []) as Ponto[])];
 
-  return { inicio, periodo, veOTime, pisoMon, meses, de, filasDoSetor, todoSol, pessoas, csat, volume, monitorias, pontuacoes };
+  // 4.4.0: só quem está no setor da tela (antes vinham os de todos os setores)
+  // e a meta de C-SAT da faixa dele (Expansão 95%, Telecom 94%).
+  const doSetor = (id: string) => (setorNoMes.get(id) ?? 1) === setorDaAba;
+  const filtra = <T extends { data: unknown }>(r: T, campo: string): T =>
+    ({ ...r, data: ((r.data ?? []) as Record<string, unknown>[]).filter((x) => doSetor(String(x[campo]))) });
+  const faixas = await faixasDeCsat(db, (filasDb as { setor_id?: number; grupo_csat?: string | null }[])
+    .filter((f) => (f.setor_id ?? 1) === setorDaAba).map((f) => f.grupo_csat ?? null));
+  const metaCsat = metaDoCsat(Object.values(faixas)[0]);
+  return { inicio, periodo, veOTime, pisoMon, meses, de, filasDoSetor, todoSol, metaCsat,
+    pessoas: filtra(pessoas, 'id'), csat: filtra(csat, 'pessoa_id'), volume: filtra(volume, 'pessoa_id'),
+    monitorias: filtra(monitorias, 'operador_id'), pontuacoes: pontuacoes.filter((p) => doSetor(p.pessoa_id)) };
 }
 
 type Dados = Awaited<ReturnType<typeof carregar>>;
@@ -222,7 +232,11 @@ export default function TelaComparativo(entrada: EntradaDoComparativo) {
 }
 
 function Visao({ entrada: { cat, fim }, dados }: { entrada: EntradaDoComparativo; dados: Dados }) {
-  const { periodo, veOTime, pisoMon, meses, de, filasDoSetor, todoSol, pessoas, csat, volume, monitorias, pontuacoes } = dados;
+  const { periodo, veOTime, pisoMon, meses, de, filasDoSetor, todoSol, metaCsat, pessoas, csat, volume, monitorias, pontuacoes } = dados;
+  // As filas do setor da tela (4.4.0), no lugar das duas da Expansão.
+  const CANAIS: Canal[] = filasDoSetor.map((f) => f.apelido);
+  const nomeDaFilaC = (c: string) => filasDoSetor.find((f) => f.apelido === c)?.nome ?? c;
+  const meta = { valor: metaCsat, rotulo: `meta ${textoDaMeta(metaCsat)}` };
 
   const nome = new Map((pessoas.data ?? []).map((p) => [p.id as string, nomeCurto(p.nome as string)]));
   // As mesmas duas decisões da tela inicial: aparecer na lista e entrar na média.
@@ -489,7 +503,7 @@ function Visao({ entrada: { cat, fim }, dados }: { entrada: EntradaDoComparativo
   const linhasGeral: { rotulo: string; valores: (string | null)[]; tom?: (i: number) => Tom; destaque?: boolean }[] = [
     { rotulo: 'Atendimentos lançados', valores: geralEquipe.map((g) => (g.atendimentos ? inteiro(g.atendimentos) : null)), destaque: true },
     ...filasNosDados.map((c) => ({
-      rotulo: `· ${c === 'huggy' ? 'Expansão' : c === 'diretores' ? 'Diretores' : c}`,
+      rotulo: `· ${nomeDaFilaC(c)}`,
       valores: meses.map((m) => { const v = volDe(c as Canal, TODOS, m); return v ? inteiro(v) : null; }),
     })),
     { rotulo: 'Avaliações', valores: geralEquipe.map((g) => (g.avaliacoes ? inteiro(g.avaliacoes) : null)), destaque: true },
@@ -547,7 +561,7 @@ function Visao({ entrada: { cat, fim }, dados }: { entrada: EntradaDoComparativo
           <Secao titulo="Taxa de avaliação por fila" subtitulo="Quanto de cada fila foi avaliado: avaliações ÷ atendimentos.">
             <GraficoBarrasELinha largura={760} rotulos={meses.map(rotuloMes)} formatar={percentual} min={0}
                                  linhas={filasNosDados.map((c, k) => ({
-                                   nome: c === 'huggy' ? 'Expansão' : c === 'diretores' ? 'Diretores' : c,
+                                   nome: nomeDaFilaC(c),
                                    cor: SERIES[k % SERIES.length],
                                    valores: meses.map((m) => {
                                      const a = indice.get(em(TODOS, c, m));
@@ -558,9 +572,9 @@ function Visao({ entrada: { cat, fim }, dados }: { entrada: EntradaDoComparativo
           </Secao>
         </Painel>
         <Painel>
-          <Secao titulo="C-SAT e monitoria" subtitulo="C-SAT de todas as filas e a nota média de monitoria. Tracejada: a meta de 95%.">
+          <Secao titulo="C-SAT e monitoria" subtitulo={`C-SAT de todas as filas e a nota média de monitoria. Tracejada: a meta de ${textoDaMeta(metaCsat)}.`}>
             <GraficoBarrasELinha largura={760} rotulos={meses.map(rotuloMes)} formatar={percentual} min={0.7} max={1}
-                                 referencia={{ valor: 0.95, rotulo: 'meta 95%' }}
+                                 referencia={meta}
                                  linhas={[
                                    { nome: 'C-SAT', cor: SERIES[0], valores: geralEquipe.map(csatDoGeral) },
                                    { nome: 'Monitoria', cor: SERIES[4], valores: notaEquipe },
@@ -570,7 +584,7 @@ function Visao({ entrada: { cat, fim }, dados }: { entrada: EntradaDoComparativo
       </div>
 
       <Painel>
-        <Secao titulo="Mês a mês" subtitulo={veOTime ? 'A equipe em cada mês do período, com a cor da escala do painel em C-SAT e monitoria. Atendimentos, avaliações e C-SAT contam todo mundo; nota de monitoria e pontuação média seguem quem entra nas médias (Configuração › Exibição e contagem).' : 'Você em cada mês do período.'}>
+        <Secao titulo="Mês a mês" subtitulo={veOTime ? 'A equipe em cada mês do período, com a cor da escala do painel em C-SAT e monitoria. Atendimentos, avaliações e C-SAT contam todo mundo; nota de monitoria e pontuação média seguem quem entra nas médias (na ficha da pessoa, em Usuários e setores).' : 'Você em cada mês do período.'}>
           <div className="-mx-6 overflow-x-auto sm:-mx-7">
             <table className="w-full text-sm tabular-nums">
               <thead>
@@ -686,8 +700,8 @@ function Visao({ entrada: { cat, fim }, dados }: { entrada: EntradaDoComparativo
       chave: 'csat', rotulo: 'C-SAT',
       conteudo: porCanal((c) => (
         <Vista k="csat" formatar={percentual} min={0.75} max={1} tom={(v) => tomDoCsat(v)}
-               titulo="C-SAT da equipe por mês" subtitulo="Positivas sobre avaliações. Linha tracejada: a meta de 95%."
-               referencia={{ valor: 0.95, rotulo: 'meta 95%' }}
+               titulo="C-SAT da equipe por mês" subtitulo={`Positivas sobre avaliações. Linha tracejada: a meta de ${textoDaMeta(metaCsat)}.`}
+               referencia={meta}
                equipe={meses.map((m) => csatDe(c, EQUIPE, m))}
                pessoas={series(ids(todoCsat.filter((x) => x.origem === c)), (id, m) => csatDe(c, id, m))} />
       )),
@@ -759,7 +773,7 @@ function Visao({ entrada: { cat, fim }, dados }: { entrada: EntradaDoComparativo
   ];
 
   return (
-    <ProvedorDeCanal inicial="huggy">
+    <ProvedorDeCanal canais={filasDoSetor.map((f) => ({ chave: f.apelido, rotulo: f.nome }))}>
       <div className="space-y-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>

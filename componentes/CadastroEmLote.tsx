@@ -57,7 +57,7 @@ function gabaritoXlsx(setores: Setor[], cargos: Cargo[]): Uint8Array {
       { coluna: 'Nome', obrigatoria: 'Sim', oque: 'O nome completo. Uma pessoa por linha, na aba Pessoas (as outras abas são só de consulta).', exemplo: 'Maria da Silva Souza' },
       { coluna: 'E-mail', obrigatoria: 'Não', oque: 'Com e-mail (ou nome de usuário), o acesso já é criado e a senha temporária aparece no fim. Em branco: só a ficha, sem acesso.', exemplo: 'maria.souza@empresa.com.br' },
       { coluna: 'Setor', obrigatoria: umSetor ? 'Não' : 'Sim', oque: `O setor exatamente como na aba Setores e cargos.${umSetor ? ` Em branco: ${exemploSetor}.` : ''}`, exemplo: exemploSetor },
-      { coluna: 'Cargo', obrigatoria: 'Não', oque: 'Só para Atendente: o cargo da pessoa no setor, como na aba Setores e cargos. Cargo que o setor ainda não tem é criado no cadastro, sem meta (a meta e os pesos se definem em Configuração › Pesos por cargo). Gestão e qualidade ficam sem cargo (em branco, ou "Gestão").', exemplo: exemploCargo },
+      { coluna: 'Cargo', obrigatoria: 'Não', oque: 'Só para Atendente: o cargo da pessoa no setor, como na aba Setores e cargos. Cargo que o setor ainda não tem é criado no cadastro, sem meta (a meta e os pesos se definem em Metas e métricas › Pesos por cargo). Gestão e qualidade ficam sem cargo (em branco, ou "Gestão").', exemplo: exemploCargo },
       { coluna: 'Setor novo', obrigatoria: '—', oque: 'Para um setor que ainda vai ser criado: escreva o nome dele em Setor (ou deixe em branco) e os cargos que ele terá em Cargo. No assistente de Novo setor, o passo "Cargos e metas" cria os cargos a partir desta coluna, e no fim as pessoas são cadastradas com este mesmo arquivo.', exemplo: '' },
       { coluna: 'Nome no Hub', obrigatoria: 'Não', oque: 'Como a pessoa aparece nos relatórios do Hub, para ligar volume e avaliações a ela. Não pode repetir o de outra pessoa.', exemplo: 'Maria Souza' },
       { coluna: 'Entrada', obrigatoria: 'Não', oque: 'A data de entrada (dd/mm/aaaa). Setor e cargo valem a partir do mês dessa data. Em branco: o mês aberto.', exemplo: '01/11/2026' },
@@ -255,7 +255,7 @@ export default function CadastroEmLote({ pessoas, setores, cargos, inicial, seto
         if (!CARGO_DO_PAPEL.has(textoCargo)) problemas.push('gestão e qualidade não têm cargo (deixe a coluna Cargo em branco)');
       } else if (textoCargo && setor && !cargo) {
         cargoNovo = String(l[col.cargo!]).trim().replace(/\s+/g, ' ');
-        avisos.push(`cria o cargo "${cargoNovo}" em ${setor.nome} (sem meta: defina em Configuração › Pesos por cargo)`);
+        avisos.push(`cria o cargo "${cargoNovo}" em ${setor.nome} (sem meta: defina em Metas e métricas › Pesos por cargo)`);
       }
 
       const hub = col.hub ? String(l[col.hub] ?? '').trim() || null : null;
@@ -284,7 +284,7 @@ export default function CadastroEmLote({ pessoas, setores, cargos, inicial, seto
     for (const p of prontas) if (p.cargoNovo && p.setor) faltam.set(`${p.setor.id}|${normalizar(p.cargoNovo)}`, { setor: p.setor, nome: p.cargoNovo });
     const listaFaltam = [...faltam.values()].map((c) => `${c.nome} (${c.setor.nome})`).join(', ');
     if (!confirm(`Cadastrar ${prontas.length} pessoa(s)${comAcesso ? ` e criar ${comAcesso} acesso(s)` : ''}?`
-      + (faltam.size ? `\n\nCria ${faltam.size} cargo(s) sem meta: ${listaFaltam}. A meta e os pesos se definem em Configuração › Pesos por cargo.` : '')
+      + (faltam.size ? `\n\nCria ${faltam.size} cargo(s) sem meta: ${listaFaltam}. A meta e os pesos se definem em Metas e métricas › Pesos por cargo.` : '')
       + '\n\nAs senhas temporárias aparecem uma vez só, no fim.')) return;
     const db = criarClienteNavegador();
     const feitos: Resultado[] = [];

@@ -97,15 +97,22 @@ export default async function LancamentosDeCota({
     db.from('atendimentos_outro_setor').select('id, pessoa_id, setor, mes_competencia, semana')
       .eq('situacao', 'pendente').order('data'),
     // Bypass de outubro (migração 81): os setores do mês e o volume colado.
-    db.from('vw_setores_do_mes_outro').select('setor').eq('mes_competencia', competencia),
+    // 4.4.0: só o que não foi descartado — o Royais (descartado em 11/11/2026)
+    // abria uma aba vazia. Com o paliativo desligado, a aba só aparece em mês
+    // que ainda tem atendimento ou volume de outro setor de verdade (outubro).
+    db.from('atendimentos_outro_setor').select('setor').eq('mes_competencia', competencia).neq('situacao', 'descartado'),
     db.from('volume_outro_setor').select('setor, pessoa_id, semana, resolvidos').eq('mes_competencia', competencia),
     // As avaliações do outro setor por semana, para o cartão da aba dele.
-    db.from('atendimentos_outro_setor').select('setor, semana').eq('mes_competencia', competencia).not('nota', 'is', null),
+    db.from('atendimentos_outro_setor').select('setor, semana').eq('mes_competencia', competencia).not('nota', 'is', null)
+      .neq('situacao', 'descartado'),
     // O nome de toda regra, para a lista: as cópias de C-SAT e notas do outro
     // setor não são manuais e apareciam com a chave.
     db.from('regras').select('chave, rotulo'),
   ]);
-  const setoresBypass = [...new Set(((setoresDoMes.data ?? []) as { setor: string }[]).map((s) => s.setor))].sort();
+  const setoresBypass = [...new Set([
+    ...((setoresDoMes.data ?? []) as { setor: string }[]).map((s) => s.setor),
+    ...((volumesOutro.data ?? []) as { setor: string }[]).map((s) => s.setor),
+  ])].sort();
 
   const listaVolumes = (volumes.data ?? []) as LinhaVolume[];
   const listaConferencia = (conferencia.data ?? []) as ConferenciaLancamento[];
@@ -375,9 +382,9 @@ export default async function LancamentosDeCota({
                           rotulo={`Volume do ${setor}`} grade="sm:grid-cols-2 lg:grid-cols-4" />
       ) : semRegras ? (
         <Quadro titulo={`${fila.nome} · sem regras`}
-                subtitulo="Cadastrada na árvore, em Configuração › Setores e filas.">
+                subtitulo="Cadastrada na árvore, em Usuários e setores › Setores e filas.">
           <p className="text-sm text-slate-600">
-            Esta fila ainda não diz como pontua. Em Configuração › Setores e filas, escolha copiar as métricas de
+            Esta fila ainda não diz como pontua. Em Usuários e setores › Setores e filas, escolha copiar as métricas de
             outra fila ou criar regras próprias; depois disso o volume dela é lançado aqui.
           </p>
         </Quadro>

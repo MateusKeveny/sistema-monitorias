@@ -2,22 +2,33 @@
 
 import { createContext, useContext, useState, type ReactNode } from 'react';
 
-export type Canal = 'huggy' | 'diretores';
+/** O apelido da fila ('huggy', 'diretores', 'fila_15'…), como o banco grava. */
+export type Canal = string;
+export type CanalDaTela = { chave: Canal; rotulo: string };
 
-const CANAIS = [['huggy', 'Expansão'], ['diretores', 'Diretores-Expansão']] as const;
-const Contexto = createContext<[Canal, (c: Canal) => void]>(['huggy', () => {}]);
+/** As filas da Expansão: o padrão de quem ainda não passa as filas do setor. */
+const PADRAO: CanalDaTela[] = [{ chave: 'huggy', rotulo: 'Expansão' }, { chave: 'diretores', rotulo: 'Diretores e acima' }];
+
+const Contexto = createContext<{ canal: Canal; escolher: (c: Canal) => void; canais: CanalDaTela[] }>(
+  { canal: 'huggy', escolher: () => {}, canais: PADRAO });
 
 /**
  * O canal escolhido, compartilhado pela tela inteira (1.15.0).
  *
  * Na disposição com menu lateral, as abas ficam no topo e o que depende do
  * canal está espalhado: a faixa de destaques, o C-SAT por atendente e o
- * detalhe semana a semana. Cada pedaço usa `NoCanal`; o conteúdo dos dois
- * canais já vem pronto do servidor e a troca só mostra um e esconde o outro —
- * sem ir ao servidor, para não recalcular a cota a cada clique.
+ * detalhe semana a semana. Cada pedaço usa `NoCanal`; o conteúdo de cada
+ * canal já vem pronto e a troca só mostra um e esconde os outros — sem ir ao
+ * servidor, para não recalcular a cota a cada clique.
+ *
+ * Desde a 4.4.0 as filas vêm do setor (`canais`): o Telecom tem quatro, a
+ * Expansão duas. Sem `canais`, as da Expansão.
  */
-export function ProvedorDeCanal({ inicial, children }: { inicial: Canal; children: ReactNode }) {
-  const [canal, setCanal] = useState<Canal>(inicial);
+export function ProvedorDeCanal({ inicial, canais = PADRAO, children }: {
+  inicial?: Canal; canais?: CanalDaTela[]; children: ReactNode;
+}) {
+  const primeira = canais.some((c) => c.chave === inicial) ? inicial! : canais[0]?.chave ?? 'huggy';
+  const [canal, setCanal] = useState<Canal>(primeira);
   function escolher(c: Canal) {
     setCanal(c);
     // Mantém o canal na URL para recarregar ou compartilhar, sem navegar.
@@ -27,20 +38,27 @@ export function ProvedorDeCanal({ inicial, children }: { inicial: Canal; childre
       window.history.replaceState(null, '', url);
     } catch { /* URL é só conveniência */ }
   }
-  return <Contexto.Provider value={[canal, escolher]}>{children}</Contexto.Provider>;
+  return <Contexto.Provider value={{ canal, escolher, canais }}>{children}</Contexto.Provider>;
+}
+
+/** As filas que a tela está mostrando (para quem monta o conteúdo de cada uma). */
+export function useCanais() {
+  return useContext(Contexto).canais;
 }
 
 /**
  * Abas de canal. Sobre a arte de fundo (padrão): pílula translúcida, a
  * escolhida em superfície. Dentro de uma superfície (`naSuperficie`): pílula
  * cinza, porque o texto claro da outra sumiria no tema claro.
+ * Com uma fila só, não há o que escolher: as abas não aparecem.
  */
 export function AbasDeCanal({ naSuperficie = false }: { naSuperficie?: boolean }) {
-  const [canal, escolher] = useContext(Contexto);
+  const { canal, escolher, canais } = useContext(Contexto);
+  if (canais.length < 2) return null;
   return (
-    <div role="tablist" aria-label="Canal"
-         className={`inline-flex gap-1 rounded-full p-1 ${naSuperficie ? 'bg-slate-100' : 'bg-pilula'}`}>
-      {CANAIS.map(([chave, rotulo]) => (
+    <div role="tablist" aria-label="Fila"
+         className={`inline-flex max-w-full flex-wrap gap-1 rounded-full p-1 ${naSuperficie ? 'bg-slate-100' : 'bg-pilula'}`}>
+      {canais.map(({ chave, rotulo }) => (
         <button key={chave} type="button" role="tab" aria-selected={canal === chave}
                 onClick={() => escolher(chave)}
                 className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
@@ -58,7 +76,7 @@ export function AbasDeCanal({ naSuperficie = false }: { naSuperficie?: boolean }
  * aparecer, as barras (crescer-y/x) crescem de novo — é o movimento da troca.
  */
 export function NoCanal({ canal, children }: { canal: Canal; children: ReactNode }) {
-  const [atual] = useContext(Contexto);
+  const { canal: atual } = useContext(Contexto);
   // `contents` só quando visível: assim o invólucro não quebra grades, e o
   // escondido não depende de qual das duas regras de display vence.
   return <div hidden={atual !== canal} className={atual === canal ? 'contents' : undefined}>{children}</div>;

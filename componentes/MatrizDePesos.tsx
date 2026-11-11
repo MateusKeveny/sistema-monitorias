@@ -57,7 +57,7 @@ function tipoDa(r: RegraCota): string {
   if (r.valor_manual) return 'valor digitado';
   if (r.grupo === 'atendimento') return 'por atendimento';
   if (r.grupo === 'tme' || r.grupo === 'tme_diretores') return 'faixa de TME';
-  if (r.grupo === 'csat') return 'faixa · os dois canais';
+  if (r.grupo === 'csat') return 'faixa · todas as filas do setor';
   if (r.grupo === 'nota') return 'por avaliação';
   if (r.grupo === 'monitoria') return 'pontua acima do mínimo';
   return 'lançamento';
@@ -210,7 +210,7 @@ export default function MatrizDePesos({
             <i className="ml-2 h-2.5 w-2.5 rounded-sm bg-slate-200" /> valor digitado
             <i className="ml-2 h-1 w-1 rounded-full bg-slate-300" /> não pontua
           </span>
-          <Link href="/cota/configuracao?cat=faixas#nova-metrica" className={botaoSecundario}>+ Métrica manual</Link>
+          <Link href="/cota/metricas-e-faixas#nova-metrica" className={botaoSecundario}>+ Métrica manual</Link>
           <button type="button" onClick={() => setCargoAberto(cargoAberto === 'novo' ? null : 'novo')} className={botaoSecundario}>
             + Cargo
           </button>

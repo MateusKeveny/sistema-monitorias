@@ -45,39 +45,47 @@ export const ITENS: Record<Sistema, Item[]> = {
     { href: '/cota/aprovacao', rotulo: 'Aguardando aprovação', papeis: ['diretoria'], grupo: 'Aprovação das cotas' },
     { href: '/cota/aprovacao/aprovadas', rotulo: 'Aprovadas', papeis: ['diretoria'], grupo: 'Aprovação das cotas' },
     // Cruzeiro (4.0.0): ranking por setor, somando os meses escolhidos (só cotas aprovadas).
-    { href: '/cota/cruzeiro', rotulo: 'Cruzeiro', papeis: ['diretoria'], grupo: 'Acompanhar' },
-    { href: '/cota/comparativo', rotulo: 'Comparativo', papeis: ['gestor', 'qualidade', 'operador'], grupo: 'Acompanhar' },
+    // 4.4.0: o nome diz o que é ("Ranking"), com o nome da campanha entre parênteses.
+    { href: '/cota/cruzeiro', rotulo: 'Ranking (Cruzeiro)', papeis: ['diretoria'], grupo: 'Acompanhar' },
     { href: '/cota/extrato', rotulo: 'Extrato', papeis: ['gestor', 'qualidade', 'operador'], grupo: 'Acompanhar' },
+    { href: '/cota/comparativo', rotulo: 'Comparativo', papeis: ['gestor', 'qualidade', 'operador'], grupo: 'Acompanhar' },
     { href: '/cota/historico', rotulo: 'Histórico', papeis: ['gestor', 'qualidade', 'operador'], grupo: 'Acompanhar' },
-    { href: '/cota/cruzeiro', rotulo: 'Cruzeiro', papeis: ['gestor'], grupo: 'Acompanhar' },
-    // Cenários sobre o mês aberto, sem gravar (1.53.0).
-    { href: '/cota/simulacao', rotulo: 'Simulação', papeis: ['gestor'], grupo: 'Acompanhar' },
+    { href: '/cota/cruzeiro', rotulo: 'Ranking (Cruzeiro)', papeis: ['gestor'], grupo: 'Acompanhar' },
     { href: '/cota/monitorias', rotulo: 'Monitorias', papeis: ['gestor', 'qualidade', 'operador'], grupo: 'Qualidade' },
     // As avaliações de 1 a 5, com o protocolo para revisar (2.10.0).
     { href: '/cota/csat', rotulo: 'C-SAT', rotuloOperador: 'Meu C-SAT', papeis: ['gestor', 'qualidade', 'operador'], grupo: 'Qualidade' },
     { href: '/cota/diario', rotulo: 'Diário de bordo', papeis: ['gestor', 'qualidade', 'operador'], grupo: 'Registrar' },
     { href: '/cota/presencial', rotulo: 'Presencial', papeis: ['gestor', 'qualidade', 'operador'], grupo: 'Registrar' },
+    // 4.4.0: o ciclo na ordem em que o mês acontece — importar, lançar, simular, fechar.
     { href: '/cota/importar', rotulo: 'Importar', papeis: ['gestor'], grupo: 'Ciclo do mês' },
     { href: '/cota/lancamentos', rotulo: 'Lançamentos', papeis: ['gestor'], grupo: 'Ciclo do mês' },
-    // Desligar o TME de uma semana, com justificativa (migração 66).
-    { href: '/cota/metricas', rotulo: 'Métricas da semana', papeis: ['gestor'], grupo: 'Ciclo do mês' },
-    // Se o cálculo bate entre si; roda sozinha às 06:00 (2.1.0).
-    { href: '/cota/conferencia', rotulo: 'Conferência do cálculo', papeis: ['gestor'], grupo: 'Ciclo do mês' },
+    // Cenários sobre o mês aberto, sem gravar (1.53.0): a prévia antes de fechar.
+    { href: '/cota/simulacao', rotulo: 'Simulação', papeis: ['gestor'], grupo: 'Ciclo do mês' },
     { href: '/cota/fechamento', rotulo: 'Fechamento', papeis: ['gestor'], grupo: 'Ciclo do mês' },
+    // Metas e métricas (4.4.0): as regras da cota, que eram abas da Configuração.
+    { href: '/cota/metas', rotulo: 'Pesos por cargo', papeis: ['gestor'], grupo: 'Metas e métricas' },
+    { href: '/cota/metricas-e-faixas', rotulo: 'Métricas e faixas', papeis: ['gestor'], grupo: 'Metas e métricas' },
+    // Desligar o TME de uma semana, com justificativa (migração 66); era "Métricas da semana".
+    { href: '/cota/metricas', rotulo: 'Ajustes da semana', papeis: ['gestor'], grupo: 'Metas e métricas' },
+    { href: '/cota/alteracoes', rotulo: 'Histórico de alterações', papeis: ['gestor'], grupo: 'Metas e métricas' },
     // Pessoas, logins, papéis e setores num lugar só (3.0): junta Atendentes e Acessos.
     { href: '/cota/usuarios', rotulo: 'Usuários e setores', papeis: ['gestor'], grupo: 'Equipe' },
     // Férias: quem vê é decidido por ve_ferias (cargo Pleno ou Analista conta), não só pelo papel.
     { href: '/cota/ferias', rotulo: 'Férias', papeis: ['gestor', 'qualidade', 'operador'], grupo: 'Equipe' },
     { href: '/cota/configuracao', rotulo: 'Configuração', papeis: ['gestor'], grupo: 'Sistema' },
+    // Se o cálculo bate entre si; roda sozinha às 06:00 (2.1.0). Auditoria: fica no Sistema (4.4.0).
+    { href: '/cota/conferencia', rotulo: 'Conferência do cálculo', papeis: ['gestor'], grupo: 'Sistema' },
     { href: '/reportes', rotulo: 'Problemas reportados', papeis: ['gestor'], grupo: 'Sistema' },
   ],
 };
 
 export default function Navegacao({
-  perfil, pendentes = 0, sistema, versao, avisosReporte = 0, veFerias = false,
+  perfil, pendentes = 0, sistema, versao, avisosReporte = 0, veFerias = false, vePresencial = true,
 }: {
   /** Vê a tela de Férias (ve_ferias, migração 62): papel ou cargo Pleno/Analista. */
   veFerias?: boolean;
+  /** Presencial no menu só para quem pontua nele (4.4.0): o Telecom não tem a regra. */
+  vePresencial?: boolean;
   /** Respostas novas (autor) ou reports novos (gestor), no botão de reportar. */
   avisosReporte?: number;
   perfil: Perfil;
@@ -106,7 +114,10 @@ export default function Navegacao({
   // A raiz de cada sistema só fica ativa nela mesma, senão acenderia junto com
   // todas as páginas de dentro.
   const ativo = (href: string) =>
-    href === '/' || href === '/cota' ? caminho === href : caminho.startsWith(href);
+    // Igual ao MenuLateral (4.4.0): o endereço ou uma subpágina dele. Só
+    // startsWith acendia "Ajustes da semana" (/cota/metricas) dentro de
+    // /cota/metricas-e-faixas.
+    href === '/' || href === '/cota' ? caminho === href : caminho === href || caminho.startsWith(`${href}/`);
 
   // No Performance (1.15.0) o item ativo é marcado por um traço que desliza
   // até ele, em vez do fundo verde. As Monitorias ficam como estavam: são
@@ -137,7 +148,7 @@ export default function Navegacao({
   }, [caminho, deslizante]);
 
   // Na ordem da lista: cada grupo entra onde aparece o primeiro item dele.
-  const visiveis = ITENS[sistema].filter((i) => (i.href === '/cota/ferias' ? veFerias : i.papeis.includes(perfil.papel)))
+  const visiveis = ITENS[sistema].filter((i) => (i.href === '/cota/ferias' ? veFerias : i.href === '/cota/presencial' ? vePresencial && i.papeis.includes(perfil.papel) : i.papeis.includes(perfil.papel)))
     .map((i) => ({ ...i, rotulo: rotuloDo(i, perfil.papel) }));
   const entradas: (Item | { grupo: string; itens: Item[] })[] = [];
   for (const item of visiveis) {

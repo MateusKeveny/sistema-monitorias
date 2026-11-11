@@ -35,6 +35,61 @@ para o Performance.
 
 ---
 
+## Performance 4.4.0
+
+Migração **105** (`supabase/105-leitura-do-diario-por-setor.sql`, já aplicada no
+oficial em 10/11/2026): a leitura obrigatória do diário cobra só quem está no
+setor do autor do registro e deixa de fora gestor, administrador e diretoria.
+O Telecom deixou de aparecer como "não lido" nos processos do Expansão.
+
+- **Repaginação, no jeito da criação de setores.** Toda tela abre com uma faixa
+  própria (cartão, título grande, círculo verde ao fundo); cartões mais
+  redondos que sobem em sequência; botões em pílula; indicadores maiores com a
+  borda na cor do tom; cabeçalho de tabela mais leve. Só no Performance:
+  Monitorias e Agenda não mudam.
+- **Início do gestor:** abertura com a frase da meta em verde ("6 de 8 estão
+  na meta.") e o "Precisa de você" como passos numerados; quadro novo "Quem
+  está abaixo da meta", com a % da meta e o que falta. Início do atendente e do
+  Pleno com a mesma abertura.
+- **Cada setor com as suas filas e a sua meta** (`lib/filasDoSetor.ts`). O
+  Início, o Comparativo, as Métricas da semana, o Extrato, o Histórico, a tela
+  de C-SAT e a Aprovação tinham as duas filas da Expansão e a meta de C-SAT de
+  95% escritas no código; agora as filas vêm do cadastro e a meta, da faixa de
+  C-SAT do setor (Telecom: 94%). As abas de fila somem quando o setor tem uma
+  só. O Início e o Comparativo do gestor mostram só as pessoas do setor
+  escolhido no menu, e o setor deixou de depender de ter monitoria (o Início
+  do Telecom mostrava o Expansão). O Início do atendente usa a regra de
+  finalizado, os degraus de C-SAT e as faixas de TME e nota da fila dele.
+- **Menu:** grupo novo **Metas e métricas** com Pesos por cargo, Métricas e
+  faixas, Ajustes da semana (era "Métricas da semana") e Histórico de
+  alterações — eram abas da Configuração, que ficou só com os avisos no Teams e
+  o diário. Simulação foi para o Ciclo do mês; Conferência do cálculo, para
+  Sistema; "Cruzeiro" virou "Ranking (Cruzeiro)". Os endereços antigos da
+  Configuração (`?cat=pesos`, `faixas`…) redirecionam para as telas novas.
+- **Métricas e faixas** junta, numa tela, o que cada fila mede, os cortes das
+  faixas (antes editáveis em dois lugares), o SLA dos chamados e os nomes. O
+  título de cada régua diz quais filas a usam.
+- **Presencial** só aparece no menu de quem pontua nele (o Telecom não tem a
+  regra).
+- Importar e Extrato abrem as abas por `?cat=`, como as outras telas (`?aba=`
+  continua valendo).
+- **Importação de avaliações com o relatório novo do Hub.** Desde 11/2026 o
+  relatório traz "Setor" (a equipe: "Diretores-Expansao" para o Expansão
+  inteiro) e uma coluna nova, "Fila" (Expansao / Diretores-Expansao). O leitor
+  usava só o Setor e gravou as 587 avaliações de 03 a 10/11 como Diretores
+  (importação de 11/11). Agora vale a Fila quando ela é uma fila cadastrada, e
+  o Setor como antes; a reimportação também corrige a fila de avaliação já
+  gravada ("fila Diretores e acima → Expansão"), menos em mês fechado.
+  O Setor decide primeiro: setor sem fila cadastrada (Royais…) fica de fora.
+- **iGreen Mob vira fila do Expansão; sai o paliativo.** O gestor criou a fila
+  iGreen Mob (copia as regras da Expansão). Dados de novembro passados por
+  `supabase/106-igreen-mob-vira-fila.sql` (aplicada em 11/11/2026): o volume
+  colado e as 98 avaliações do Mob viraram da fila, e os atendimentos,
+  lançamentos e volume do paliativo saíram — pontos idênticos. O leitor não
+  cria mais demanda extra de outro setor, e na fila que copia outra (o Mob)
+  atendente sem cadastro é de outra equipe e fica de fora, sem virar nota
+  guardada. Outubro e antes ficam com o paliativo da época.
+
 ## Performance 4.3.0
 
 Migração **104** (`supabase/104-sla-em-faixas.sql`): o SLA dos chamados em

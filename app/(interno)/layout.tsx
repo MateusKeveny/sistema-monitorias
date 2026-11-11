@@ -101,6 +101,23 @@ export default async function LayoutInterno({ children }: { children: React.Reac
       .filter((s) => sistema === 'cota' || s.monitorias !== false);
     const escolhido = await setorDoCookie();
     const setorAtual = setoresDoMenu.find((s) => String(s.id) === escolhido)?.id ?? setoresDoMenu[0]?.id ?? 1;
+    // Presencial (4.4.0): só aparece para quem pontua nele. O atendente, pelo
+    // cargo dele; quem vê o time, pelo setor escolhido no menu (algum cargo do
+    // setor com peso de presencial). O Telecom não tem a regra.
+    const vePresencial = sistema !== 'cota' || perfil.papel === 'diretoria' ? false : await (async () => {
+      const [{ data: comPeso }, { data: cargosDb }] = await Promise.all([
+        db.from('pesos_por_cargo').select('cargo_id').eq('regra', 'presencial').eq('ativo', true),
+        db.from('cargos').select('id, setor_id'),
+      ]);
+      const cargosCom = new Set(((comPeso ?? []) as { cargo_id: number }[]).map((p) => p.cargo_id));
+      if (perfil.papel === 'operador') {
+        const { data: hist } = await db.from('cargos_da_pessoa').select('cargo_id, desde').eq('pessoa_id', perfil.id)
+          .lte('desde', hojeNoBrasil()).order('desde', { ascending: false }).limit(1);
+        return cargosCom.has((hist?.[0] as { cargo_id?: number } | undefined)?.cargo_id ?? -1);
+      }
+      return ((cargosDb ?? []) as { id: number; setor_id: number | null }[])
+        .some((c) => cargosCom.has(c.id) && (c.setor_id ?? 1) === setorAtual);
+    })();
     return (
       <div className="lg:grid lg:min-h-screen lg:grid-cols-[15rem_1fr]">
         {/* Uma abertura do painel por carregamento (migração 52, tela Acessos). */}
@@ -111,13 +128,14 @@ export default async function LayoutInterno({ children }: { children: React.Reac
         {perfil.papel === 'diretoria' && <GuardaDaDiretoria />}
         {/* 4.0.0: a página se atualiza sozinha quando muda fechamento, aprovação, correção ou aviso. */}
         {sistema === 'cota' && (perfil.papel === 'gestor' || perfil.papel === 'diretoria') && <AtualizacaoAutomatica />}
-        <MenuLateral perfil={perfil} versao={versao} sistema={sistema} veFerias={veFerias}
+        <MenuLateral perfil={perfil} versao={versao} sistema={sistema} veFerias={veFerias} vePresencial={vePresencial}
                      avisosReporte={avisosReporte} pendentes={pendentes}
                      setores={setoresDoMenu.map(({ id, nome }) => ({ id, nome }))} setorAtual={setorAtual}
                      apresentacao={process.env.APRESENTACAO === '1'} />
         <div className="min-w-0">
           <div className="lg:hidden">
-            <Navegacao perfil={perfil} pendentes={pendentes} sistema={sistema} versao={versao} avisosReporte={avisosReporte} veFerias={veFerias} />
+            <Navegacao perfil={perfil} pendentes={pendentes} sistema={sistema} versao={versao} avisosReporte={avisosReporte}
+                       veFerias={veFerias} vePresencial={vePresencial} />
           </div>
           <main className="max-w-[1680px] px-6 py-8 lg:px-9">{children}</main>
         </div>

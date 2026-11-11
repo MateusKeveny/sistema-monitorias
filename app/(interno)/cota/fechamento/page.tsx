@@ -204,7 +204,7 @@ export default async function Fechamento({
   const mesCurto = competencia.slice(0, 7);
   const antesDeFechar: { texto: React.ReactNode; grave?: boolean; acao?: { rotulo: string; href: string } }[] = [];
   if ((semCargo.data ?? []).length) {
-    antesDeFechar.push({ grave: true, acao: { rotulo: 'Definir', href: '/cota/configuracao' },
+    antesDeFechar.push({ grave: true, acao: { rotulo: 'Definir', href: '/cota/metas' },
       texto: <>Sem cargo, ficam fora do fechamento: <b>{(semCargo.data ?? []).map((p) => p.nome as string).join(', ')}</b></> });
   }
   if ((conferir.data ?? []).length) {

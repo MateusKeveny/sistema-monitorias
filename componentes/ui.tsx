@@ -29,7 +29,8 @@ export function Secao({
       {(titulo || acao) && (
         <header className="mb-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
           <div>
-            {titulo && <h2 className="text-base font-semibold text-slate-800">{titulo}</h2>}
+            {/* `secao-titulo`: gancho do visual do Performance (globals.css). */}
+            {titulo && <h2 className="secao-titulo text-base font-semibold text-slate-800">{titulo}</h2>}
             {subtitulo && <p className="text-sm text-slate-500">{subtitulo}</p>}
           </div>
           {acao}
@@ -76,9 +77,11 @@ export function Indicador({
   return (
     // Na repaginação (5.0.0) ficou igual ao cartão de resumo do Performance:
     // sem borda e sem caixa-alta, que faziam o rótulo competir com o número.
-    <div className="rounded-2xl bg-superficie px-5 py-4 shadow-sm">
-      <p className="text-sm text-slate-500">{rotulo}</p>
-      <p className={`text-2xl font-semibold tracking-tight tabular-nums ${tons[tom]}`}>{valor}</p>
+    // `indicador`/`indicador-*`: ganchos do visual do Performance (globals.css);
+    // nas Monitorias as classes não têm regra e nada muda.
+    <div className="indicador rounded-2xl bg-superficie px-5 py-4 shadow-sm" data-tom={tom}>
+      <p className="indicador-rotulo text-sm text-slate-500">{rotulo}</p>
+      <p className={`indicador-valor text-2xl font-semibold tracking-tight tabular-nums ${tons[tom]}`}>{valor}</p>
       {detalhe && <p className="text-xs text-slate-500">{detalhe}</p>}
     </div>
   );

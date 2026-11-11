@@ -5,13 +5,12 @@ import { resolverCompetencia } from '@/lib/competencia';
 import { fonteDoMes } from '@/lib/resumo';
 import { todas } from '@/lib/consultas';
 import { diaMes, periodoDaSemana } from '@/lib/formatar';
+import { setorDoCookie } from '@/lib/setorEscolhido';
+import { filasDoSetor, setorDoPerformance } from '@/lib/filasDoSetor';
 
 export const dynamic = 'force-dynamic';
 
-const CANAIS = [
-  { chave: 'huggy', nome: 'Expansão', grupo: 'tme' },
-  { chave: 'diretores', nome: 'Diretores-Expansão', grupo: 'tme_diretores' },
-] as const;
+
 
 type Desligada = {
   semana: number; canal: string; motivo: string; tem_registro_diario: boolean;
@@ -36,16 +35,21 @@ export default async function MetricasDaSemana({
   const fonte = await fonteDoMes(competencia);
   const [de] = periodoDaSemana(competencia, 1);
   const [, ate] = periodoDaSemana(competencia, 4);
+  // 4.4.0: as filas do setor escolhido no menu que medem TME (o Telecom tem quatro).
+  const { setorId } = await setorDoPerformance(db, await setorDoCookie());
+  const CANAIS = (await filasDoSetor(db, setorId)).filter((f) => f.grupoTme)
+    .map((f) => ({ chave: f.apelido, nome: f.nome, grupo: f.grupoTme! }));
+  const gruposTme = [...new Set(CANAIS.map((c) => c.grupo))];
 
   const [tme, volume, desligadas, faixas, efeito, fechado, diario, filas] = await todas([
     db.from('vw_tme_equipe').select('semana, canal, tme_seg').eq('mes_competencia', competencia),
     db.from('volume_semanal').select('semana, canal, finalizados, tme_seg').eq('mes_competencia', competencia),
     db.from('metricas_desligadas').select('semana, canal, motivo, tem_registro_diario, diario_registro_id, desligado_por_nome, desligado_em')
       .eq('mes_competencia', competencia),
-    db.from('regras').select('chave, rotulo, grupo, faixa_min, faixa_max').in('grupo', ['tme', 'tme_diretores']),
+    db.from('regras').select('chave, rotulo, grupo, faixa_min, faixa_max').in('grupo', gruposTme.length ? gruposTme : ['-']),
     // O que a faixa de TME rendeu (ou tirou) na semana, somado na equipe.
     db.from(fonte.extrato).select('semana, origem, cota').eq('mes_competencia', competencia)
-      .in('grupo', ['tme', 'tme_diretores']),
+      .in('grupo', gruposTme.length ? gruposTme : ['-']),
     db.from('fechamentos_cota').select('id', { count: 'exact', head: true }).eq('mes_competencia', competencia),
     db.from('diario_registros').select('id, data, tipo, assunto').gte('data', de).lte('data', ate)
       .order('data'),
@@ -115,7 +119,7 @@ export default async function MetricasDaSemana({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">Métricas da semana</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">Ajustes da semana</h1>
         <div className="mt-1.5">
           <SetasDeCompetencia competencia={competencia} atual={atual} caminho="/cota/metricas" compacto />
         </div>

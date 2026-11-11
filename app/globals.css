@@ -325,6 +325,151 @@ html[data-visual='3'] svg.grafico, html[data-visual='3'] .barra-semana { filter:
 html[data-visual='3'] main tbody tr { transition: background-color 120ms ease-out; }
 html[data-visual='3'] main tbody tr:hover { background-color: var(--color-slate-50); }
 
+/* ---------------------------------------------------------------------------
+   Repaginação (4.4.0), só no Performance: o jeito da criação de setores
+   levado às peças comuns — títulos grandes com o traço verde, cartões mais
+   redondos que sobem em sequência ao abrir a tela, botões em pílula, números
+   dos indicadores maiores e cabeçalho de tabela mais leve. Só CSS e ganchos
+   de classe: nenhuma tela muda de estrutura, e Monitorias/Agenda não mudam.
+--------------------------------------------------------------------------- */
+html[data-visual='3'] main h1 {
+  font-size: clamp(1.75rem, 1.15rem + 1.5vw, 2.35rem);
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+  font-weight: 650;
+}
+/* O traço verde acima do título (o "Novo setor" da criação de setores). */
+html[data-visual='3'] main h1:not(.flex)::before {
+  content: '';
+  display: block;
+  width: 2.4rem;
+  height: 4px;
+  margin-bottom: 0.75rem;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, var(--color-marca-600), var(--color-marca-400));
+}
+html[data-visual='3'] :is(.faixa-inicio, .abertura) h1::before { display: none; }
+html[data-visual='3'] main h1 + p { margin-top: 0.45rem; font-size: 0.975rem; max-width: 64rem; }
+
+/* Abertura de cada tela (4.4.0): o bloco do título — o primeiro da página —
+   vira uma faixa como a da criação de setores e a do Início: superfície
+   própria, cantos de 26px, respiro e um círculo verde de fundo à direita.
+   Vale para todas as telas que abrem com título, sem mexer em nenhuma delas;
+   o Início, que já tem a sua abertura, fica de fora. */
+html[data-visual='3'] main > div > :first-child:has(h1):not(.faixa-inicio):not(:has(.abertura, .faixa-inicio)) {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  padding: 1.9rem 2.1rem;
+  border: 1px solid var(--color-slate-200);
+  border-radius: 26px;
+  background: var(--color-superficie);
+  box-shadow: var(--sombra-3);
+}
+html[data-visual='3'] main > div > :first-child:has(h1):not(.faixa-inicio):not(:has(.abertura, .faixa-inicio))::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  right: -90px;
+  top: -110px;
+  width: 340px;
+  height: 340px;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgb(16 185 129 / .16) 0%, rgb(16 185 129 / .06) 45%, transparent 70%);
+  pointer-events: none;
+}
+html[data-visual='3'].dark main > div > :first-child:has(h1):not(.faixa-inicio):not(:has(.abertura, .faixa-inicio))::after {
+  background: radial-gradient(circle, rgb(52 211 153 / .14) 0%, rgb(52 211 153 / .05) 45%, transparent 70%);
+}
+@media (max-width: 640px) {
+  html[data-visual='3'] main > div > :first-child:has(h1):not(.faixa-inicio):not(:has(.abertura, .faixa-inicio)) { padding: 1.4rem 1.25rem; }
+}
+
+/* Cartões: mais redondos, como os passos da criação de setores. */
+html[data-visual='3'] .bg-superficie.rounded-2xl { border-radius: 24px; }
+
+/* Ao abrir a tela, os blocos sobem em sequência (40 ms entre um e outro).
+   `backwards`, e não `both`: depois de subir, o bloco fica sem transform —
+   com o transform preso, janelas fixas dentro dele (modais) sairiam do lugar. */
+html[data-visual='3'] main > * > * { animation: sobe 480ms cubic-bezier(.2,.8,.2,1) backwards; }
+html[data-visual='3'] main > * > :nth-child(2) { animation-delay: 40ms; }
+html[data-visual='3'] main > * > :nth-child(3) { animation-delay: 80ms; }
+html[data-visual='3'] main > * > :nth-child(4) { animation-delay: 120ms; }
+html[data-visual='3'] main > * > :nth-child(5) { animation-delay: 160ms; }
+html[data-visual='3'] main > * > :nth-child(n+6) { animation-delay: 200ms; }
+
+/* Títulos de quadro um pouco maiores e mais firmes. */
+html[data-visual='3'] .secao-titulo { font-size: 1.06rem; letter-spacing: -0.012em; color: var(--color-slate-900); }
+
+/* Indicadores: rótulo pequeno em caixa-alta, número grande, borda de cor no
+   tom (bom/alerta/ruim) e um leve levantar ao passar o mouse. */
+html[data-visual='3'] .indicador {
+  position: relative;
+  overflow: hidden;
+  padding: 1.1rem 1.35rem;
+  transition: transform .25s cubic-bezier(.2,.8,.2,1), box-shadow .25s;
+}
+html[data-visual='3'] .indicador:hover { transform: translateY(-2px); }
+html[data-visual='3'] .indicador-rotulo {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--color-slate-500);
+}
+html[data-visual='3'] .indicador-valor { margin-top: .2rem; font-size: 1.9rem; font-weight: 700; letter-spacing: -0.03em; line-height: 1.15; }
+html[data-visual='3'] .indicador::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--color-slate-200);
+}
+html[data-visual='3'] .indicador[data-tom='bom']::after { background: var(--color-marca-500); }
+html[data-visual='3'] .indicador[data-tom='alerta']::after { background: #f59e0b; }
+html[data-visual='3'] .indicador[data-tom='ruim']::after { background: #f43f5e; }
+
+/* Botões em pílula; o principal com a sombra verde e um leve levantar. */
+html[data-visual='3'] main button:not([role='tab']):is(.rounded-lg, .rounded-md, .rounded-xl),
+html[data-visual='3'] main a:is(.rounded-lg, .rounded-md).bg-marca-600 {
+  border-radius: 9999px;
+}
+html[data-visual='3'] main :is(button, a).bg-marca-600:not([role='tab']) {
+  box-shadow: 0 8px 18px -8px rgb(5 150 105 / .6);
+  transition: transform .15s ease-out, box-shadow .15s ease-out, background-color .15s;
+}
+html[data-visual='3'] main :is(button, a).bg-marca-600:not([role='tab']):not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 22px -10px rgb(5 150 105 / .7);
+}
+html[data-visual='3'] main :is(button, a).bg-marca-600:disabled { box-shadow: none; }
+
+/* Campos com canto mais suave e o contorno verde ao focar. */
+html[data-visual='3'] main :is(input:not([type='checkbox']):not([type='radio']), select, textarea) { border-radius: 10px; }
+html[data-visual='3'] main :is(input, select, textarea):focus-visible {
+  outline: none;
+  border-color: var(--color-marca-600);
+  box-shadow: 0 0 0 3px rgb(16 185 129 / .18);
+}
+
+/* Cabeçalho de tabela mais leve: sem faixa cinza, letra menor e espaçada. */
+html[data-visual='3'] main thead th {
+  background: transparent;
+  font-size: 10.5px;
+  letter-spacing: .08em;
+  color: var(--color-slate-500);
+  border-bottom-color: var(--color-slate-200);
+}
+
+/* Abas: a escolhida com a sombra verde, como o botão principal. */
+html[data-visual='3'] [role='tablist'] [role='tab'][aria-selected='true'] { box-shadow: 0 6px 14px -8px rgb(5 150 105 / .7); }
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-visual='3'] main > * > * { animation: none; }
+  html[data-visual='3'] .indicador:hover,
+  html[data-visual='3'] main :is(button, a).bg-marca-600:hover { transform: none; }
+}
+
 /* O detalhe de um destaque aparece sem salto (SeletorDeDetalhe). */
 @keyframes surgir { from { opacity: 0; transform: translateY(-4px); } }
 .surgir { animation: surgir 250ms ease-out; }

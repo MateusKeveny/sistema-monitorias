@@ -35,8 +35,6 @@ type Faixa = { chave: string; rotulo: string; faixa_min: number | null; faixa_ma
 type CsatSemana = { origem: Canal; semana: number; avaliacoes: number; positivas: number; csat: number };
 
 const NOME_CANAL: Record<string, string> = {
-  huggy: 'Expansão',
-  diretores: 'Diretores-Expansão',
   geral: 'Monitoria e lançamentos',
 };
 
@@ -71,11 +69,13 @@ const faixaDo = (csat: number, faixas: Faixa[]) => faixas.find((f) =>
 export default async function Extrato({
   searchParams,
 }: {
-  searchParams: Promise<{ mes?: string; pessoa?: string; aba?: string }>;
+  searchParams: Promise<{ mes?: string; pessoa?: string; aba?: string; cat?: string }>;
 }) {
   // As consultas saem em poucas rodadas (1.39.4): eram nove, uma esperando a
   // outra, e o extrato de quem recebe pela média levava ~4 s.
-  const { mes, pessoa: pessoaPedida, aba } = await searchParams;
+  // 4.4.0: ?cat= como nas outras telas; ?aba= continua valendo (links antigos).
+  const { mes, pessoa: pessoaPedida, aba: abaAntiga, cat } = await searchParams;
+  const aba = cat ?? abaAntiga;
   // A situação do resumo do mês (migração 58) sai junto: é uma consulta leve.
   const [perfil, { competencia, atual, emAberto }] = await todas([
     exigirPerfil(), resolverCompetencia(mes), situacaoDoResumo(),
@@ -85,8 +85,10 @@ export default async function Extrato({
   const db = await criarClienteServidor();
   // Fila nova (3.0) aparece pelo nome do cadastro; as de sempre, como antes.
   const { data: nomesDasFilas } = await db.from('canais_do_setor').select('apelido, nome');
-  const nomeDaOrigem = (o: string) => NOME_CANAL[o]
-    ?? (nomesDasFilas ?? []).find((f) => f.apelido === o)?.nome ?? o;
+  // 4.4.0: o nome do cadastro vem primeiro (cada setor tem as suas filas);
+  // NOME_CANAL fica só para o que não é fila ('geral').
+  const nomeDaOrigem = (o: string) => (nomesDasFilas ?? []).find((f) => f.apelido === o)?.nome
+    ?? NOME_CANAL[o] ?? o;
   // O mês aberto vem do resumo quando ele está em dia (migração 58); senão,
   // das views, como antes.
   const fonte = await fonteDoMes(competencia);
@@ -274,8 +276,10 @@ export default async function Extrato({
     l.regra?.startsWith('outro_setor_') && !l.regra.includes('__') ? 0 : posicao(l.grupo, l.ordem);
   const naOrdem = <T extends { grupo: string; ordem: number; regra?: string }>(ls: T[]) =>
     [...ls].sort((a, b) => lugar(a) - lugar(b));
-  const ORDEM_CANAL = ['huggy', 'diretores', 'outro', 'geral'];
-  const ordemDo = (q: string) => ORDEM_CANAL.indexOf(q.startsWith('outro:') ? 'outro' : q);
+  // As filas pela ordem do cadastro; depois o bypass ('outro') e, por último, 'geral'.
+  const ordemDasFilas = (nomesDasFilas ?? []).map((f) => f.apelido as string);
+  const ordemDo = (q: string) => q === 'geral' ? 1001 : q.startsWith('outro:') ? 1000
+    : (ordemDasFilas.indexOf(q) + 1 || 999);
   const canaisDe = (ls: Linha[]) => [...new Set(ls.map(quadroDa))].sort((a, b) => ordemDo(a) - ordemDo(b));
   // Nome do quadro: o canal, ou o setor do Hub ("Atendimento iGreen Mob" → "iGreen Mob").
   // O nome do setor sai do rótulo de qualquer linha dele: "Atendimento iGreen Mob"
@@ -322,8 +326,9 @@ export default async function Extrato({
   /** O C-SAT de um canal no cartão da semana, na cor da escala. */
   const etiquetaCsat = (quadro: string, semana: number) => {
     const c = csatDoQuadro(quadro, semana);
-    const rotulo = quadro === 'huggy' ? 'Exp' : quadro === 'diretores' ? 'Dir'
-      : quadro.startsWith('outro:') ? nomeDoSetor(quadro.slice(6)).replace(/^iGreen\s+/, '') : nomeDaOrigem(quadro);
+    // A etiqueta curta é a primeira palavra do nome da fila ("Expansão", "Diretores", "Conexao"…).
+    const rotulo = quadro.startsWith('outro:') ? nomeDoSetor(quadro.slice(6)).replace(/^iGreen\s+/, '')
+      : nomeDaOrigem(quadro).split(/\s+/)[0];
     return c ? (
       <span key={quadro} className={`rounded-full px-2 py-px font-semibold ${tomCsat(Number(c.csat))}`}>
         {rotulo} {percentual(Number(c.csat))}
@@ -511,7 +516,7 @@ export default async function Extrato({
           {([['pontos', 'Pontos'], ['chamados', 'Chamados']] as const).map(([chave, rotulo]) => {
             const ativa = (chave === 'chamados') === abaChamados;
             const q = new URLSearchParams({ mes: competencia.slice(0, 7), ...(veOTime ? { pessoa: pessoaId } : {}),
-              ...(chave === 'chamados' ? { aba: 'chamados' } : {}) });
+              ...(chave === 'chamados' ? { cat: 'chamados' } : {}) });
             return (
               // <a> e não Link: carrega a página inteira. Pelo Link, a troca de aba
             // não completava no navegador do Analista (1.38.1); o endereço direto abria.
@@ -533,14 +538,14 @@ export default async function Extrato({
       ) : (
         <>
           {/* De onde vieram os pontos (1.18.0): cada categoria somada no mês,
-              os dois canais e a monitoria juntos, do que mais somou ao que
+              todas as filas e a monitoria juntas, do que mais somou ao que
               mais tirou. Responde "por que deu isso" antes das tabelas. */}
           <Quadro titulo="De onde vieram os pontos"
                   subtitulo={linhaMedia
                     ? (demanda
                       ? 'A média da equipe e a demanda tratada no mês, somadas, e o multiplicador do cargo sobre a soma.'
                       : 'A média da equipe recebida e o multiplicador do cargo sobre ela.')
-                    : 'Cada categoria no mês, do que mais somou ao que mais tirou — os dois canais e a monitoria juntos.'}>
+                    : 'Cada categoria no mês, do que mais somou ao que mais tirou — todas as filas e a monitoria juntas.'}>
             <div className="grid gap-x-12 gap-y-6 lg:grid-cols-2">
               {([
                 ['O que somou', somou, '+'],
@@ -604,7 +609,7 @@ export default async function Extrato({
               const canais = canaisDe(daSemana);
               // C-SAT e Monitoria só para quem é medido por eles; para os demais
               // (Pleno, Analista, Gestor), o que a semana teve (08/10).
-              const comCsat = [...new Set(['huggy', 'diretores', ...canais])].filter((q) => csatDoQuadro(q, semana));
+              const comCsat = [...new Set([...ordemDasFilas, ...canais])].filter((q) => csatDoQuadro(q, semana));
               const temCsat = comCsat.length > 0;
               // A régua de monitoria do setor: 'monitoria' ou a cópia dela (monitoria_s5).
               const medeMonitoria = [...pesoDaFaixa].some(([regra, peso]) => /^monitoria(_s\d+)?$/.test(regra) && peso !== 0);

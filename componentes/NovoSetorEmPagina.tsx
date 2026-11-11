@@ -386,7 +386,7 @@ export default function NovoSetorEmPagina({
           </p>
         )}
         <div className="sobe mt-7 flex flex-wrap justify-center gap-3" style={atraso(10)}>
-          <a href={`/cota/configuracao?setor=${criado.id}`} className="rounded-full bg-marca-600 px-5 py-2 text-sm font-semibold text-white hover:bg-marca-700">Ver as metas e pesos</a>
+          <a href={`/cota/metas?setor=${criado.id}`} className="rounded-full bg-marca-600 px-5 py-2 text-sm font-semibold text-white hover:bg-marca-700">Ver as metas e pesos</a>
           <a href="/cota/usuarios" className="rounded-full border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cadastrar o gestor e as pessoas</a>
           <button type="button" onClick={aoFechar} className="rounded-full border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Voltar aos setores</button>
         </div>

@@ -204,7 +204,7 @@ export default function ImportadorChamados() {
         </p>
       )}
       <p className="mt-3 text-xs text-slate-500">
-        A cota do Analista sai daqui: tratativas (fechados e recusados), o SLA de cada um (nas faixas de Configuração › Faixas e nomes das métricas)
+        A cota do Analista sai daqui: tratativas (fechados e recusados), o SLA de cada um (nas faixas de Metas e métricas › Métricas e faixas)
         e os atrasos que a gestão mantiver. Cancelados e chamados em aberto não contam. Mês já fechado não muda.
       </p>
     </Quadro>

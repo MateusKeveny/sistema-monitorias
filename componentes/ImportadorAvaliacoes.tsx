@@ -19,6 +19,8 @@ const normalizar = (v: unknown) => String(v ?? '').normalize('NFD')
 type Colunas = {
   data: string; protocolo: string; atendente: string; nota: string;
   tabulacao?: string; setor?: string;
+  /** Coluna "Fila" (relatório do Hub desde 11/2026): é ela que separa Expansão de Diretores. */
+  fila?: string;
 };
 
 /**
@@ -35,6 +37,7 @@ function acharColunas(cabecalho: Linha): Colunas | null {
     nota: um('csat', 'avaliacao'),
     tabulacao: um('tabulacao (tag)', 'tabulacao'),
     setor: um('setor', 'tipo de atendimento'),
+    fila: um('fila'),
   };
   return c.data && c.protocolo && c.atendente && c.nota ? (c as Colunas) : null;
 }
@@ -45,6 +48,13 @@ function lerData(v: unknown): string | null {
   const m = /^(\d{2})\/(\d{2})\/(\d{4})/.exec(String(v ?? ''));
   return m ? `${m[3]}-${m[2]}-${m[1]}` : null;
 }
+
+/**
+ * O paliativo do outro setor (demanda extra, 2.9.0): desligado em 11/11/2026,
+ * quando o iGreen Mob virou fila do Expansão. O código fica para reler meses
+ * antigos e para religar se precisar; com `false`, setor sem fila é ignorado.
+ */
+const PALIATIVO_OUTRO_SETOR = false;
 
 /** "Sem atendente (bot/sem handoff)", vazio: conversa sem pessoa — não há a quem atribuir. */
 const ehRobo = (atendente: string) => !atendente || normalizar(atendente).startsWith('sem atendente');
@@ -75,6 +85,8 @@ type Atualizacao = {
   /** data: a do arquivo; de_data: a gravada (o Hub às vezes muda a data do atendimento). */
   data: string; de_data: string; protocolo: string; de_pessoa: string; para_pessoa: string;
   de_nota: number; para_nota: number; mes_fechado: boolean; origem_arquivo: string;
+  /** A fila (4.4.1): o relatório novo do Hub pode corrigir a fila de uma avaliação já gravada. */
+  de_origem: string; para_origem: string;
 };
 
 type AnaliseArquivo = {
@@ -137,6 +149,11 @@ export default function ImportadorAvaliacoes({
     return (apelido: string | null | undefined) => !!apelido && deFora.has(apelido);
   }, [cadastro, setorId]);
   const pessoaDeFora = (id: string) => setorId != null && (setorDe[id] ?? 1) !== setorId;
+  /** A fila copia as regras de outra (copia_de, migração 85)? O iGreen Mob copia a Expansão. */
+  const filaQueCopia = useMemo(() => {
+    const copias = new Set(cadastro.filter((c) => (c as Partial<Canal>).copia_de != null).map((c) => c.apelido));
+    return (apelido: string | null | undefined) => !!apelido && copias.has(apelido);
+  }, [cadastro]);
   // Uma seção por fila da árvore (3.0): as do setor de quem importa.
   const CANAIS = useMemo(() => cadastro.filter((c) => setorId == null || ((c as Partial<Canal>).setor_id ?? 1) === setorId)
     .map((c) => c.apelido).filter((a): a is string => !!a), [cadastro, setorId]);
@@ -173,13 +190,35 @@ export default function ImportadorAvaliacoes({
 
     const [nomeAba, [cabecalho, ...linhas]] = aba;
     const col = acharColunas(cabecalho)!;
-    a.aba = nomeAba; a.formato = col.setor ? 'hub' : 'huggy'; a.lidas = linhas.length;
+    a.aba = nomeAba; a.formato = col.setor || col.fila ? 'hub' : 'huggy'; a.lidas = linhas.length;
+    /**
+     * A fila da linha (4.4.1). Desde 11/2026 o relatório do Hub traz "Setor" (a
+     * equipe: "Diretores-Expansao" para o Expansão inteiro) e "Fila" (a fila de
+     * verdade: "Expansao" ou "Diretores-Expansao"). Lendo só o Setor, tudo caía
+     * em Diretores (importação de 11/11/2026).
+     *
+     * O Setor decide primeiro: setor de fora (iGreen Mob, Royais…) é demanda
+     * extra, qualquer que seja a fila — o Royais tem uma fila chamada
+     * "Expansao" que não é a nossa. Setor nosso (Diretores-Expansao, Conexao
+     * Telecom): vale a Fila, se for uma fila cadastrada. Sem a coluna Setor, a
+     * Fila; relatório antigo, só o Setor (que lá era a fila).
+     */
+    const setorDaLinha = (l: Linha) => {
+      const fila = col.fila ? String(l[col.fila] ?? '').trim() : '';
+      const setor = col.setor ? String(l[col.setor] ?? '').trim() : '';
+      if (!setor) return fila;
+      if (!SETORES[normalizar(setor)]) return setor;
+      return fila && SETORES[normalizar(fila)] ? fila : setor;
+    };
     for (const l of linhas) {
-      // Outro setor (2.9.0): qualquer setor fora de Expansão e Diretores-Expansão
-      // vira demanda extra pendente — com ou sem nota. Antes, recusava o arquivo.
-      if (col.setor) {
-        const setor = String(l[col.setor] ?? '').trim();
+      // Outro setor (2.9.0 a 4.4.0): setor sem fila cadastrada virava demanda
+      // extra pendente — o paliativo do iGreen Mob. Desde 11/11/2026 o Mob é fila
+      // do Expansão (decisão do gestor) e o paliativo saiu: setor sem fila
+      // cadastrada (Royais…) é de outra equipe e fica de fora, sem pendência.
+      if (col.setor || col.fila) {
+        const setor = setorDaLinha(l);
         if (!SETORES[normalizar(setor)]) {
+          if (!PALIATIVO_OUTRO_SETOR) { a.deOutraEquipe++; continue; }
           const atendente = String(l[col.atendente] ?? '').trim();
           const data = lerData(l[col.data]);
           if (ehRobo(atendente) || !data || !setor) continue;
@@ -208,7 +247,7 @@ export default function ImportadorAvaliacoes({
       if (!data) { a.semData++; continue; }
 
       let origem: Origem = CANAIS[0] ?? 'huggy';
-      if (col.setor) origem = SETORES[normalizar(String(l[col.setor] ?? '').trim())];
+      if (col.setor || col.fila) origem = SETORES[normalizar(setorDaLinha(l))];
       // Fila de outro setor da plataforma: é da outra equipe, fica de fora.
       if (filaDeFora(origem)) { a.deOutraEquipe++; continue; }
 
@@ -226,6 +265,13 @@ export default function ImportadorAvaliacoes({
         a.deOutraEquipe++;
       } else if (pessoa) {
         a.novas.push({ pessoa_id: pessoa.id, origem, data, protocolo, nota, tabulacao, origem_arquivo: f.name });
+      } else if (filaQueCopia(origem)) {
+        // Fila que copia outra (o iGreen Mob copia a Expansão, 11/11/2026): é
+        // atendida também por gente de fora da equipe, que não tem cadastro
+        // aqui. Sem cadastro, é de outra equipe — fica de fora, sem virar nota
+        // guardada (decisão do gestor). Nas filas próprias, nome sem cadastro
+        // continua guardado: costuma ser alguém da equipe com o nome do Hub diferente.
+        a.deOutraEquipe++;
       } else {
         a.guardar.push({ nome_no_arquivo: atendente, origem, data, protocolo, nota, tabulacao, origem_arquivo: f.name });
       }
@@ -257,16 +303,16 @@ export default function ImportadorAvaliacoes({
       const ate = deslocar(fins[fins.length - 1], 15);
       const existentes = new Set<string>();
       // As já gravadas, com quem e qual nota: o arquivo pode trazer diferente (3.3.1).
-      const gravadas = new Map<string, { data: string; pessoa_id: string; nota: number }>();
+      const gravadas = new Map<string, { data: string; pessoa_id: string; nota: number; origem: string }>();
       const db = criarClienteNavegador();
       for (const tabela of ['avaliacoes', 'avaliacoes_guardadas'] as const) {
         for (let i = 0; ; i += PAGINA) {
-          const { data: pag, error } = await db.from(tabela).select(tabela === 'avaliacoes' ? 'data, protocolo, pessoa_id, nota' : 'data, protocolo')
+          const { data: pag, error } = await db.from(tabela).select(tabela === 'avaliacoes' ? 'data, protocolo, pessoa_id, nota, origem' : 'data, protocolo')
             .gte('data', de).lte('data', ate).order('data').order('protocolo').range(i, i + PAGINA - 1);
           if (error) { setErro(await mensagemDoErro(error)); setOcupado(null); return; }
-          for (const r of (pag ?? []) as unknown as { data: string; protocolo: string; pessoa_id?: string; nota?: number }[]) {
+          for (const r of (pag ?? []) as unknown as { data: string; protocolo: string; pessoa_id?: string; nota?: number; origem?: string }[]) {
             existentes.add(r.protocolo);
-            if (r.pessoa_id) gravadas.set(r.protocolo, { data: r.data, pessoa_id: r.pessoa_id, nota: Number(r.nota) });
+            if (r.pessoa_id) gravadas.set(r.protocolo, { data: r.data, pessoa_id: r.pessoa_id, nota: Number(r.nota), origem: r.origem ?? '' });
           }
           if ((pag ?? []).length < PAGINA) break;
         }
@@ -282,11 +328,11 @@ export default function ImportadorAvaliacoes({
       for (const a of validos) {
         for (const c of a.novas) {
           const g = gravadas.get(c.protocolo);
-          if (!g || (g.pessoa_id === c.pessoa_id && g.nota === c.nota && g.data === c.data)) continue;
+          if (!g || (g.pessoa_id === c.pessoa_id && g.nota === c.nota && g.data === c.data && g.origem === c.origem)) continue;
           const mes = mesDeCompetencia(c.data);
           const mesAntes = mesDeCompetencia(g.data);
           a.atualizar.push({ data: c.data, de_data: g.data, protocolo: c.protocolo, de_pessoa: g.pessoa_id, para_pessoa: c.pessoa_id,
-            de_nota: g.nota, para_nota: c.nota, origem_arquivo: c.origem_arquivo,
+            de_nota: g.nota, para_nota: c.nota, origem_arquivo: c.origem_arquivo, de_origem: g.origem, para_origem: c.origem,
             mes_fechado: fechados.has(`${g.pessoa_id}|${mesAntes}`) || fechados.has(`${c.pessoa_id}|${mes}`) });
         }
       }
@@ -339,7 +385,7 @@ export default function ImportadorAvaliacoes({
     // Já gravadas, diferentes no arquivo: vale o arquivo (3.3.1).
     for (let i = 0; i < atualizar.length; i += 20) {
       const resultados = await Promise.all(atualizar.slice(i, i + 20).map((u) => db.from('avaliacoes')
-        .update({ data: u.data, pessoa_id: u.para_pessoa, nota: u.para_nota, origem_arquivo: u.origem_arquivo,
+        .update({ data: u.data, pessoa_id: u.para_pessoa, nota: u.para_nota, origem: u.para_origem, origem_arquivo: u.origem_arquivo,
                   importado_por: importadoPor, importado_em: agora })
         .eq('data', u.de_data).eq('protocolo', u.protocolo)));
       const falha = resultados.find((r) => r.error)?.error;
@@ -467,7 +513,7 @@ export default function ImportadorAvaliacoes({
 
       <p className="mb-4 text-sm text-slate-600">
         Relatórios de atendimentos do Hub (<code>.xlsx</code>), um ou vários de uma vez. Entram só as avaliações com nota
-        de 1 a 5, cada uma na fila do seu setor (Configuração › Setores e filas).
+        de 1 a 5, cada uma na fila do seu setor (Usuários e setores › Setores e filas).
         A mesma avaliação (o mesmo protocolo) entra uma vez só; se ela já estava gravada e o arquivo traz outro
         atendente ou outra nota, vale o arquivo (menos em mês já fechado). Nota de atendente não reconhecido fica guardada;
         conversa só com o robô é ignorada. Atendimento de <strong>outro setor</strong> vira demanda extra pendente, para
@@ -554,7 +600,10 @@ export default function ImportadorAvaliacoes({
                         ? `${nomePessoa.get(u.de_pessoa) ?? '—'} → ${nomePessoa.get(u.para_pessoa) ?? '—'}`
                         : u.de_nota !== u.para_nota
                           ? `${nomePessoa.get(u.para_pessoa) ?? '—'}: nota ${u.de_nota} → ${u.para_nota}`
-                          : `${nomePessoa.get(u.para_pessoa) ?? '—'}: data do atendimento mudou no Hub`;
+                          : u.de_origem !== u.para_origem
+                            // 4.4.1: a fila corrigida pelo relatório novo do Hub (coluna "Fila").
+                            ? `fila ${nomeDaFila(cadastro, u.de_origem)} → ${nomeDaFila(cadastro, u.para_origem)}`
+                            : `${nomePessoa.get(u.para_pessoa) ?? '—'}: data do atendimento mudou no Hub`;
                       return m.set(txt, (m.get(txt) ?? 0) + 1);
                     }, new Map<string, number>())].sort((a, b) => b[1] - a[1]).map(([txt, n]) => (
                       <li key={txt}>{txt} <span className="text-sky-700">· {n}</span></li>
@@ -589,7 +638,7 @@ export default function ImportadorAvaliacoes({
               <header className="border-b border-slate-100 px-4 py-2.5">
                 <h3 className="text-sm font-semibold text-slate-800">Atendimentos de outros setores</h3>
                 <p className="text-xs text-slate-500">
-                  Setores que não estão em nenhuma fila (Configuração › Setores e filas). Ficam guardados como demanda extra pendente, sem pontos, para você
+                  Setores que não estão em nenhuma fila (Usuários e setores › Setores e filas). Ficam guardados como demanda extra pendente, sem pontos, para você
                   decidir em Lançamentos — lançar com a regra que escolher ou descartar. A nota deles não entra no C-SAT.
                 </p>
               </header>

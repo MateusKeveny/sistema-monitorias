@@ -1,3 +1,4 @@
+import { faixasDeCsat, filasDoSetor, metaDoCsat, textoDaMeta } from '@/lib/filasDoSetor';
 import { redirect } from 'next/navigation';
 import Link from '@/componentes/Link';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
@@ -183,11 +184,18 @@ export async function TelaDeAprovacao({ searchParams, modo }: {
         })}
       </div>
 
-      {escolhido && <SetorDoMes key={escolhido.id} s={escolhido} mes={mes} podeDecidir={diretoria} modo={modo} base={base} />}
+      {escolhido && <SetorDoMes key={escolhido.id} s={escolhido} mes={mes} podeDecidir={diretoria} modo={modo} base={base}
+                                metaCsat={await metaDoSetor(db, escolhido.id)} />}
     </div>
   );
 }
 
+/** A meta de C-SAT de um setor: a faixa mais alta da primeira fila dele. */
+async function metaDoSetor(db: Awaited<ReturnType<typeof criarClienteServidor>>, setorId: number) {
+  const filas = await filasDoSetor(db, setorId);
+  const faixas = await faixasDeCsat(db, filas.map((f) => f.grupoCsat));
+  return metaDoCsat(faixas[filas[0]?.grupoCsat ?? '']);
+}
 function Cabecalho({ modo }: { modo: ModoDaAprovacao }) {
   return (
     <div>
@@ -200,7 +208,9 @@ function Cabecalho({ modo }: { modo: ModoDaAprovacao }) {
   );
 }
 
-function SetorDoMes({ s, mes, podeDecidir, modo, base }: {
+function SetorDoMes({ s, mes, podeDecidir, modo, base, metaCsat = 0.95 }: {
+  /** A meta de C-SAT do setor, pela faixa mais alta (4.4.0): Expansão 95%, Telecom 94%. */
+  metaCsat?: number;
   s: SetorDoPainel; mes: string; podeDecidir: boolean; modo: ModoDaAprovacao; base: string;
 }) {
   const mesCurto = mes.slice(0, 7);
@@ -302,10 +312,10 @@ function SetorDoMes({ s, mes, podeDecidir, modo, base }: {
       </div>
 
       <Painel>
-        <Secao titulo="C-SAT por semana" subtitulo={`${canais.length > 1 ? 'Uma linha por canal, com todas as avaliações.' : 'Todas as avaliações do canal.'} Tracejada: a meta de 95%.`}>
+        <Secao titulo="C-SAT por semana" subtitulo={`${canais.length > 1 ? 'Uma linha por canal, com todas as avaliações.' : 'Todas as avaliações do canal.'} Tracejada: a meta de ${textoDaMeta(metaCsat)}.`}>
           {semanas.length
             ? <GraficoBarrasELinha largura={1400} rotulos={semanas.map((w) => `${w}ª semana`)} formatar={percentual}
-                                   min={piso(linhasSemana.flatMap((l) => l.valores))} max={1} referencia={{ valor: 0.95, rotulo: 'meta 95%' }} linhas={linhasSemana} />
+                                   min={piso(linhasSemana.flatMap((l) => l.valores))} max={1} referencia={{ valor: metaCsat, rotulo: `meta ${textoDaMeta(metaCsat)}` }} linhas={linhasSemana} />
             : <Vazio>Sem avaliações importadas neste mês.</Vazio>}
         </Secao>
       </Painel>
@@ -334,7 +344,7 @@ function SetorDoMes({ s, mes, podeDecidir, modo, base }: {
               <div>
                 <p className="mb-1 text-xs text-slate-500">C-SAT mês a mês{canaisMes.length > 1 ? ', por canal' : ''}</p>
                 <GraficoBarrasELinha largura={720} rotulos={meses.map((m) => nomeDoMes(m.mes))} formatar={percentual}
-                                     min={piso(linhasMes.flatMap((l) => l.valores))} max={1} referencia={{ valor: 0.95, rotulo: 'meta 95%' }} linhas={linhasMes} />
+                                     min={piso(linhasMes.flatMap((l) => l.valores))} max={1} referencia={{ valor: metaCsat, rotulo: `meta ${textoDaMeta(metaCsat)}` }} linhas={linhasMes} />
               </div>
             </div>
           </Secao>

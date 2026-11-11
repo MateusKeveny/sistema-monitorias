@@ -232,7 +232,7 @@ export default function SetoresECanais({ setores, canais, vistos, monitorias = {
       return `Copia as métricas da fila ${canais.find((x) => x.id === c.copia_de)?.nome ?? 'original'} e acompanha as mudanças dela · ${tme}.`;
     }
     if (c.apelido === 'huggy' || c.apelido === 'diretores') return `Regras da equipe · ${tme}.`;
-    return `Regras próprias (Configuração › Pesos por cargo) · ${tme}.`;
+    return `Regras próprias (Metas e métricas › Pesos por cargo) · ${tme}.`;
   }
 
   function ligar(setorDoHub: string, canalId: number) {
@@ -405,7 +405,7 @@ export default function SetoresECanais({ setores, canais, vistos, monitorias = {
         )}
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-xs text-slate-500">
-            Fila nova recebe volume, avaliações e lançamentos já na próxima importação. Copiando, ela usa as mesmas regras da original e acompanha qualquer mudança de peso feita lá; com regras próprias, os pesos começam em zero (Configuração › Pesos por cargo). C-SAT e notas de 1 a 5 são os da equipe.
+            Fila nova recebe volume, avaliações e lançamentos já na próxima importação. Copiando, ela usa as mesmas regras da original e acompanha qualquer mudança de peso feita lá; com regras próprias, os pesos começam em zero (Metas e métricas › Pesos por cargo). C-SAT e notas de 1 a 5 são os da equipe.
           </p>
           <button type="button" onClick={salvar} disabled={!mudou || ocupado || atualizando}
                   className="rounded-lg bg-marca-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-marca-700 disabled:opacity-40">

@@ -4,7 +4,7 @@ import { REGRA_MEDIA, REGRA_META, type PesoCargo } from '@/lib/tipos';
 import type { criarClienteNavegador } from '@/lib/supabase/cliente';
 
 /**
- * Metas e pesos por lista (4.0.0): a matriz de Configuração › Pesos por cargo
+ * Metas e pesos por lista (4.0.0): a matriz de Metas e métricas › Pesos por cargo
  * numa planilha. Uma linha por métrica (Meta do mês, Média da equipe e cada
  * métrica) e uma coluna por cargo, com os pontos no cruzamento — o mesmo
  * desenho da tela.
@@ -362,13 +362,13 @@ export function modeloXlsx(ctx: ContextoMetas, nomeDaAba = 'Metas'): Uint8Array 
       linhas: [
         { item: 'Onde preencher', regra: `Na aba "${nomeDaAba}", só nas colunas amarelas (${nomes || 'uma por cargo'}): uma linha por métrica, a pontuação no cruzamento com o cargo. Métrica, Como pontua e Faixa são só para leitura.` },
         ...(cargos.length ? [] : [{ item: 'Setor sem cargos', regra: `Troque "${PREFIXO_VAGO} 1, 2, 3" pelo nome de cada cargo e preencha a Meta do mês: cada coluna vira um cargo. Coluna que continuar "${PREFIXO_VAGO}" é ignorada.` }]),
-        ...(ctx.metricas.length ? [] : [{ item: 'Setor sem métricas', regra: 'Este setor ainda não tem métricas (foi criado do zero, sem copiar de outro setor). As métricas nascem com as filas e em Configuração › Faixas e nomes; depois disso, baixe o modelo de novo e as linhas aparecem aqui.' }]),
+        ...(ctx.metricas.length ? [] : [{ item: 'Setor sem métricas', regra: 'Este setor ainda não tem métricas (foi criado do zero, sem copiar de outro setor). As métricas nascem com as filas e em Metas e métricas › Métricas e faixas; depois disso, baixe o modelo de novo e as linhas aparecem aqui.' }]),
         { item: 'Número', regra: 'A pontuação da métrica no cargo. Negativo desconta (ex.: -50). Decimal com vírgula (ex.: 0,25).' },
         { item: 'não pontua', regra: 'A métrica não conta para o cargo. Trocar por um número liga; escrever "não pontua" desliga.' },
         { item: 'Célula vazia', regra: 'Não muda nada naquele cargo.' },
         { item: 'Cargo novo', regra: 'Acrescente uma coluna com o nome do cargo: ele é criado com a meta preenchida, e o que ficar vazio é copiado do Atendente Júnior.' },
         { item: 'Métrica nova', regra: 'Acrescente uma linha com um nome que o setor não tem: ela é criada. O tipo vem de "Como pontua": "faixa de TME", "faixa de TMA", "faixa de C-SAT", "avaliação com esta nota" ou "atendimento finalizado" são automáticas (vêm do Hub e pedem uma fila no setor); qualquer outro texto vira lançamento manual. A faixa vem de "Faixa" (ex.: "de 0 a 10 min", "a partir de 30", "de 5 a 5" para a nota).' },
-        { item: 'Uma fila ou todas', regra: 'Métrica automática com " · " e o nome da fila no fim (ex.: "TME até 15 min · Logística") vale só para aquela fila. Sem o nome da fila, vale para todas as filas do setor que não têm a própria. Para escolher sem planilha: Configuração › Métricas por fila.' },
+        { item: 'Uma fila ou todas', regra: 'Métrica automática com " · " e o nome da fila no fim (ex.: "TME até 15 min · Logística") vale só para aquela fila. Sem o nome da fila, vale para todas as filas do setor que não têm a própria. Para escolher sem planilha: Metas e métricas › Métricas e faixas.' },
         { item: 'Faixas novas', regra: 'Faixas de TME, C-SAT ou notas trazidas pela lista substituem as antigas do setor (que são desligadas), para o mesmo atendimento não pontuar duas vezes.' },
         { item: 'Nomes', regra: 'Não mude o texto da coluna Métrica das que já existem nem os nomes dos cargos: é por eles que o sistema reconhece cada linha e coluna.' },
       ],
@@ -514,7 +514,7 @@ function novaMetrica(rotulo: string, comoPontua: string, faixaTxt: string, ctx: 
     }
     else if (!opcoes.length) m.erro = `${NOME_DO_TIPO[tipo]} precisa de uma fila do Hub no setor${tipo === 'tme' ? ' que pontue TME' : ''} (Setores e filas › + Fila)`;
     else if (opcoes.length === 1 && doSetor(opcoes[0])) { if (tipo === 'finalizado') m.daFila = opcoes[0]; else m.grupo = opcoes[0]; }
-    else if (ctx.setorId == null || ctx.setorId === 1) m.erro = `as filas do setor usam ${NOME_DO_TIPO[tipo]} diferentes: ajuste esta em Configuração › Faixas e nomes`;
+    else if (ctx.setorId == null || ctx.setorId === 1) m.erro = `as filas do setor usam ${NOME_DO_TIPO[tipo]} diferentes: ajuste esta em Metas e métricas › Métricas e faixas`;
     else if (tipo === 'finalizado') {
       if (repontar.regra_finalizado) m.erro = 'só uma linha de finalizados por lista (vale para todas as filas)';
       else { m.grupo = 'atendimento'; repontar.regra_finalizado = chave; m.substitui = opcoes.filter(doSetor); }

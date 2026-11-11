@@ -23,26 +23,37 @@ type Regua = { grupo: string; titulo: string; cor: string; unidade: Unidade; mai
 
 const MODELOS: Regua[] = [
   { grupo: 'csat', titulo: 'C-SAT', cor: COR_DA_METRICA.csat, unidade: '%', maiorMelhor: true,
-    texto: 'O C-SAT da semana escolhe a faixa; a faixa multiplica os finalizados. Vale para os dois canais.' },
-  { grupo: 'tme', titulo: 'TME · Expansão', cor: COR_DA_METRICA.expansao, unidade: 'min', maiorMelhor: false,
+    texto: 'O C-SAT da semana escolhe a faixa; a faixa multiplica os finalizados.' },
+  { grupo: 'tme', titulo: 'TME', cor: COR_DA_METRICA.expansao, unidade: 'min', maiorMelhor: false,
     texto: 'O TME da semana escolhe a faixa.' },
-  { grupo: 'tme_diretores', titulo: 'TME · Diretores-Expansão', cor: COR_DA_METRICA.diretores, unidade: 'min', maiorMelhor: false,
+  { grupo: 'tme_diretores', titulo: 'TME', cor: COR_DA_METRICA.diretores, unidade: 'min', maiorMelhor: false,
     texto: 'O TME da semana escolhe a faixa.' },
   { grupo: 'monitoria', titulo: 'Monitoria', cor: COR_DA_METRICA.monitoria, unidade: '%', maiorMelhor: true,
     texto: 'A média da semana só pontua acima do mínimo — o valor exato do corte não pontua.' },
 ];
 
-/** As réguas das regras recebidas (as de um setor), na ordem dos modelos. */
-function reguasDe(regras: RegraCota[]): Regua[] {
+/**
+ * As réguas das regras recebidas (as de um setor), na ordem dos modelos.
+ * 4.4.0: o título diz quais filas usam a régua ("TME · Expansão", "C-SAT ·
+ * as 4 filas"), pelo cadastro de cada setor — antes os nomes da Expansão
+ * estavam escritos aqui e apareciam também no Telecom.
+ */
+function reguasDe(regras: RegraCota[], filasPorGrupo: Record<string, string[]>): Regua[] {
   const grupos = [...new Set(regras.filter((r) => r.ativo).map((r) => r.grupo))];
   const lista: Regua[] = [];
+  const comFilas = (m: Regua, g: string): Regua => {
+    const filas = filasPorGrupo[g] ?? [];
+    const quem = filas.length === 0 ? '' : filas.length === 1 ? filas[0] : filas.length <= 2 ? filas.join(' e ') : `as ${filas.length} filas`;
+    return { ...m, grupo: g, titulo: quem ? `${m.titulo} · ${quem}` : m.titulo,
+             texto: filas.length > 1 && m.grupo === 'csat' ? `${m.texto} Vale para ${quem}.` : m.texto };
+  };
   for (const m of MODELOS) {
-    for (const g of grupos) if (g.replace(/_s\d+$/, '') === m.grupo) lista.push({ ...m, grupo: g });
+    for (const g of grupos) if (g.replace(/_s\d+$/, '') === m.grupo) lista.push(comFilas(m, g));
   }
   for (const g of grupos) {
     if (g.startsWith('tme_') && !lista.some((x) => x.grupo === g)) {
-      lista.push({ grupo: g, titulo: `TME · ${g.slice(4)}`, cor: COR_DA_METRICA.expansao, unidade: 'min', maiorMelhor: false,
-        texto: 'O TME da semana escolhe a faixa.' });
+      lista.push(comFilas({ grupo: g, titulo: 'TME', cor: COR_DA_METRICA.expansao, unidade: 'min', maiorMelhor: false,
+        texto: 'O TME da semana escolhe a faixa.' }, g));
     }
   }
   return lista;
@@ -62,9 +73,11 @@ const TOM = {
  * soltos por métrica ("de" e "até"), e dava para deixar um buraco entre faixas.
  */
 export default function ReguasDeFaixa({
-  regras, pesosBase, nomeBase, tmePorPessoa = {},
+  regras, pesosBase, nomeBase, tmePorPessoa = {}, filasPorGrupo = {},
 }: {
   regras: RegraCota[];
+  /** Por grupo de régua (tme, csat_s10…): os nomes das filas que a usam (4.4.0). */
+  filasPorGrupo?: Record<string, string[]>;
   /** Por grupo de TME: desde quando a fila avalia o TME de cada pessoa (migração 90); nulo = da equipe. */
   tmePorPessoa?: Record<string, string | null>;
   /** Peso de cada regra no cargo de base, só para mostrar na régua. */
@@ -72,7 +85,7 @@ export default function ReguasDeFaixa({
   nomeBase: string;
 }) {
   const router = useRouter();
-  const REGUAS = useMemo(() => reguasDe(regras), [regras]);
+  const REGUAS = useMemo(() => reguasDe(regras, filasPorGrupo), [regras, filasPorGrupo]);
   const inicial = (): Record<string, string[]> => Object.fromEntries(REGUAS.map((g) => {
     const faixas = ordenadas(g.grupo);
     const valores = g.grupo === 'monitoria'
