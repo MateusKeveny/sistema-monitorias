@@ -35,6 +35,23 @@ para o Performance.
 
 ---
 
+## Performance 4.7.1
+
+Importação do Telecom pelas planilhas LAB/HELP do Hub. Sem migração.
+
+- **Importar › Avaliações:** o relatório do Telecom traz "Setor = Telecom" em
+  todas as linhas e a fila de verdade na coluna Fila. Como "Telecom" não é nome
+  de fila, a 4.7.0 descartaria o arquivo inteiro como "de outra equipe". Agora
+  o Setor do Hub que é o nome de um setor do sistema ("Telecom" em "Conexão
+  Telecom") faz valer a Fila. Conferido com a LAB-49511 (26/10 a 08/11): 269
+  avaliações entram (Conexao Telecom 236, iGreen Store 27, Top Performance 6).
+  O Expansão não muda (lá o Setor já é o nome da fila; o Royais segue de fora).
+- Fila do Hub do nosso setor que não está cadastrada (ex.: "Notificações de
+  cobranças iGreen Telecom") fica de fora com um aviso, em vez de sumir como
+  "outra equipe".
+
+---
+
 ## Performance 4.7.0
 
 Revisão dos vínculos com o Expansão: cada tela mostra só o setor do menu e

@@ -39,7 +39,7 @@ export default async function ImportarAvaliacoes({
   const db = await criarClienteServidor();
 
   // Cada um importa só o seu (3.0): o setor do seletor do menu.
-  const { data: setoresDb } = await db.from('setores').select('id').eq('ativo', true).order('ordem');
+  const { data: setoresDb } = await db.from('setores').select('id, nome').eq('ativo', true).order('ordem');
   const escolhido = await setorDoCookie();
   const setorId = ((setoresDb ?? []) as { id: number }[]).find((s) => String(s.id) === escolhido)?.id
     ?? (setoresDb?.[0] as { id: number } | undefined)?.id ?? 1;
@@ -211,7 +211,8 @@ export default async function ImportarAvaliacoes({
       </Quadro>
 
       <ImportadorAvaliacoes pessoas={lista} importadoPor={perfil.id} canais={(canais ?? []) as Canal[]}
-                            setorId={setorId} setorDe={Object.fromEntries(setorDe)} />
+                            setorId={setorId} setorDe={Object.fromEntries(setorDe)}
+                            nomesDosSetores={((setoresDb ?? []) as { nome: string }[]).map((s) => s.nome)} />
       <NotasGuardadas notas={(guardadas ?? []) as NotaGuardada[]}
                       pessoas={lista.filter((p) => p.ativo && !p.desligado_em && (setorDe.get(p.id) ?? 1) === setorId)
                         .map((p) => ({ id: p.id, nome: p.nome }))} />

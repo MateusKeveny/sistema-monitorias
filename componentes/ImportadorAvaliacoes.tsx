@@ -119,6 +119,8 @@ type AnaliseArquivo = {
   outroSetorJa: number;
   /** Linhas de outra equipe da plataforma (fila ou pessoa de outro setor): ficam de fora (3.0). */
   deOutraEquipe: number;
+  /** 4.7.1: linhas do nosso setor numa fila do Hub que não está cadastrada (fila → linhas). */
+  filasSemCadastro: Record<string, number>;
   periodo: [string, string] | null;
 };
 
@@ -134,7 +136,7 @@ const PAGINA = 1000;
  * com o robô é ignorada.
  */
 export default function ImportadorAvaliacoes({
-  pessoas, importadoPor, canais, setorId, setorDe = {},
+  pessoas, importadoPor, canais, setorId, setorDe = {}, nomesDosSetores = [],
 }: {
   pessoas: Pessoa[];
   importadoPor: string;
@@ -147,6 +149,9 @@ export default function ImportadorAvaliacoes({
    */
   setorId?: number;
   setorDe?: Record<string, number>;
+  /** Os nomes dos setores do sistema (4.7.1): o "Setor" do Hub pode vir com o nome
+   *  do setor ("Telecom" para o Conexão Telecom), e não com o de uma fila. */
+  nomesDosSetores?: string[];
 }) {
   // Setor do Hub → canal da cota, pelo cadastro (2.10.0). Antes, fixo no código.
   const cadastro = canais?.length ? canais : CANAIS_PADRAO;
@@ -156,6 +161,12 @@ export default function ImportadorAvaliacoes({
     const deFora = new Set(cadastro.filter((c) => setorId != null && ((c as Partial<Canal>).setor_id ?? 1) !== setorId).map((c) => c.apelido));
     return (apelido: string | null | undefined) => !!apelido && deFora.has(apelido);
   }, [cadastro, setorId]);
+  /** O "Setor" do Hub é um setor nosso? Pela palavra inteira no nome do setor
+   *  ("Telecom" em "Conexão Telecom"). O Royais e outras equipes não batem. */
+  const ehSetorNosso = (setorDoHub: string) => {
+    const n = normalizar(setorDoHub);
+    return n.length >= 3 && nomesDosSetores.some((nome) => ` ${normalizar(nome)} `.includes(` ${n} `));
+  };
   const pessoaDeFora = (id: string) => setorId != null && (setorDe[id] ?? 1) !== setorId;
   /**
    * Fila atendida também por outra equipe (o iGreen Mob, 11/11/2026): quem não
@@ -190,7 +201,7 @@ export default function ImportadorAvaliacoes({
   async function lerArquivo(f: File, vistas: Set<string>): Promise<AnaliseArquivo> {
     const a: AnaliseArquivo = {
       nome: f.name, atualizar: [], aba: null, formato: null, erro: null, lidas: 0, semNota: 0, semData: 0, robo: 0,
-      repetidasNoLote: 0, jaImportadas: 0, novas: [], guardar: [], outroSetor: [], outroSetorSemPessoa: 0, outroSetorJa: 0, deOutraEquipe: 0, periodo: null,
+      repetidasNoLote: 0, jaImportadas: 0, novas: [], guardar: [], outroSetor: [], outroSetorSemPessoa: 0, outroSetorJa: 0, deOutraEquipe: 0, filasSemCadastro: {}, periodo: null,
     };
     let abas: Map<string, Linha[]>;
     try { abas = await lerPlanilha(f); } catch (e) {
@@ -220,7 +231,9 @@ export default function ImportadorAvaliacoes({
       const fila = col.fila ? String(l[col.fila] ?? '').trim() : '';
       const setor = col.setor ? String(l[col.setor] ?? '').trim() : '';
       if (!setor) return fila;
-      if (!SETORES[normalizar(setor)]) return setor;
+      // 4.7.1: o Setor do Hub é o nome de um setor nosso ("Telecom" → Conexão
+      // Telecom): vale a Fila. Fila não cadastrada fica de fora e é avisada.
+      if (!SETORES[normalizar(setor)]) return ehSetorNosso(setor) ? fila : setor;
       return fila && SETORES[normalizar(fila)] ? fila : setor;
     };
     for (const l of linhas) {
@@ -231,6 +244,10 @@ export default function ImportadorAvaliacoes({
       if (col.setor || col.fila) {
         const setor = setorDaLinha(l);
         if (!SETORES[normalizar(setor)]) {
+          const doHub = col.setor ? String(l[col.setor] ?? '').trim() : '';
+          if (doHub && !SETORES[normalizar(doHub)] && ehSetorNosso(doHub) && setor) {
+            a.filasSemCadastro[setor] = (a.filasSemCadastro[setor] ?? 0) + 1; continue;
+          }
           if (!PALIATIVO_OUTRO_SETOR) { a.deOutraEquipe++; continue; }
           const atendente = String(l[col.atendente] ?? '').trim();
           const data = lerData(l[col.data]);
@@ -588,6 +605,20 @@ export default function ImportadorAvaliacoes({
           <p className="text-xs text-slate-500">
             <b>Repetidas</b>: a mesma avaliação em mais de um arquivo — entra uma vez. <b>Robô</b>: conversas sem atendente, ignoradas.
           </p>
+
+          {/* 4.7.1: fila do Hub do nosso setor que não está cadastrada: fica de fora, mas avisada. */}
+          {(() => {
+            const semCadastro: Record<string, number> = {};
+            for (const a of arquivos ?? []) for (const [f, n] of Object.entries(a.filasSemCadastro)) semCadastro[f] = (semCadastro[f] ?? 0) + n;
+            const lista = Object.entries(semCadastro).sort((x, y) => y[1] - x[1]);
+            return lista.length > 0 && (
+              <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-sm text-amber-800 ring-1 ring-amber-600/20 dark:text-amber-300">
+                Fila{lista.length > 1 ? 's' : ''} do setor sem cadastro, de fora desta importação:{' '}
+                {lista.map(([f, n]) => `${f} (${n} linha${n > 1 ? 's' : ''})`).join(', ')}. Para contar, cadastre a fila em
+                Usuários e setores › Setores e filas, com este nome do Hub, e importe de novo.
+              </p>
+            );
+          })()}
 
           {soma((a) => a.deOutraEquipe) > 0 && (
             <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600 ring-1 ring-slate-200">
