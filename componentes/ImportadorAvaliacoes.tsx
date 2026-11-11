@@ -514,6 +514,51 @@ export default function ImportadorAvaliacoes({
   const guardarPorNome = [...guardar.reduce((m, g) => m.set(g.nome_no_arquivo, (m.get(g.nome_no_arquivo) ?? 0) + 1),
     new Map<string, number>())].sort((a, b) => b[1] - a[1]);
 
+  /**
+   * Nome do Hub parecido com alguém do setor (4.8.0): todas as palavras do nome
+   * do Hub estão no nome da pessoa, começando pelo primeiro nome ("Kamilla
+   * Cordeiro" → Kamilla Mendonça Cordeiro; "Renan Goncalves David" → Renan
+   * David Gonçalves). O gestor confirma; ninguém é ligado sozinho.
+   */
+  const doSetorAtivas = useMemo(() => pessoas.filter((p) => p.ativo && !p.desligado_em && !pessoaDeFora(p.id))
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [pessoas, setorId, setorDe]);
+  const palavras = (s: string) => normalizar(s).split(/\s+/).filter((w) => w.length > 1);
+  const parecida = (nomeDoHub: string): Pessoa | null => {
+    const h = palavras(nomeDoHub);
+    if (h.length < 2) return null;
+    const candidatas = doSetorAtivas.filter((p) => [p.nome, p.nome_hub ?? ''].some((n) => {
+      const w = palavras(n);
+      return w[0] === h[0] && h.every((x) => w.includes(x));
+    }));
+    return candidatas.length === 1 ? candidatas[0] : null;
+  };
+  const [escolhaDoNome, setEscolhaDoNome] = useState<Record<string, string>>({});
+
+  /** Liga o nome do Hub à pessoa (nomes no Hub extras) e passa as notas dela para "novas". */
+  async function vincular(nomeDoHub: string, pessoaId: string) {
+    const p = pessoas.find((x) => x.id === pessoaId);
+    if (!p || !arquivos) return;
+    if (!window.confirm(`Gravar "${nomeDoHub}" como nome no Hub de ${p.nome}? As notas com esse nome entram para ela nesta importação e nas próximas.`)) return;
+    setOcupado('Gravando o nome no Hub…'); setErro(null);
+    const extras = [...new Set([...(p.nomes_hub_extras ?? []), nomeDoHub])];
+    const { error } = await criarClienteNavegador().from('pessoas').update({ nomes_hub_extras: extras }).eq('id', p.id);
+    setOcupado(null);
+    if (error) { setErro(await mensagemDoErro(error)); return; }
+    p.nomes_hub_extras = extras;
+    setArquivos(arquivos.map((a) => {
+      const dele = a.guardar.filter((g) => g.nome_no_arquivo === nomeDoHub);
+      if (!dele.length) return a;
+      return {
+        ...a,
+        guardar: a.guardar.filter((g) => g.nome_no_arquivo !== nomeDoHub),
+        novas: [...a.novas, ...dele.map((g) => ({ pessoa_id: p.id, origem: g.origem, data: g.data, protocolo: g.protocolo,
+          nota: g.nota, tabulacao: g.tabulacao, origem_arquivo: g.origem_arquivo }))],
+      };
+    }));
+  }
+
   // Três passos (1.19.0): escolher, conferir, importar.
   const passo = sucesso ? 3 : arquivos ? 2 : 1;
   const Passo = ({ n, rotulo }: { n: number; rotulo: string }) => (
@@ -666,10 +711,32 @@ export default function ImportadorAvaliacoes({
               <p className="font-semibold">
                 {guardar.length} nota{guardar.length > 1 ? 's' : ''} de atendente{guardarPorNome.length > 1 ? 's' : ''} não reconhecido{guardarPorNome.length > 1 ? 's' : ''} ser{guardar.length > 1 ? 'ão' : 'á'} guardada{guardar.length > 1 ? 's' : ''}, sem entrar na cota
               </p>
-              <p className="mt-1">{guardarPorNome.map(([n, q]) => `"${n}" (${q})`).join(', ')}.</p>
-              <p className="mt-1 text-xs">
-                Grave o nome como Nome no Hub na ficha da pessoa (Atendentes) e as notas entram sozinhas — ou atribua no quadro
-                "Notas guardadas", abaixo.
+              {/* 4.8.0: cada nome com a pessoa parecida já sugerida; vincular grava o nome no Hub e as notas entram. */}
+              <ul className="mt-2 space-y-1.5">
+                {guardarPorNome.map(([n, q]) => {
+                  const sugerida = parecida(n);
+                  const escolhida = escolhaDoNome[n] ?? sugerida?.id ?? '';
+                  return (
+                    <li key={n} className="flex flex-wrap items-center gap-2">
+                      <span>&ldquo;{n}&rdquo; ({q})</span>
+                      {sugerida && <span className="text-xs">parece ser <b>{sugerida.nome}</b> —</span>}
+                      <select value={escolhida} disabled={!!ocupado} aria-label={`Quem é ${n}`}
+                              onChange={(e) => setEscolhaDoNome((s) => ({ ...s, [n]: e.target.value }))}
+                              className="rounded-md border border-amber-600/30 bg-superficie px-1.5 py-0.5 text-xs text-slate-800">
+                        <option value="">deixar guardada</option>
+                        {doSetorAtivas.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                      </select>
+                      <button type="button" disabled={!!ocupado || !escolhida} onClick={() => vincular(n, escolhida)}
+                              className="rounded-md bg-amber-600 px-2 py-0.5 text-xs font-semibold text-white disabled:opacity-40">
+                        {sugerida && escolhida === sugerida.id ? 'Sim, é essa pessoa' : 'Vincular'}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              <p className="mt-2 text-xs">
+                Vincular grava o nome como &ldquo;nome no Hub&rdquo; da pessoa (vale para as próximas importações) e as notas
+                entram nesta. Sem vincular, ficam guardadas para atribuir no quadro &ldquo;Notas guardadas&rdquo;, abaixo.
               </p>
             </div>
           )}

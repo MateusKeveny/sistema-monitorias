@@ -35,6 +35,22 @@ para o Performance.
 
 ---
 
+## Performance 4.8.0
+
+Nome do Hub vinculado direto na importação. Sem migração.
+
+- **Importar › Avaliações:** nota de atendente que o sistema não reconhece
+  mostra, nome a nome, a pessoa do setor com nome parecido (todas as palavras
+  do nome do Hub no nome da pessoa, começando pelo primeiro nome: "Kamilla
+  Cordeiro" → Kamilla Mendonça Cordeiro). O gestor confirma ("Sim, é essa
+  pessoa") ou escolhe outra na lista; o nome vira "nome no Hub" da pessoa e as
+  notas entram já nesta importação. Ninguém é ligado sem confirmação; sem
+  vincular, a nota fica guardada como antes.
+- Dados (11/11): "Kamilla Cordeiro" e "Renan Goncalves David" gravados como
+  nome no Hub da Kamilla Mendonça Cordeiro e do Renan David Gonçalves (Telecom).
+
+---
+
 ## Performance 4.7.1
 
 Importação do Telecom pelas planilhas LAB/HELP do Hub. Sem migração.
