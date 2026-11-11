@@ -56,6 +56,14 @@ function lerData(v: unknown): string | null {
  */
 const PALIATIVO_OUTRO_SETOR = false;
 
+/**
+ * Filas do Hub atendidas também por outra equipe (nome no Hub, normalizado):
+ * atendente sem cadastro nelas é de fora e fica de fora, sem virar nota
+ * guardada (decisão do gestor, 11/11/2026). Nas demais, nome sem cadastro
+ * continua guardado — costuma ser alguém da equipe com o nome do Hub diferente.
+ */
+const FILAS_COM_OUTRA_EQUIPE = new Set(['igreen mob']);
+
 /** "Sem atendente (bot/sem handoff)", vazio: conversa sem pessoa — não há a quem atribuir. */
 const ehRobo = (atendente: string) => !atendente || normalizar(atendente).startsWith('sem atendente');
 
@@ -149,10 +157,15 @@ export default function ImportadorAvaliacoes({
     return (apelido: string | null | undefined) => !!apelido && deFora.has(apelido);
   }, [cadastro, setorId]);
   const pessoaDeFora = (id: string) => setorId != null && (setorDe[id] ?? 1) !== setorId;
-  /** A fila copia as regras de outra (copia_de, migração 85)? O iGreen Mob copia a Expansão. */
+  /**
+   * Fila atendida também por outra equipe (o iGreen Mob, 11/11/2026): quem não
+   * tem cadastro aqui é de fora e é ignorado. Pelo nome no Hub, e não pelo
+   * copia_de, que some quando as métricas da fila são gravadas.
+   */
   const filaQueCopia = useMemo(() => {
-    const copias = new Set(cadastro.filter((c) => (c as Partial<Canal>).copia_de != null).map((c) => c.apelido));
-    return (apelido: string | null | undefined) => !!apelido && copias.has(apelido);
+    const deOutraEquipe = new Set(cadastro.filter((c) => c.nomes_no_hub.some((n) => FILAS_COM_OUTRA_EQUIPE.has(normalizar(n))))
+      .map((c) => c.apelido));
+    return (apelido: string | null | undefined) => !!apelido && deOutraEquipe.has(apelido);
   }, [cadastro]);
   // Uma seção por fila da árvore (3.0): as do setor de quem importa.
   const CANAIS = useMemo(() => cadastro.filter((c) => setorId == null || ((c as Partial<Canal>).setor_id ?? 1) === setorId)
@@ -266,11 +279,9 @@ export default function ImportadorAvaliacoes({
       } else if (pessoa) {
         a.novas.push({ pessoa_id: pessoa.id, origem, data, protocolo, nota, tabulacao, origem_arquivo: f.name });
       } else if (filaQueCopia(origem)) {
-        // Fila que copia outra (o iGreen Mob copia a Expansão, 11/11/2026): é
-        // atendida também por gente de fora da equipe, que não tem cadastro
-        // aqui. Sem cadastro, é de outra equipe — fica de fora, sem virar nota
-        // guardada (decisão do gestor). Nas filas próprias, nome sem cadastro
-        // continua guardado: costuma ser alguém da equipe com o nome do Hub diferente.
+        // Fila atendida também por outra equipe (FILAS_COM_OUTRA_EQUIPE, o
+        // iGreen Mob): sem cadastro, é de fora — fica de fora, sem virar nota
+        // guardada (decisão do gestor, 11/11/2026).
         a.deOutraEquipe++;
       } else {
         a.guardar.push({ nome_no_arquivo: atendente, origem, data, protocolo, nota, tabulacao, origem_arquivo: f.name });

@@ -35,6 +35,19 @@ para o Performance.
 
 ---
 
+## Performance 4.4.1
+
+Correções do iGreen Mob como fila. Sem migração.
+
+- **Exportação:** a fila iGreen Mob preenche as colunas do Mob no fim do
+  arquivo (atendimentos, faixas de C-SAT, notas e o C-SAT do Mob), como o
+  paliativo fazia — sem isso, os pontos do Mob de novembro sumiam do arquivo.
+  Conferido: as quantidades de novembro são as mesmas do paliativo.
+- **Importação:** a fila atendida também por outra equipe (o Mob) é
+  reconhecida pelo nome no Hub. Antes era pelo "copia de", que some quando as
+  métricas da fila são gravadas — e os atendentes de fora voltariam a virar
+  notas guardadas.
+
 ## Performance 4.4.0
 
 Migração **105** (`supabase/105-leitura-do-diario-por-setor.sql`, já aplicada no

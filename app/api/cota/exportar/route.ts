@@ -133,7 +133,7 @@ export async function GET(requisicao: NextRequest) {
       .eq('mes_competencia', competencia).order('pessoa'),
     db.from('vw_csat_semanal').select('pessoa_id, origem, avaliacoes, positivas')
       .eq('mes_competencia', competencia),
-    db.from('canais_do_setor').select('setor_id, apelido, nome, ordem, id').order('ordem').order('id'),
+    db.from('canais_do_setor').select('setor_id, apelido, nome, ordem, id, nomes_no_hub').order('ordem').order('id'),
     db.from('setores').select('nome').eq('id', setorId).maybeSingle(),
     setorDasPessoas(db, competencia),
   ]);
@@ -149,9 +149,22 @@ export async function GET(requisicao: NextRequest) {
   // A métrica copiada (chave_s2) conta na coluna da original.
   const base = (regra: string) => regra.replace(/_s\d+$/, '');
 
+  // iGreen Mob (4.4.1): desde 11/2026 é fila do Expansão, e não mais demanda
+  // extra. No arquivo continua nas colunas dele, no fim (o portal já as lê):
+  // finalizado → "Atendimentos iGreen Mob", faixa de C-SAT e notas → as do Mob.
+  const filasDoMob = new Set(((filasDb.data ?? []) as { setor_id: number; apelido: string | null; nomes_no_hub?: string[] | null }[])
+    .filter((f) => f.setor_id === setorId && f.apelido && (f.nomes_no_hub ?? []).some((n) => /^igreen mob$/i.test(n.trim())))
+    .map((f) => f.apelido!));
+  const regraNoArquivo = (l: Linha) => {
+    const r = base(l.regra);
+    if (!l.origem || !filasDoMob.has(l.origem)) return r;
+    if (l.grupo === 'atendimento') return 'outro_setor_igreen_mob';
+    if (/^(csat_|nota_)/.test(r)) return `outro_setor_igreen_mob__${r}`;
+    return r;
+  };
   const linhas = ((extrato.data ?? []) as Linha[]).filter((l) => doSetor(l.pessoa_id))
     .map((l) => ({ ...l, nomeDaFila: l.origem ? nomeDaFila.get(l.origem) : undefined,
-                   regra: base(l.regra), origem: l.origem ? posicao.get(l.origem) ?? null : null }));
+                   regra: regraNoArquivo(l), origem: l.origem ? posicao.get(l.origem) ?? null : null }));
   const lista = ((cotas.data ?? []) as Cota[]).filter((p) => doSetor(p.pessoa_id));
   const avaliacoes = ((csat.data ?? []) as Csat[]).filter((c) => doSetor(c.pessoa_id))
     .map((c) => ({ ...c, origem: posicao.get(c.origem) ?? c.origem }));
