@@ -6,6 +6,7 @@ import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { Quadro } from '@/componentes/ui';
 import { diaMes, duracao, mesRotulo, periodoDaSemana } from '@/lib/formatar';
 import { mensagemDoErro } from '@/lib/erro-amigavel';
+import { nomeDaFila } from '@/lib/setores';
 
 type PessoaSimples = { id: string; nome: string };
 
@@ -80,7 +81,11 @@ export type Pendente = {
  * gestor passar para outra pessoa, manter sem cota (fica como volume da
  * equipe) ou apagar — como as notas guardadas.
  */
-export default function LancamentosPendentes({ pendentes, pessoas }: { pendentes: Pendente[]; pessoas: PessoaSimples[] }) {
+export default function LancamentosPendentes({ pendentes, pessoas, filas = [] }: {
+  pendentes: Pendente[]; pessoas: PessoaSimples[];
+  /** As filas cadastradas, para o nome do canal (4.7.0; antes era Expansão ou Diretores). */
+  filas?: { apelido: string | null; nome: string }[];
+}) {
   const router = useRouter();
   const [para, setPara] = useState<Record<string, string>>({});
   const [ocupado, setOcupado] = useState<string | null>(null);
@@ -124,7 +129,7 @@ export default function LancamentosPendentes({ pendentes, pessoas }: { pendentes
                     <span className="rounded-full bg-amber-500/15 px-2 py-px text-xs text-amber-700 dark:text-amber-300">{p.motivo}</span>
                   </td>
                   <td className="whitespace-nowrap px-2 py-2 text-slate-700">
-                    {p.tipo === 'volume' ? 'Volume' : 'Lançamento'} · {p.canal === 'diretores' ? 'Diretores' : 'Expansão'}
+                    {p.tipo === 'volume' ? 'Volume' : 'Lançamento'} · {nomeDaFila(filas, p.canal)}
                     <span className="block text-xs text-slate-500">{mesRotulo(p.mes_competencia)}</span>
                   </td>
                   <td className="whitespace-nowrap px-2 py-2 text-slate-700">

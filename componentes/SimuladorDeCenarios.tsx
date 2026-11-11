@@ -2,9 +2,8 @@
 
 import { Fragment, useMemo, useState } from 'react';
 import { diaMes, duracao } from '@/lib/formatar';
-import { CENARIO_VAZIO, faixaDe, faixasDoGrupo, semanasComDado, simular, type Base, type Cenario } from '@/lib/simulacao';
+import { CENARIO_VAZIO, faixaDe, faixasDoGrupo, gruposDeCsat, semanasComDado, simular, type Base, type Cenario } from '@/lib/simulacao';
 
-const CANAIS = [['huggy', 'Expansão', 'tme'], ['diretores', 'Diretores-Expansão', 'tme_diretores']] as const;
 const pts = (v: number) => Math.round(v).toLocaleString('pt-BR');
 const pct = (v: number | null) => v == null ? '—' : `${(v * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`;
 const entrada = 'w-20 rounded-md border px-2 py-0.5 text-right text-sm tabular-nums outline-none focus:border-marca-600 bg-superficie';
@@ -59,7 +58,15 @@ export default function SimuladorDeCenarios({ base, periodos, cargos }: {
   const regrasDoCargo = cargo == null ? [] : base.pesos
     .filter((p) => p.cargo_id === cargo && p.regra !== 'meta')
     .sort((a, b) => (base.faixas.find((f) => f.chave === a.regra)?.ordem ?? 999) - (base.faixas.find((f) => f.chave === b.regra)?.ordem ?? 999));
-  const faixasCsat = base.faixas.filter((f) => f.grupo === 'csat').sort((a, b) => (b.faixa_min ?? -1) - (a.faixa_min ?? -1));
+  // 4.7.0: as filas do setor da tela (antes, Expansão e Diretores fixos), cada
+  // uma com o seu grupo de TME; e as faixas de C-SAT dos grupos dessas filas.
+  const CANAIS = (base.filas ?? [{ apelido: 'huggy', nome: 'Expansão', grupoTme: 'tme', grupoCsat: 'csat' },
+    { apelido: 'diretores', nome: 'Diretores e acima', grupoTme: 'tme_diretores', grupoCsat: 'csat' }])
+    .filter((f) => f.grupoTme && base.faixas.some((x) => x.grupo === f.grupoTme))
+    .map((f) => [f.apelido, f.nome, f.grupoTme!] as const);
+  const nomeDaFila = new Map((base.filas ?? []).map((f) => [f.apelido, f.nome]));
+  const gruposCsat = [...gruposDeCsat(base)];
+  const faixasCsat = base.faixas.filter((f) => gruposCsat.includes(f.grupo)).sort((a, b) => (b.faixa_min ?? -1) - (a.faixa_min ?? -1));
   const nomeCargo = new Map(cargos.map((c) => [c.id, c.nome]));
 
   // Projeção (2.0.0): quantas semanas já têm dado, e quem deve bater a meta.
@@ -74,7 +81,7 @@ export default function SimuladorDeCenarios({ base, periodos, cargos }: {
     ...Object.entries(cen.pesosTodos).map(([k, v]) => `${rotulo.get(k) ?? k}: ${pontosHoje(k).join('/')} → ${v} pts`),
     ...cen.tmeInvertido.map((k) => {
       const [s, c] = k.split('|');
-      return `TME ${c === 'huggy' ? 'Expansão' : 'Diretores'} ${s}ª sem. ${base.tmeDesligado.includes(k) ? 'volta a contar' : 'fora'}`;
+      return `TME ${nomeDaFila.get(c) ?? (c === 'huggy' ? 'Expansão' : c === 'diretores' ? 'Diretores' : c)} ${s}ª sem. ${base.tmeDesligado.includes(k) ? 'volta a contar' : 'fora'}`;
     }),
     ...Object.entries(cen.csatMinimos).map(([k, v]) => `${rotulo.get(k)}: a partir de ${pct(v)}`),
     ...Object.entries(cen.pesos).map(([k, v]) => {

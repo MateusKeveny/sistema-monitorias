@@ -13,7 +13,7 @@ import { hojeNoBrasil, periodoDaSemana } from '@/lib/formatar';
 import ListaDeMonitorias from '@/componentes/ListaDeMonitorias';
 import { todas, conferida } from '@/lib/consultas';
 import { MONITORIAS_PADRAO, monitoriasPorSetor, setorDasPessoas, textoDoPiso } from '@/lib/monitoriasDoSetor';
-import { faixaDoCsat, faixasDeCsat, filasDoSetor as lerFilasDoSetor, metaDoCsat, textoDaMeta } from '@/lib/filasDoSetor';
+import { faixaDoCsat, faixasDeCsat, filasDoSetor as lerFilasDoSetor, metaDoCsat, textoDaMeta, tomDoCsatPelaMeta } from '@/lib/filasDoSetor';
 
 
 type CsatSemana = { origem: Canal; semana: number; avaliacoes: number; positivas: number; mes_competencia: string };
@@ -53,7 +53,6 @@ const nomeDoMes = (c: string) =>
   new Date(`${c}T12:00:00Z`).toLocaleDateString('pt-BR', { month: 'long', timeZone: 'UTC' });
 const nomeDoMesMaiusculo = (c: string) => nomeDoMes(c).replace(/^./, (l) => l.toUpperCase());
 
-const tomDoCsat = (v: number): 'bom' | 'atencao' | 'ruim' => (v >= 0.90 ? 'bom' : v >= 0.85 ? 'atencao' : 'ruim');
 /** A nota de monitoria na escala do painel: verde a partir do piso do setor (a Expansão: 85%). */
 const tomDaNotaCom = (v: number, piso: number): 'bom' | 'atencao' | 'ruim' => (v >= piso ? 'bom' : v >= 0.70 ? 'atencao' : 'ruim');
 const BARRA = { bom: 'bg-marca-600', atencao: 'bg-amber-500', ruim: 'bg-rose-500' };
@@ -155,7 +154,7 @@ export default async function PainelAtendente({
   const avaliacoesDo = (c: Canal) => semanasCsat.filter((s) => s.origem === c).reduce((a, s) => a + s.avaliacoes, 0);
   const canalInicial: Canal = CANAIS.some((c) => c.chave === canalPedido)
     ? canalPedido as Canal
-    : [...CANAIS].sort((a, b) => avaliacoesDo(b.chave) - avaliacoesDo(a.chave))[0]?.chave ?? 'huggy';
+    : [...CANAIS].sort((a, b) => avaliacoesDo(b.chave) - avaliacoesDo(a.chave))[0]?.chave ?? '';
 
   const resultado = linhas.reduce((a, l) => a + Number(l.cota), 0);
   const meta = peso.get('meta') ?? null;
@@ -189,7 +188,7 @@ export default async function PainelAtendente({
   const falta = meta != null ? meta - resultado : null;
   // A fila em que a pessoa mais finalizou no mês; sem volume, a primeira do setor.
   const finalizadosDo = (c: Canal) => volumes.filter((v) => v.canal === c).reduce((a, v) => a + v.finalizados, 0);
-  const canalPrincipal: Canal = [...CANAIS].sort((a, b) => finalizadosDo(b.chave) - finalizadosDo(a.chave))[0]?.chave ?? 'huggy';
+  const canalPrincipal: Canal = [...CANAIS].sort((a, b) => finalizadosDo(b.chave) - finalizadosDo(a.chave))[0]?.chave ?? '';
   const pesoDoAtendimento = peso.get(filaDe(canalPrincipal)?.regraFinalizado ?? '') ?? 0;
   const finalizadosQueFaltam = falta != null && falta > 0 && pesoDoAtendimento > 0 ? Math.ceil(falta / pesoDoAtendimento) : null;
 
@@ -341,7 +340,7 @@ export default async function PainelAtendente({
       blocoCsat: <Bloco rotulo="Meu C-SAT" nota={`meta ${textoDaMeta(metaC)}`} min={0.7} max={1}
                         valor={csatMes != null ? percentual(csatMes) : '—'}
                         comparacao={dCsat == null ? null : { texto: `${seta(dCsat)} ${num(Math.abs(dCsat), 1)} pt`, melhor: dCsat >= 0, vs }}
-                        barras={csatSemanas.map((s) => s && { v: s.valor, cor: BARRA[tomDoCsat(s.valor)] })} />,
+                        barras={csatSemanas.map((s) => s && { v: s.valor, cor: BARRA[tomDoCsatPelaMeta(s.valor, metaC)] })} />,
       blocoVol: <Bloco rotulo="Meus atendimentos" nota="finalizados"
                        valor={volTotal ? num(volTotal) : '—'}
                        comparacao={dVol == null ? null : { texto: `${seta(dVol)} ${num(Math.abs(dVol * 100), 1)}%`, melhor: dVol >= 0, vs }}
@@ -361,7 +360,7 @@ export default async function PainelAtendente({
                 <GraficoDeLinha min={0.75} max={1} formatar={percentual}
                                 referencia={{ valor: metaC, rotulo: `meta ${textoDaMeta(metaC)}` }}
                                 comparacao={{ pontos: csatSemanasAntes, ...nomes }}
-                                pontos={csatSemanas.map((s): PontoDaLinha => s && { valor: s.valor, tom: tomDoCsat(s.valor) })} />
+                                pontos={csatSemanas.map((s): PontoDaLinha => s && { valor: s.valor, tom: tomDoCsatPelaMeta(s.valor, metaC) })} />
               )}
             </Secao>
           </Painel>

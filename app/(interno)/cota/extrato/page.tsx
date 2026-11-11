@@ -31,7 +31,7 @@ type Linha = {
   cota: number;
 };
 
-type Faixa = { chave: string; rotulo: string; faixa_min: number | null; faixa_max: number | null; ordem: number };
+type Faixa = { chave: string; rotulo: string; grupo: string; faixa_min: number | null; faixa_max: number | null; ordem: number };
 type CsatSemana = { origem: Canal; semana: number; avaliacoes: number; positivas: number; csat: number };
 
 const NOME_CANAL: Record<string, string> = {
@@ -53,6 +53,9 @@ const chaveCanal = (o: Canal | null) => o ?? 'geral';
 const quadroDa = (l: { origem: Canal | null; regra: string }) =>
   l.regra.startsWith('outro_setor_') ? `outro:${l.regra.split('__')[0]}` : chaveCanal(l.origem);
 const nomeCurto = (nome: string) => nome.trim().split(' ').slice(0, 2).join(' ');
+
+/** Linha de faixa de C-SAT, de qualquer setor ('csat', 'csat_s10'…) — 4.7.0. */
+const ehCsat = (grupo: string) => grupo.replace(/_s\d+$/, '') === 'csat';
 
 /** Faixa em que o C-SAT caiu, pelas mesmas regras do cálculo. */
 const faixaDo = (csat: number, faixas: Faixa[]) => faixas.find((f) =>
@@ -84,7 +87,10 @@ export default async function Extrato({
 
   const db = await criarClienteServidor();
   // Fila nova (3.0) aparece pelo nome do cadastro; as de sempre, como antes.
-  const { data: nomesDasFilas } = await db.from('canais_do_setor').select('apelido, nome');
+  const { data: nomesDasFilas } = await db.from('canais_do_setor').select('apelido, nome, grupo_csat');
+  // 4.7.0: as faixas de C-SAT de cada fila (o Expansão usa 'csat'; o Telecom, 'csat_s10').
+  const grupoCsatDe = (o: string) => (nomesDasFilas ?? []).find((f) => f.apelido === o)?.grupo_csat as string | null | undefined ?? 'csat';
+  const gruposCsat = [...new Set(['csat', ...(nomesDasFilas ?? []).map((f) => f.grupo_csat as string | null).filter((g): g is string => !!g)])];
   // 4.4.0: o nome do cadastro vem primeiro (cada setor tem as suas filas);
   // NOME_CANAL fica só para o que não é fila ('geral').
   const nomeDaOrigem = (o: string) => (nomesDasFilas ?? []).find((f) => f.apelido === o)?.nome
@@ -133,8 +139,8 @@ export default async function Extrato({
       .eq('pessoa_id', pessoaId).eq('mes_competencia', competencia),
     db.from('vw_csat_semanal').select('origem, semana, avaliacoes, positivas, csat')
       .eq('pessoa_id', pessoaId).eq('mes_competencia', competencia),
-    db.from('regras').select('chave, rotulo, faixa_min, faixa_max, ordem')
-      .eq('grupo', 'csat').eq('ativo', true).order('ordem'),
+    db.from('regras').select('chave, rotulo, grupo, faixa_min, faixa_max, ordem')
+      .in('grupo', gruposCsat).eq('ativo', true).order('ordem'),
     db.from('fechamentos_cota').select('id, cargo, resultado, meta')
       .eq('pessoa_id', pessoaId).eq('mes_competencia', competencia).maybeSingle(),
     // Só existe em competência fechada: o valor sai do que foi entregue.
@@ -222,7 +228,10 @@ export default async function Extrato({
     ? (linhasFechadas as Omit<Linha, 'cargo_id'>[]).map((l) => ({ ...l, cargo_id: cargoId as number }))
     : aoVivo;
   const semanasSemTme = await semTme;
-  const faixas = (faixasCsat.data ?? []) as Faixa[];
+  const todasAsFaixas = (faixasCsat.data ?? []) as Faixa[];
+  const faixasDaFila = (o: string) => todasAsFaixas.filter((f) => f.grupo === grupoCsatDe(o));
+  // O bypass de outro setor (outubro) pontuava com as faixas do Expansão.
+  const faixas = faixasDaFila('huggy');
   const semanal = (csat.data ?? []) as CsatSemana[];
   const resultado = congelado
     ? Number(congelado.resultado)
@@ -267,9 +276,10 @@ export default async function Extrato({
   // catálogo sozinho não basta: o TME de Diretores (61–63) viria depois das
   // faixas (30–34) e das notas (40–44), que os dois canais dividem.
   const ETAPA: Record<string, number> = {
-    media: 0, atendimento: 1, tme: 2, tme_diretores: 2, csat: 3, nota: 4, monitoria: 5,
+    media: 0, atendimento: 1, tme: 2, tme_diretores: 2, tma: 2, csat: 3, nota: 4, monitoria: 5,
   };
-  const posicao = (grupo: string, ordem: number) => (ETAPA[grupo] ?? (ordem < 20 ? 1 : 6)) * 1000 + ordem;
+  // 4.7.0: o grupo sem o sufixo do setor (tme_s10 → tme), e o TMA junto do TME.
+  const posicao = (grupo: string, ordem: number) => (ETAPA[grupo.replace(/_s\d+$/, '')] ?? (ordem < 20 ? 1 : 6)) * 1000 + ordem;
   // O atendimento de outro setor (bypass, migração 81) vem primeiro no quadro
   // dele, como o finalizado no canal; as cópias de C-SAT e notas seguem a ordem.
   const lugar = (l: { grupo: string; ordem: number; regra?: string }) =>
@@ -339,7 +349,7 @@ export default async function Extrato({
   /** O "Feito" de cada linha: a monitoria é média (percentual), não contagem. */
   const feito = (l: Pick<Linha, 'grupo' | 'quantidade'>) =>
     l.grupo === 'monitoria' ? percentual(Number(l.quantidade))
-      : l.grupo === 'csat' ? num(Number(l.quantidade), 4) : num(Number(l.quantidade));
+      : ehCsat(l.grupo) ? num(Number(l.quantidade), 4) : num(Number(l.quantidade));
 
   /** Uma linha da tabela: rótulo, quantidade, peso e pontos. */
   const Linha = ({ l, detalhe }: { l: Linha; detalhe?: string }) => (
@@ -372,10 +382,10 @@ export default async function Extrato({
   type Origem = { chave: string; rotulo: string; grupo: string; quantidade: number; cota: number; vezes: number };
   const porOrigem = new Map<string, Origem>();
   for (const l of linhas) {
-    const chave = l.grupo === 'csat' ? `${l.regra}|${l.origem}` : l.regra;
+    const chave = ehCsat(l.grupo) ? `${l.regra}|${l.origem}` : l.regra;
     const o = porOrigem.get(chave) ?? {
       chave, grupo: l.grupo, quantidade: 0, cota: 0, vezes: 0,
-      rotulo: l.grupo === 'csat' && l.origem ? `${l.rotulo} · ${nomeDaOrigem(l.origem)}` : l.rotulo,
+      rotulo: ehCsat(l.grupo) && l.origem ? `${l.rotulo} · ${nomeDaOrigem(l.origem)}` : l.rotulo,
     };
     o.quantidade += Number(l.quantidade);
     o.cota += Number(l.cota);
@@ -664,7 +674,7 @@ export default async function Extrato({
                             <tbody>
                               {doCanal.map((l) => (
                                 <Linha key={`${l.regra}-${l.origem ?? 'sem'}`} l={l}
-                                       detalhe={(l.grupo === 'csat' || /__csat_/.test(l.regra)) && c ? percentual(Number(c.csat)) : undefined} />
+                                       detalhe={(ehCsat(l.grupo) || /__csat_/.test(l.regra)) && c ? percentual(Number(c.csat)) : undefined} />
                               ))}
                             </tbody>
                           </table>
@@ -754,7 +764,7 @@ export default async function Extrato({
               // Cada categoria somada no mês; o C-SAT tem tratamento próprio.
               // A monitoria é a média das semanas (cada semana já é a média
               // das monitorias dela), não a soma; a cota, essa sim, soma.
-              const categorias = [...new Map(doCanal.filter((l) => l.grupo !== 'csat'
+              const categorias = [...new Map(doCanal.filter((l) => !ehCsat(l.grupo)
                 && (Number(l.quantidade) !== 0 || Math.abs(Number(l.cota)) >= 0.005))
                 .map((l) => [l.regra, l])).values()]
                 .map((base) => {
@@ -772,8 +782,8 @@ export default async function Extrato({
               // como o Pleno, eram cinco linhas de zeros.
               const semanasDoCanal = canal === 'geral' || canal.startsWith('outro:') ? []
                 : semanal.filter((c) => c.origem === canal as Canal);
-              const linhasFaixa = canal === 'geral' || canal.startsWith('outro:') ? [] : faixas.map((f) => {
-                const atingidas = semanasDoCanal.filter((c) => faixaDo(Number(c.csat), faixas)?.chave === f.chave);
+              const linhasFaixa = canal === 'geral' || canal.startsWith('outro:') ? [] : faixasDaFila(canal).map((f) => {
+                const atingidas = semanasDoCanal.filter((c) => faixaDo(Number(c.csat), faixasDaFila(canal))?.chave === f.chave);
                 const doExtrato = doCanal.filter((l) => l.regra === f.chave);
                 return {
                   faixa: f,

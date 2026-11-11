@@ -4,6 +4,9 @@ import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
 import { Painel } from '@/componentes/ui';
 import { diaMes, hojeNoBrasil, mesDeCompetencia, periodoDaSemana, mesValido } from '@/lib/formatar';
 import type { Presencial } from '@/lib/tipos';
+import { setorDoPerformance } from '@/lib/filasDoSetor';
+import { setorDoCookie } from '@/lib/setorEscolhido';
+import { setorDasPessoas } from '@/lib/monitoriasDoSetor';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,7 +50,10 @@ export default async function AtendimentoPresencial({
   const cargoId = (cargos ?? [])[0]?.cargo_id as number | undefined;
   const doCargo = veOTime ? (pesos ?? []) : (pesos ?? []).filter((p) => p.cargo_id === cargoId);
 
-  const lista = (registros ?? []) as Presencial[];
+  // 4.7.0: quem vê a equipe vê só o setor do menu (antes, todos os setores juntos).
+  const { setorId } = veOTime ? await setorDoPerformance(db, await setorDoCookie()) : { setorId: 0 };
+  const setorDe = veOTime ? await setorDasPessoas(db, competencia) : new Map<string, number>();
+  const lista = ((registros ?? []) as Presencial[]).filter((r) => !veOTime || (setorDe.get(r.pessoa_id) ?? 1) === setorId);
   const valores = doCargo.map((p) => Number(p.peso)).filter((v) => v > 0);
   const pontos = valores.length ? Math.max(...valores) : null;
   const pessoasNoMes = new Set(lista.map((r) => r.pessoa_id)).size;

@@ -30,7 +30,8 @@ const iniciais = (nome: string) =>
   curto(nome).normalize('NFD').replace(/\p{Diacritic}/gu, '').slice(0, 2).toUpperCase();
 
 /** Os grupos na ordem da planilha, com a cor da bolinha. */
-const GRUPOS = [
+type Grupo = { chave: string; titulo: string; cor: string };
+const GRUPOS: Grupo[] = [
   { chave: 'expansao', titulo: 'Expansão', cor: COR_DA_METRICA.expansao },
   { chave: 'csat', titulo: 'C-SAT', cor: COR_DA_METRICA.csat },
   { chave: 'notas', titulo: 'Notas', cor: COR_DA_METRICA.notas },
@@ -38,28 +39,40 @@ const GRUPOS = [
   { chave: 'monitoria', titulo: 'Monitoria', cor: COR_DA_METRICA.monitoria },
   { chave: 'extra', titulo: 'Demanda extra', cor: COR_DA_METRICA.extra },
   { chave: 'chamados', titulo: 'Chamados', cor: COR_DA_METRICA.chamados },
-] as const;
+];
+/**
+ * Os grupos do setor da tela (4.7.0). No Expansão, os de sempre; nos outros,
+ * o primeiro vira "Atendimento" (finalizados, TME e TMA de todas as filas) e o
+ * de Diretores, que é só do Expansão, não aparece.
+ */
+const gruposDoSetor = (setorId: number): Grupo[] => setorId === 1 ? GRUPOS
+  : GRUPOS.filter((g) => g.chave !== 'diretores').map((g) => (g.chave === 'expansao' ? { ...g, titulo: 'Atendimento' } : g));
 
 function grupoDa(r: RegraCota): string {
   // Cópia de outro setor (etapa 4): a chave e o grupo levam o sufixo do setor.
   const chave = r.chave.replace(/_s\d+$/, '');
   const grupo = r.grupo.replace(/_s\d+$/, '');
-  if (chave === 'huggy_atendimento' || chave === 'transferencias' || grupo === 'tme') return 'expansao';
+  if (chave === 'diretores_atendimento' || grupo === 'tme_diretores') return 'diretores';
+  // 4.7.0: o finalizado e o TMA de qualquer setor ficam com o atendimento (antes,
+  // o finalizado do Telecom caía em "Demanda extra").
+  if (chave === 'huggy_atendimento' || chave === 'transferencias' || grupo === 'tme' || grupo === 'tma'
+    || r.grupo === 'atendimento') return 'expansao';
   if (grupo === 'csat') return 'csat';
   if (grupo === 'nota') return 'notas';
-  if (chave === 'diretores_atendimento' || grupo === 'tme_diretores') return 'diretores';
   if (r.grupo === 'monitoria') return 'monitoria';
   if (r.chave.startsWith('chamados_')) return 'chamados';
   return 'extra';
 }
 
 function tipoDa(r: RegraCota): string {
+  const grupo = r.grupo.replace(/_s\d+$/, '');
   if (r.valor_manual) return 'valor digitado';
-  if (r.grupo === 'atendimento') return 'por atendimento';
-  if (r.grupo === 'tme' || r.grupo === 'tme_diretores') return 'faixa de TME';
-  if (r.grupo === 'csat') return 'faixa · todas as filas do setor';
-  if (r.grupo === 'nota') return 'por avaliação';
-  if (r.grupo === 'monitoria') return 'pontua acima do mínimo';
+  if (grupo === 'atendimento') return 'por atendimento';
+  if (grupo === 'tme' || grupo === 'tme_diretores') return 'faixa de TME';
+  if (grupo === 'tma') return 'faixa de TMA';
+  if (grupo === 'csat') return 'faixa · todas as filas do setor';
+  if (grupo === 'nota') return 'por avaliação';
+  if (grupo === 'monitoria') return 'pontua acima do mínimo';
   return 'lançamento';
 }
 
@@ -226,7 +239,7 @@ export default function MatrizDePesos({
           <CopiarDoCargoBase
             key={`copiar-${cargoAberto}`}
             destino={cargos.find((c) => c.id === cargoAberto)!}
-            grupos={GRUPOS.filter((g) => pontuaveis.some((r) => grupoDa(r) === g.chave))}
+            grupos={gruposDoSetor(setorId).filter((g) => pontuaveis.some((r) => grupoDa(r) === g.chave))}
             onCopiar={(grupos) => {
               const destino = cargoAberto;
               const copiadas = pontuaveis.filter((r) => grupos.includes(grupoDa(r)));
@@ -303,7 +316,7 @@ export default function MatrizDePesos({
               </tr>
             </thead>
 
-            {GRUPOS.map((g, gi) => {
+            {gruposDoSetor(setorId).map((g, gi) => {
               const regrasDoGrupo = pontuaveis.filter((r) => grupoDa(r) === g.chave
                 && (!termo || r.rotulo.toLocaleLowerCase('pt-BR').includes(termo))
                 && (!soPontuam || cargos.some((c) => celulas[`${c.id}|${r.chave}`]?.ativo)));
@@ -430,7 +443,7 @@ function CopiarDoCargoBase({
   destino, grupos, onCopiar,
 }: {
   destino: Cargo;
-  grupos: readonly (typeof GRUPOS)[number][];
+  grupos: Grupo[];
   onCopiar: (grupos: string[]) => void;
 }) {
   const [marcados, setMarcados] = useState<Set<string>>(new Set(grupos.map((g) => g.chave)));

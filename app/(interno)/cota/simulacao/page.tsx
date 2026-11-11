@@ -5,6 +5,9 @@ import { fonteDoMes } from '@/lib/resumo';
 import { dados, todas } from '@/lib/consultas';
 import { mesRotulo, periodoDaSemana } from '@/lib/formatar';
 import type { Base, LinhaDoExtrato } from '@/lib/simulacao';
+import { filasDoSetor, setorDoPerformance } from '@/lib/filasDoSetor';
+import { setorDoCookie } from '@/lib/setorEscolhido';
+import { setorDasPessoas } from '@/lib/monitoriasDoSetor';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +24,11 @@ export default async function Simulacao() {
   const [, { competencia }] = await todas([exigirGestor(), resolverCompetencia()]);
   const db = await criarClienteServidor();
   const fonte = await fonteDoMes(competencia);
+  // 4.7.0: só o setor do menu — pessoas, filas, faixas e o mês fechado dele.
+  // Antes a simulação juntava todos os setores e só tinha as filas do Expansão.
+  const { setorId } = await setorDoPerformance(db, await setorDoCookie());
+  const [filasDaTela, setorDe] = await Promise.all([filasDoSetor(db, setorId), setorDasPessoas(db, competencia)]);
+  const doSetor = (id: string) => (setorDe.get(id) ?? 1) === setorId;
 
   // O extrato passa de 1.000 linhas (o teto do PostgREST): lido em páginas.
   async function linhas(): Promise<LinhaDoExtrato[]> {
@@ -37,14 +45,14 @@ export default async function Simulacao() {
   const [extrato, mensal, faixas, pesos, referencias, tme, desligadas, volume, csat, fechado, cargos, filas] = await todas([
     linhas(),
     db.from(fonte.mensal).select('pessoa_id, pessoa, cargo, resultado, meta, compoe_media').eq('mes_competencia', competencia),
-    db.from('regras').select('chave, rotulo, grupo, faixa_min, faixa_max, ordem').eq('ativo', true),
+    db.from('regras').select('chave, rotulo, grupo, faixa_min, faixa_max, ordem').eq('ativo', true).eq('setor_id', setorId),
     db.from('pesos_por_cargo').select('cargo_id, regra, peso').eq('ativo', true),
     db.from('cargos_referencia').select('cargo_id, referencia_id'),
     db.from('vw_tme_equipe').select('semana, canal, tme_seg').eq('mes_competencia', competencia),
     db.rpc('semanas_sem_tme', { p_mes: competencia }),
     db.from('volume_semanal').select('pessoa_id, semana, canal, finalizados, tme_seg').eq('mes_competencia', competencia),
     db.from('vw_csat_semanal').select('pessoa_id, origem, semana, csat').eq('mes_competencia', competencia),
-    db.from('fechamentos_cota').select('id', { count: 'exact', head: true }).eq('mes_competencia', competencia),
+    db.from('fechamentos_cota').select('id', { count: 'exact', head: true }).eq('mes_competencia', competencia).eq('setor_id', setorId),
     db.from('cargos').select('id, nome'),
     // TME por pessoa (migração 90): as filas e desde quando.
     db.from('canais_do_setor').select('*'),
@@ -54,17 +62,18 @@ export default async function Simulacao() {
     l.map((x) => ({ ...x, ...Object.fromEntries(campos.map((c) => [c, x[c] == null ? null : Number(x[c])])) }));
 
   const base: Base = {
-    linhas: num(extrato, ['quantidade', 'peso', 'cota']) as LinhaDoExtrato[],
-    pessoas: num((mensal.data ?? []) as Base['pessoas'], ['resultado', 'meta']) as Base['pessoas'],
+    linhas: num(extrato.filter((l) => doSetor(l.pessoa_id)), ['quantidade', 'peso', 'cota']) as LinhaDoExtrato[],
+    pessoas: num(((mensal.data ?? []) as Base['pessoas']).filter((p) => doSetor(p.pessoa_id)), ['resultado', 'meta']) as Base['pessoas'],
+    filas: filasDaTela.map((f) => ({ apelido: f.apelido, nome: f.nome, grupoTme: f.grupoTme, grupoCsat: f.grupoCsat })),
     faixas: num((faixas.data ?? []) as Base['faixas'], ['faixa_min', 'faixa_max']) as Base['faixas'],
     pesos: num((pesos.data ?? []) as Base['pesos'], ['peso']) as Base['pesos'],
     referencias: (referencias.data ?? []) as Base['referencias'],
     tme: num((tme.data ?? []) as Base['tme'], ['tme_seg']) as Base['tme'],
     tmeDesligado: ((desligadas.data ?? []) as { semana: number; canal: string }[]).map((d) => `${d.semana}|${d.canal}`),
-    volume: num((volume.data ?? []) as Base['volume'], ['finalizados', 'tme_seg']) as Base['volume'],
+    volume: num(((volume.data ?? []) as Base['volume']).filter((v) => doSetor(v.pessoa_id)), ['finalizados', 'tme_seg']) as Base['volume'],
     tmePorPessoa: ((filas.data ?? []) as { apelido: string | null; tme_por_pessoa_desde?: string | null }[])
       .filter((f) => f.apelido && f.tme_por_pessoa_desde && f.tme_por_pessoa_desde <= competencia).map((f) => f.apelido!),
-    csat: num((csat.data ?? []) as Base['csat'], ['csat']) as Base['csat'],
+    csat: num(((csat.data ?? []) as Base['csat']).filter((c) => doSetor(c.pessoa_id)), ['csat']) as Base['csat'],
   };
 
   const periodos = [1, 2, 3, 4].map((s) => periodoDaSemana(competencia, s));

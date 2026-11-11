@@ -1,5 +1,6 @@
 import { criarClienteServidor, exigirGestor } from '@/lib/supabase/servidor';
 import { setorDoCookie } from '@/lib/setorEscolhido';
+import { setorDasPessoas } from '@/lib/monitoriasDoSetor';
 import FormularioLancamentos from '@/componentes/FormularioLancamentos';
 import VolumeSemanal, { type LinhaVolume } from '@/componentes/VolumeSemanal';
 import VolumeDaSol, { type LinhaDaSol } from '@/componentes/VolumeDaSol';
@@ -60,6 +61,17 @@ export default async function LancamentosDeCota({
     : CANAIS_PADRAO.map((c, i) => ({ id: -1 - i, nome: c.nome, apelido: c.apelido, ordem: i,
       regra_finalizado: c.apelido === 'huggy' ? 'huggy_atendimento' : 'diretores_atendimento' }));
   const fila = abasDeFila.find((f) => f.apelido === canalPedido) ?? abasDeFila[0];
+  // 4.7.0: setor ainda sem fila cadastrada (a tela quebrava).
+  if (!fila) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">Lançamentos</h1>
+        <Quadro titulo="Setor sem filas" subtitulo="Cadastre as filas em Usuários e setores › Setores e filas.">
+          <p className="text-sm text-slate-600">Este setor ainda não tem fila cadastrada; o volume é lançado por fila.</p>
+        </Quadro>
+      </div>
+    );
+  }
   const canal = fila.apelido!;
 
   // Avaliações do canal por semana, contadas com `head` (a view passa de mil
@@ -70,7 +82,7 @@ export default async function LancamentosDeCota({
     .eq('mes_competencia', competencia).eq('origem', canal).eq('semana', s)
     .then(({ count }) => count ?? 0);
   const [ultimaImportacao, ...avaliacoesPorSemana] = await Promise.all([
-    db.from('avaliacoes').select('importado_em').not('importado_em', 'is', null)
+    db.from('avaliacoes').select('importado_em').eq('origem', canal).not('importado_em', 'is', null)
       .order('importado_em', { ascending: false }).limit(1).maybeSingle()
       .then(({ data }) => (data?.importado_em as string | undefined)?.slice(0, 10) ?? null),
     ...SEMANAS.map(avaliacoesNa),
@@ -79,7 +91,7 @@ export default async function LancamentosDeCota({
 
   const [pessoas, regras, pesos, historico, lancamentos, conferencia, volumes, anterior, pendentes, cargos, outroSetor, setoresDoMes, volumesOutro, notasOutro, nomesDasRegras] = await Promise.all([
     db.from('pessoas').select('*').order('nome'),
-    db.from('regras').select('*').eq('manual', true).eq('ativo', true).order('ordem'),
+    db.from('regras').select('*').eq('manual', true).eq('ativo', true).eq('setor_id', setorId).order('ordem'),
     db.from('pesos_por_cargo').select('cargo_id, regra, peso, ativo').eq('ativo', true),
     db.from('cargos_da_pessoa').select('*'),
     db.from('lancamentos').select('*').eq('mes_competencia', competencia).eq('canal', canal)
@@ -100,7 +112,7 @@ export default async function LancamentosDeCota({
     // 4.4.0: só o que não foi descartado — o Royais (descartado em 11/11/2026)
     // abria uma aba vazia. Com o paliativo desligado, a aba só aparece em mês
     // que ainda tem atendimento ou volume de outro setor de verdade (outubro).
-    db.from('atendimentos_outro_setor').select('setor').eq('mes_competencia', competencia).neq('situacao', 'descartado'),
+    db.from('atendimentos_outro_setor').select('setor, pessoa_id').eq('mes_competencia', competencia).neq('situacao', 'descartado'),
     db.from('volume_outro_setor').select('setor, pessoa_id, semana, resolvidos').eq('mes_competencia', competencia),
     // As avaliações do outro setor por semana, para o cartão da aba dele.
     db.from('atendimentos_outro_setor').select('setor, semana').eq('mes_competencia', competencia).not('nota', 'is', null)
@@ -109,13 +121,15 @@ export default async function LancamentosDeCota({
     // setor não são manuais e apareciam com a chave.
     db.from('regras').select('chave, rotulo'),
   ]);
+  // 4.7.0: conferência, pendentes e outro setor só de quem é do setor da tela.
+  const setorDe = await setorDasPessoas(db, competencia);
+  const doSetor = (id: string) => (setorDe.get(id) ?? 1) === setorId;
   const setoresBypass = [...new Set([
-    ...((setoresDoMes.data ?? []) as { setor: string }[]).map((s) => s.setor),
-    ...((volumesOutro.data ?? []) as { setor: string }[]).map((s) => s.setor),
+    ...((setoresDoMes.data ?? []) as { setor: string; pessoa_id: string }[]).filter((s) => doSetor(s.pessoa_id)).map((s) => s.setor),
+    ...((volumesOutro.data ?? []) as { setor: string; pessoa_id: string }[]).filter((s) => doSetor(s.pessoa_id)).map((s) => s.setor),
   ])].sort();
-
   const listaVolumes = (volumes.data ?? []) as LinhaVolume[];
-  const listaConferencia = (conferencia.data ?? []) as ConferenciaLancamento[];
+  const listaConferencia = ((conferencia.data ?? []) as ConferenciaLancamento[]).filter((c) => doSetor(c.pessoa_id));
 
   // Quem foi desligado some da lista — menos no mês em que ainda tem dado.
   // Sem isso não há como corrigir o volume nem lançar o acerto de quem saiu no
@@ -389,11 +403,12 @@ export default async function LancamentosDeCota({
           </p>
         </Quadro>
       ) : (<>
-      <LancamentosPendentes pendentes={(pendentes.data ?? []) as Pendente[]} pessoas={recebem} />
+      <LancamentosPendentes pendentes={((pendentes.data ?? []) as Pendente[]).filter((p) => doSetor(p.pessoa_id))} pessoas={recebem}
+                            filas={abasDeFila} />
 
       {/* Os do mês do bypass saem daqui: lá eles pontuam com as regras da Expansão. */}
       <DemandasExtrasPendentes pendentes={((outroSetor.data ?? []) as AtendimentoOutroSetor[])
-                                 .filter((a) => !(a.mes_competencia === competencia && setoresBypass.includes(a.setor)))}
+                                 .filter((a) => doSetor(a.pessoa_id) && !(a.mes_competencia === competencia && setoresBypass.includes(a.setor)))}
                                pessoas={(pessoas.data ?? []) as Pessoa[]} regras={(regras.data ?? []) as RegraCota[]} />
 
       <SeletorDeDetalhe key={`${competencia}-${canal}`} destaques={destaques} inicial={inicial} alternar

@@ -167,11 +167,13 @@ export default async function InicioCota({
     ]);
     const cargoDaPessoa = cargoTeste?.[0]?.cargo_id as number | undefined;
     const pelaMedia = !!cargoDaPessoa && (mediasTeste ?? []).some((m) => m.cargo_id === cargoDaPessoa && m.ativo);
+    // 4.7.0: as filas do setor de quem está sendo visto (antes, as do Expansão).
+    const filasDeQuemVe = pelaMedia ? await filasDoSetor(dbTeste, await setorDaPessoa(dbTeste, verComo, competencia)) : [];
     return (
       <div className="space-y-4">
         <VerComoAtendente atual={verComo} />
         {pelaMedia ? (
-          <ProvedorDeCanal inicial={canalPedido === 'diretores' ? 'diretores' : 'huggy'}>
+          <ProvedorDeCanal inicial={canalPedido} canais={filasDeQuemVe.map((f) => ({ chave: f.apelido, rotulo: f.nome }))}>
             <PainelPleno pessoaId={verComo} cargoId={cargoDaPessoa!} competencia={competencia} />
           </ProvedorDeCanal>
         ) : (

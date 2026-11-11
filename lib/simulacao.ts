@@ -56,6 +56,9 @@ export type Base = {
   /** Semanas já lançadas, quando quem chama sabe melhor (a tela do atendente só
    *  enxerga o próprio volume; ali vem do TME da equipe). */
   semanasLancadas?: number[];
+  /** As filas do setor da tela (4.7.0): o grupo de TME e de C-SAT de cada uma.
+   *  Sem elas, as duas filas do Expansão (o padrão de antes). */
+  filas?: { apelido: string; nome: string; grupoTme: string | null; grupoCsat: string | null }[];
 };
 
 export type Cenario = {
@@ -82,7 +85,13 @@ export const CENARIO_VAZIO: Cenario = {
 };
 
 const DERIVADAS = new Set(['media_da_equipe', 'media_sobre_realizado', 'atestado']);
-export const GRUPO_TME: Record<string, string> = { huggy: 'tme', diretores: 'tme_diretores' };
+/** Fila → grupo de TME. Sem as filas na base, as duas do Expansão. */
+export const gruposDeTme = (base: Base): Record<string, string> => base.filas
+  ? Object.fromEntries(base.filas.filter((f) => f.grupoTme).map((f) => [f.apelido, f.grupoTme!]))
+  : { huggy: 'tme', diretores: 'tme_diretores' };
+/** Os grupos de C-SAT das filas (o Expansão usa 'csat'; o Telecom, 'csat_s10'). */
+export const gruposDeCsat = (base: Base) =>
+  new Set(base.filas ? base.filas.map((f) => f.grupoCsat).filter((g): g is string => !!g) : ['csat']);
 const r4 = (v: number) => Math.round(v * 10_000) / 10_000;
 
 /** A faixa (de um grupo) em que um valor cai. */
@@ -102,7 +111,6 @@ export function faixasDoGrupo(faixas: Faixa[], grupo: string, minimos: Record<st
     .sort((a, b) => (a.faixa_min ?? -Infinity) - (b.faixa_min ?? -Infinity));
   return doGrupo.map((f, i) => ({ ...f, faixa_max: doGrupo[i + 1]?.faixa_min ?? null }));
 }
-export const faixasDeCsat = (faixas: Faixa[], minimos: Record<string, number>) => faixasDoGrupo(faixas, 'csat', minimos);
 
 export type Resultado = {
   pessoa_id: string; pessoa: string; cargo: string | null;
@@ -138,8 +146,9 @@ export function simular(base: Base, cen: Cenario): Resultado[] {
   // 2. TME, canal a canal.
   const desligado = new Set(base.tmeDesligado);
   const invertido = new Set(cen.tmeInvertido);
-  for (const canal of Object.keys(GRUPO_TME)) {
-    const grupo = GRUPO_TME[canal];
+  const grupoTme = gruposDeTme(base);
+  for (const canal of Object.keys(grupoTme)) {
+    const grupo = grupoTme[canal];
     const limitesMudaram = base.faixas.some((f) => f.grupo === grupo && f.chave in cen.tmeMinimos);
     const semanasMexidas = [1, 2, 3, 4].filter((s) => invertido.has(`${s}|${canal}`));
     if (!limitesMudaram && !semanasMexidas.length) continue;
@@ -168,11 +177,11 @@ export function simular(base: Base, cen: Cenario): Resultado[] {
 
   // 3. Faixas de C-SAT.
   if (Object.keys(cen.csatMinimos).length) {
-    const novas = faixasDeCsat(base.faixas, cen.csatMinimos);
+    const grupos = gruposDeCsat(base);
     linhas = linhas.map((l) => {
-      if (l.grupo !== 'csat' || l.semana == null) return l;
+      if (!grupos.has(l.grupo) || l.semana == null) return l;
       const c = base.csat.find((x) => x.pessoa_id === l.pessoa_id && x.origem === l.origem && x.semana === l.semana);
-      const f = c ? faixaDe(novas, 'csat', Number(c.csat)) : undefined;
+      const f = c ? faixaDe(faixasDoGrupo(base.faixas, l.grupo, cen.csatMinimos), l.grupo, Number(c.csat)) : undefined;
       return f && f.chave !== l.regra ? { ...l, regra: f.chave, rotulo: f.rotulo, peso: 0, cota: 0 } : l;
     });
   }

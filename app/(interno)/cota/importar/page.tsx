@@ -4,7 +4,6 @@ import { setorDasPessoas } from '@/lib/monitoriasDoSetor';
 import ImportadorAvaliacoes from '@/componentes/ImportadorAvaliacoes';
 import type { Canal } from '@/lib/setores';
 import ImportadorChamados from '@/componentes/ImportadorChamados';
-import ImportadorMesAnterior, { type ImportacaoFeita, type PessoaDoCadastro } from '@/componentes/ImportadorMesAnterior';
 import FilaDeAtrasos, { type ChamadoAtrasado } from '@/componentes/FilaDeAtrasos';
 import NotasGuardadas, { type NotaGuardada } from '@/componentes/NotasGuardadas';
 import SemanasDeChamados, { type SemanaDeChamados } from '@/componentes/SemanasDeChamados';
@@ -17,7 +16,6 @@ import type { Pessoa } from '@/lib/tipos';
 
 export const dynamic = 'force-dynamic';
 
-const CANAIS = [['huggy', 'Expansão'], ['diretores', 'Diretores-Expansão']] as const;
 const SEMANAS = [1, 2, 3, 4];
 
 /**
@@ -40,12 +38,26 @@ export default async function ImportarAvaliacoes({
 
   const db = await criarClienteServidor();
 
+  // Cada um importa só o seu (3.0): o setor do seletor do menu.
+  const { data: setoresDb } = await db.from('setores').select('id').eq('ativo', true).order('ordem');
+  const escolhido = await setorDoCookie();
+  const setorId = ((setoresDb ?? []) as { id: number }[]).find((s) => String(s.id) === escolhido)?.id
+    ?? (setoresDb?.[0] as { id: number } | undefined)?.id ?? 1;
+  // 4.7.0: a aba de chamados só no setor que pontua tratativas de chamados (o
+  // Elo é do Expansão). A aba "Mês anterior (planilha)", do Dashboard Expansão
+  // de antes do sistema, saiu: os meses já importados continuam no banco.
+  const { data: regraDeChamados } = await db.from('regras').select('chave')
+    .eq('chave', 'chamados_tratados').eq('ativo', true).eq('setor_id', setorId).limit(1);
+  const pontuaChamados = (regraDeChamados ?? []).length > 0;
+  const opcoes = ([['hub', 'Avaliações (Hub)'], ['chamados', 'Chamados (ELO)']] as const)
+    .filter(([chave]) => chave !== 'chamados' || pontuaChamados);
+
   // Abas internas (migração 53): cada relatório na sua. Chamados do ELO não
   // dependem das contagens do Hub, então a aba deles sai antes delas.
-  const abas = (
+  const abas = opcoes.length < 2 ? null : (
     <div role="tablist" className="inline-flex gap-1 rounded-full border border-slate-200 bg-superficie p-1 shadow-sm">
-      {([['hub', 'Avaliações (Hub)'], ['chamados', 'Chamados (ELO)'], ['mes-anterior', 'Mês anterior (planilha)']] as const).map(([chave, rotulo]) => {
-        const ativa = chave === 'hub' ? aba !== 'chamados' && aba !== 'mes-anterior' : aba === chave;
+      {opcoes.map(([chave, rotulo]) => {
+        const ativa = chave === 'hub' ? aba !== 'chamados' : aba === chave;
         return (
           // <a> e não Link: carrega a página inteira. Pelo Link, a troca de aba
             // não completava no navegador do Analista (1.38.1); o endereço direto abria.
@@ -60,42 +72,7 @@ export default async function ImportarAvaliacoes({
     </div>
   );
 
-  // Meses antes do sistema (1.52.0, migração 69): o "Dashboard Expansão" de cada mês.
-  if (aba === 'mes-anterior') {
-    const [{ data: cadastro }, { data: feitas }, { data: primeiro }] = await Promise.all([
-      db.from('pessoas').select('id, nome, email, nome_hub, ativo').order('nome'),
-      db.from('importacoes_mes').select('id, mes_competencia, arquivo, importado_por_nome, importado_em, resumo, tipo')
-        .order('mes_competencia', { ascending: false }),
-      db.from('fechamentos_cota').select('mes_competencia').is('importacao_id', null)
-        .order('mes_competencia').limit(1).maybeSingle(),
-    ]);
-    // Meses fechados pelo sistema e sem volume (1.54.0): deles, só o volume.
-    const { data: fechadosDoSistema } = await db.from('fechamentos_cota').select('mes_competencia')
-      .is('importacao_id', null).limit(1000);
-    const mesesFechados = [...new Set(((fechadosDoSistema ?? []) as { mes_competencia: string }[]).map((f) => f.mes_competencia))];
-    const contagens = await Promise.all(mesesFechados.map((m) => db.from('volume_semanal')
-      .select('id', { count: 'exact', head: true }).eq('mes_competencia', m).then((r) => r.count ?? 0)));
-    const semVolume = mesesFechados.filter((_, i) => contagens[i] === 0);
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">Importar</h1>
-          <p className="mt-1 text-sm text-sobre-fundo-suave">Cada relatório na sua aba. A planilha é lida no seu computador.</p>
-          <div className="mt-3">{abas}</div>
-        </div>
-        {feitas == null && primeiro == null ? (
-          <Quadro titulo="Mês anterior"><p className="text-sm text-slate-600">Falta rodar a migração 69 no banco.</p></Quadro>
-        ) : (
-          <ImportadorMesAnterior pessoas={(cadastro ?? []) as PessoaDoCadastro[]}
-                                 importacoes={(feitas ?? []) as ImportacaoFeita[]}
-                                 primeiroDoSistema={(primeiro as { mes_competencia: string } | null)?.mes_competencia ?? null}
-                                 semVolume={semVolume} />
-        )}
-      </div>
-    );
-  }
-
-  if (aba === 'chamados') {
+  if (aba === 'chamados' && pontuaChamados) {
     const campos = 'protocolo, titulo, responsavel, aberto_em, concluido_em, tempo_util, tempo_interno, tempo_ti, motivo_atraso, observacao, justificativa, justificado_por_nome, justificado_em, decisao, decidido_por_nome, decidido_em, dias_escala';
     // Semanas sem chamados (migração 60): o mês corrente e, enquanto não
     // fechado, o anterior — os mesmos que a pendência olha.
@@ -140,21 +117,18 @@ export default async function ImportarAvaliacoes({
   // Setores e filas (migração 79): qual nome do Hub vai para cada fila, e as
   // linhas da grade abaixo — uma por fila da árvore; sem a 79, as duas de sempre.
   const { data: canais } = await db.from('canais_do_setor').select('*').eq('ativo', true).order('ordem');
-  // Cada um importa só o seu (3.0): o setor do seletor do menu — a grade, as
-  // notas guardadas e a leitura do arquivo ficam nas filas e pessoas dele.
-  const { data: setoresDb } = await db.from('setores').select('id').eq('ativo', true).order('ordem');
-  const escolhido = await setorDoCookie();
-  const setorId = ((setoresDb ?? []) as { id: number }[]).find((s) => String(s.id) === escolhido)?.id
-    ?? (setoresDb?.[0] as { id: number } | undefined)?.id ?? 1;
+  // A grade, as notas guardadas e a leitura do arquivo ficam nas filas e pessoas do setor.
   const setorDe = await setorDasPessoas(db, competencia);
   const filas = ((canais ?? []) as Canal[]).filter((f) => (f.setor_id ?? 1) === setorId);
-  const linhasDaGrade = (filas.length ? filas : CANAIS.map(([apelido, nome]) => ({ apelido, nome })))
+  // 4.7.0: sem fila cadastrada, a grade fica vazia (antes caía nas filas do Expansão).
+  const linhasDaGrade = filas
     .flatMap((f) => (f.apelido ? [{ origem: f.apelido as string, rotulo: f.nome as string }] : []))
     .map((f, c) => ({ ...f, c }));
+  const origensDoSetor = linhasDaGrade.map((f) => f.origem);
 
   const [{ data: pessoas }, ultima, ...contagens] = await Promise.all([
     db.from('pessoas').select('*').order('nome'),
-    db.from('avaliacoes').select('importado_em, importado_por')
+    db.from('avaliacoes').select('importado_em, importado_por').in('origem', origensDoSetor.length ? origensDoSetor : ['-'])
       .not('importado_em', 'is', null).order('importado_em', { ascending: false }).limit(1).maybeSingle(),
     ...linhasDaGrade.flatMap(({ origem }) => SEMANAS.map((s) => contar(origem, s))),
   ]);
@@ -162,7 +136,7 @@ export default async function ImportarAvaliacoes({
   // Notas de atendentes não reconhecidos, esperando atribuição (migração 45).
   const { data: guardadas } = await db.from('avaliacoes_guardadas')
     .select('nome_no_arquivo, nome_normalizado, data, nota, origem_arquivo, importado_em')
-    .eq('situacao', 'guardada').order('data').limit(5000);
+    .eq('situacao', 'guardada').in('origem', origensDoSetor.length ? origensDoSetor : ['-']).order('data').limit(5000);
 
   const lista = (pessoas ?? []) as Pessoa[];
   const ultimaImportacao = ultima.data as { importado_em: string; importado_por: string | null } | null;

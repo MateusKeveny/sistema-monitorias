@@ -102,7 +102,7 @@ type AnaliseArquivo = {
   /** Já gravadas, mas diferentes no arquivo (atendente ou nota). */
   atualizar: Atualizacao[];
   aba: string | null;
-  formato: 'hub' | 'huggy' | null;
+  formato: 'hub' | null;
   /** Arquivo fora: sem as colunas ou ilegível. */
   erro: string | null;
   lidas: number;
@@ -184,8 +184,6 @@ export default function ImportadorAvaliacoes({
     }
     return m;
   }, [pessoas]);
-  const porEmail = useMemo(() => new Map(pessoas.filter((p) => p.email)
-    .map((p) => [normalizar(p.email), p])), [pessoas]);
   const nomePessoa = useMemo(() => new Map(pessoas.map((p) => [p.id, p.nome])), [pessoas]);
 
   /** Lê um arquivo e separa as linhas, sem olhar o banco ainda. */
@@ -203,7 +201,9 @@ export default function ImportadorAvaliacoes({
 
     const [nomeAba, [cabecalho, ...linhas]] = aba;
     const col = acharColunas(cabecalho)!;
-    a.aba = nomeAba; a.formato = col.setor || col.fila ? 'hub' : 'huggy'; a.lidas = linhas.length;
+    // 4.7.0: só o relatório do Hub (com Setor e Fila). O da Huggy, que não existe mais, ficou de fora.
+    if (!col.setor && !col.fila) { a.erro = 'Arquivo sem as colunas Setor e Fila: use o relatório "_painel" do Hub.'; return a; }
+    a.aba = nomeAba; a.formato = 'hub'; a.lidas = linhas.length;
     /**
      * A fila da linha (4.4.1). Desde 11/2026 o relatório do Hub traz "Setor" (a
      * equipe: "Diretores-Expansao" para o Expansão inteiro) e "Fila" (a fila de
@@ -259,8 +259,7 @@ export default function ImportadorAvaliacoes({
       const data = lerData(l[col.data]);
       if (!data) { a.semData++; continue; }
 
-      let origem: Origem = CANAIS[0] ?? 'huggy';
-      if (col.setor || col.fila) origem = SETORES[normalizar(setorDaLinha(l))];
+      const origem: Origem = SETORES[normalizar(setorDaLinha(l))];
       // Fila de outro setor da plataforma: é da outra equipe, fica de fora.
       if (filaDeFora(origem)) { a.deOutraEquipe++; continue; }
 
@@ -273,7 +272,7 @@ export default function ImportadorAvaliacoes({
       vistas.add(protocolo);
 
       const tabulacao = col.tabulacao && l[col.tabulacao] != null ? String(l[col.tabulacao]) : null;
-      const pessoa = a.formato === 'hub' ? porNomeHub.get(normalizar(atendente)) : porEmail.get(normalizar(atendente));
+      const pessoa = porNomeHub.get(normalizar(atendente));
       if (pessoa && pessoaDeFora(pessoa.id)) {
         a.deOutraEquipe++;
       } else if (pessoa) {

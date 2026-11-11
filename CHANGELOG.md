@@ -35,6 +35,45 @@ para o Performance.
 
 ---
 
+## Performance 4.7.0
+
+Revisão dos vínculos com o Expansão: cada tela mostra só o setor do menu e
+usa as filas, faixas e metas dele. No Expansão os números ficam iguais.
+Migração 108 (Agenda da Gestão por setor).
+
+- **Início do gestor:** "semana sem volume" olha todas as filas do setor
+  (antes, só a fila Expansão). Avisos de valor por ponto, valor do RH, sem
+  cargo, faixas a conferir, recusas da CEO, conferência dos números e ponto
+  facultativo passam a ser só do setor da tela. Chamados (Elo) só aparecem no
+  setor que pontua chamados. A cor do C-SAT segue a meta da fila: no Expansão
+  (95%) continua verde a partir de 90% e amarelo a partir de 85%; no Telecom
+  (94%), 89% e 84%.
+- **Painel do atendente:** a mesma cor do C-SAT pela meta da fila.
+- **Importar:** só o relatório do Hub (com Setor e Fila); o arquivo antigo da
+  Huggy dá um aviso. Saiu a aba "Mês anterior (planilha)", do Dashboard
+  Expansão de antes do sistema; os meses já importados continuam no banco.
+  A aba de chamados só aparece no setor que pontua chamados. Última
+  importação e notas guardadas só das filas do setor; setor sem fila não cai
+  mais nas filas do Expansão.
+- **Lançamentos:** conferência, pendentes de realocação e atendimentos de
+  outro setor só de quem é do setor; regras manuais do setor; o nome da fila
+  nos pendentes vem do cadastro; setor sem fila mostra um aviso em vez de erro.
+- **Fechamento:** semana sem volume por todas as filas do setor; sem cargo,
+  faixas a conferir, realocação, outro setor e histórico de alterações só do
+  setor.
+- **Simulação:** só o setor do menu (pessoas, filas, faixas, mês fechado),
+  com as filas dele no TME e os grupos de C-SAT dele (antes, Expansão e
+  Diretores fixos e todos os setores juntos).
+- **Pesos por cargo:** fora do Expansão o primeiro grupo vira "Atendimento"
+  (finalizado, TME e TMA) e o de Diretores some; o finalizado do Telecom
+  deixa de cair em "Demanda extra".
+- **Ver como atendente (Pleno)** e **Presencial** usam o setor da pessoa / do menu.
+- **Agenda da Gestão (migração 108):** semana sem volume, fechamento atrasado
+  e valor por ponto por setor, com o nome do setor quando há mais de um; a
+  leitura pendente do diário com as mesmas regras da tela do Diário (sem
+  administrador, diretoria e perfil de teste; só quem vê o registro e é do
+  setor do autor).
+
 ## Performance 4.6.0
 
 SLA dos chamados pela escala de cada pessoa. Migração 107 (aplicada no

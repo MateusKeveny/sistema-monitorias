@@ -13,7 +13,7 @@ import { percentual, numeroBR } from '@/lib/formatar';
 import { fonteDaSituacao, type SituacaoDoResumo } from '@/lib/fonteDoMes';
 import { todas } from '@/lib/consultas';
 import { MONITORIAS_PADRAO, monitoriasPorSetor, setorDasPessoas, textoDoPiso } from '@/lib/monitoriasDoSetor';
-import { faixasDeCsat, metaDoCsat, textoDaMeta } from '@/lib/filasDoSetor';
+import { faixasDeCsat, metaDoCsat, textoDaMeta, tomDoCsatPelaMeta } from '@/lib/filasDoSetor';
 import { SERIES } from '@/lib/cores';
 import AbasLocais from '@/componentes/AbasLocais';
 
@@ -311,7 +311,8 @@ function Visao({ entrada: { cat, fim }, dados }: { entrada: EntradaDoComparativo
   const notaDe = (quem: string, m: string) => media(indice.get(em(quem, '-', m))?.notas ?? []);
 
   // ------------------------------------------------------------- montagem
-  const tomDoCsat = (v: number): Tom => (v >= 0.90 ? 'bom' : v >= 0.85 ? 'atencao' : 'ruim');
+  // 4.7.0: a cor pela meta do setor (no Expansão, 90% e 85% como antes).
+  const tomDoCsat = (v: number): Tom => tomDoCsatPelaMeta(v, metaCsat);
   const tomDaNota = (v: number): Tom => (v >= pisoMon ? 'bom' : v >= 0.70 ? 'atencao' : 'ruim');
   const TOM_LINHA = { bom: 'bom', atencao: 'atencao', ruim: 'ruim', neutro: 'bom' } as const;
 

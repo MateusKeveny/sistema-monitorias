@@ -74,9 +74,10 @@ export default async function Fechamento({
     return (l.find((h) => h.desde <= competencia) ?? l.at(-1))?.setor_id ?? 1;
   };
   const doSetor = (id: string) => setorDe(id) === setorId;
-  // A fila principal do setor: a que conta para "semana sem volume".
-  const filaPrincipal = ((filasDoSetor ?? []) as { setor_id: number; apelido: string | null }[])
-    .find((f) => f.setor_id === setorId && f.apelido)?.apelido ?? 'huggy';
+  // As filas do setor: volume em qualquer uma conta para "semana sem volume"
+  // (4.7.0; antes era só a primeira, e sem fila caía na do Expansão).
+  const filasDaTela = new Set(((filasDoSetor ?? []) as { setor_id: number; apelido: string | null }[])
+    .filter((f) => f.setor_id === setorId && f.apelido).map((f) => f.apelido!));
 
   // Tudo o que não depende de nada sai junto, já com a conferência do gestor
   // (2.8.2): antes eram quatro esperas em fila. Sem ser gestor, exigirGestor
@@ -86,9 +87,9 @@ export default async function Fechamento({
     db.from('fechamentos_cota')
       .select('id, pessoa_id, pessoa_nome, cargo, resultado, meta, fechado_por_nome, fechado_em')
       .eq('mes_competencia', competencia).eq('setor_id', setorId).order('resultado', { ascending: false }),
-    db.from('vw_lancamentos_a_conferir').select('bloco').eq('mes_competencia', competencia),
+    db.from('vw_lancamentos_a_conferir').select('pessoa_id, bloco').eq('mes_competencia', competencia),
     db.from('fechamento_alteracoes')
-      .select('id, pessoa_nome, campo, valor_anterior, valor_novo, motivo, autor_nome, criado_em')
+      .select('id, pessoa_id, pessoa_nome, campo, valor_anterior, valor_novo, motivo, autor_nome, criado_em')
       .eq('mes_competencia', competencia).order('criado_em', { ascending: false }),
     db.from('valores_da_cota').select('*').eq('mes_competencia', competencia).eq('setor_id', setorId).maybeSingle(),
     db.from('vw_pagamento_mensal').select('*')
@@ -100,7 +101,7 @@ export default async function Fechamento({
     db.from('vw_monitorias').select('operador_id, semana_mes').eq('mes_referencia', competencia),
     db.from('pessoas').select('id, nome').eq('avaliado', true).eq('ativo', true).order('nome'),
     // Pendentes de realocação (migração 71): não pontuam para ninguém.
-    db.from('vw_lancamentos_pendentes').select('pessoa, tipo').eq('mes_competencia', competencia),
+    db.from('vw_lancamentos_pendentes').select('pessoa_id, pessoa, tipo').eq('mes_competencia', competencia),
     // Valor encaminhado pelo RH (migração 73).
     db.from('valores_rh').select('pessoa_id, valor, informado_por_nome, informado_em').eq('mes_competencia', competencia),
   ]);
@@ -120,17 +121,22 @@ export default async function Fechamento({
   ]);
   const semCalculo = fonte.resumo == null && (jaFechou ?? 0) > 0 && pediuConferir !== '1';
   const vazio = Promise.resolve({ data: [] as never[], error: null });
-  const [[, fechados, conferir, alteracoes, valor, pagamento, correcoes, volumes, monitorias, avaliados, realocar, { data: valoresRh }],
+  let [[, fechados, conferir, alteracoes, valor, pagamento, correcoes, volumes, monitorias, avaliados, realocar, { data: valoresRh }],
     [abertos, semCargo]] = await Promise.all([
     independentes,
     todas([
       semCalculo ? vazio : db.from(fonte.mensal).select('pessoa_id, pessoa, cargo, resultado, meta')
         .eq('mes_competencia', competencia).order('resultado', { ascending: false }),
-      semCalculo ? vazio : db.from(fonte.semCargo).select('nome').eq('mes_competencia', competencia),
+      semCalculo ? vazio : db.from(fonte.semCargo).select('pessoa_id, nome').eq('mes_competencia', competencia),
     ]),
   ]);
 
-  const outroPendentes = ((await outroSetor).data ?? []) as unknown as { pessoa_id: string; pessoas: { nome: string } | null }[];
+  // 4.7.0: avisos, conferência, realocação e histórico só do setor da tela.
+  const outroPendentes = (((await outroSetor).data ?? []) as unknown as { pessoa_id: string; pessoas: { nome: string } | null }[])
+    .filter((o) => doSetor(o.pessoa_id));
+  const soDoSetor = <T extends { data: unknown }>(r: T): T =>
+    ({ ...r, data: ((r.data ?? []) as { pessoa_id: string }[]).filter((x) => doSetor(x.pessoa_id)) });
+  semCargo = soDoSetor(semCargo); conferir = soDoSetor(conferir); realocar = soDoSetor(realocar); alteracoes = soDoSetor(alteracoes);
   const lista = ((abertos.data ?? []) as Aberto[]).filter((p) => doSetor(p.pessoa_id));
   const congelados = (fechados.data ?? []) as Fechado[];
   // A decisão da diretoria sobre cada fechamento (4.0.0, migração 98). Fora do
@@ -187,7 +193,7 @@ export default async function Fechamento({
   // andamento, semana que ainda não aconteceu não é pendência.
   const semanasEncerradas = competencia < atual ? 4 : Math.max(0, semanaDoCiclo(hojeNoBrasil()) - 1);
   const comVolume = new Set(((volumes.data ?? []) as { semana: number; canal: string }[])
-    .filter((v) => v.canal === filaPrincipal).map((v) => v.semana));
+    .filter((v) => filasDaTela.has(v.canal)).map((v) => v.semana));
   const semVolume = [1, 2, 3, 4].slice(0, semanasEncerradas).filter((s) => !comVolume.has(s));
   // Quantas por semana: a do setor (Monitorias 6.0); a Conexão Expansão: 4.
   const POR_SEMANA = setor?.monitorias_por_semana ?? 4;

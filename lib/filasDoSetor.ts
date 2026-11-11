@@ -90,5 +90,15 @@ export function faixaDoCsat(faixas: FaixaCsat[] | undefined, v: number): FaixaCs
   return (faixas ?? []).find((f) => (f.min == null || v >= f.min) && (f.max == null || v < f.max)) ?? null;
 }
 
+/**
+ * A cor do C-SAT medida pela meta do setor (4.7.0): verde até 5 pontos abaixo
+ * da meta, amarelo até 10. Com a meta de 95% dá os 90% e 85% de sempre do
+ * Expansão; no Telecom (94%), 89% e 84%.
+ */
+export function tomDoCsatPelaMeta(v: number, meta: number = META_CSAT_PADRAO): 'bom' | 'atencao' | 'ruim' {
+  const r = (x: number) => Math.round(x * 1000) / 1000;
+  return v >= r(meta - 0.05) ? 'bom' : v >= r(meta - 0.1) ? 'atencao' : 'ruim';
+}
+
 /** "94%" ou "94,5%". */
 export const textoDaMeta = (v: number) => `${(Math.round(v * 1000) / 10).toLocaleString('pt-BR')}%`;

@@ -16,7 +16,7 @@ import { limiteDeRenovacao, pessoasComLeituraPendente, type LeituraDiario } from
 import { todas } from '@/lib/consultas';
 import { conferirNumerosDoMes, pendentesDaConferencia } from '@/lib/conferenciaDoMes';
 import { MONITORIAS_PADRAO, monitoriasPorSetor, setorDasPessoas, textoDoPiso } from '@/lib/monitoriasDoSetor';
-import { faixasDeCsat, filasDoSetor, metaDoCsat, setorDoPerformance, textoDaMeta } from '@/lib/filasDoSetor';
+import { faixasDeCsat, filasDoSetor, metaDoCsat, setorDoPerformance, textoDaMeta, tomDoCsatPelaMeta } from '@/lib/filasDoSetor';
 
 /** O mês anterior de '2026-09-01' → '2026-08-01' (o de lib/competencia, que é só do servidor). */
 /** 'AAAA-MM-DD' + n dias. */
@@ -63,7 +63,7 @@ const maiusculo = (t: string) => t.replace(/^./, (l) => l.toUpperCase());
 
 /** Escala única do painel para a nota de monitoria: verde a partir do piso do setor (a Expansão: 85%). */
 const tomDaNotaCom = (v: number, piso: number): 'bom' | 'atencao' | 'ruim' => (v >= piso ? 'bom' : v >= 0.70 ? 'atencao' : 'ruim');
-const tomDoCsat = (v: number): 'bom' | 'atencao' | 'ruim' => (v >= 0.90 ? 'bom' : v >= 0.85 ? 'atencao' : 'ruim');
+// 4.7.0: a cor do C-SAT pela meta da fila (tomDoCsatPelaMeta).
 
 /** Tons das 4 semanas no volume por atendente, do mais claro ao mais escuro. */
 const TONS_SEMANA = ['bg-emerald-300', 'bg-emerald-500', 'bg-emerald-700', 'bg-emerald-900'];
@@ -123,6 +123,10 @@ async function carregar(db: SupabaseClient, { competencia, atual, comPendencias 
   const faixas = await faixasDeCsat(db, filas.map((f) => f.grupoCsat));
   const metaCsat = Object.fromEntries(filas.map((f) => [f.apelido, metaDoCsat(faixas[f.grupoCsat ?? ''])])) as Record<string, number>;
   const doSetor = (id: string) => (setorDe.get(id) ?? 1) === setorDaEquipe;
+  // 4.7.0: chamados (Elo) só para o setor que pontua tratativas de chamados.
+  const { data: regraDeChamados } = await db.from('regras').select('chave')
+    .eq('chave', 'chamados_tratados').eq('ativo', true).eq('setor_id', setorDaEquipe).limit(1);
+  const pontuaChamados = (regraDeChamados ?? []).length > 0;
 
   const [pessoas, csat, volume, criterios, cota, cargos, fechados, monitorias, valores, semCargo, conferir, diario, vencendo, leituras, privados, reportes, atrasos,
     { data: semanasDeChamados }, { data: mesesComRh }, { data: conferencia }, { data: recusas }, { data: facultativos }]
@@ -141,9 +145,9 @@ async function carregar(db: SupabaseClient, { competencia, atual, comPendencias 
     db.from('fechamentos_cota').select('pessoa_id, mes_competencia, resultado, meta, cargo')
       .in('mes_competencia', meses),
     db.from('vw_monitorias').select('operador_id, nota_final, mes_referencia').in('mes_referencia', meses),
-    db.from('valores_da_cota').select('mes_competencia').in('mes_competencia', meses),
-    db.from(fonte.semCargo).select('nome').eq('mes_competencia', competencia),
-    db.from('vw_lancamentos_a_conferir').select('bloco').eq('mes_competencia', competencia),
+    db.from('valores_da_cota').select('mes_competencia, setor_id').in('mes_competencia', meses),
+    db.from(fonte.semCargo).select('pessoa_id, nome').eq('mes_competencia', competencia),
+    db.from('vw_lancamentos_a_conferir').select('pessoa_id, bloco').eq('mes_competencia', competencia),
     db.from('diario_registros').select('id', { count: 'exact', head: true }).eq('situacao', 'aguardando'),
     // Validade nos próximos 7 dias: dá para renovar (migração 37).
     db.from('diario_registros').select('id', { count: 'exact', head: true })
@@ -155,42 +159,56 @@ async function carregar(db: SupabaseClient, { competencia, atual, comPendencias 
     // Problemas reportados ainda não vistos (migração 44).
     db.from('reportes').select('id', { count: 'exact', head: true }).eq('situacao', 'novo'),
     // Chamados fora do prazo esperando decisão da gestão (migração 53).
-    db.from('chamados_elo').select('protocolo', { count: 'exact', head: true })
+    db.from('chamados_elo').select('pessoa_id')
       .eq('faixa_sla', SLA_ULTIMA).not('concluido_em', 'is', null).neq('status', 'Cancelado')
       .not('pessoa_id', 'is', null).is('decisao', null),
     // Estas quatro saíam uma atrás da outra no servidor; aqui vão juntas.
     // Sem a migração de cada uma, o erro é ignorado e a pendência não aparece
     // (como antes): por isso não passam pela conferência do todas().
-    (comPendencias ? db.rpc('chamados_por_semana', { p_mes: competencia }) : Promise.resolve({ data: null }))
+    (comPendencias && pontuaChamados ? db.rpc('chamados_por_semana', { p_mes: competencia }) : Promise.resolve({ data: null }))
       .then((r) => ({ data: r.data })),
-    db.from('valores_rh').select('mes_competencia').in('mes_competencia', meses).then((r) => ({ data: r.data })),
+    db.from('valores_rh').select('pessoa_id, mes_competencia').in('mes_competencia', meses).then((r) => ({ data: r.data })),
     db.from('conferencias_calculo').select('falhas').order('rodada_em', { ascending: false }).limit(1).maybeSingle()
       .then((r) => ({ data: r.data })),
-    db.from('vw_aprovacao_atual').select('mes_competencia').eq('situacao', 'recusado').then((r) => ({ data: r.data })),
+    db.from('vw_aprovacao_atual').select('mes_competencia, setor_id').eq('situacao', 'recusado').then((r) => ({ data: r.data })),
     // Ponto facultativo a confirmar nos próximos 15 dias (migração 107).
-    db.from('feriados').select('data, nome').eq('facultativo', true).is('confirmado', null)
+    db.from('feriados').select('data, nome').eq('setor_id', setorDaEquipe).eq('facultativo', true).is('confirmado', null)
       .gte('data', hojeNoBrasil()).lte('data', somarDias(hojeNoBrasil(), 15)).order('data')
       .then((r) => ({ data: r.data })),
   ]);
 
-  // Conferência dos números (3.5.0): a mesma do Fechamento, enquanto o mês não fecha.
-  const semanasEsperadas = competencia < atual ? 4 : Math.max(0, semanaDoCiclo(hojeNoBrasil()) - 1);
-  const fechado = ((fechados.data ?? []) as Fechado[]).some((f) => f.mes_competencia === competencia);
-  const alertas = fechado ? [] : pendentesDaConferencia(await conferirNumerosDoMes(db, {
-    competencia, semanasEncerradas: semanasEsperadas,
-    pessoas: ((cota.data ?? []) as Cota[]).map((c) => ({ pessoa_id: c.pessoa_id, pessoa: c.pessoa })),
-    volumes: ((volume.data ?? []) as Volume[]).filter((v) => v.mes_competencia === competencia),
-    csats: ((csat.data ?? []) as Csat[]).filter((c) => c.mes_competencia === competencia),
-  }));
-
   // Só o setor da tela (4.4.0): antes vinham as pessoas de todos os setores que o gestor enxerga.
+  // 4.7.0: também pendências, valores, conferência e recusas, que ainda misturavam os setores.
   const soDoSetor = <T extends { data: unknown }>(r: T, campo: string): T =>
     ({ ...r, data: ((r.data ?? []) as Record<string, unknown>[]).filter((x) => doSetor(String(x[campo]))) });
+  const doSetorDaLinha = <T extends { setor_id?: number | null }>(l: T[] | null) =>
+    (l ?? []).filter((x) => (x.setor_id ?? 1) === setorDaEquipe);
+  const cotaDoSetor = soDoSetor(cota, 'pessoa_id');
+  const volumeDoSetor = soDoSetor(volume, 'pessoa_id');
+  const csatDoSetor = soDoSetor(csat, 'pessoa_id');
+  const atrasosDoSetor = pontuaChamados
+    ? ((atrasos.data ?? []) as { pessoa_id: string }[]).filter((c) => doSetor(c.pessoa_id)).length : 0;
+
+  // Conferência dos números (3.5.0): a mesma do Fechamento, enquanto o mês não fecha.
+  const semanasEsperadas = competencia < atual ? 4 : Math.max(0, semanaDoCiclo(hojeNoBrasil()) - 1);
+  const fechado = ((fechados.data ?? []) as Fechado[]).some((f) => f.mes_competencia === competencia && doSetor(f.pessoa_id));
+  const alertas = fechado ? [] : pendentesDaConferencia(await conferirNumerosDoMes(db, {
+    competencia, semanasEncerradas: semanasEsperadas,
+    pessoas: ((cotaDoSetor.data ?? []) as Cota[]).map((c) => ({ pessoa_id: c.pessoa_id, pessoa: c.pessoa })),
+    volumes: ((volumeDoSetor.data ?? []) as Volume[]).filter((v) => v.mes_competencia === competencia),
+    csats: ((csatDoSetor.data ?? []) as Csat[]).filter((c) => c.mes_competencia === competencia),
+  }));
+
   return { piso, filas, metaCsat,
-    pessoas: soDoSetor(pessoas, 'id'), csat: soDoSetor(csat, 'pessoa_id'), volume: soDoSetor(volume, 'pessoa_id'),
-    criterios, cota: soDoSetor(cota, 'pessoa_id'), cargos, fechados: soDoSetor(fechados, 'pessoa_id'),
-    monitorias: soDoSetor(monitorias, 'operador_id'), valores, semCargo, conferir, diario,
-    vencendo, leituras, privados, reportes, atrasos, semanasDeChamados, mesesComRh, conferencia, recusas, alertas, facultativos };
+    pessoas: soDoSetor(pessoas, 'id'), csat: csatDoSetor, volume: volumeDoSetor,
+    criterios, cota: cotaDoSetor, cargos, fechados: soDoSetor(fechados, 'pessoa_id'),
+    monitorias: soDoSetor(monitorias, 'operador_id'),
+    valores: { ...valores, data: doSetorDaLinha(valores.data as { mes_competencia: string; setor_id: number | null }[] | null) },
+    semCargo: soDoSetor(semCargo, 'pessoa_id'), conferir: soDoSetor(conferir, 'pessoa_id'), diario,
+    vencendo, leituras, privados, reportes, atrasos: { count: atrasosDoSetor }, semanasDeChamados,
+    mesesComRh: ((mesesComRh ?? []) as { pessoa_id: string; mes_competencia: string }[]).filter((r) => doSetor(r.pessoa_id)),
+    conferencia, recusas: doSetorDaLinha(recusas as { mes_competencia: string; setor_id: number | null }[] | null),
+    alertas, facultativos };
 }
 
 type Dados = Awaited<ReturnType<typeof carregar>>;
@@ -373,8 +391,10 @@ function Visao({ competencia, atual, comPendencias = true, fonte, dados, abertur
   const mes = competencia.slice(0, 7);
   const pendencias: { texto: string; acao: string; href: string; grave?: boolean }[] = [];
   const semanasEsperadas = competencia < atual ? 4 : Math.max(0, semanaDoCiclo(hojeNoBrasil()) - 1);
+  // 4.7.0: volume de qualquer fila do setor (antes, só a fila Expansão).
+  const filasDaTela = new Set(filas.map((f) => f.apelido));
   const semVolume = [1, 2, 3, 4].slice(0, semanasEsperadas).filter((s) =>
-    !todoVolume.some((v) => v.mes_competencia === competencia && v.canal === 'huggy' && v.semana === s));
+    !todoVolume.some((v) => v.mes_competencia === competencia && filasDaTela.has(v.canal) && v.semana === s));
   if (semVolume.length) {
     pendencias.push({
       texto: semVolume.length === 1 ? `Semana ${semVolume[0]} sem volume lançado`
@@ -607,7 +627,7 @@ function Visao({ competencia, atual, comPendencias = true, fonte, dados, abertur
                         comparacao={<Comparacao melhor={(dCsat ?? 0) >= 0}
                           texto={dCsat == null ? null : `${seta(dCsat)} ${numeroBR(Math.abs(dCsat), 1)} pt`} />}
                         barras={agora.csatSemanas.map((s) => s && {
-                          v: s.valor, cor: { bom: 'bg-marca-600', atencao: 'bg-amber-500', ruim: 'bg-rose-500' }[tomDoCsat(s.valor)] })} />,
+                          v: s.valor, cor: { bom: 'bg-marca-600', atencao: 'bg-amber-500', ruim: 'bg-rose-500' }[tomDoCsatPelaMeta(s.valor, metaDaFila)] })} />,
       blocoVol: <Bloco rotulo="Volume" nota="finalizados"
                        valor={agora.volTotal ? inteiro(agora.volTotal) : '—'}
                        comparacao={<Comparacao melhor={(dVol ?? 0) >= 0}
@@ -630,7 +650,7 @@ function Visao({ competencia, atual, comPendencias = true, fonte, dados, abertur
                   <GraficoDeLinha min={0.75} max={1} formatar={percentual}
                                   referencia={{ valor: metaDaFila, rotulo: `meta ${textoDaMeta(metaDaFila)}` }}
                                   comparacao={{ pontos: antes.csatSemanas.map((s) => s?.valor ?? null), ...nomes }}
-                                  pontos={agora.csatSemanas.map((s): PontoDaLinha => s && { valor: s.valor, tom: tomDoCsat(s.valor) })} />
+                                  pontos={agora.csatSemanas.map((s): PontoDaLinha => s && { valor: s.valor, tom: tomDoCsatPelaMeta(s.valor, metaDaFila) })} />
                   {/* O tamanho da amostra: 100% de duas avaliações não é 100% de duzentas. */}
                   <p className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-500">
                     {agora.csatSemanas.map((s, i) => (
