@@ -35,6 +35,17 @@ para o Performance.
 
 ---
 
+## Performance 4.5.0
+
+Nível de acesso editável na ficha. Sem migração.
+
+- **Usuários e setores › ficha › Acesso:** campo "Nível de acesso" (Operador,
+  Qualidade ou Gestor) para quem já tem login. Antes o acesso só era escolhido
+  ao criar o login, e mudar o cargo (que define pesos e pontuação) não mudava o
+  que a pessoa vê — caso da Agnes no Conexão Telecom, que virou Gestor de cargo
+  e continuava entrando como atendente (corrigido direto no banco em 11/11).
+  Administrador e diretoria não aparecem no campo.
+
 ## Performance 4.4.1
 
 Correções do iGreen Mob como fila. Sem migração.

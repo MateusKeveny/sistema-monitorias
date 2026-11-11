@@ -421,6 +421,28 @@ function Ficha({
             </div>
           ) : (
             <>
+              {/* 4.4.2: o nível de acesso de quem já tem login. Antes só dava para
+                  escolher ao criar o acesso; mudar o cargo não muda o acesso. */}
+              {(pessoa.papel === 'operador' || pessoa.papel === 'qualidade' || pessoa.papel === 'gestor') && (
+                <div className="mb-3 grid grid-cols-[auto_1fr] items-center gap-x-3 text-sm text-slate-600">
+                  <label htmlFor="acesso-papel">Nível de acesso</label>
+                  <select id="acesso-papel" value={pessoa.papel} disabled={ocupado} className={entrada}
+                          onChange={(e) => {
+                            const novo = e.target.value as PapelUsuario;
+                            if (!confirm(`Mudar o acesso de ${pessoa.nome} de ${NOMES_PAPEL[pessoa.papel]} para ${NOMES_PAPEL[novo]}? `
+                              + 'Vale no próximo acesso dela ao site. O cargo (pontuação) não muda.')) { e.target.value = pessoa.papel; return; }
+                            executar(() => db().from('pessoas').update({ papel: novo }).eq('id', pessoa.id),
+                              `Acesso de ${pessoa.nome.split(' ')[0]} mudado para ${NOMES_PAPEL[novo]}.`);
+                          }}>
+                    <option value="operador">Operador (atendente)</option>
+                    <option value="qualidade">Qualidade</option>
+                    <option value="gestor">Gestor</option>
+                  </select>
+                  <p className="col-span-2 mt-1 text-xs text-slate-500">
+                    O que a pessoa vê e pode fazer no site. É diferente do cargo, que define os pesos e a pontuação.
+                  </p>
+                </div>
+              )}
               <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
                 <span>{pessoa.senha_definida ? 'Senha própria definida' : 'Ainda não trocou a senha provisória'}</span>
                 <button type="button" disabled={ocupado} className={botaoSecundario}
