@@ -8,7 +8,7 @@ import GraficoDeLinha, { type PontoDaLinha } from '@/componentes/GraficoDeLinha'
 import SeletorDeDetalhe, { type Destaque } from '@/componentes/SeletorDeDetalhe';
 import { BarraDeMeta, Painel, Secao, Vazio } from '@/componentes/ui';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
-import { lerPrazoDoSla } from '@/lib/sla';
+import { SLA_ULTIMA } from '@/lib/sla';
 import { corDoCsat, hojeNoBrasil, mesRotulo, percentual, semanaDoCiclo, numeroBR } from '@/lib/formatar';
 import type { FonteDoMes } from '@/lib/fonteDoMes';
 import ProjecaoDaCota from '@/componentes/ProjecaoDaCota';
@@ -19,6 +19,13 @@ import { MONITORIAS_PADRAO, monitoriasPorSetor, setorDasPessoas, textoDoPiso } f
 import { faixasDeCsat, filasDoSetor, metaDoCsat, setorDoPerformance, textoDaMeta } from '@/lib/filasDoSetor';
 
 /** O mês anterior de '2026-09-01' → '2026-08-01' (o de lib/competencia, que é só do servidor). */
+/** 'AAAA-MM-DD' + n dias. */
+function somarDias(d: string, n: number): string {
+  const x = new Date(`${d}T12:00:00Z`);
+  x.setUTCDate(x.getUTCDate() + n);
+  return x.toISOString().slice(0, 10);
+}
+
 function mesAnterior(c: string): string {
   const [a, m] = c.split('-').map(Number);
   return m === 1 ? `${a - 1}-12-01` : `${a}-${String(m - 1).padStart(2, '0')}-01`;
@@ -108,8 +115,9 @@ async function carregar(db: SupabaseClient, { competencia, atual, comPendencias 
   // 4.3.0: o prazo do SLA vem das faixas (migração 104).
   // 4.4.0: o setor do menu sem depender de ter monitoria (o Telecom não tem),
   // as filas dele e quem está nele no mês — a tela mostra só esse setor.
-  const [porSetorMon, { setorId: setorDaEquipe }, prazoSla, setorDe] = await Promise.all([
-    monitoriasPorSetor(db), setorDoPerformance(db, setorPedido), lerPrazoDoSla(db), setorDasPessoas(db, competencia)]);
+  // 4.6.0: fora do prazo é a faixa salva em cada chamado (migração 107).
+  const [porSetorMon, { setorId: setorDaEquipe }, setorDe] = await Promise.all([
+    monitoriasPorSetor(db), setorDoPerformance(db, setorPedido), setorDasPessoas(db, competencia)]);
   const piso = porSetorMon.get(setorDaEquipe)?.piso ?? MONITORIAS_PADRAO.piso;
   const filas = await filasDoSetor(db, setorDaEquipe);
   const faixas = await faixasDeCsat(db, filas.map((f) => f.grupoCsat));
@@ -117,7 +125,7 @@ async function carregar(db: SupabaseClient, { competencia, atual, comPendencias 
   const doSetor = (id: string) => (setorDe.get(id) ?? 1) === setorDaEquipe;
 
   const [pessoas, csat, volume, criterios, cota, cargos, fechados, monitorias, valores, semCargo, conferir, diario, vencendo, leituras, privados, reportes, atrasos,
-    { data: semanasDeChamados }, { data: mesesComRh }, { data: conferencia }, { data: recusas }]
+    { data: semanasDeChamados }, { data: mesesComRh }, { data: conferencia }, { data: recusas }, { data: facultativos }]
     = await todas([
     db.from('pessoas').select('id, nome, exibir_no_painel, conta_nas_medias'),
     db.from('vw_csat_semanal').select('pessoa_id, origem, semana, avaliacoes, positivas, mes_competencia')
@@ -148,7 +156,7 @@ async function carregar(db: SupabaseClient, { competencia, atual, comPendencias 
     db.from('reportes').select('id', { count: 'exact', head: true }).eq('situacao', 'novo'),
     // Chamados fora do prazo esperando decisão da gestão (migração 53).
     db.from('chamados_elo').select('protocolo', { count: 'exact', head: true })
-      .gte('tempo_util', prazoSla).not('concluido_em', 'is', null).neq('status', 'Cancelado')
+      .eq('faixa_sla', SLA_ULTIMA).not('concluido_em', 'is', null).neq('status', 'Cancelado')
       .not('pessoa_id', 'is', null).is('decisao', null),
     // Estas quatro saíam uma atrás da outra no servidor; aqui vão juntas.
     // Sem a migração de cada uma, o erro é ignorado e a pendência não aparece
@@ -159,6 +167,10 @@ async function carregar(db: SupabaseClient, { competencia, atual, comPendencias 
     db.from('conferencias_calculo').select('falhas').order('rodada_em', { ascending: false }).limit(1).maybeSingle()
       .then((r) => ({ data: r.data })),
     db.from('vw_aprovacao_atual').select('mes_competencia').eq('situacao', 'recusado').then((r) => ({ data: r.data })),
+    // Ponto facultativo a confirmar nos próximos 15 dias (migração 107).
+    db.from('feriados').select('data, nome').eq('facultativo', true).is('confirmado', null)
+      .gte('data', hojeNoBrasil()).lte('data', somarDias(hojeNoBrasil(), 15)).order('data')
+      .then((r) => ({ data: r.data })),
   ]);
 
   // Conferência dos números (3.5.0): a mesma do Fechamento, enquanto o mês não fecha.
@@ -178,7 +190,7 @@ async function carregar(db: SupabaseClient, { competencia, atual, comPendencias 
     pessoas: soDoSetor(pessoas, 'id'), csat: soDoSetor(csat, 'pessoa_id'), volume: soDoSetor(volume, 'pessoa_id'),
     criterios, cota: soDoSetor(cota, 'pessoa_id'), cargos, fechados: soDoSetor(fechados, 'pessoa_id'),
     monitorias: soDoSetor(monitorias, 'operador_id'), valores, semCargo, conferir, diario,
-    vencendo, leituras, privados, reportes, atrasos, semanasDeChamados, mesesComRh, conferencia, recusas, alertas };
+    vencendo, leituras, privados, reportes, atrasos, semanasDeChamados, mesesComRh, conferencia, recusas, alertas, facultativos };
 }
 
 type Dados = Awaited<ReturnType<typeof carregar>>;
@@ -306,7 +318,7 @@ function Visao({ competencia, atual, comPendencias = true, fonte, dados, abertur
   const anterior = mesAnterior(competencia);
   const meses = [competencia, anterior];
   const { piso, filas, metaCsat, pessoas, csat, volume, criterios, cota, cargos, fechados, monitorias, valores, semCargo, conferir, diario,
-    vencendo, leituras, privados, reportes, atrasos, semanasDeChamados, mesesComRh, conferencia, recusas } = dados;
+    vencendo, leituras, privados, reportes, atrasos, semanasDeChamados, mesesComRh, conferencia, recusas, facultativos } = dados;
   const tomDaNota = (v: number) => tomDaNotaCom(v, piso);
 
   const nome = new Map((pessoas.data ?? []).map((p) => [p.id as string, nomeCurto(p.nome as string)]));
@@ -469,6 +481,13 @@ function Visao({ competencia, atual, comPendencias = true, fonte, dados, abertur
     pendencias.push({
       texto: `${atrasos.count} chamado${atrasos.count > 1 ? 's' : ''} fora do prazo esperando decisão`,
       acao: 'Decidir', href: '/cota/importar?cat=chamados',
+    });
+  }
+  const aConfirmar = (facultativos ?? []) as { data: string; nome: string }[];
+  if (aConfirmar.length) {
+    pendencias.push({
+      texto: `Ponto facultativo a confirmar: ${aConfirmar.map((f) => `${f.data.slice(8, 10)}/${f.data.slice(5, 7)} (${f.nome})`).join(', ')}`,
+      acao: 'Confirmar', href: '/cota/escala',
     });
   }
   if ((conferir.data ?? []).length) {

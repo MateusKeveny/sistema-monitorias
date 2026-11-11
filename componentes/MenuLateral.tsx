@@ -53,7 +53,8 @@ const ICONES: Record<string, React.ReactNode> = {
   // 4.4.0: as telas de Metas e métricas (eram abas da Configuração).
   '/cota/metas': <><circle cx="10" cy="10" r="7" /><circle cx="10" cy="10" r="3.5" /><circle cx="10" cy="10" r=".6" /></>,
   '/cota/metricas-e-faixas': <><path d="M3 16h14" /><path d="M5 13v-3M9 13V6M13 13V9M17 13V4" /></>,
-  '/cota/alteracoes': <><path d="M3.5 10a6.5 6.5 0 1 0 2-4.7L3.5 7.2" /><path d="M3.5 3.5v3.7h3.7M10 6.5V10l2.5 1.5" /></>,
+  '/cota/escala': <><rect x="3.5" y="4.5" width="13" height="12" rx="2" /><path d="M3.5 8.5h13M7 3v3M13 3v3M10 11v2.5l1.5 1" /></>,
+  '/cota/alteracoes':<><path d="M3.5 10a6.5 6.5 0 1 0 2-4.7L3.5 7.2" /><path d="M3.5 3.5v3.7h3.7M10 6.5V10l2.5 1.5" /></>,
   '/cota/metricas': <><circle cx="10" cy="11" r="6" /><path d="M10 8v3l2 1.5M8.5 3h3M10 3v2" /></>,
   '/cota/acessos': <><circle cx="10" cy="10" r="6.5" /><path d="M10 6.5V10l2.5 1.5" /></>,
   '/reportes': <path d="M5 17V3.5M5 4h9l-2 3.5 2 3.5H5" />,

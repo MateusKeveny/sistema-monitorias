@@ -2,9 +2,11 @@
  * SLA dos chamados em faixas (4.3.0, migração 104).
  *
  * As faixas são as regras "chamados_sla_*", com faixa_min e faixa_max em
- * HORAS. Hoje o relógio é o tempo do Elo, em dias úteis de 24 h; quando a
- * escala de cada pessoa entrar (etapa 2), as horas passam a ser úteis de
- * verdade e só HORAS_DO_DIA muda.
+ * HORAS e a unidade de cada limite em unidade_max ('h' ou 'd'). Desde a 4.5.0
+ * (migração 107) o relógio é a escala de quem tratou: limite em horas compara
+ * horas úteis; limite em dias compara dias de expediente (1 dia = o expediente
+ * da pessoa). Sem escala, vale o tempo do Elo (dias úteis de 24 h). O banco
+ * guarda a faixa de cada chamado em chamados_elo.faixa_sla.
  *
  * A primeira faixa é sempre "chamados_sla_ate_2d" e a última, sem teto,
  * "chamados_sla_acima_2d" — o "fora do prazo", que vai para a fila de atrasos
@@ -22,7 +24,23 @@ export const PRAZO_PADRAO_DIAS = 3;
 export const MAX_FAIXAS = 6;
 
 export type UnidadeSla = 'h' | 'd';
-export type RegraSla = { chave: string; rotulo: string; faixa_min: number | null; faixa_max: number | null; ativo: boolean; ordem: number; setor_id?: number | null };
+export type RegraSla = { chave: string; rotulo: string; faixa_min: number | null; faixa_max: number | null; ativo: boolean; ordem: number; setor_id?: number | null; unidade_max?: UnidadeSla | null };
+
+/** O que as telas leem de um chamado para o SLA (migração 107). */
+export type ChamadoSla = { tempo_util: number | null; dias_escala?: number | null; horas_escala?: number | null; faixa_sla?: string | null };
+
+/** Fora do prazo = caiu na última faixa. */
+export const foraDoPrazo = (c: ChamadoSla) => c.faixa_sla === SLA_ULTIMA;
+
+/** O tempo do chamado em dias úteis: pela escala de quem tratou, ou o do Elo. */
+export const diasDoChamado = (c: ChamadoSla): number | null =>
+  c.dias_escala != null ? Number(c.dias_escala) : c.tempo_util == null ? null : Number(c.tempo_util);
+
+/** Quando há escala, a parte de quem trata e a do TI são proporcionais ao tempo do Elo. */
+export function proporcaoDaEscala(c: ChamadoSla): number {
+  if (c.dias_escala == null || !c.tempo_util) return 1;
+  return Number(c.dias_escala) / Number(c.tempo_util);
+}
 
 export const ehSla = (chave: string) => chave.startsWith(SLA_PREFIXO);
 
@@ -53,9 +71,13 @@ export function textoDoTempo(horas: number, u: UnidadeSla): string {
   return `${fmt(d)} ${d === 1 ? 'dia útil' : 'dias úteis'}`;
 }
 
-/** Texto do prazo, para as telas: "3 dias úteis (72 h)", o mesmo número do limite. */
+/**
+ * Texto do prazo, para as telas: "1,5 dias úteis". Desde a 4.5.0 o dia útil é
+ * o expediente de quem tratou (sem escala, 24 h do Elo), então as horas não
+ * vão mais entre parênteses.
+ */
 export function textoDoPrazo(dias: number): string {
-  return `${fmt(dias)} ${dias === 1 ? 'dia útil' : 'dias úteis'} (${fmt(dias * HORAS_DO_DIA)} h)`;
+  return `${fmt(dias)} ${dias === 1 ? 'dia útil' : 'dias úteis'}`;
 }
 
 /**
@@ -76,6 +98,7 @@ export function rotuloDaFaixaSla(i: number, cortes: number[], unidades: UnidadeS
  */
 export function unidadesSalvas(faixas: RegraSla[]): UnidadeSla[] {
   return faixas.slice(0, -1).map((f, i) => {
+    if (f.unidade_max === 'h' || f.unidade_max === 'd') return f.unidade_max;
     const c = Number(f.faixa_max);
     const nomes = `${f.rotulo} ${faixas[i + 1]?.rotulo ?? ''}`;
     if (nomes.includes(textoDoTempo(c, 'h'))) return 'h';
@@ -115,13 +138,15 @@ export async function gravarSla(db: SupabaseClient, regras: RegraSla[], cortes: 
       rotulo: rotuloDaFaixaSla(i, cortes, u),
       faixa_min: i === 0 ? 0 : cortes[i - 1],
       faixa_max: i === total - 1 ? null : cortes[i],
+      unidade_max: i === total - 1 ? null : (u[i] ?? 'h'),
       ordem: 91 + i,
       ativo: true,
     };
     const atual = existentes.get(chave);
     if (atual) {
       const igual = atual.rotulo === dados.rotulo && Number(atual.faixa_min ?? 0) === dados.faixa_min
-        && (atual.faixa_max == null ? null : Number(atual.faixa_max)) === dados.faixa_max && atual.ordem === dados.ordem && atual.ativo;
+        && (atual.faixa_max == null ? null : Number(atual.faixa_max)) === dados.faixa_max && atual.ordem === dados.ordem && atual.ativo
+        && (atual.unidade_max ?? null) === dados.unidade_max;
       if (igual) continue;
       const { error } = await db.from('regras').update(dados).eq('chave', chave);
       if (error) return `${dados.rotulo}: ${error.message}`;

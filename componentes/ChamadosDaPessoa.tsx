@@ -3,7 +3,7 @@ import { Indicador, Quadro, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import { BarraDoTempo, LegendaDoTempo } from '@/componentes/FilaDeAtrasos';
 import JustificarAtraso from '@/componentes/JustificarAtraso';
 import { dataHora, diaMes, periodoDaSemana, tempoUtil } from '@/lib/formatar';
-import { lerPrazoDoSla, textoDoPrazo } from '@/lib/sla';
+import { foraDoPrazo, lerPrazoDoSla, proporcaoDaEscala, textoDoPrazo } from '@/lib/sla';
 
 type Chamado = {
   protocolo: number; titulo: string | null; status: string; semana: number;
@@ -12,6 +12,7 @@ type Chamado = {
   motivo_atraso: string | null; observacao: string | null;
   justificativa: string | null; justificado_em: string | null;
   decisao: 'manter' | 'retirar' | null; decidido_por_nome: string | null;
+  dias_escala: number | null; faixa_sla: string | null;
 };
 
 const media = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
@@ -28,25 +29,27 @@ export default async function ChamadosDaPessoa({ pessoaId, competencia, podeJust
   // O prazo (4.3.0): onde começa a última faixa do SLA (migração 104).
   const LIMITE = await lerPrazoDoSla(db);
   const { data } = await db.from('chamados_elo')
-    .select('protocolo, titulo, status, semana, aberto_em, concluido_em, tempo_util, tempo_interno, tempo_ti, motivo_atraso, observacao, justificativa, justificado_em, decisao, decidido_por_nome')
+    .select('protocolo, titulo, status, semana, aberto_em, concluido_em, tempo_util, tempo_interno, tempo_ti, motivo_atraso, observacao, justificativa, justificado_em, decisao, decidido_por_nome, dias_escala, faixa_sla')
     .eq('pessoa_id', pessoaId).eq('mes_competencia', competencia).order('aberto_em', { ascending: false });
-  const chamados = ((data ?? []) as Chamado[]).map((c) => ({
-    ...c, tempo_util: c.tempo_util == null ? null : Number(c.tempo_util),
-    tempo_interno: c.tempo_interno == null ? null : Number(c.tempo_interno),
-    tempo_ti: c.tempo_ti == null ? null : Number(c.tempo_ti),
-  }));
+  // 4.5.0 (migração 107): com escala, o tempo é em dias de expediente de quem
+  // tratou; a parte de quem trata e a do TI seguem a mesma proporção.
+  const chamados = ((data ?? []) as Chamado[]).map((c) => {
+    const k = proporcaoDaEscala(c);
+    const num = (v: number | null) => (v == null ? null : Number(v) * k);
+    return { ...c, tempo_util: num(c.tempo_util), tempo_interno: num(c.tempo_interno), tempo_ti: num(c.tempo_ti) };
+  });
 
   const resolvidos = chamados.filter((c) => c.concluido_em && c.status !== 'Cancelado');
   // Parte de quem trata: até o ClickUp; sem ClickUp, o tempo todo.
   const doAnalista = (c: Chamado) => c.tempo_interno ?? (c.tempo_ti == null ? c.tempo_util ?? 0 : 0);
   const comRepasse = resolvidos.filter((c) => c.tempo_ti != null);
-  const atrasados = resolvidos.filter((c) => (c.tempo_util ?? 0) >= LIMITE);
+  const atrasados = resolvidos.filter(foraDoPrazo);
   const repassesLentos = resolvidos.filter((c) => doAnalista(c) >= 1).length;
 
   const situacao = (c: Chamado) => {
     if (c.status === 'Cancelado') return 'Cancelado · não conta';
     if (!c.concluido_em) return 'Em aberto · conta quando resolver';
-    if ((c.tempo_util ?? 0) < LIMITE) return 'No prazo';
+    if (!foraDoPrazo(c)) return 'No prazo';
     return c.decisao === 'manter' ? 'Fora do prazo · desconto mantido'
       : c.decisao === 'retirar' ? 'Fora do prazo · desconto retirado' : 'Fora do prazo · com a gestão';
   };
@@ -92,7 +95,7 @@ export default async function ChamadosDaPessoa({ pessoaId, competencia, podeJust
                     ) : <span className="text-slate-400">—</span>}
                   </Td>
                   <Td className="text-right tabular-nums">
-                    {daSemana.length ? daSemana.filter((c) => (c.tempo_util ?? 0) >= LIMITE).length : '—'}
+                    {daSemana.length ? daSemana.filter(foraDoPrazo).length : '—'}
                   </Td>
                 </tr>
               );

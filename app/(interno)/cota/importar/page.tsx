@@ -10,7 +10,7 @@ import NotasGuardadas, { type NotaGuardada } from '@/componentes/NotasGuardadas'
 import SemanasDeChamados, { type SemanaDeChamados } from '@/componentes/SemanasDeChamados';
 import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
 import { Quadro } from '@/componentes/ui';
-import { lerPrazoDoSla } from '@/lib/sla';
+import { SLA_ULTIMA, lerPrazoDoSla } from '@/lib/sla';
 import { mesAnterior , resolverCompetencia } from '@/lib/competencia';
 import { dataHora, diaMes, hojeNoBrasil, mesDeCompetencia, mesRotulo, periodoDaSemana, mesValido } from '@/lib/formatar';
 import type { Pessoa } from '@/lib/tipos';
@@ -96,14 +96,15 @@ export default async function ImportarAvaliacoes({
   }
 
   if (aba === 'chamados') {
-    const campos = 'protocolo, titulo, responsavel, aberto_em, concluido_em, tempo_util, tempo_interno, tempo_ti, motivo_atraso, observacao, justificativa, justificado_por_nome, justificado_em, decisao, decidido_por_nome, decidido_em';
+    const campos = 'protocolo, titulo, responsavel, aberto_em, concluido_em, tempo_util, tempo_interno, tempo_ti, motivo_atraso, observacao, justificativa, justificado_por_nome, justificado_em, decisao, decidido_por_nome, decidido_em, dias_escala';
     // Semanas sem chamados (migração 60): o mês corrente e, enquanto não
     // fechado, o anterior — os mesmos que a pendência olha.
     const anterior = mesAnterior(atual);
-    // 4.3.0: o prazo vem das faixas do SLA (migração 104).
+    // 4.3.0: o prazo vem das faixas do SLA (migração 104); 4.5.0: fora do prazo
+    // é a faixa salva em cada chamado, pela escala de quem tratou (migração 107).
     const prazoSla = await lerPrazoDoSla(db);
     const [{ data: pendentes }, { data: decididos }, { count: anteriorFechado }, semanasAtual, semanasAnterior] = await Promise.all([
-      db.from('chamados_elo').select(campos).gte('tempo_util', prazoSla).not('concluido_em', 'is', null)
+      db.from('chamados_elo').select(campos).eq('faixa_sla', SLA_ULTIMA).not('concluido_em', 'is', null)
         .neq('status', 'Cancelado').not('pessoa_id', 'is', null).is('decisao', null).order('aberto_em'),
       db.from('chamados_elo').select(campos).not('decisao', 'is', null).eq('mes_competencia', atual)
         .order('decidido_em', { ascending: false }),

@@ -35,6 +35,35 @@ para o Performance.
 
 ---
 
+## Performance 4.6.0
+
+SLA dos chamados pela escala de cada pessoa. Migração 107 (aplicada no
+oficial em 11/11/2026).
+
+- **Relógio do SLA pela escala** (setor com a opção ligada: Conexão Expansão,
+  a partir da competência de novembro/2026): do momento da abertura até a
+  conclusão, só dentro da escala de quem tratou o chamado. O intervalo e os
+  feriados do setor pausam o relógio; 1 dia útil = o expediente da pessoa
+  naquele dia. Limite em horas compara horas úteis; limite em dias compara
+  expedientes. Quem não tem escala (e os meses anteriores) segue o tempo do
+  Elo, em dias úteis de 24 h.
+- **Faixa salva em cada chamado** (`faixa_sla`): a cota, a Fila de atrasos,
+  a justificativa, a conferência da importação, o Início do gestor e Meus
+  chamados leem a faixa do chamado. Recalcula sozinha quando mudam o chamado,
+  a escala, os feriados ou as faixas.
+- **Faixas do Expansão:** o limite de 12 h virou 0,5 dia útil (com a escala, 12 h
+  passavam de 1,5 expediente). Ficam: até 3 h | 3 h a 0,5 dia útil | 0,5 a 1
+  dia útil | 1 a 1,5 dia útil | fora do prazo. Cada limite guarda a sua
+  unidade (`regras.unidade_max`).
+- **Metas e métricas › Escala e feriados** (tela nova): subir a planilha de
+  horários e feriados, ver a escala da semana de cada pessoa, incluir e
+  excluir feriados, confirmar ponto facultativo (folga pausa o relógio;
+  enquanto não confirmado, conta como dia normal) e, em outro setor, copiar
+  as configurações de um setor que já usa a escala.
+- **Precisa de você:** "Ponto facultativo a confirmar" 15 dias antes.
+- Novembro do Matheus Camargo (262 chamados): fora do prazo de 109 (Elo) para
+  78 pela escala.
+
 ## Performance 4.5.0
 
 Nível de acesso editável na ficha. Sem migração.

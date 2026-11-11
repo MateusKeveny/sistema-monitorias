@@ -94,8 +94,9 @@ export default function SlaDosChamados({ regras, pesosBase, nomeBase }: {
       </h2>
       <p className="mt-0.5 text-sm text-slate-500">
         O tempo de cada chamado resolvido escolhe a faixa. A última faixa é o fora do prazo: vai para a Fila de atrasos e só
-        conta quando a gestão mantém o desconto. Cada limite pode ser em horas ou em dias úteis. Hoje o tempo vem do Elo,
-        em dias úteis de 24 h.
+        conta quando a gestão mantém o desconto. Cada limite pode ser em horas ou em dias úteis. Com a escala
+        ligada (Metas e métricas › Escala e feriados), o tempo conta só dentro do expediente de quem tratou: horas úteis
+        para limite em horas e expedientes para limite em dias. Quem não tem escala segue o tempo do Elo (dia útil de 24 h).
       </p>
 
       {erro && <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-800 ring-1 ring-rose-600/20">{erro}</p>}

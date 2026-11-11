@@ -67,6 +67,8 @@ export const ITENS: Record<Sistema, Item[]> = {
     { href: '/cota/metricas-e-faixas', rotulo: 'Métricas e faixas', papeis: ['gestor'], grupo: 'Metas e métricas' },
     // Desligar o TME de uma semana, com justificativa (migração 66); era "Métricas da semana".
     { href: '/cota/metricas', rotulo: 'Ajustes da semana', papeis: ['gestor'], grupo: 'Metas e métricas' },
+    // Escala de cada pessoa e feriados do setor, para o SLA dos chamados (migração 107).
+    { href: '/cota/escala', rotulo: 'Escala e feriados', papeis: ['gestor'], grupo: 'Metas e métricas' },
     { href: '/cota/alteracoes', rotulo: 'Histórico de alterações', papeis: ['gestor'], grupo: 'Metas e métricas' },
     // Pessoas, logins, papéis e setores num lugar só (3.0): junta Atendentes e Acessos.
     { href: '/cota/usuarios', rotulo: 'Usuários e setores', papeis: ['gestor'], grupo: 'Equipe' },

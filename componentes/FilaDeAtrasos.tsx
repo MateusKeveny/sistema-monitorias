@@ -6,7 +6,7 @@ import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { Quadro, Tabela, Th, Td, Vazio } from '@/componentes/ui';
 import { dataHora, tempoUtil } from '@/lib/formatar';
 import { mensagemDoErro } from '@/lib/erro-amigavel';
-import { PRAZO_PADRAO_DIAS, textoDoPrazo } from '@/lib/sla';
+import { PRAZO_PADRAO_DIAS, proporcaoDaEscala, textoDoPrazo } from '@/lib/sla';
 
 export type ChamadoAtrasado = {
   protocolo: number;
@@ -25,6 +25,8 @@ export type ChamadoAtrasado = {
   decisao: 'manter' | 'retirar' | null;
   decidido_por_nome: string | null;
   decidido_em: string | null;
+  /** Dias de expediente de quem tratou (migração 107); nulo = tempo do Elo. */
+  dias_escala?: number | null;
 };
 
 /**
@@ -84,7 +86,13 @@ export default function FilaDeAtrasos({ pendentes, decididos, prazo = PRAZO_PADR
     router.refresh();
   }
 
-  const Linha = ({ c }: { c: ChamadoAtrasado }) => (
+  const Linha = ({ c: bruto }: { c: ChamadoAtrasado }) => {
+    // 4.5.0: com escala, os tempos vão para dias de expediente (mesma proporção).
+    const k = proporcaoDaEscala(bruto);
+    const c = { ...bruto, tempo_util: Number(bruto.tempo_util) * k,
+      tempo_interno: bruto.tempo_interno == null ? null : Number(bruto.tempo_interno) * k,
+      tempo_ti: bruto.tempo_ti == null ? null : Number(bruto.tempo_ti) * k };
+    return (
     <tr className="align-top">
       <Td>
         <span className="font-semibold text-slate-900">{c.protocolo}</span>
@@ -135,6 +143,7 @@ export default function FilaDeAtrasos({ pendentes, decididos, prazo = PRAZO_PADR
       </Td>
     </tr>
   );
+  };
 
   const Cabecalho = () => (
     <thead>
