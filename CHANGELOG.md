@@ -35,6 +35,25 @@ para o Performance.
 
 ---
 
+## Performance 4.10.0 · Monitorias 6.4.0 · Agenda da Gestão 1.9.0
+
+Mês em aberto por setor e o visual novo nos três sites. Sem migração.
+
+- **Performance — mês em aberto por setor:** a tela abre no mês que o setor do
+  menu ainda não fechou. Antes, o fechamento de qualquer setor virava o mês
+  para todos, e um setor recém-criado abria no mês anterior à criação: o
+  Telecom (criado em 10/11) abriu em outubro, e o volume da 1ª semana de
+  novembro foi lançado lá. Agora o setor começa na competência em que foi
+  criado (o Expansão, que tem fechamentos de antes, segue como sempre).
+- Dados (12/11): os 14 lançamentos de volume da 1ª semana que caíram em
+  outubro no Telecom passaram para novembro; a avaliação de 25/10 (Pasta2.xlsx)
+  foi apagada. Outubro do Telecom ficou vazio.
+- **Monitorias e Agenda:** passam a usar o visual do Performance (a
+  repaginação da 4.4.0): fundo liso, cartões arredondados, título com traço
+  verde, botões em pílula, campos com foco verde, tabelas mais leves.
+
+---
+
 ## Performance 4.9.0
 
 Nome do setor no Hub. Migração 109.

@@ -1,6 +1,8 @@
 import { cache } from 'react';
 import { cookies } from 'next/headers';
-import { criarClienteServidor } from '@/lib/supabase/servidor';
+import { criarClienteServidor, obterPerfil } from '@/lib/supabase/servidor';
+import { setorDaPessoa, setorDoPerformance } from '@/lib/filasDoSetor';
+import { setorDoCookie } from '@/lib/setorEscolhido';
 import { hojeNoBrasil, mesDeCompetencia, mesValido } from '@/lib/formatar';
 
 export type Competencia = {
@@ -44,8 +46,27 @@ const competenciaPadrao = cache(async (): Promise<Competencia> => {
   const anterior = mesAnterior(atual);
 
   const db = await criarClienteServidor();
-  const { count: fechado } = await db.from('fechamentos_cota')
-    .select('id', { count: 'exact', head: true }).eq('mes_competencia', anterior);
+  // 4.10.0: por setor. Antes, o fechamento de qualquer setor que a pessoa
+  // enxergasse virava o mês; e um setor recém-criado abria no mês anterior à
+  // própria criação (o Telecom, criado em 10/11, abria em outubro e o volume
+  // da 1ª semana de novembro foi lançado lá — 12/11/2026).
+  const perfil = await obterPerfil();
+  const setorId = perfil?.papel === 'operador'
+    ? await setorDaPessoa(db, perfil.id, atual)
+    : (await setorDoPerformance(db, await setorDoCookie())).setorId;
+  const [{ data: setor }, { count: fechado }, { count: fechouAntes }] = await Promise.all([
+    db.from('setores').select('criado_em').eq('id', setorId).maybeSingle(),
+    db.from('fechamentos_cota').select('id', { count: 'exact', head: true })
+      .eq('mes_competencia', anterior).eq('setor_id', setorId),
+    db.from('fechamentos_cota').select('id', { count: 'exact', head: true })
+      .lt('mes_competencia', anterior).eq('setor_id', setorId),
+  ]);
+  // O setor começa no mês (competência) em que foi criado — a não ser que já
+  // tenha fechamento antes disso (o Expansão existia antes da tabela de setores).
+  const criadoEm = (setor as { criado_em?: string } | null)?.criado_em;
+  const inicio = criadoEm && !(fechouAntes ?? 0)
+    ? mesDeCompetencia(new Date(criadoEm).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })) : null;
+  if (inicio && anterior < inicio) return { competencia: atual, atual, emAberto: false };
 
   const emAberto = (fechado ?? 0) === 0;
   return { competencia: emAberto ? anterior : atual, atual, emAberto };

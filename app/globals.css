@@ -127,9 +127,9 @@ body {
 }
 
 /* ---------------------------------------------------------------------------
-   Visual da 3.0 (aprovado em 27/10/2026, cor "Marca"), só no Performance:
-   o <html> ganha data-visual="3" (app/layout.tsx). Monitorias e Agenda seguem
-   no visual de antes.
+   Visual da 3.0 (aprovado em 27/10/2026, cor "Marca"): o <html> ganha
+   data-visual="3" (app/layout.tsx). Até 11/11/2026 só no Performance; desde
+   12/11/2026 também no Monitorias e na Agenda (pedido do gestor).
 
    A estrutura das telas não muda: a base troca os tokens — fundo liso no lugar
    da arte, superfícies e cinzas grafite-esverdeados, verde só no destaque — e
