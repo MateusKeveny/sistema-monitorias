@@ -35,6 +35,27 @@ para o Performance.
 
 ---
 
+## Performance 4.11.0 · Monitorias 6.5.0
+
+Proteção do login. Migração 110.
+
+- **Login pelo servidor:** a tela de login do Performance e do Monitorias
+  passa a entrar por `/auth/entrar`, que conta as senhas erradas por usuário +
+  endereço de rede. Depois de 1 erro, pede uma verificação ("Quanto é 4 + 7?");
+  na 5ª tentativa errada, bloqueia 15 minutos (e cada erro seguinte bloqueia
+  de novo); acertar a senha zera a contagem.
+- **Usuários e setores › Uso dos acessos:** quadro "Tentativas de login
+  erradas" dos últimos 7 dias, com quem chegou a ser bloqueado.
+- **Brechas sem login fechadas (migração 110):** sem login, já não dá para
+  chamar `recalcular_sla` nem `sla_pela_escala`, nem ler
+  `bonus_da_competencia` e `vw_tme_equipe` (estes dois seguem para quem está
+  logado).
+- Limite: quem chamar o login do Supabase direto, por fora do site, não passa
+  pela contagem; o Supabase já limita por endereço de rede. A Agenda tem banco
+  e login próprios e ficou como estava.
+
+---
+
 ## Performance 4.10.0 · Monitorias 6.4.0 · Agenda da Gestão 1.9.0
 
 Mês em aberto por setor e o visual novo nos três sites. Sem migração.

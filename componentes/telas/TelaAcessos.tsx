@@ -45,7 +45,7 @@ export default async function TelaAcessos({ sistema }: { sistema: Sistema }) {
   const hoje = hojeNoBrasil();
   const inicio = somarDias(hoje, -(JANELA - 1));
   const [{ data: pessoas }, { data: cargos }, { data: historico }, { data: recentes },
-    { data: ultimos }, { data: logins }] = await Promise.all([
+    { data: ultimos }, { data: logins }, { data: tentativas }] = await Promise.all([
     db.from('pessoas').select('id, nome, papel').eq('ativo', true).not('auth_id', 'is', null).order('nome'),
     db.from('cargos').select('id, nome'),
     db.from('cargos_da_pessoa').select('pessoa_id, desde, cargo_id').lte('desde', hoje)
@@ -54,7 +54,22 @@ export default async function TelaAcessos({ sistema }: { sistema: Sistema }) {
       .eq('sistema', sistema).gte('dia', inicio),
     db.from('vw_ultimo_acesso').select('pessoa_id, ultimo').eq('sistema', sistema),
     db.rpc('ultimo_login_das_pessoas'),
+    // 4.11.0 (migração 110): tentativas de login dos últimos 7 dias (os dois sistemas).
+    db.from('tentativas_login').select('chave, ip, sucesso, criado_em')
+      .gte('criado_em', new Date(Date.now() - 7 * 86_400_000).toISOString()).order('criado_em', { ascending: false }).limit(2000)
+      .then((r) => ({ data: r.data })),
   ]);
+
+  // Erros de senha por usuário e endereço: quantos, o último, e se chegou a bloquear (5 seguidos).
+  type Tentativa = { chave: string; ip: string; sucesso: boolean; criado_em: string };
+  const erradas = new Map<string, { chave: string; ip: string; erros: number; ultimo: string; bloqueou: boolean; seguidos: number; fechou: boolean }>();
+  for (const t of [...((tentativas ?? []) as Tentativa[])].reverse()) {
+    const k = `${t.chave}|${t.ip}`;
+    const g = erradas.get(k) ?? { chave: t.chave, ip: t.ip, erros: 0, ultimo: t.criado_em, bloqueou: false, seguidos: 0, fechou: false };
+    if (t.sucesso) { g.seguidos = 0; } else { g.erros++; g.seguidos++; g.ultimo = t.criado_em; if (g.seguidos >= 5) g.bloqueou = true; }
+    erradas.set(k, g);
+  }
+  const listaErradas = [...erradas.values()].filter((g) => g.erros > 0).sort((a, b) => b.ultimo.localeCompare(a.ultimo));
 
   // Cargo atual: o mais recente já em vigor. Quem não tem cargo (gestão,
   // qualidade) aparece pelo papel.
@@ -201,6 +216,43 @@ export default async function TelaAcessos({ sistema }: { sistema: Sistema }) {
               para quem ainda não tem acesso registrado, aparece em cinza a data do último login.
             </p>
           </>
+        )}
+      </Quadro>
+
+      {/* 4.11.0: senhas erradas na tela de login (Performance e Monitorias). */}
+      <Quadro titulo="Tentativas de login erradas"
+              subtitulo="Últimos 7 dias. Depois de 1 erro a tela pede uma verificação; com 5 erros seguidos o acesso daquele usuário, naquele endereço, fica bloqueado por 15 minutos.">
+        {listaErradas.length === 0 ? (
+          <Vazio>Nenhuma senha errada nos últimos 7 dias.</Vazio>
+        ) : (
+          <Tabela noQuadro>
+            <thead>
+              <tr><Th>Usuário digitado</Th><Th>Endereço de rede</Th><Th className="text-right">Erros</Th><Th>Último erro</Th><Th>Situação</Th></tr>
+            </thead>
+            <tbody>
+              {listaErradas.map((g) => {
+                const q = noBrasil(g.ultimo);
+                const bloqueadoAgora = g.seguidos >= 5 && Date.parse(g.ultimo) + 15 * 60_000 > Date.now();
+                return (
+                  <tr key={`${g.chave}|${g.ip}`}>
+                    <Td className="font-medium text-slate-900">{g.chave.replace(/@painel\.interno$/, '')}</Td>
+                    <Td className="text-slate-600 tabular-nums">{g.ip}</Td>
+                    <Td className="text-right tabular-nums">{g.erros}</Td>
+                    <Td className="whitespace-nowrap">{formatarData(q.dia)}, {q.hora}</Td>
+                    <Td>
+                      {bloqueadoAgora
+                        ? <span className="rounded-full bg-rose-500/10 px-2 py-0.5 text-xs font-semibold text-rose-700">bloqueado agora</span>
+                        : g.bloqueou
+                          ? <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-800">chegou a bloquear</span>
+                          : g.seguidos === 0
+                            ? <span className="text-xs text-slate-500">entrou depois</span>
+                            : <span className="text-xs text-slate-500">{g.seguidos} erro{g.seguidos > 1 ? 's' : ''} seguido{g.seguidos > 1 ? 's' : ''}</span>}
+                    </Td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </Tabela>
         )}
       </Quadro>
     </div>
