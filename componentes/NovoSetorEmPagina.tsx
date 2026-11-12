@@ -57,6 +57,8 @@ export default function NovoSetorEmPagina({
   const [passo, setPasso] = useState(0); // 0 = abertura; P_CRIADO = criado
   const [direcao, setDirecao] = useState<'dir' | 'esq'>('dir');
   const [nome, setNome] = useState('');
+  // 4.8.1: como o Hub escreve o setor na coluna "Setor" (ex.: "Telecom").
+  const [hubDoSetor, setHubDoSetor] = useState('');
   const [origem, setOrigem] = useState(setores[0] ? String(setores[0].id) : '');
   const regrasPadrao = (): Regras => ({ copiar: comRegras[0] ? String(comRegras[0].id) : '', tme: true });
   const [filas, setFilas] = useState<FilaNova[]>([{ nome: '', hub: '', regras: regrasPadrao() }]);
@@ -248,6 +250,13 @@ export default function NovoSetorEmPagina({
     if (error) { setOcupado(false); setErro(await mensagemDoErro(error)); return; }
     const setorId = Number(id);
     const falhas: string[] = [];
+    {
+      const nomesNoHub = separar(hubDoSetor);
+      if (nomesNoHub.length) {
+        const { error: eh } = await db.from('setores').update({ nomes_no_hub: nomesNoHub }).eq('id', setorId);
+        if (eh) falhas.push(`nome no Hub: ${await mensagemDoErro(eh)}`);
+      }
+    }
     // As filas na ordem do passo 3 (null = não criada), para as métricas do passo 4.
     const criadas: (FilaReal | null)[] = [];
     for (const [i, f] of filasValidas.entries()) {
@@ -439,6 +448,13 @@ export default function NovoSetorEmPagina({
                   <input autoFocus value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex.: Conexão Energia"
                          onKeyDown={(e) => { if (e.key === 'Enter') { const v = validar(); if (v) setErro(v); else irPara(2); } }}
                          className={`${campo} py-3.5 text-xl font-semibold`} />
+                </label>
+                <label className="mt-5 block"><span className="mb-1.5 block text-xs font-semibold text-slate-600">Nome do setor no Hub</span>
+                  <input value={hubDoSetor} onChange={(e) => setHubDoSetor(e.target.value)} placeholder="Ex.: Energia" className={campo} />
+                  <span className="mt-1 block text-xs text-slate-500">
+                    Como o relatório do Hub escreve a equipe na coluna "Setor" (o Telecom vem como "Telecom"). Com ele, a
+                    importação reconhece o setor e usa a coluna Fila. Vários: separe por vírgula. Dá para mudar depois em Setores e filas.
+                  </span>
                 </label>
               </>
             )}

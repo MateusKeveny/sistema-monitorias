@@ -46,7 +46,7 @@ export default function SetoresECanais({ setores, canais, vistos, monitorias = {
   const [editado, setRascunho] = useState<Record<string, string>>({});
   const rascunho: Record<string, string> = {
     ...Object.fromEntries([
-      ...setores.map((s) => [`s${s.id}`, s.nome]),
+      ...setores.flatMap((s) => [[`s${s.id}`, s.nome], [`n${s.id}`, (s.nomes_no_hub ?? []).join(', ')]]),
       ...canais.flatMap((c) => [[`c${c.id}`, c.nome], [`h${c.id}`, c.nomes_no_hub.join(', ')]]),
     ]),
     ...editado,
@@ -58,7 +58,8 @@ export default function SetoresECanais({ setores, canais, vistos, monitorias = {
   const [criando, setCriando] = useState(false);
 
   const lista = (t: string) => [...new Set(t.split(',').map((x) => x.trim()).filter(Boolean))];
-  const mudou = setores.some((s) => rascunho[`s${s.id}`].trim() !== s.nome)
+  const mudou = setores.some((s) => rascunho[`s${s.id}`].trim() !== s.nome
+      || lista(rascunho[`n${s.id}`]).join('|') !== (s.nomes_no_hub ?? []).join('|'))
     || canais.some((c) => rascunho[`c${c.id}`].trim() !== c.nome
       || lista(rascunho[`h${c.id}`]).join('|') !== c.nomes_no_hub.join('|'));
 
@@ -83,8 +84,9 @@ export default function SetoresECanais({ setores, canais, vistos, monitorias = {
     const db = criarClienteNavegador();
     for (const s of setores) {
       const nome = rascunho[`s${s.id}`].trim();
-      if (nome === s.nome) continue;
-      const { error } = await db.from('setores').update({ nome }).eq('id', s.id);
+      const nomesNoHub = lista(rascunho[`n${s.id}`]);
+      if (nome === s.nome && nomesNoHub.join('|') === (s.nomes_no_hub ?? []).join('|')) continue;
+      const { error } = await db.from('setores').update({ nome, nomes_no_hub: nomesNoHub }).eq('id', s.id);
       if (error) { setOcupado(false); setErro(await mensagemDoErro(error)); return; }
     }
     for (const c of canais) {
@@ -267,6 +269,11 @@ export default function SetoresECanais({ setores, canais, vistos, monitorias = {
                   <input value={rascunho[`s${s.id}`]} disabled={ocupado} aria-label="Nome do setor"
                          onChange={(e) => setRascunho((r) => ({ ...r, [`s${s.id}`]: e.target.value }))}
                          className={`${entrada} w-64 font-semibold`} />
+                  {/* 4.8.1: como o Hub escreve o setor na coluna "Setor" (ex.: "Telecom"). */}
+                  <input value={rascunho[`n${s.id}`]} disabled={ocupado} aria-label="Nome do setor no Hub"
+                         placeholder="Nome no Hub (coluna Setor)" title="Como o relatório do Hub escreve este setor na coluna Setor. Vários: separe por vírgula."
+                         onChange={(e) => setRascunho((r) => ({ ...r, [`n${s.id}`]: e.target.value }))}
+                         className={`${entrada} w-56`} />
                   {administrador && historicos[s.id] && (
                     <AcoesDoSetor setor={{ id: s.id, nome: s.nome, ativo: s.ativo !== false }} historico={historicos[s.id]} />
                   )}

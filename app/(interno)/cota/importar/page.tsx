@@ -39,7 +39,8 @@ export default async function ImportarAvaliacoes({
   const db = await criarClienteServidor();
 
   // Cada um importa só o seu (3.0): o setor do seletor do menu.
-  const { data: setoresDb } = await db.from('setores').select('id, nome').eq('ativo', true).order('ordem');
+  // select('*'): inclui nomes_no_hub (migração 109) sem quebrar antes dela.
+  const { data: setoresDb } = await db.from('setores').select('*').eq('ativo', true).order('ordem');
   const escolhido = await setorDoCookie();
   const setorId = ((setoresDb ?? []) as { id: number }[]).find((s) => String(s.id) === escolhido)?.id
     ?? (setoresDb?.[0] as { id: number } | undefined)?.id ?? 1;
@@ -212,7 +213,8 @@ export default async function ImportarAvaliacoes({
 
       <ImportadorAvaliacoes pessoas={lista} importadoPor={perfil.id} canais={(canais ?? []) as Canal[]}
                             setorId={setorId} setorDe={Object.fromEntries(setorDe)}
-                            nomesDosSetores={((setoresDb ?? []) as { nome: string }[]).map((s) => s.nome)} />
+                            nomesDosSetores={((setoresDb ?? []) as { nome: string; nomes_no_hub?: string[] }[])
+                              .flatMap((s) => [s.nome, ...(s.nomes_no_hub ?? [])])} />
       <NotasGuardadas notas={(guardadas ?? []) as NotaGuardada[]}
                       pessoas={lista.filter((p) => p.ativo && !p.desligado_em && (setorDe.get(p.id) ?? 1) === setorId)
                         .map((p) => ({ id: p.id, nome: p.nome }))} />

@@ -13,6 +13,8 @@ export type Setor = {
   monitorias?: boolean; regra_monitoria?: string | null;
   /** Quantas monitorias por semana (Monitorias 6.0, migração 89). */
   monitorias_por_semana?: number;
+  /** Como o setor aparece na coluna "Setor" do relatório do Hub (4.8.1, migração 109). */
+  nomes_no_hub?: string[];
 };
 export type Canal = {
   id: number; setor_id: number; nome: string; apelido: string | null;

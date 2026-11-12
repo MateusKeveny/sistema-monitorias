@@ -35,6 +35,21 @@ para o Performance.
 
 ---
 
+## Performance 4.9.0
+
+Nome do setor no Hub. Migração 109.
+
+- **Setores e filas:** cada setor ganha o campo "Nome no Hub (coluna Setor)":
+  como o relatório do Hub escreve a equipe na coluna Setor (o Telecom vem
+  como "Telecom", já preenchido). A importação reconhece o setor por esses
+  nomes, além da palavra do nome do setor (4.7.1), e usa a coluna Fila.
+- **Criar setor:** o passo "Nome" pede também o nome do setor no Hub.
+- **Criar setor copiando o Expansão (migração 109):** as faixas e os pesos de
+  chamados (Elo, SLA) ficam de fora da cópia — chamados são só do Expansão, e
+  o setor novo nascia com uma régua de chamados sem chamado nenhum.
+
+---
+
 ## Performance 4.8.0
 
 Nome do Hub vinculado direto na importação. Sem migração.
