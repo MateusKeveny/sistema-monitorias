@@ -35,6 +35,23 @@ para o Performance.
 
 ---
 
+## Banco: migração 111 (13/11/2026) · sem mudança de site
+
+Teste de acesso por dentro, simulando cada papel logado.
+
+- **Papel de diretoria:** só o administrador dá ou tira. Antes, um gestor
+  conseguia mudar o próprio papel para "diretoria" (a CEO, que vê e aprova a
+  cota de todos os setores). E ninguém muda mais o próprio nível de acesso.
+- **Anotações do gestor:** cada gestor lê as do próprio setor; antes, o gestor
+  do Telecom lia as do Expansão.
+- **Qualidade** (decisão do gestor): deixa de ver, de outras pessoas, o valor
+  em R$ do pagamento, os desligamentos, os registros privados e as férias;
+  continua vendo notas, C-SAT, volume, pontos e monitorias da equipe.
+- Cada pessoa passa a ver as próprias férias (o quadro "Para bater a meta" do
+  atendente já as procurava).
+
+---
+
 ## Performance 4.11.0 · Monitorias 6.5.0
 
 Proteção do login. Migração 110.
