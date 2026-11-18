@@ -35,6 +35,15 @@ para o Performance.
 
 ---
 
+## Performance 4.13.1 · Monitorias 6.6.1 · Agenda 1.9.2
+
+Correção de segurança, sem mudança de tela. Sem migração.
+
+- Next.js 16.4.2 → 16.4.6 e @opennextjs/cloudflare 1.20.13 → 1.20.17:
+  fecham duas falhas do Next (vazamento de cache entre parâmetros de rota com
+  `use cache`, não usado aqui) e uma na source-map-js. `npm audit` zerado.
+- O build deixou de falhar na primeira tentativa pelo aviso de segurança.
+
 ## Agenda da Gestão 1.9.1
 
 Correção, sem mudança de tela. Sem migração.
