@@ -35,6 +35,15 @@ para o Performance.
 
 ---
 
+## Monitorias 6.6.0
+
+Menu lateral com grupos retráteis, o mesmo do Performance 4.13.0. Sem migração.
+
+- Os grupos (Registrar, Administrar) abrem e fecham com um clique; o da página
+  aberta fica sempre à vista, e os que a pessoa abriu continuam abertos
+  (guardado no navegador). Grupo com um item só vira link solto.
+
+---
 ## Performance 4.13.0 (inclui a 4.12.0, que não chegou a ser publicada)
 
 Menus reorganizados, Regras da cota numa tela só, diário de bordo por cargo e
