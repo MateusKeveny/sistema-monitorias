@@ -30,4 +30,4 @@ export const VERSAO_MONITORIAS: string = pacote.version;
 export const VERSAO_COTA = '4.13.0';
 
 /** Agenda da Gestão (migração 59), terceiro site do mesmo código. */
-export const VERSAO_AGENDA = '1.9.0';
+export const VERSAO_AGENDA = '1.9.1';

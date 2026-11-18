@@ -35,6 +35,16 @@ para o Performance.
 
 ---
 
+## Agenda da Gestão 1.9.1
+
+Correção, sem mudança de tela. Sem migração.
+
+- Republicada com o pacote limpo: a versão anterior levava junto, do arquivo
+  de configuração local, a chave secreta do banco do Performance (já trocada e
+  apagada em 17/11) e a senha padrão. Agora elas ficam em
+  `.env.scripts.local`, fora do que é publicado.
+
+---
 ## Monitorias 6.6.0
 
 Menu lateral com grupos retráteis, o mesmo do Performance 4.13.0. Sem migração.
