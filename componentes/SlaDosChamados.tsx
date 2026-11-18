@@ -77,7 +77,7 @@ export default function SlaDosChamados({ regras, pesosBase, nomeBase }: {
     const falha = await gravarSla(criarClienteNavegador(), regras, cortesEmHoras as number[], unidades);
     setOcupado(false);
     if (falha) { setErro(falha); return; }
-    setAviso('SLA salvo. O mês em aberto é recalculado com as faixas novas; os meses fechados não mudam. Confira os pesos das faixas novas em Pesos por cargo.');
+    setAviso('SLA salvo. O mês em aberto é recalculado com as faixas novas; os meses fechados não mudam. Confira os pontos das faixas novas logo abaixo.');
     router.refresh();
   }
 
@@ -95,7 +95,7 @@ export default function SlaDosChamados({ regras, pesosBase, nomeBase }: {
       <p className="mt-0.5 text-sm text-slate-500">
         O tempo de cada chamado resolvido escolhe a faixa. A última faixa é o fora do prazo: vai para a Fila de atrasos e só
         conta quando a gestão mantém o desconto. Cada limite pode ser em horas ou em dias úteis. Com a escala
-        ligada (Metas e métricas › Escala e feriados), o tempo conta só dentro do expediente de quem tratou: horas úteis
+        ligada (Escala e feriados, logo abaixo), o tempo conta só dentro do expediente de quem tratou: horas úteis
         para limite em horas e expedientes para limite em dias. Quem não tem escala segue o tempo do Elo (dia útil de 24 h).
       </p>
 

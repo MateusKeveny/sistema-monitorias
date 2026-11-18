@@ -183,7 +183,7 @@ export function MetricasPorFilaEditor({ cfg, mudar, ocupado = false, assistente 
       </div>
       <p className="text-xs text-slate-500">
         <b>Geral</b>: a régua do setor, igual em todas as filas que a escolhem (o nome não leva a fila). <b>Própria</b>: uma régua só da fila
-        (o nome leva a fila, ex.: &quot;TME até 15 min · Logística&quot;). Os pontos de cada faixa por cargo ficam em Pesos por cargo ou na planilha.
+        (o nome leva a fila, ex.: &quot;TME até 15 min · Logística&quot;). Os pontos de cada faixa por cargo ficam em Regras da cota ou na planilha.
       </p>
 
       {aberta && (() => {
@@ -248,12 +248,12 @@ export default function MetricasPorFila({ setorId, setorNome, filas, regras }: {
     if (problemas.length) { setErro(problemas.join(' · ')); return; }
     if (!confirm(`Gravar as métricas de ${setorNome}?\n\n${mudancas.join('\n')}\n\n`
       + 'Vale já para o mês aberto (os meses fechados guardam o que foi fechado). Faixa nova começa sem pontos: '
-      + 'defina em Pesos por cargo ou na planilha.')) return;
+      + 'defina em Regras da cota ou na planilha.')) return;
     setOcupado(true); setErro(null); setAviso(null);
     const r = await aplicarMetricas(criarClienteNavegador(), setorId, cfg, filas);
     setOcupado(false);
     if (r.falhas.length) setErro(`Parte não foi gravada: ${r.falhas.join('; ')}`);
-    else setAviso(`Gravado: ${r.criadas} faixa(s) nova(s), ${r.desligadas} desligada(s), ${r.filasMudadas} fila(s) ajustada(s). Agora defina os pontos em Pesos por cargo.`);
+    else setAviso(`Gravado: ${r.criadas} faixa(s) nova(s), ${r.desligadas} desligada(s), ${r.filasMudadas} fila(s) ajustada(s). Agora defina os pontos em Regras da cota.`);
     router.refresh();
   }
 

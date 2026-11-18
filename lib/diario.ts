@@ -30,7 +30,17 @@ export type RegistroDiario = {
   decidido_em: string | null;
   comentario_decisao: string | null;
   criado_em: string;
+  /** "Mudar tipo" do gestor (migração 112): o tipo de antes, quem mudou e quando. */
+  tipo_anterior?: TipoRegistro | null;
+  tipo_mudado_por?: string | null;
+  tipo_mudado_em?: string | null;
 };
+
+/** Só Pleno, analistas e gestão registram (migração 112, função registra_processo_diario). */
+export const TIPOS_SO_PLENO_E_ACIMA: TipoRegistro[] = ['processo', 'treinamento'];
+
+/** Para onde o gestor pode mudar um registro (migração 112): todos menos problema. */
+export const TIPOS_PARA_MUDAR: TipoRegistro[] = ['processo', 'treinamento', 'autorizacao', 'excecao'];
 
 export const TIPOS: { chave: TipoRegistro; rotulo: string; dica: string }[] = [
   { chave: 'processo', rotulo: 'Processo novo', dica: 'mudou como se faz' },

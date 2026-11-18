@@ -197,7 +197,7 @@ export default function PainelRegras({ regras, setorId = 1 }: { regras: RegraCot
     setOcupado(false);
     setNova({ rotulo: '', peso: '', valorManual: false });
     setAviso(`"${rotulo}" criada. Agora marque em quais cargos ela pontua, `
-      + 'no painel de cargos acima — sem peso no cargo, ela não aparece nos lançamentos.');
+      + 'nos cartões dos cargos, acima, — sem pontos no cargo, ela não aparece nos lançamentos.');
     router.refresh();
   }
 
@@ -206,7 +206,7 @@ export default function PainelRegras({ regras, setorId = 1 }: { regras: RegraCot
   return (
     <Quadro
       titulo={`Nomes das métricas (${regras.length})`}
-      subtitulo="O nome que aparece em toda tela. O peso é por cargo, na tabela de pesos."
+      subtitulo="O nome que aparece em toda tela. Os pontos ficam nos blocos acima e nas outras abas."
       acao={
         <button type="button" onClick={salvar} disabled={ocupado} className={botaoPrimario}>
           {ocupado ? 'Salvando…' : 'Salvar métricas'}
@@ -309,7 +309,7 @@ export default function PainelRegras({ regras, setorId = 1 }: { regras: RegraCot
       <p className="mt-2 text-xs text-slate-500">
         A métrica nova entra por <strong>lançamento manual</strong> — as automáticas
         (volume, C-SAT, TME, monitoria) vêm de cálculo no banco. Depois de criada, marque
-        na tabela de pesos em quais cargos ela pontua e com que peso; sem isso ela não
+        nos cartões dos cargos, acima, em quais cargos ela pontua e com quantos pontos (ou crie a demanda direto no cartão do cargo); sem isso ela não
         aparece na tela de lançamentos. Marque “o gestor digita os pontos” quando o valor
         não for quantidade × peso, como no Atestado.
       </p>

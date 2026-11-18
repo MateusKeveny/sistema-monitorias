@@ -19,7 +19,13 @@ export type Item = {
   href: string; rotulo: string; papeis: Perfil['papel'][]; grupo?: string;
   /** Nome do item para o atendente, quando é diferente (ex.: "Meu C-SAT"). */
   rotuloOperador?: string;
+  /** Outras páginas que acendem este item (4.13.0: o Histórico é uma aba do Extrato). */
+  tambem?: string[];
 };
+
+/** A página está neste item: o endereço dele, uma subpágina ou uma das páginas de `tambem`. */
+export const casaCom = (i: Item, caminho: string) => [i.href, ...(i.tambem ?? [])].some((h) =>
+  h === '/' || h === '/cota' ? caminho === h : caminho === h || caminho.startsWith(`${h}/`));
 
 /** O nome do item para quem está vendo. */
 export const rotuloDo = (i: Item, papel: Perfil['papel']) => (papel === 'operador' && i.rotuloOperador) || i.rotulo;
@@ -47,9 +53,9 @@ export const ITENS: Record<Sistema, Item[]> = {
     // Cruzeiro (4.0.0): ranking por setor, somando os meses escolhidos (só cotas aprovadas).
     // 4.4.0: o nome diz o que é ("Ranking"), com o nome da campanha entre parênteses.
     { href: '/cota/cruzeiro', rotulo: 'Ranking (Cruzeiro)', papeis: ['diretoria'], grupo: 'Acompanhar' },
-    { href: '/cota/extrato', rotulo: 'Extrato', papeis: ['gestor', 'qualidade', 'operador'], grupo: 'Acompanhar' },
+    // 4.13.0: o Histórico (a pessoa mês a mês) virou aba do Extrato (a pessoa no mês).
+    { href: '/cota/extrato', rotulo: 'Extrato', papeis: ['gestor', 'qualidade', 'operador'], grupo: 'Acompanhar', tambem: ['/cota/historico'] },
     { href: '/cota/comparativo', rotulo: 'Comparativo', papeis: ['gestor', 'qualidade', 'operador'], grupo: 'Acompanhar' },
-    { href: '/cota/historico', rotulo: 'Histórico', papeis: ['gestor', 'qualidade', 'operador'], grupo: 'Acompanhar' },
     { href: '/cota/cruzeiro', rotulo: 'Ranking (Cruzeiro)', papeis: ['gestor'], grupo: 'Acompanhar' },
     { href: '/cota/monitorias', rotulo: 'Monitorias', papeis: ['gestor', 'qualidade', 'operador'], grupo: 'Qualidade' },
     // As avaliações de 1 a 5, com o protocolo para revisar (2.10.0).
@@ -59,17 +65,17 @@ export const ITENS: Record<Sistema, Item[]> = {
     // 4.4.0: o ciclo na ordem em que o mês acontece — importar, lançar, simular, fechar.
     { href: '/cota/importar', rotulo: 'Importar', papeis: ['gestor'], grupo: 'Ciclo do mês' },
     { href: '/cota/lancamentos', rotulo: 'Lançamentos', papeis: ['gestor'], grupo: 'Ciclo do mês' },
+    // Desligar o TME de uma semana, com justificativa (migração 66). 4.13.0: é
+    // operação do mês, não regra — saiu de "Metas e métricas".
+    { href: '/cota/metricas', rotulo: 'Ajustes da semana', papeis: ['gestor'], grupo: 'Ciclo do mês' },
     // Cenários sobre o mês aberto, sem gravar (1.53.0): a prévia antes de fechar.
     { href: '/cota/simulacao', rotulo: 'Simulação', papeis: ['gestor'], grupo: 'Ciclo do mês' },
     { href: '/cota/fechamento', rotulo: 'Fechamento', papeis: ['gestor'], grupo: 'Ciclo do mês' },
-    // Metas e métricas (4.4.0): as regras da cota, que eram abas da Configuração.
-    { href: '/cota/metas', rotulo: 'Pesos por cargo', papeis: ['gestor'], grupo: 'Metas e métricas' },
-    { href: '/cota/metricas-e-faixas', rotulo: 'Métricas e faixas', papeis: ['gestor'], grupo: 'Metas e métricas' },
-    // Desligar o TME de uma semana, com justificativa (migração 66); era "Métricas da semana".
-    { href: '/cota/metricas', rotulo: 'Ajustes da semana', papeis: ['gestor'], grupo: 'Metas e métricas' },
-    // Escala de cada pessoa e feriados do setor, para o SLA dos chamados (migração 107).
-    { href: '/cota/escala', rotulo: 'Escala e feriados', papeis: ['gestor'], grupo: 'Metas e métricas' },
-    { href: '/cota/alteracoes', rotulo: 'Histórico de alterações', papeis: ['gestor'], grupo: 'Metas e métricas' },
+    // Regras da cota (4.13.0): numa tela só, em abas, o que eram cinco itens de
+    // "Metas e métricas" — pontos e faixas lado a lado, SLA com a escala e o
+    // histórico. Os endereços antigos redirecionam para a aba certa.
+    { href: '/cota/metas', rotulo: 'Regras da cota', papeis: ['gestor'],
+      tambem: ['/cota/metricas-e-faixas', '/cota/escala', '/cota/alteracoes'] },
     // Pessoas, logins, papéis e setores num lugar só (3.0): junta Atendentes e Acessos.
     { href: '/cota/usuarios', rotulo: 'Usuários e setores', papeis: ['gestor'], grupo: 'Equipe' },
     // Férias: quem vê é decidido por ve_ferias (cargo Pleno ou Analista conta), não só pelo papel.
@@ -115,11 +121,13 @@ export default function Navegacao({
 
   // A raiz de cada sistema só fica ativa nela mesma, senão acenderia junto com
   // todas as páginas de dentro.
-  const ativo = (href: string) =>
-    // Igual ao MenuLateral (4.4.0): o endereço ou uma subpágina dele. Só
-    // startsWith acendia "Ajustes da semana" (/cota/metricas) dentro de
-    // /cota/metricas-e-faixas.
-    href === '/' || href === '/cota' ? caminho === href : caminho === href || caminho.startsWith(`${href}/`);
+  // Igual ao MenuLateral (4.4.0): o endereço ou uma subpágina dele. Só
+  // startsWith acendia "Ajustes da semana" (/cota/metricas) dentro de
+  // /cota/metricas-e-faixas. 4.13.0: e as páginas de `tambem`.
+  const ativo = (href: string) => {
+    const item = ITENS[sistema].find((i) => i.href === href);
+    return item ? casaCom(item, caminho) : caminho === href;
+  };
 
   // No Performance (1.15.0) o item ativo é marcado por um traço que desliza
   // até ele, em vez do fundo verde. As Monitorias ficam como estavam: são

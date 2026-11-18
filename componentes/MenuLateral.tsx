@@ -5,12 +5,15 @@ import { usePathname, useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import BotaoTema from '@/componentes/BotaoTema';
 import BotaoReportar from '@/componentes/BotaoReportar';
-import { ITENS, rotuloDo, type Item } from '@/componentes/Navegacao';
+import { ITENS, casaCom, rotuloDo, type Item } from '@/componentes/Navegacao';
 import { ASSINATURA, NOME_SISTEMA, type SistemaDoPainel as Sistema } from '@/lib/sistema';
 import SinoDeAvisos from '@/componentes/SinoDeAvisos';
 import SeletorDeSetor from '@/componentes/SeletorDeSetor';
 import Novidades from '@/componentes/Novidades';
-import { Suspense } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+
+/** Onde ficam os grupos que a pessoa deixou abertos (só neste navegador). */
+const CHAVE_ABERTOS = 'menu-grupos-abertos';
 import { NOMES_PAPEL, type Perfil } from '@/lib/tipos';
 import VoltarApresentacaoAoInicio from '@/componentes/VoltarApresentacaoAoInicio';
 
@@ -104,14 +107,62 @@ export default function MenuLateral({ perfil, versao, sistema, avisosReporte = 0
   // Vence o endereço mais específico que casa com a página. Sem isso,
   // "/monitorias" e "/monitorias/nova" acendiam juntos — duas linhas acesas no
   // menu parecem defeito.
-  const dentro = (href: string) =>
-    href === '/' || href === '/cota' ? caminho === href : caminho === href || caminho.startsWith(`${href}/`);
-  const aceso = visiveis.filter((i) => dentro(i.href))
+  const aceso = visiveis.filter((i) => casaCom(i, caminho))
     .sort((a, b) => b.href.length - a.href.length)[0]?.href;
 
   const grupoDe = (i: Item) => i.grupo ?? (i.href === '/relatorios' ? 'Analisar' : undefined);
 
-  let grupoAnterior: string | undefined;
+  // Grupos retráteis (4.13.0): na ordem da lista, cada grupo entra onde aparece
+  // o primeiro item dele. Grupo de um item só (para quem vê) vira link solto.
+  const entradas: ({ item: Item } | { grupo: string; itens: Item[] })[] = [];
+  for (const item of visiveis) {
+    const g = grupoDe(item);
+    const doGrupo = g ? visiveis.filter((i) => grupoDe(i) === g) : [];
+    if (doGrupo.length < 2) entradas.push({ item });
+    else if (doGrupo[0] === item) entradas.push({ grupo: g!, itens: doGrupo });
+  }
+
+  // Abertos: os que a pessoa abriu (guardados no navegador) e, sempre, o da
+  // página atual — fechado, ninguém saberia onde está.
+  const [abertos, setAbertos] = useState<string[]>([]);
+  useEffect(() => {
+    try { setAbertos(JSON.parse(localStorage.getItem(CHAVE_ABERTOS) ?? '[]')); } catch { /* sem armazenamento: tudo fechado */ }
+  }, []);
+  function alternar(grupo: string) {
+    setAbertos((a) => {
+      const n = a.includes(grupo) ? a.filter((g) => g !== grupo) : [...a, grupo];
+      try { localStorage.setItem(CHAVE_ABERTOS, JSON.stringify(n)); } catch { /* idem */ }
+      return n;
+    });
+  }
+
+  const linha = (item: Item, dentroDeGrupo = false) => {
+    const atual = aceso === item.href;
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        aria-current={atual ? 'page' : undefined}
+        className={`relative flex items-center gap-2.5 rounded-lg py-1.5 text-sm font-medium transition-colors ${
+          dentroDeGrupo ? 'pl-4 pr-2.5' : 'px-2.5'} ${
+          atual ? 'bg-marca-50 text-slate-900' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+      >
+        {atual && <span aria-hidden className="absolute -left-3.5 inset-y-2 w-[3px] rounded-r bg-marca-600" />}
+        <svg aria-hidden viewBox="0 0 20 20" className="h-[18px] w-[18px] shrink-0 opacity-80" fill="none"
+             stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          {ICONES[item.href]}
+        </svg>
+        {rotuloDo(item, perfil.papel)}
+        {/* Exclusões esperando decisão: o quadro só existe no Painel, e
+            sem o contador o gestor não saberia que chegou pedido. */}
+        {item.href === '/' && pendentes > 0 && (
+          <span className="ml-auto rounded-full bg-amber-100 px-1.5 text-xs font-semibold tabular-nums text-amber-900">
+            {pendentes}
+          </span>
+        )}
+      </Link>
+    );
+  };
 
   return (
     // Só a lista rola; o topo (sistema, sino, setor) e o rodapé (pessoa, sair, novidades) ficam sempre à vista (3.0).
@@ -126,34 +177,23 @@ export default function MenuLateral({ perfil, versao, sistema, avisosReporte = 0
       <Suspense><SeletorDeSetor setores={setores} atual={setorAtual} /></Suspense>
 
       <nav className="-mx-1 flex min-h-0 flex-1 flex-col gap-px overflow-y-auto px-1" aria-label="Menu">
-        {visiveis.map((item) => {
-          const grupo = grupoDe(item);
-          const titulo = grupo && grupo !== grupoAnterior ? grupo : null;
-          grupoAnterior = grupo;
-          const atual = aceso === item.href;
+        {entradas.map((e) => {
+          if ('item' in e) return linha(e.item);
+          const temAtual = e.itens.some((i) => i.href === aceso);
+          const aberto = temAtual || abertos.includes(e.grupo);
           return (
-            <div key={item.href}>
-              {titulo && <p className="mx-2.5 mb-0.5 mt-3 text-xs text-slate-500">{titulo}</p>}
-              <Link
-                href={item.href}
-                aria-current={atual ? 'page' : undefined}
-                className={`relative flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors ${
-                  atual ? 'bg-marca-50 text-slate-900' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
-              >
-                {atual && <span aria-hidden className="absolute -left-3.5 inset-y-2 w-[3px] rounded-r bg-marca-600" />}
-                <svg aria-hidden viewBox="0 0 20 20" className="h-[18px] w-[18px] shrink-0 opacity-80" fill="none"
-                     stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                  {ICONES[item.href]}
+            <div key={e.grupo} className="mt-1">
+              <button type="button" aria-expanded={aberto} disabled={temAtual} onClick={() => alternar(e.grupo)}
+                      title={temAtual ? 'O grupo da página aberta fica sempre à vista' : undefined}
+                      className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold uppercase
+                                  tracking-wider transition-colors disabled:cursor-default ${
+                                  temAtual ? 'text-slate-700' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-700'}`}>
+                <span className="flex-1">{e.grupo}</span>
+                <svg aria-hidden viewBox="0 0 12 12" className={`h-3 w-3 transition-transform ${aberto ? 'rotate-90' : ''}`}>
+                  <path d="M4.5 3 7.5 6 4.5 9" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-                {rotuloDo(item, perfil.papel)}
-                {/* Exclusões esperando decisão: o quadro só existe no Painel, e
-                    sem o contador o gestor não saberia que chegou pedido. */}
-                {item.href === '/' && pendentes > 0 && (
-                  <span className="ml-auto rounded-full bg-amber-100 px-1.5 text-xs font-semibold tabular-nums text-amber-900">
-                    {pendentes}
-                  </span>
-                )}
-              </Link>
+              </button>
+              {aberto && <div className="flex flex-col gap-px pb-1">{e.itens.map((i) => linha(i, true))}</div>}
             </div>
           );
         })}

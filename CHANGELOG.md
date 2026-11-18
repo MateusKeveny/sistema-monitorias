@@ -35,6 +35,40 @@ para o Performance.
 
 ---
 
+## Performance 4.13.0 (inclui a 4.12.0, que não chegou a ser publicada)
+
+Menus reorganizados, Regras da cota numa tela só, diário de bordo por cargo e
+pontuação única nos atendimentos. Migração 112 (já aplicada em 17/11).
+
+- **Menu lateral com grupos retráteis:** cada grupo abre e fecha com um clique;
+  o da página aberta fica sempre à vista, e os que a pessoa abriu continuam
+  abertos (guardado no navegador). O menu do gestor passou de 23 para 17 itens.
+- **Regras da cota** (`/cota/metas`), no lugar de Metas e pontuação, Métricas e
+  faixas, Escala e feriados e Histórico de alterações, em abas:
+  - *Atendimento:* a faixa de cada métrica (minutos, %) na mesma linha dos
+    pontos, salvas juntas; "O que cada fila mede" recolhido embaixo.
+  - *Chamados:* limites do SLA, os pontos de cada faixa e, recolhidos, a escala
+    e os feriados.
+  - *Demandas e cargos:* demandas comuns (com o corte da monitoria), cartões dos
+    cargos (meta, média, demandas só dele, "+ Demanda"), nomes das métricas e a
+    planilha em Excel.
+  - *Histórico:* o que mudou, por quem e por quê.
+  Os endereços antigos levam à aba certa.
+- **Pontuação única nos atendimentos** (migração 112): finalizado, TME, C-SAT,
+  notas e atendimentos lançados à mão com um valor só para todos os cargos que
+  atendem; chamados com o mesmo valor para todos que tratam.
+- **Ajustes da semana** foi para o grupo Ciclo do mês.
+- **Extrato** ganhou as abas "No mês" e "Mês a mês (fechados)" (o antigo
+  Histórico, que saiu do menu).
+- **Diário de bordo:** processos novos e treinamentos só registrados por Pleno,
+  analistas e gestão (migração 112); botão "Mudar tipo" para o gestor realocar
+  o que já foi registrado; aba **Configurar** (quem vê, subcategorias), que
+  antes ficava na Configuração.
+- **Configuração** ficou só com os avisos no Teams.
+- Scripts de manutenção leem a chave secreta de `.env.scripts.local`, fora do
+  pacote publicado.
+
+---
 ## Banco: migração 111 (13/11/2026) · sem mudança de site
 
 Teste de acesso por dentro, simulando cada papel logado.

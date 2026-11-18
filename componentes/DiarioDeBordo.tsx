@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import {
   AUTORIZADORES, COR_SITUACAO, COR_TIPO, ROTULO_QUEM, ROTULO_SITUACAO, ROTULO_TIPO, TIPOS,
+  TIPOS_PARA_MUDAR, TIPOS_SO_PLENO_E_ACIMA,
   juntarOutro, palavrasEncontradas, separarOutro, validade, type LeituraDiario, type RenovacaoDiario, type Subcategoria, type QuemAutorizou, type RegistroDiario, type TipoRegistro,
 } from '@/lib/diario';
 import { mensagemDoErro } from '@/lib/erro-amigavel';
@@ -47,8 +48,10 @@ const vazio = {
  */
 export default function DiarioDeBordo({
   registros, renovacoes, leituras, subcategorias, nomes, pessoaId, ehGestor, aprova, concluiDireto, hoje, filtroInicial,
-  tiposDaEquipe = ['processo', 'treinamento', 'autorizacao', 'excecao'],
+  tiposDaEquipe = ['processo', 'treinamento', 'autorizacao', 'excecao'], registraProcesso = true,
 }: {
+  /** Pleno, analistas e gestão: registram processo novo e treinamento (migração 112). */
+  registraProcesso?: boolean;
   registros: RegistroDiario[];
   /** Renovações de validade, da mais recente à mais antiga. */
   renovacoes: RenovacaoDiario[];
@@ -81,6 +84,8 @@ export default function DiarioDeBordo({
   const [devolvendo, setDevolvendo] = useState<{ id: string; texto: string } | null>(null);
   const [renovando, setRenovando] = useState<{ id: string; ate: string } | null>(null);
   const [vendoLeitura, setVendoLeitura] = useState<string | null>(null);
+  // "Mudar tipo" do gestor (migração 112).
+  const [mudando, setMudando] = useState<{ id: string; tipo: TipoRegistro; protocolo: string; quem: QuemAutorizou | ''; nome: string } | null>(null);
   const leiturasDe = (id: string) => leituras.filter((l) => l.registro_id === id);
   const comLeituraPendente = new Set(leituras.filter((l) => !l.ciente_em).map((l) => l.registro_id));
 
@@ -179,6 +184,23 @@ export default function DiarioDeBordo({
     router.refresh();
   }
 
+  async function mudarTipo() {
+    if (!mudando) return;
+    setOcupado(true); setErro(null); setAviso(null);
+    const pede = mudando.tipo === 'autorizacao' || mudando.tipo === 'excecao';
+    const { error } = await criarClienteNavegador().rpc('mudar_tipo_registro_diario', {
+      p_registro: mudando.id, p_tipo: mudando.tipo,
+      p_protocolo: pede ? mudando.protocolo : null,
+      p_quem: pede ? mudando.quem : null,
+      p_quem_nome: pede ? mudando.nome : null,
+    });
+    setOcupado(false);
+    if (error) { setErro(await mensagemDoErro(error)); return; }
+    setAviso(`Registro passou a ser ${ROTULO_TIPO[mudando.tipo]}.`);
+    setMudando(null);
+    router.refresh();
+  }
+
   async function excluir(r: RegistroDiario) {
     if (!confirm(`Excluir o registro "${r.assunto}"${r.protocolo ? ` (protocolo ${r.protocolo})` : ''}? Não dá para desfazer.`)) return;
     setOcupado(true); setErro(null);
@@ -206,11 +228,15 @@ export default function DiarioDeBordo({
       {/* ------------------------------------------------ Novo registro */}
       <section className="rounded-[18px] bg-superficie px-6 py-5 shadow-sm xl:sticky xl:top-6">
         <h2 className="text-base font-semibold text-slate-800">{corrigindo ? 'Corrigir registro devolvido' : 'Novo registro'}</h2>
-        <p className="mb-4 text-sm text-slate-500">Autorização e exceção pedem o protocolo do atendimento.</p>
+        <p className="mb-4 text-sm text-slate-500">
+          Autorização e exceção pedem o protocolo do atendimento.
+          {!registraProcesso && ' Processo novo e treinamento são registrados pelo Pleno, pelos analistas e pela gestão.'}
+        </p>
 
         <form onSubmit={registrar} className="grid gap-3">
           <div className="grid grid-cols-2 gap-2 2xl:grid-cols-4" role="radiogroup" aria-label="Tipo do registro">
-            {TIPOS.filter((t) => t.chave !== 'problema' || aprova).map((t) => (
+            {TIPOS.filter((t) => (t.chave !== 'problema' || aprova)
+              && (registraProcesso || !TIPOS_SO_PLENO_E_ACIMA.includes(t.chave) || t.chave === f.tipo)).map((t) => (
               <button key={t.chave} type="button" role="radio" aria-checked={f.tipo === t.chave} disabled={ocupado}
                       onClick={() => setF((s) => ({ ...s, tipo: t.chave }))}
                       className={`rounded-xl border-2 px-3 py-2 text-left transition ${f.tipo === t.chave
@@ -391,6 +417,7 @@ export default function DiarioDeBordo({
                     {/* Quem conclui direto fica como "decidido por" si mesmo: não é aprovação. */}
                     {r.situacao === 'concluido' && r.decidido_por && r.decidido_por !== r.pessoa_id
                       && ` · aprovado por ${nomeCurto(nomes[r.decidido_por] ?? '—')}`}
+                    {r.tipo_anterior && ` · era ${ROTULO_TIPO[r.tipo_anterior]}, mudado${r.tipo_mudado_por ? ` por ${nomeCurto(nomes[r.tipo_mudado_por] ?? '—')}` : ''}${r.tipo_mudado_em ? ` em ${dataBR(new Date(r.tipo_mudado_em).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }))}` : ''}`}
                   </p>
                   {vendoLeitura === r.id && <QuemLeu lista={leiturasDe(r.id)} hoje={hoje} desde={r.criado_em} />}
                   <UltimaRenovacao lista={renovacoes.filter((x) => x.registro_id === r.id)} nomes={nomes} />
@@ -450,6 +477,19 @@ export default function DiarioDeBordo({
                           <button type="button" onClick={() => setRenovando(null)} className="text-sm text-slate-500 hover:underline">cancelar</button>
                         </span>
                       )}
+                      {ehGestor && r.tipo !== 'problema' && mudando?.id !== r.id && (
+                        <button type="button" disabled={ocupado} className={botaoSecundario}
+                                onClick={() => setMudando({
+                                  id: r.id, tipo: TIPOS_PARA_MUDAR.find((t) => t !== r.tipo) ?? 'excecao',
+                                  protocolo: r.protocolo ?? '', quem: r.autorizado_por ?? '', nome: r.autorizado_por_nome ?? '',
+                                })}>
+                          Mudar tipo
+                        </button>
+                      )}
+                      {ehGestor && mudando?.id === r.id && (
+                        <MudarTipo valor={mudando} atual={r.tipo} ocupado={ocupado}
+                                   onMudar={setMudando} onConfirmar={mudarTipo} onCancelar={() => setMudando(null)} />
+                      )}
                       {ehGestor && (
                         <button type="button" disabled={ocupado} onClick={() => excluir(r)}
                                 className="ml-auto text-xs text-slate-400 hover:text-rose-700 hover:underline">
@@ -465,6 +505,64 @@ export default function DiarioDeBordo({
         ))}
       </section>
     </div>
+  );
+}
+
+/**
+ * "Mudar tipo" (migração 112): o gestor troca o tipo de um registro já feito
+ * — por exemplo, um processo novo registrado por um júnior que vira exceção.
+ * Autorização e exceção pedem protocolo e quem autorizou, como no registro.
+ */
+function MudarTipo({
+  valor, atual, ocupado, onMudar, onConfirmar, onCancelar,
+}: {
+  valor: { id: string; tipo: TipoRegistro; protocolo: string; quem: QuemAutorizou | ''; nome: string };
+  atual: TipoRegistro;
+  ocupado: boolean;
+  onMudar: (v: typeof valor) => void;
+  onConfirmar: () => void;
+  onCancelar: () => void;
+}) {
+  const pede = valor.tipo === 'autorizacao' || valor.tipo === 'excecao';
+  const pronto = !pede || (valor.protocolo.trim() && valor.quem && valor.nome.trim());
+  const campo = 'rounded-lg border border-slate-300 bg-superficie px-3 py-1.5 text-sm outline-none focus:border-marca-600';
+  return (
+    <span className="flex w-full flex-wrap items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-600">
+      Passa a ser
+      <select value={valor.tipo} disabled={ocupado} className={campo}
+              onChange={(e) => onMudar({ ...valor, tipo: e.target.value as TipoRegistro })}>
+        {TIPOS_PARA_MUDAR.filter((t) => t !== atual).map((t) => <option key={t} value={t}>{ROTULO_TIPO[t]}</option>)}
+      </select>
+      {pede && (
+        <>
+          <input value={valor.protocolo} disabled={ocupado} placeholder="Protocolo"
+                 onChange={(e) => onMudar({ ...valor, protocolo: e.target.value })} className={`${campo} w-28`} />
+          <select value={valor.quem} disabled={ocupado} className={campo}
+                  onChange={(e) => onMudar({ ...valor, quem: e.target.value as QuemAutorizou, nome: '' })}>
+            <option value="">Quem autorizou…</option>
+            {(['gestao', 'diretoria', 'outro'] as const).map((q) => <option key={q} value={q}>{ROTULO_QUEM[q]}</option>)}
+          </select>
+          {valor.quem === 'gestao' || valor.quem === 'diretoria' ? (
+            <select value={valor.nome} disabled={ocupado} className={campo}
+                    onChange={(e) => onMudar({ ...valor, nome: e.target.value })}>
+              <option value="">Nome…</option>
+              {AUTORIZADORES[valor.quem].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          ) : valor.quem === 'outro' ? (
+            <input value={valor.nome} disabled={ocupado} placeholder="Nome · cargo · setor"
+                   onChange={(e) => onMudar({ ...valor, nome: e.target.value })} className={`${campo} w-56`} />
+          ) : null}
+        </>
+      )}
+      <button type="button" disabled={ocupado || !pronto} onClick={onConfirmar}
+              className="rounded-lg bg-marca-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-marca-700 disabled:opacity-40">
+        Mudar
+      </button>
+      <button type="button" onClick={onCancelar} className="text-sm text-slate-500 hover:underline">cancelar</button>
+      {(atual === 'processo' || atual === 'treinamento') && !TIPOS_SO_PLENO_E_ACIMA.includes(valor.tipo) && (
+        <span className="w-full text-xs text-slate-500">Deixa de ter leitura obrigatória; as confirmações já dadas ficam guardadas.</span>
+      )}
+    </span>
   );
 }
 

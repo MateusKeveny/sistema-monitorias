@@ -100,7 +100,7 @@ export default function SimuladorDeCenarios({ base, periodos, cargos }: {
     <div className="space-y-4">
       <p className="rounded-xl bg-slate-50 px-4 py-2.5 text-sm text-slate-600 ring-1 ring-slate-200">
         <b>Só simulação.</b> Nada aqui é gravado nem muda o extrato de ninguém; fechar a tela descarta o cenário. Para valer
-        de verdade, use as telas de sempre (Ajustes da semana, Metas e métricas › Pesos por cargo, Presencial).
+        de verdade, use as telas de sempre (Ajustes da semana, Regras da cota, Presencial).
       </p>
 
       <div className="grid items-start gap-4 xl:grid-cols-[22rem_minmax(0,1fr)]">

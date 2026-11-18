@@ -1,4 +1,5 @@
 import Link from '@/componentes/Link';
+import AbasDaPessoa from '@/componentes/AbasDaPessoa';
 import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { Quadro, Vazio } from '@/componentes/ui';
 import GraficoDeLinha, { type PontoDaLinha } from '@/componentes/GraficoDeLinha';
@@ -116,6 +117,7 @@ export default async function Historico({
 
   return (
     <div className="space-y-6">
+      <AbasDaPessoa atual="historico" pessoa={veOTime && pessoaId !== perfil.id ? pessoaId : undefined} />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-sobre-fundo sm:text-[1.7rem]">

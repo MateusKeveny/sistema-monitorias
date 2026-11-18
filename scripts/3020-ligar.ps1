@@ -10,8 +10,14 @@ if (Get-NetTCPConnection -LocalPort 3020 -State Listen -ErrorAction SilentlyCont
   exit 0
 }
 
-$comando = "`$env:SISTEMA='cota'; `$env:NEXT_DIST_DIR='.next-local'; npx next start -p 3020 *> '$log'"
-Start-Process powershell.exe -WindowStyle Hidden -WorkingDirectory $projeto -ArgumentList '-NoProfile', '-Command', $comando
+# Guarda o registro da vez anterior: se a 3020 cair, ele diz por quê.
+if (Test-Path $log) { Copy-Item $log (Join-Path $env:TEMP 'painel-3020.anterior.log') -Force }
+
+# Liga pelo Win32_Process (CIM), e não pelo Start-Process: assim o servidor
+# não fica preso à janela/terminal que rodou este script e não cai quando ela
+# fecha (era o que derrubava a 3020 "sozinha").
+$comando = "powershell.exe -NoProfile -WindowStyle Hidden -Command `"`$env:SISTEMA='cota'; `$env:NEXT_DIST_DIR='.next-local'; npx next start -p 3020 *> '$log'`""
+Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $comando; CurrentDirectory = $projeto } | Out-Null
 
 # Espera responder (até 40 s).
 for ($i = 0; $i -lt 40; $i++) {

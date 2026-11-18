@@ -10,6 +10,7 @@ import {
 } from '@/lib/tipos';
 import { mensagemDoErro } from '@/lib/erro-amigavel';
 import { COR_DA_METRICA } from '@/lib/cores';
+import { cargoDeReferencia, cargosDaPontuacaoUnica, ehMetricaDeAtendimento } from '@/lib/pontuacaoUnica';
 
 /**
  * O cargo de base é avaliado em todas as regras e serve de referência para os
@@ -91,8 +92,10 @@ type Celula = { peso: number; ativo: boolean };
  * valor anterior, como no editor antigo.
  */
 export default function MatrizDePesos({
-  setorId = 1, cargos, regras, pesos, referencias, pessoasPorCargo,
+  setorId = 1, cargos, regras, pesos, referencias, pessoasPorCargo, pontuacaoUnica = false,
 }: {
+  /** A chave do setor (migração 112): atendimento com um valor só em todos os cargos. */
+  pontuacaoUnica?: boolean;
   /** O setor da tela (etapa 4): cargo novo nasce nele. */
   setorId?: number;
   cargos: Cargo[];
@@ -133,10 +136,39 @@ export default function MatrizDePesos({
   // Motivo obrigatório de cada alteração: vai para o histórico (migração 56).
   const [motivo, setMotivo] = useState('');
 
+  // Pontuação única (migração 112): a chave como está na tela; vai ao banco no salvar.
+  const [unica, setUnica] = useState(pontuacaoUnica);
+  const mudouUnica = unica !== pontuacaoUnica;
+  const cargosUnicos = cargosDaPontuacaoUnica(cargos);
+  const unicaNaLinha = (regra: string) => unica && pontuaveis.some((r) => r.chave === regra && ehMetricaDeAtendimento(r) && !r.valor_manual);
+
   const mudancas = Object.keys(celulas).filter((k) =>
     celulas[k].ativo !== original[k].ativo || (celulas[k].ativo && celulas[k].peso !== original[k].peso));
   const cargosAfetados = [...new Set(mudancas.map((k) => Number(k.split('|')[0])))];
   const pessoasAfetadas = cargosAfetados.reduce((a, c) => a + (pessoasPorCargo[c] ?? 0), 0);
+
+  /**
+   * Ligar a chave: cada métrica de atendimento passa a ter o valor do Júnior
+   * em todos os cargos (as diferenças aparecem em âmbar, para conferir antes
+   * de salvar). Desligar não muda nenhum valor: só volta a editar por cargo.
+   */
+  function alternarUnica() {
+    const liga = !unica;
+    setUnica(liga);
+    if (!liga) { setCelulas(original); setAviso(null); return; }
+    const ref = cargoDeReferencia(cargos);
+    if (!ref) return;
+    setCelulas((atual) => {
+      const novo = { ...atual };
+      for (const r of pontuaveis.filter((x) => ehMetricaDeAtendimento(x) && !x.valor_manual)) {
+        for (const c of cargosUnicos) novo[`${c.id}|${r.chave}`] = { ...atual[`${ref.id}|${r.chave}`] };
+      }
+      return novo;
+    });
+    setMotivo((m) => m || 'Pontuação única nos atendimentos');
+    setAviso(`Finalizado, TME, TMA, C-SAT e notas passam a valer como no ${curto(ref.nome)} em todos os cargos `
+      + `(${cargosUnicos.map((c) => curto(c.nome)).join(', ')}). O que muda está em âmbar: confira e salve.`);
+  }
 
   function abrir(chave: string) {
     const c = celulas[chave];
@@ -146,12 +178,15 @@ export default function MatrizDePesos({
 
   function aplicar(chave: string, valor: string) {
     const t = valor.trim();
+    // Com a pontuação única, a métrica de atendimento muda em todos os cargos juntos.
+    const regra = chave.split('|')[1];
+    const alvos = unicaNaLinha(regra) ? cargosUnicos.map((c) => `${c.id}|${regra}`) : [chave];
     if (!t) {
-      setCelulas((s) => ({ ...s, [chave]: { ...s[chave], ativo: false } }));
+      setCelulas((s) => ({ ...s, ...Object.fromEntries(alvos.map((k) => [k, { ...s[k], ativo: false }])) }));
     } else {
       const n = Number(t.replace(/\./g, '').replace(',', '.'));
       if (!Number.isFinite(n)) { setErro('Peso inválido: use números, como 4 ou -0,5.'); return; }
-      setCelulas((s) => ({ ...s, [chave]: { peso: n, ativo: true } }));
+      setCelulas((s) => ({ ...s, ...Object.fromEntries(alvos.map((k) => [k, { peso: n, ativo: true }])) }));
     }
     setErro(null);
     setEditando(null);
@@ -165,11 +200,20 @@ export default function MatrizDePesos({
       return { cargo_id: Number(cargo), regra, peso: celulas[k].peso, ativo: celulas[k].ativo, atualizado_em: agora,
                motivo_alteracao: motivo.trim() };
     });
-    const { error } = await criarClienteNavegador().from('pesos_por_cargo')
-      .upsert(linhas, { onConflict: 'cargo_id,regra' });
+    const db = criarClienteNavegador();
+    if (linhas.length) {
+      const { error } = await db.from('pesos_por_cargo').upsert(linhas, { onConflict: 'cargo_id,regra' });
+      if (error) { setOcupado(false); setErro(await mensagemDoErro(error)); return; }
+    }
+    if (mudouUnica) {
+      const { error } = await db.from('setores').update({ pontuacao_unica_atendimento: unica }).eq('id', setorId);
+      if (error) { setOcupado(false); setErro(await mensagemDoErro(error)); return; }
+    }
     setOcupado(false);
-    if (error) { setErro(await mensagemDoErro(error)); return; }
-    setAviso(`${linhas.length} ${linhas.length === 1 ? 'peso salvo' : 'pesos salvos'}. Meses já fechados não mudam.`);
+    setAviso([
+      linhas.length ? `${linhas.length} ${linhas.length === 1 ? 'peso salvo' : 'pesos salvos'}. Meses já fechados não mudam.` : '',
+      mudouUnica ? (unica ? 'Pontuação única nos atendimentos ligada.' : 'Pontuação única desligada: cada cargo volta a ter o seu valor.') : '',
+    ].filter(Boolean).join(' '));
     setMotivo('');
     router.refresh();
   }
@@ -216,6 +260,16 @@ export default function MatrizDePesos({
                     : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
             Só as que pontuam em algum cargo
           </button>
+          <button type="button" role="switch" aria-checked={unica} onClick={alternarUnica} disabled={ocupado}
+                  title="Finalizado, TME, TMA, C-SAT e notas com um valor só, igual em todos os cargos"
+                  className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs ${unica
+                    ? 'border-marca-600 bg-marca-600/10 font-semibold text-marca-700 dark:text-marca-400'
+                    : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+            <span className={`relative h-3.5 w-6 rounded-full transition ${unica ? 'bg-marca-600' : 'bg-slate-300'}`}>
+              <span className={`absolute top-0.5 h-2.5 w-2.5 rounded-full bg-white transition-all ${unica ? 'left-3' : 'left-0.5'}`} />
+            </span>
+            Pontuação única nos atendimentos
+          </button>
           <span className="flex-1" />
           <span className="mr-1 hidden items-center gap-1.5 text-xs text-slate-500 xl:inline-flex">
             <i className="h-2.5 w-2.5 rounded-sm bg-marca-600/35" /> soma
@@ -223,7 +277,7 @@ export default function MatrizDePesos({
             <i className="ml-2 h-2.5 w-2.5 rounded-sm bg-slate-200" /> valor digitado
             <i className="ml-2 h-1 w-1 rounded-full bg-slate-300" /> não pontua
           </span>
-          <Link href="/cota/metricas-e-faixas#nova-metrica" className={botaoSecundario}>+ Métrica manual</Link>
+          <Link href="/cota/metas?cat=demandas" className={botaoSecundario}>+ Métrica manual</Link>
           <button type="button" onClick={() => setCargoAberto(cargoAberto === 'novo' ? null : 'novo')} className={botaoSecundario}>
             + Cargo
           </button>
@@ -341,7 +395,10 @@ export default function MatrizDePesos({
                     <tr key={r.chave} className="hover:bg-slate-50">
                       <td className="py-1.5 pl-11 pr-2">
                         <span className="block text-slate-800">{r.rotulo}</span>
-                        <span className="block text-[11.5px] text-slate-400">{tipoDa(r)}</span>
+                        <span className="block text-[11.5px] text-slate-400">
+                          {tipoDa(r)}
+                          {unicaNaLinha(r.chave) && <b className="ml-1.5 font-semibold text-marca-700 dark:text-marca-400">· vale para todos os cargos</b>}
+                        </span>
                       </td>
                       {visiveis.map((c) => {
                         const k = `${c.id}|${r.chave}`;
@@ -400,13 +457,18 @@ export default function MatrizDePesos({
         <div className="h-4" />
       </div>
 
-      {mudancas.length > 0 && (
+      {(mudancas.length > 0 || mudouUnica) && (
         <div className="sticky bottom-4 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-marca-600/40
                         bg-[#0f1a14] px-5 py-3 text-sm text-[#e8f5ec] shadow-2xl">
           <span>
-            <strong>{mudancas.length} {mudancas.length === 1 ? 'alteração' : 'alterações'}</strong>
-            {' '}em {cargosAfetados.map((c) => curto(nomeCargo.get(c) ?? '')).join(', ')}
-            {' '}· afeta {pessoasAfetadas} pessoa{pessoasAfetadas === 1 ? '' : 's'} nos meses em aberto
+            {avisoDaUnica(mudouUnica, unica)}
+            {mudancas.length > 0 ? (
+              <>
+                <strong>{mudancas.length} {mudancas.length === 1 ? 'alteração' : 'alterações'}</strong>
+                {' '}em {cargosAfetados.map((c) => curto(nomeCargo.get(c) ?? '')).join(', ')}
+                {' '}· afeta {pessoasAfetadas} pessoa{pessoasAfetadas === 1 ? '' : 's'} nos meses em aberto
+              </>
+            ) : 'Nenhum peso muda.'}
           </span>
           <label className="flex min-w-72 flex-1 items-center gap-2">
             <span className="whitespace-nowrap text-[#bcd6c4]">Motivo</span>
@@ -416,7 +478,7 @@ export default function MatrizDePesos({
                               placeholder:text-[#8fa99a] outline-none focus:border-marca-400" />
           </label>
           <span className="flex gap-2">
-            <button type="button" disabled={ocupado} onClick={() => { setCelulas(original); setEditando(null); }}
+            <button type="button" disabled={ocupado} onClick={() => { setCelulas(original); setEditando(null); setUnica(pontuacaoUnica); setAviso(null); }}
                     className="rounded-lg border border-white/25 px-3 py-1.5 text-sm hover:bg-white/10 disabled:opacity-40">
               Desfazer
             </button>
@@ -429,6 +491,12 @@ export default function MatrizDePesos({
       )}
     </div>
   );
+}
+
+/** O começo da barra de salvar quando a chave da pontuação única muda. */
+function avisoDaUnica(mudou: boolean, liga: boolean) {
+  if (!mudou) return null;
+  return <strong className="mr-2">{liga ? 'Liga a pontuação única nos atendimentos.' : 'Desliga a pontuação única.'}</strong>;
 }
 
 /**
@@ -475,7 +543,7 @@ function CopiarDoCargoBase({
 }
 
 /** Nome, meta e média do cargo: o que não é peso de métrica. */
-function EditorDoCargo({
+export function EditorDoCargo({
   cargo, cargos, pesos, referencias, onFechar,
 }: {
   cargo: Cargo;
@@ -649,7 +717,7 @@ function EditorDoCargo({
 }
 
 /** Cargo novo, nascendo com os pesos de outro para não começar do zero. */
-function NovoCargo({ setorId, cargos, pesos, onFechar }: { setorId: number; cargos: Cargo[]; pesos: PesoCargo[]; onFechar: () => void }) {
+export function NovoCargo({ setorId, cargos, pesos, onFechar }: { setorId: number; cargos: Cargo[]; pesos: PesoCargo[]; onFechar: () => void }) {
   const router = useRouter();
   const [nome, setNome] = useState('');
   const [copiarDe, setCopiarDe] = useState(String(cargos[0]?.id ?? ''));

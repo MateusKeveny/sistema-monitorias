@@ -507,7 +507,7 @@ function Visao({ competencia, atual, comPendencias = true, fonte, dados, abertur
   if (aConfirmar.length) {
     pendencias.push({
       texto: `Ponto facultativo a confirmar: ${aConfirmar.map((f) => `${f.data.slice(8, 10)}/${f.data.slice(5, 7)} (${f.nome})`).join(', ')}`,
-      acao: 'Confirmar', href: '/cota/escala',
+      acao: 'Confirmar', href: '/cota/metas?cat=chamados',
     });
   }
   if ((conferir.data ?? []).length) {

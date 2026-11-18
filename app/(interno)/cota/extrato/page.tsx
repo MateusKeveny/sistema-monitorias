@@ -3,6 +3,7 @@ import { criarClienteServidor, exigirPerfil } from '@/lib/supabase/servidor';
 import { BarraDeMeta, Quadro, Vazio } from '@/componentes/ui';
 import { mesRotulo, percentual, umaCasa } from '@/lib/formatar';
 import SetasDeCompetencia from '@/componentes/SetasDeCompetencia';
+import AbasDaPessoa from '@/componentes/AbasDaPessoa';
 import SeletorDeDetalhe from '@/componentes/SeletorDeDetalhe';
 import { resolverCompetencia } from '@/lib/competencia';
 import { fonteDoMes, situacaoDoResumo } from '@/lib/resumo';
@@ -415,6 +416,7 @@ export default async function Extrato({
 
   return (
     <div className="space-y-6">
+      <AbasDaPessoa atual="extrato" pessoa={veOTime && pessoaId !== perfil.id ? pessoaId : undefined} />
       {/* Topo no padrão das telas novas (1.18.0): de quem é o extrato, o mês
           com setas e, discreto, o cargo e a situação do mês. */}
       <div className="flex flex-wrap items-end justify-between gap-4">

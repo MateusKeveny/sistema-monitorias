@@ -7,6 +7,7 @@ import { criarClienteNavegador } from '@/lib/supabase/cliente';
 import { mensagemDoErro } from '@/lib/erro-amigavel';
 import type { Cargo, PesoCargo, RegraCota } from '@/lib/tipos';
 import type { Canal, Setor } from '@/lib/setores';
+import { cargoDeReferencia, cargosDaPontuacaoUnica } from '@/lib/pontuacaoUnica';
 
 const entrada = 'w-20 rounded-md border border-slate-300 bg-superficie px-2 py-1 text-right text-sm tabular-nums outline-none focus:border-marca-600';
 const num = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 4 });
@@ -21,8 +22,10 @@ const num = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 4 
  * Grava em `pesos_por_cargo`, como a Matriz de pesos, com o motivo no
  * histórico (migração 56).
  */
-export default function RegrasPorFila({ setores, filas, regras, pesos, cargos }: {
+export default function RegrasPorFila({ setores, filas, regras, pesos, cargos, pontuacaoUnica = false }: {
   setores: Setor[]; filas: Canal[]; regras: RegraCota[]; pesos: PesoCargo[]; cargos: Cargo[];
+  /** Pontuação única (migração 112): um valor por fila, gravado em todos os cargos. */
+  pontuacaoUnica?: boolean;
 }) {
   const router = useRouter();
   // Um setor por vez. Até a etapa 4 o gestor vê todos; com mais de um, escolhe.
@@ -35,7 +38,9 @@ export default function RegrasPorFila({ setores, filas, regras, pesos, cargos }:
   // Os cargos que pontuam finalizado em alguma fila.
   const finalizados = new Set(comRegras.map((f) => f.regra_finalizado!));
   const cargosQuePontuam = cargos.filter((c) => pesos.some((p) => p.cargo_id === c.id && p.ativo && finalizados.has(p.regra)));
-  const [cargoId, setCargoId] = useState<number | undefined>(cargosQuePontuam[0]?.id);
+  const [cargoId, setCargoId] = useState<number | undefined>(
+    pontuacaoUnica ? cargoDeReferencia(cargos)?.id : cargosQuePontuam[0]?.id);
+  const cargosUnicos = cargosDaPontuacaoUnica(cargos);
 
   // As faixas de TME de cada fila, na ordem (até 15 min, até 30, acima).
   const faixasDe = (grupo: string | null | undefined) => (grupo
@@ -72,10 +77,14 @@ export default function RegrasPorFila({ setores, filas, regras, pesos, cargos }:
 
   const mudancas = Object.entries(rascunho).flatMap(([k, t]) => {
     const [cargo, regra] = k.split('|');
-    const original = pesos.find((x) => x.cargo_id === Number(cargo) && x.regra === regra);
     const n = t.trim() === '' ? null : Number(t.trim().replace(/\./g, '').replace(',', '.'));
-    const antes = original && original.ativo ? Number(original.peso) : null;
-    return n === antes ? [] : [{ cargo_id: Number(cargo), regra, n }];
+    // Pontuação única: o valor digitado vale para todos os cargos que recebem cota.
+    const destinos = pontuacaoUnica ? cargosUnicos.map((c) => c.id) : [Number(cargo)];
+    return destinos.flatMap((id) => {
+      const original = pesos.find((x) => x.cargo_id === id && x.regra === regra);
+      const antes = original && original.ativo ? Number(original.peso) : null;
+      return n === antes ? [] : [{ cargo_id: id, regra, n }];
+    });
   });
   const invalida = mudancas.some((m) => m.n != null && !Number.isFinite(m.n));
 
@@ -122,6 +131,11 @@ export default function RegrasPorFila({ setores, filas, regras, pesos, cargos }:
       )}
       <Quadro titulo={`Regras por fila · ${setor?.nome ?? ''}`}
               subtitulo={`As filas do setor ${setor?.nome ?? ''} e o que muda de uma para outra. Fila que copiou as métricas de outra mostra o valor da original (↺) e muda junto com ela.`}>
+        {pontuacaoUnica ? (
+          <p className="mb-4 inline-block rounded-full bg-marca-600/10 px-4 py-1.5 text-sm font-medium text-marca-700 dark:text-marca-400">
+            Pontuação única: vale para todos os cargos ({cargosUnicos.map((c) => c.nome.replace(/^Atendente\s+/, '')).join(', ')})
+          </p>
+        ) : (
         <div className="mb-4 inline-flex gap-1 rounded-full bg-slate-100 p-1" role="tablist" aria-label="Cargo">
           {cargosQuePontuam.map((c) => (
             <button key={c.id} type="button" role="tab" aria-selected={cargoId === c.id} onClick={() => setCargoId(c.id)}
@@ -131,6 +145,7 @@ export default function RegrasPorFila({ setores, filas, regras, pesos, cargos }:
             </button>
           ))}
         </div>
+        )}
 
         <Tabela noQuadro>
           <thead>
@@ -199,7 +214,7 @@ export default function RegrasPorFila({ setores, filas, regras, pesos, cargos }:
       </Quadro>
 
       <Quadro titulo="Valem para todas as filas"
-              subtitulo="C-SAT e notas de 1 a 5 são os da equipe: a mesma régua em todas as filas. Os pesos ficam em Pesos por cargo.">
+              subtitulo="C-SAT e notas de 1 a 5 são os da equipe: a mesma régua em todas as filas. Os pesos ficam em Regras da cota.">
         <Tabela noQuadro>
           <thead><tr><Th>Métrica</Th><Th className="text-right">Todas as filas</Th></tr></thead>
           <tbody>

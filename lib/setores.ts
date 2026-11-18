@@ -15,6 +15,8 @@ export type Setor = {
   monitorias_por_semana?: number;
   /** Como o setor aparece na coluna "Setor" do relatório do Hub (4.8.1, migração 109). */
   nomes_no_hub?: string[];
+  /** Um valor só para finalizado, TME, TMA, C-SAT e notas em todos os cargos (4.12.0, migração 112). */
+  pontuacao_unica_atendimento?: boolean;
 };
 export type Canal = {
   id: number; setor_id: number; nome: string; apelido: string | null;

@@ -3,6 +3,8 @@ import DiarioDeBordo from '@/componentes/DiarioDeBordo';
 import RegistrosComAGestao from '@/componentes/RegistrosComAGestao';
 import AnotacoesDoGestor from '@/componentes/AnotacoesDoGestor';
 import Abas from '@/componentes/Abas';
+import SubcategoriasDiario from '@/componentes/SubcategoriasDiario';
+import QuemVeODiario, { type VisibilidadeDoDiario } from '@/componentes/QuemVeODiario';
 import { hojeNoBrasil } from '@/lib/formatar';
 import type {
   AnotacaoGestor, LeituraDiario, RegistroDiario, RegistroPrivado, RenovacaoDiario, Subcategoria,
@@ -34,7 +36,7 @@ export default async function Diario({
 
   const [{ data: registros }, { data: pessoas }, { data: aprova }, { data: concluiDireto }, { data: renovacoes },
     { data: leituras }, { data: privados }, { data: anotacoes }, { data: equipe }, { data: subcategorias },
-    { data: visibilidade }] = await Promise.all([
+    { data: visibilidade }, { data: registraProcesso }] = await Promise.all([
     // Os últimos 500: bastam para a consulta do dia a dia. A busca por um
     // protocolo antigo está na consulta do site de Monitorias.
     db.from('diario_registros').select('*')
@@ -64,7 +66,18 @@ export default async function Diario({
     // Quem vê cada tipo (migração 67): decide os filtros da tela; os registros
     // em si já vêm filtrados pelo banco.
     db.from('diario_visibilidade').select('tipo, quem'),
+    // Processo novo e treinamento: só Pleno, analistas e gestão (migração 112).
+    db.rpc('registra_processo_diario'),
   ]);
+
+  // Aba Configurar (4.13.0; antes na Configuração): quem vê cada tipo e as
+  // subcategorias, com quantos registros usam cada uma. Só o gestor.
+  const [{ data: visibilidadeToda }, { data: usosSub }] = ehGestor ? await Promise.all([
+    db.from('diario_visibilidade').select('*'),
+    db.from('diario_registros').select('subcategoria_id').not('subcategoria_id', 'is', null),
+  ]) : [{ data: [] }, { data: [] }];
+  const usos: Record<number, number> = {};
+  for (const u of (usosSub ?? []) as { subcategoria_id: number }[]) usos[u.subcategoria_id] = (usos[u.subcategoria_id] ?? 0) + 1;
 
   const nomes: Record<string, string> = Object.fromEntries(
     (pessoas ?? []).map((p: { id: string; nome: string }) => [p.id, p.nome]));
@@ -92,6 +105,8 @@ export default async function Diario({
       ehGestor={ehGestor}
       aprova={aprova === true}
       concluiDireto={concluiDireto === true}
+      // Antes da 112 a função não existe: aí vale a regra antiga (todos registram).
+      registraProcesso={registraProcesso !== false}
       hoje={hojeNoBrasil()}
       filtroInicial={filtro}
     />
@@ -127,6 +142,16 @@ export default async function Diario({
               <AnotacoesDoGestor anotacoes={(anotacoes ?? []) as AnotacaoGestor[]} nomes={nomes}
                                  pessoas={(equipe ?? []) as { id: string; nome: string }[]}
                                  pessoaId={perfil.id} hoje={hojeNoBrasil()} />
+            ),
+          }] : []),
+          ...(ehGestor ? [{
+            chave: 'configurar',
+            rotulo: 'Configurar',
+            conteudo: (
+              <div className="space-y-6">
+                <QuemVeODiario configuracao={(visibilidadeToda ?? []) as VisibilidadeDoDiario[]} />
+                <SubcategoriasDiario subcategorias={(subcategorias ?? []) as Subcategoria[]} usos={usos} />
+              </div>
             ),
           }] : []),
         ]}
