@@ -5,7 +5,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 /** O apelido da fila ('huggy', 'diretores', 'fila_15'…), como o banco grava. */
 export type Canal = string;
 /** `nivel` 1 = fila dentro de um galho; `detalhe` = "3 filas" (4.14.0). */
-export type CanalDaTela = { chave: Canal; rotulo: string; nivel?: 0 | 1; detalhe?: string };
+export type CanalDaTela = { chave: Canal; rotulo: string; nivel?: 0 | 1; detalhe?: string; principal?: boolean };
 
 /** As filas da Expansão: o padrão de quem ainda não passa as filas do setor. */
 const PADRAO: CanalDaTela[] = [{ chave: 'huggy', rotulo: 'Expansão' }, { chave: 'diretores', rotulo: 'Diretores e acima' }];
@@ -112,7 +112,7 @@ function SeletorDeCanal({ naSuperficie }: { naSuperficie: boolean }) {
   for (const c of canais) {
     if (c.chave === 'todas') { blocos.push({ cabeca: c, filas: [] }); continue; }
     if (c.nivel === 1) { blocos[blocos.length - 1]?.filas.push(c); continue; }
-    if (c.chave.startsWith('galho:')) { blocos.push({ cabeca: c, filas: [] }); continue; }
+    if (c.chave.startsWith('galho:') || c.principal) { blocos.push({ cabeca: c, filas: [] }); continue; }
     soltas.push(c);
   }
   if (soltas.length) blocos.push({ titulo: blocos.length > 1 ? 'Outras filas' : 'Filas', filas: soltas });
@@ -163,12 +163,15 @@ function SeletorDeCanal({ naSuperficie }: { naSuperficie: boolean }) {
           {blocos.map((b, i) => {
             // Galho: o nome escolhe o resumo das filas dele; a setinha mostra as filas.
             const ehGalho = !!b.cabeca && b.filas.length > 0;
+            // Principal (galho de várias filas ou de uma só, como o iGreen Mob).
+            const ehPrincipal = !!b.cabeca && b.cabeca.chave !== 'todas';
+            const anteriorPrincipal = i > 0 && !!blocos[i - 1].cabeca && blocos[i - 1].cabeca!.chave !== 'todas';
             const chaveGalho = b.cabeca?.chave ?? '';
             const mostraFilas = !ehGalho || galhosAbertos.has(chaveGalho) || b.filas.some((f) => f.chave === canal);
             return (
-              <div key={b.cabeca?.chave ?? b.titulo} className={i > 0 && !(ehGalho && blocos[i - 1]?.cabeca && blocos[i - 1].filas.length > 0)
+              <div key={b.cabeca?.chave ?? b.titulo} className={i > 0 && !(ehPrincipal && anteriorPrincipal)
                 ? 'mt-2 border-t border-slate-100 pt-2' : undefined}>
-                {i === 1 && ehGalho && <p className="px-2.5 pb-1 text-[10.5px] font-semibold uppercase tracking-wider text-slate-400">Principais</p>}
+                {ehPrincipal && !anteriorPrincipal && <p className="px-2.5 pb-1 text-[10.5px] font-semibold uppercase tracking-wider text-slate-400">Principais</p>}
                 {b.titulo && <p className="px-2.5 pb-1 text-[10.5px] font-semibold uppercase tracking-wider text-slate-400">{b.titulo}</p>}
                 {b.cabeca && (ehGalho ? (
                   <div className="flex items-center gap-1">

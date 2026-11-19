@@ -72,7 +72,7 @@ export function montarGalhos<T extends Item>(itens: T[], filas: FilaComGalho[], 
 }
 
 /** A opção do seletor de fila do Início (4.14.0): todas, um galho inteiro ou uma fila. */
-export type OpcaoDeFila = { chave: string; rotulo: string; nivel: 0 | 1; detalhe?: string; filas: string[] };
+export type OpcaoDeFila = { chave: string; rotulo: string; nivel: 0 | 1; detalhe?: string; filas: string[]; /** Galho de uma fila só (iGreen Mob): vai junto dos principais. */ principal?: boolean };
 
 /** Chave da opção "Todas as filas" — o resumo geral, que abre o Início do gestor. */
 export const TODAS_AS_FILAS = 'todas';
@@ -96,7 +96,7 @@ export function opcoesDeFila(filas: { apelido: string; nome: string; galho?: str
     if (vistos.has(g)) continue;
     vistos.add(g);
     const doGalho = filas.filter((x) => x.galho?.trim() === g);
-    if (doGalho.length === 1) { opcoes.push(sozinha(f)); continue; }
+    if (doGalho.length === 1) { opcoes.push({ ...sozinha(f), principal: true }); continue; }
     opcoes.push({ chave: `galho:${g}`, rotulo: g, nivel: 0, detalhe: `${doGalho.length} filas`, filas: doGalho.map((x) => x.apelido) });
     for (const x of doGalho) opcoes.push(sozinha(x, 1));
   }

@@ -35,6 +35,16 @@ para o Performance.
 
 ---
 
+## Performance 4.14.1
+
+Correção. Migração 115 (csat_da_equipe_no_mes), já aplicada no oficial.
+
+- Início do atendente: o C-SAT da equipe do mês inteiro numa chamada só
+  (antes, uma por fila × semana). Sem a função, volta ao jeito da 4.14.0.
+- iGreen Mob como principal próprio no seletor (galho "iGreen Mob"), como o
+  Marketing: dentro do Expansão bagunçava os números do setor. Galho de uma
+  fila só aparece junto dos Principais.
+
 ## Performance 4.14.0
 
 Atualização. Migrações 113 (galhos das filas) e 114 (leituras do diário

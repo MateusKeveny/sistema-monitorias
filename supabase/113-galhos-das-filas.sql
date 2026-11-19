@@ -17,3 +17,8 @@ update public.canais_do_setor set galho = 'Expansão'
 
 update public.canais_do_setor set galho = 'Marketing'
  where setor_id = 1 and apelido in ('fila_20', 'fila_21', 'fila_22', 'fila_23');
+
+-- 19/11/2026, a pedido do gestor (depois de aplicada): o iGreen Mob virou um
+-- principal próprio, como o Marketing — junto do Expansão bagunçava os
+-- números do setor. Feito direto no oficial:
+--   update public.canais_do_setor set galho = 'iGreen Mob' where setor_id = 1 and apelido = 'fila_19';

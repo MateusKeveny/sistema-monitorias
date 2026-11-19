@@ -148,10 +148,19 @@ export default async function PainelAtendente({
   const lancadas = [...new Set([...todoCsat, ...todoVolume]
     .filter((x) => x.mes_competencia === competencia).map((x) => x.semana))].filter((s) => s >= 1 && s <= 4);
   const semanasDaEquipe = lancadas.length ? lancadas : [1, 2, 3, 4];
-  const pedidosEquipe = filasDaEquipe.flatMap((c) => semanasDaEquipe.map((semana) => ({ c, semana })));
-  const respostasEquipe = await Promise.all(pedidosEquipe.map(({ c, semana }) =>
-    db.rpc('csat_da_equipe', { p_mes: competencia, p_semana: semana, p_origem: c })));
-  const csatEquipeDa = (c: Canal) => respostasEquipe.filter((_, i) => pedidosEquipe[i].c === c).map((x) => x.data);
+  // 4.14.1 (migração 115): o mês inteiro numa chamada só. Sem a função no
+  // banco, o jeito da 4.14.0 (uma chamada por fila × semana com dados).
+  const equipeDoMes = await db.rpc('csat_da_equipe_no_mes', { p_mes: competencia });
+  let csatEquipeDa: (c: Canal) => (number | null)[];
+  if (!equipeDoMes.error) {
+    const linhasDoMes = (equipeDoMes.data ?? []) as { origem: string; semana: number; csat: number | null }[];
+    csatEquipeDa = (c) => [1, 2, 3, 4].map((s) => linhasDoMes.find((x) => x.origem === c && x.semana === s)?.csat ?? null);
+  } else {
+    const pedidosEquipe = filasDaEquipe.flatMap((c) => semanasDaEquipe.map((semana) => ({ c, semana })));
+    const respostasEquipe = await Promise.all(pedidosEquipe.map(({ c, semana }) =>
+      db.rpc('csat_da_equipe', { p_mes: competencia, p_semana: semana, p_origem: c })));
+    csatEquipeDa = (c) => respostasEquipe.filter((_, i) => pedidosEquipe[i].c === c).map((x) => x.data as number | null);
+  }
   const semanasCsat = todoCsat.filter((s) => s.mes_competencia === competencia);
   const volumes = todoVolume.filter((v) => v.mes_competencia === competencia);
   const linhas = (extrato.data ?? []) as LinhaExtrato[];
