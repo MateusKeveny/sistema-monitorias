@@ -13,6 +13,8 @@ import { hojeNoBrasil, periodoDaSemana } from '@/lib/formatar';
 import ListaDeMonitorias from '@/componentes/ListaDeMonitorias';
 import { todas, conferida } from '@/lib/consultas';
 import { MONITORIAS_PADRAO, monitoriasPorSetor, setorDasPessoas, textoDoPiso } from '@/lib/monitoriasDoSetor';
+import ArvoreDePontos, { type ItemDePonto } from '@/componentes/ArvoreDePontos';
+import { montarGalhos, rotuloNaFila } from '@/lib/galhos';
 import { faixaDoCsat, faixasDeCsat, filasDoSetor as lerFilasDoSetor, metaDoCsat, textoDaMeta, tomDoCsatPelaMeta } from '@/lib/filasDoSetor';
 
 
@@ -107,10 +109,7 @@ export default async function PainelAtendente({
   // O mês aberto e o anterior vêm do resumo quando ele está em dia (migração 58).
   const [fonte, fonteAntes] = await todas([fonteDoMes(competencia), fonteDoMes(anterior)]);
 
-  const equipe = Promise.all(CANAIS.flatMap(({ chave }) => [1, 2, 3, 4].map((semana) =>
-    db.rpc('csat_da_equipe', { p_mes: competencia, p_semana: semana, p_origem: chave }))));
-
-  const [csat, volume, extrato, fechados, pesos, regras, tmeEquipe, cotaAntes, monitorias, csatEquipe] = await todas([
+  const [csat, volume, extrato, fechados, pesos, regras, tmeEquipe, cotaAntes, monitorias] = await todas([
     db.from('vw_csat_semanal').select('origem, semana, avaliacoes, positivas, mes_competencia')
       .eq('pessoa_id', pessoaId).in('mes_competencia', meses),
     db.from('volume_semanal').select('canal, semana, finalizados, tme_seg, mes_competencia')
@@ -131,11 +130,28 @@ export default async function PainelAtendente({
       .eq('operador_id', pessoaId)
       .order('data_atendimento', { ascending: false }).order('codigo', { ascending: false })
       .limit(20),
-    equipe,
   ]);
 
   const todoCsat = (csat.data ?? []) as CsatSemana[];
   const todoVolume = (volume.data ?? []) as Volume[];
+
+  // C-SAT da equipe (19/11/2026): só das filas em que a pessoa atendeu no mês.
+  // Antes era de todas as filas do setor × 4 semanas — com as 7 do Expansão
+  // eram 28 chamadas, e a página passava do limite de 50 chamadas por
+  // carregamento do Cloudflare ("Too many subrequests"): o Início de todo
+  // operador dava "Algo deu errado".
+  const ativas = CANAIS.map((c) => c.chave).filter((c) =>
+    todoCsat.some((s) => s.origem === c && s.mes_competencia === competencia)
+    || todoVolume.some((v) => v.canal === c && v.mes_competencia === competencia));
+  const filasDaEquipe = ativas.length ? ativas : CANAIS.slice(0, 1).map((c) => c.chave);
+  // E só das semanas já lançadas: semana sem importação daria nulo de qualquer jeito.
+  const lancadas = [...new Set([...todoCsat, ...todoVolume]
+    .filter((x) => x.mes_competencia === competencia).map((x) => x.semana))].filter((s) => s >= 1 && s <= 4);
+  const semanasDaEquipe = lancadas.length ? lancadas : [1, 2, 3, 4];
+  const pedidosEquipe = filasDaEquipe.flatMap((c) => semanasDaEquipe.map((semana) => ({ c, semana })));
+  const respostasEquipe = await Promise.all(pedidosEquipe.map(({ c, semana }) =>
+    db.rpc('csat_da_equipe', { p_mes: competencia, p_semana: semana, p_origem: c })));
+  const csatEquipeDa = (c: Canal) => respostasEquipe.filter((_, i) => pedidosEquipe[i].c === c).map((x) => x.data);
   const semanasCsat = todoCsat.filter((s) => s.mes_competencia === competencia);
   const volumes = todoVolume.filter((v) => v.mes_competencia === competencia);
   const linhas = (extrato.data ?? []) as LinhaExtrato[];
@@ -262,18 +278,20 @@ export default async function PainelAtendente({
   const projecao = projetar ? (resultado * 4) / semanasLancadas : null;
 
   // ------------------------------------------------ ganhos e perdas do mês
-  const porRegra = [...new Map(linhas.map((l) => [l.regra + (l.origem ?? ''), l])).values()]
+  // 4.14.0: em árvore, galho → fila (o iGreen Mob aparece com o nome dele, e
+  // não mais como "Finalizado Expansão" misturado às da Expansão).
+  const porRegra: ItemDePonto[] = [...new Map(linhas.map((l) => [l.regra + (l.origem ?? ''), l])).values()]
     .map((base) => {
       const iguais = linhas.filter((l) => l.regra === base.regra && l.origem === base.origem);
       return {
         chave: base.regra + (base.origem ?? ''),
-        rotulo: base.rotulo,
-        quantidade: iguais.reduce((a, l) => a + Number(l.quantidade), 0),
+        origem: base.origem,
+        rotulo: rotuloNaFila(base.rotulo, base.origem, filasDaPessoa),
+        detalhe: `${num(iguais.reduce((a, l) => a + Number(l.quantidade), 0), 2)}×`,
         cota: iguais.reduce((a, l) => a + Number(l.cota), 0),
       };
-    });
-  const ganhos = porRegra.filter((r) => r.cota > 0).sort((a, b) => b.cota - a.cota).slice(0, 6);
-  const perdas = porRegra.filter((r) => r.cota < 0).sort((a, b) => a.cota - b.cota);
+    }).filter((r) => Math.abs(r.cota) >= 0.005);
+  const arvore = montarGalhos(porRegra, filasDaPessoa, rotuloDaFila);
 
   // Quanto vale cada coisa no cargo da pessoa.
   const grupoDaNota = filaDe(canalPrincipal)?.grupoNota ?? 'nota';
@@ -295,8 +313,7 @@ export default async function PainelAtendente({
       const l = deste(competencia).find((x) => x.semana === s);
       return l && l.avaliacoes ? { valor: l.positivas / l.avaliacoes, positivas: l.positivas, avaliacoes: l.avaliacoes } : null;
     });
-    const csatEquipeMes = media([1, 2, 3, 4].map((_, i) => csatEquipe[indice * 4 + i].data)
-      .filter((v): v is number => v != null).map(Number));
+    const csatEquipeMes = media(csatEquipeDa(c).filter((v): v is number => v != null).map(Number));
 
     const vol = (m: string) => todoVolume.filter((v) => v.canal === c && v.mes_competencia === m);
     const volSemanas = [1, 2, 3, 4].map((s) => vol(competencia).find((v) => v.semana === s)?.finalizados ?? null);
@@ -518,20 +535,7 @@ export default async function PainelAtendente({
         <div className="grid items-start gap-4 xl:grid-cols-[1.1fr_1fr_1fr]">
           <Painel>
             <Secao titulo="De onde vieram seus pontos" acao={<Link href="/cota/comparativo?cat=pts" className="whitespace-nowrap rounded-full border border-slate-200 px-2.5 py-0.5 text-xs text-slate-600 hover:border-marca-600">comparar meses ›</Link>} subtitulo="O que mais somou e o que tirou pontos no mês.">
-              {!porRegra.length ? <Vazio>Nada lançado nesta competência.</Vazio> : (
-                <ul className="space-y-2 text-sm">
-                  {[...ganhos, ...perdas].map((r) => (
-                    <li key={r.chave} className="flex items-baseline justify-between gap-3">
-                      <span className="min-w-0 truncate text-slate-700">
-                        {r.rotulo}<span className="ml-1.5 text-xs text-slate-400">{num(r.quantidade, 2)}×</span>
-                      </span>
-                      <span className={`font-semibold tabular-nums ${r.cota > 0 ? 'text-marca-700 dark:text-marca-400' : 'text-rose-700'}`}>
-                        {r.cota > 0 ? '+' : ''}{num(r.cota, 1)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              {!porRegra.length ? <Vazio>Nada lançado nesta competência.</Vazio> : <ArvoreDePontos galhos={arvore} />}
             </Secao>
           </Painel>
           <Painel>

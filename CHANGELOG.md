@@ -35,6 +35,26 @@ para o Performance.
 
 ---
 
+## Performance 4.14.0
+
+Atualização. Migrações 113 (galhos das filas) e 114 (leituras do diário
+mais rápidas), as duas já aplicadas no oficial em 19/11/2026.
+
+- **Correção urgente:** o Início de todo operador dava "Algo deu errado". Com
+  as 7 filas do Expansão, o C-SAT da equipe pedia 28 consultas (fila × semana)
+  e a página passava do limite de 50 por carregamento do Cloudflare ("Too many
+  subrequests"). Agora só as filas em que a pessoa atendeu e as semanas já
+  lançadas.
+- iGreen Mob deixou de aparecer como "Finalizado Expansão" e de somar com a
+  Expansão no Início e no Extrato ("o Mob sumiu").
+- Pontos em árvore (galho → fila) no Início do atendente e no Extrato; os
+  quadros do Extrato com "Expansão › iGreen Mob".
+- Início do gestor abre em "Todas as filas" (resumo somado); o seletor de fila
+  mostra os Principais (Expansão, Marketing) com o resumo das filas deles e,
+  na setinha, as filas. Mais de 3 filas viram seletor em vez de abas.
+- Campo "Galho" em Setores e filas.
+- leituras_do_diario: 1,2 s → 0,1 s para o gestor (mesmo resultado).
+
 ## Performance 4.13.1 · Monitorias 6.6.1 · Agenda 1.9.2
 
 Correção de segurança, sem mudança de tela. Sem migração.

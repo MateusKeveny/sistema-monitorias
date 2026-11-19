@@ -20,6 +20,8 @@ export type FilaDoSetor = {
   grupoCsat: string | null;
   grupoNota: string | null;
   tmePorPessoaDesde: string | null;
+  /** Galho da fila nas telas (4.14.0, migração 113); nulo = sozinha. */
+  galho: string | null;
 };
 
 /** Faixa de C-SAT em fração (0,94 = 94%). */
@@ -27,8 +29,8 @@ export type FaixaCsat = { chave: string; min: number | null; max: number | null 
 
 /** As filas da Expansão, para quando o cadastro ainda não carregou. */
 export const FILAS_PADRAO: FilaDoSetor[] = [
-  { apelido: 'huggy', nome: 'Expansão', setorId: 1, regraFinalizado: 'huggy_atendimento', grupoTme: 'tme', grupoCsat: 'csat', grupoNota: 'nota', tmePorPessoaDesde: null },
-  { apelido: 'diretores', nome: 'Diretores e acima', setorId: 1, regraFinalizado: 'diretores_atendimento', grupoTme: 'tme_diretores', grupoCsat: 'csat', grupoNota: 'nota', tmePorPessoaDesde: null },
+  { apelido: 'huggy', nome: 'Expansão', setorId: 1, regraFinalizado: 'huggy_atendimento', grupoTme: 'tme', grupoCsat: 'csat', grupoNota: 'nota', tmePorPessoaDesde: null, galho: 'Expansão' },
+  { apelido: 'diretores', nome: 'Diretores e acima', setorId: 1, regraFinalizado: 'diretores_atendimento', grupoTme: 'tme_diretores', grupoCsat: 'csat', grupoNota: 'nota', tmePorPessoaDesde: null, galho: 'Expansão' },
 ];
 export const META_CSAT_PADRAO = 0.95;
 
@@ -57,11 +59,11 @@ export async function filasDoSetor(db: SupabaseClient, setorId: number): Promise
   const { data } = await db.from('canais_do_setor').select('*').eq('ativo', true).eq('setor_id', setorId).order('ordem');
   const filas = ((data ?? []) as {
     apelido: string | null; nome: string; setor_id: number; regra_finalizado?: string | null; grupo_tme?: string | null;
-    grupo_csat?: string | null; grupo_nota?: string | null; tme_por_pessoa_desde?: string | null;
+    grupo_csat?: string | null; grupo_nota?: string | null; tme_por_pessoa_desde?: string | null; galho?: string | null;
   }[]).filter((f) => f.apelido).map((f) => ({
     apelido: f.apelido!, nome: f.nome, setorId: f.setor_id, regraFinalizado: f.regra_finalizado ?? null,
     grupoTme: f.grupo_tme ?? null, grupoCsat: f.grupo_csat ?? null, grupoNota: f.grupo_nota ?? null,
-    tmePorPessoaDesde: f.tme_por_pessoa_desde ?? null,
+    tmePorPessoaDesde: f.tme_por_pessoa_desde ?? null, galho: f.galho ?? null,
   }));
   return filas.length || setorId !== 1 ? filas : FILAS_PADRAO;
 }

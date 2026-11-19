@@ -13,6 +13,8 @@ import ChamadosDaPessoa from '@/componentes/ChamadosDaPessoa';
 import type { Pessoa } from '@/lib/tipos';
 import { todas, dados } from '@/lib/consultas';
 import { MONITORIAS_PADRAO, monitoriasPorSetor, setorDasPessoas, textoDoPiso } from '@/lib/monitoriasDoSetor';
+import ArvoreDePontos, { type ItemDePonto } from '@/componentes/ArvoreDePontos';
+import { montarGalhos, rotuloNaFila, type FilaComGalho } from '@/lib/galhos';
 
 export const dynamic = 'force-dynamic';
 
@@ -88,7 +90,7 @@ export default async function Extrato({
 
   const db = await criarClienteServidor();
   // Fila nova (3.0) aparece pelo nome do cadastro; as de sempre, como antes.
-  const { data: nomesDasFilas } = await db.from('canais_do_setor').select('apelido, nome, grupo_csat');
+  const { data: nomesDasFilas } = await db.from('canais_do_setor').select('*').order('setor_id').order('ordem');
   // 4.7.0: as faixas de C-SAT de cada fila (o Expansão usa 'csat'; o Telecom, 'csat_s10').
   const grupoCsatDe = (o: string) => (nomesDasFilas ?? []).find((f) => f.apelido === o)?.grupo_csat as string | null | undefined ?? 'csat';
   const gruposCsat = [...new Set(['csat', ...(nomesDasFilas ?? []).map((f) => f.grupo_csat as string | null).filter((g): g is string => !!g)])];
@@ -225,9 +227,13 @@ export default async function Extrato({
       ]);
 
   const aoVivo = (extrato.data ?? []) as Linha[];
-  const linhas: Linha[] = linhasFechadas
+  const linhasCruas: Linha[] = linhasFechadas
     ? (linhasFechadas as Omit<Linha, 'cargo_id'>[]).map((l) => ({ ...l, cargo_id: cargoId as number }))
     : aoVivo;
+  // 4.14.0: a linha com o nome da fila dela ("Finalizado Expansão" no iGreen
+  // Mob vira "Finalizado iGreen Mob").
+  const filasComGalho = (nomesDasFilas ?? []) as FilaComGalho[];
+  const linhas: Linha[] = linhasCruas.map((l) => ({ ...l, rotulo: rotuloNaFila(l.rotulo, l.origem, filasComGalho) }));
   const semanasSemTme = await semTme;
   const todasAsFaixas = (faixasCsat.data ?? []) as Faixa[];
   const faixasDaFila = (o: string) => todasAsFaixas.filter((f) => f.grupo === grupoCsatDe(o));
@@ -291,7 +297,23 @@ export default async function Extrato({
   const ordemDasFilas = (nomesDasFilas ?? []).map((f) => f.apelido as string);
   const ordemDo = (q: string) => q === 'geral' ? 1001 : q.startsWith('outro:') ? 1000
     : (ordemDasFilas.indexOf(q) + 1 || 999);
-  const canaisDe = (ls: Linha[]) => [...new Set(ls.map(quadroDa))].sort((a, b) => ordemDo(a) - ordemDo(b));
+  // 4.14.0: as filas do mesmo galho ficam juntas, na ordem em que o galho aparece.
+  const galhoDo = (q: string) => {
+    const f = filasComGalho.find((x) => x.apelido === q);
+    return f?.galho?.trim() || null;
+  };
+  const ordemDoGalho = (q: string) => {
+    const g = galhoDo(q);
+    return g ? Math.min(...ordemDasFilas.filter((a) => galhoDo(a) === g).map(ordemDo)) : ordemDo(q);
+  };
+  const canaisDe = (ls: Linha[]) => [...new Set(ls.map(quadroDa))]
+    .sort((a, b) => ordemDoGalho(a) - ordemDoGalho(b) || ordemDo(a) - ordemDo(b));
+  /** "Expansão › iGreen Mob"; a fila que dá nome ao galho fica só com o nome. */
+  const tituloComGalho = (q: string) => {
+    const g = galhoDo(q);
+    const nome = nomeDoQuadro(q);
+    return g && g !== nome ? `${g} › ${nome}` : nome;
+  };
   // Nome do quadro: o canal, ou o setor do Hub ("Atendimento iGreen Mob" → "iGreen Mob").
   // O nome do setor sai do rótulo de qualquer linha dele: "Atendimento iGreen Mob"
   // ou "Nota 5 · iGreen Mob".
@@ -380,13 +402,14 @@ export default async function Extrato({
   // De onde vieram os pontos: cada regra somada no mês, os dois canais
   // juntos. Só o C-SAT fica separado por canal, porque a faixa de um canal
   // não diz nada sobre a do outro. A monitoria mostra a média das semanas.
-  type Origem = { chave: string; rotulo: string; grupo: string; quantidade: number; cota: number; vezes: number };
+  type Origem = { chave: string; origem: Canal | null; rotulo: string; grupo: string; quantidade: number; cota: number; vezes: number };
   const porOrigem = new Map<string, Origem>();
   for (const l of linhas) {
-    const chave = ehCsat(l.grupo) ? `${l.regra}|${l.origem}` : l.regra;
+    // 4.14.0: cada fila separada (antes só o C-SAT): os pontos vão para a
+    // árvore galho → fila, e o iGreen Mob deixou de somar com a Expansão.
+    const chave = `${l.regra}|${l.origem ?? ''}`;
     const o = porOrigem.get(chave) ?? {
-      chave, grupo: l.grupo, quantidade: 0, cota: 0, vezes: 0,
-      rotulo: ehCsat(l.grupo) && l.origem ? `${l.rotulo} · ${nomeDaOrigem(l.origem)}` : l.rotulo,
+      chave, origem: l.origem, grupo: l.grupo, quantidade: 0, cota: 0, vezes: 0, rotulo: l.rotulo,
     };
     o.quantidade += Number(l.quantidade);
     o.cota += Number(l.cota);
@@ -398,8 +421,8 @@ export default async function Extrato({
   // (média + demanda) × peso. Antes a média vinha já × 1,2 e o multiplicador
   // do realizado era uma linha à parte, e nada batia com nada.
   if (linhaMedia) {
-    porOrigem.delete('media_sobre_realizado');
-    const m = porOrigem.get('media_da_equipe');
+    for (const k of [...porOrigem.keys()]) if (k.startsWith('media_sobre_realizado|')) porOrigem.delete(k);
+    const m = [...porOrigem.values()].find((o) => o.chave.startsWith('media_da_equipe|'));
     if (m) {
       m.rotulo = 'Média da equipe recebida';
       m.cota = Number(linhaMedia.quantidade);
@@ -412,7 +435,7 @@ export default async function Extrato({
   }));
   const somou = origens.filter((o) => o.cota > 0).sort((a, b) => b.cota - a.cota);
   const tirou = origens.filter((o) => o.cota < 0).sort((a, b) => a.cota - b.cota);
-  const maiorOrigem = Math.max(1, ...origens.map((o) => Math.abs(o.cota)));
+  const arvore = montarGalhos(origens as ItemDePonto[], filasComGalho, nomeDaOrigem);
 
   return (
     <div className="space-y-6">
@@ -558,41 +581,16 @@ export default async function Extrato({
                       ? 'A média da equipe e a demanda tratada no mês, somadas, e o multiplicador do cargo sobre a soma.'
                       : 'A média da equipe recebida e o multiplicador do cargo sobre ela.')
                     : 'Cada categoria no mês, do que mais somou ao que mais tirou — todas as filas e a monitoria juntas.'}>
-            <div className="grid gap-x-12 gap-y-6 lg:grid-cols-2">
-              {([
-                ['O que somou', somou, '+'],
-                ['O que tirou', tirou, '−'],
-              ] as const).map(([titulo, itens, sinal]) => (
+            {/* 4.14.0: em árvore — galho (Expansão, Marketing…) → fila → o que
+                somou e o que tirou. */}
+            <p className="mb-3 text-[13px] text-slate-500">
+              Somou <b className="tabular-nums text-marca-700 dark:text-marca-400">+{num(somou.reduce((a, i) => a + i.cota, 0), 1)}</b>
+              {tirou.length > 0 && <> · tirou <b className="tabular-nums text-rose-700 dark:text-rose-300">−{num(Math.abs(tirou.reduce((a, i) => a + i.cota, 0)), 1)}</b></>}
+            </p>
+            <ArvoreDePontos galhos={arvore} colunas />
+            <div className="grid gap-x-12 lg:grid-cols-2">
+              {([['O que somou', somou, '+']] as const).map(([titulo, itens, sinal]) => (
                 <div key={titulo}>
-                  <h3 className="mb-2 text-[13px] font-semibold text-slate-500">
-                    {titulo}
-                    {itens.length > 0 && (linhaMedia && sinal === '+'
-                      ? ` · ${um(itens.reduce((a, i) => a + i.cota, 0))} antes do multiplicador`
-                      : ` · ${sinal}${num(Math.abs(itens.reduce((a, i) => a + i.cota, 0)), 1)}`)}
-                  </h3>
-                  {itens.length === 0 ? (
-                    <p className="text-sm text-slate-500">Nada neste mês.</p>
-                  ) : (
-                    <ul className="grid gap-2.5">
-                      {itens.map((i) => (
-                        <li key={i.chave} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 text-sm">
-                          <span className="truncate text-slate-700">
-                            {i.rotulo}
-                            {i.detalhe && <span className="ml-1.5 text-xs text-slate-500">{i.detalhe}</span>}
-                          </span>
-                          <span className={`text-right font-semibold tabular-nums ${
-                            i.cota < 0 ? 'text-rose-700 dark:text-rose-300' : 'text-marca-700 dark:text-marca-400'}`}>
-                            {linhaMedia && i.cota > 0 ? um(i.cota) : <>{i.cota < 0 ? '−' : '+'}{num(Math.abs(i.cota), 1)}</>}
-                          </span>
-                          <span className="col-span-2 h-2 overflow-hidden rounded-full bg-slate-100">
-                            <span className={`barra-semana crescer-x block h-full origin-left rounded-full ${
-                              i.cota < 0 ? 'bg-rose-500' : 'bg-marca-600'}`}
-                                  style={{ transform: `scaleX(${Math.max(0.02, Math.abs(i.cota) / maiorOrigem)})` }} />
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
                   {linhaMedia && sinal === '+' && itens.length > 0 && (
                     <dl className="mt-4 grid grid-cols-[1fr_auto] gap-y-1 border-t border-slate-100 pt-3 text-sm tabular-nums">
                       <dt className="text-slate-600">{demanda ? 'Média + demanda tratada' : 'Média da equipe recebida'}</dt>
@@ -666,7 +664,7 @@ export default async function Extrato({
                       const somaCanal = doCanal.reduce((a, l) => a + Number(l.cota), 0);
                       const tmeFora = semanasSemTme.has(`${semana}|${canal}`);
                       return (
-                        <Quadro key={canal} titulo={`${nomeDoQuadro(canal)} · ${semana}ª semana`}
+                        <Quadro key={canal} titulo={`${tituloComGalho(canal)} · ${semana}ª semana`}
                                 subtitulo={[c ? `C-SAT ${percentual(Number(c.csat))} · ${c.positivas} de ${c.avaliacoes}` : null,
                                   tmeFora ? 'TME não contabilizado nesta semana' : null].filter(Boolean).join(' · ') || undefined}
                                 acao={<span className={`text-sm font-semibold tabular-nums ${
@@ -824,7 +822,7 @@ export default async function Extrato({
               return (
                 <Quadro
                   key={canal}
-                  titulo={nomeDoQuadro(canal)}
+                  titulo={tituloComGalho(canal)}
                   acao={<span className={`text-sm font-semibold tabular-nums ${
                     soma < 0 ? 'text-rose-700' : 'text-slate-900'}`}>{num(soma)} pts</span>}
                 >

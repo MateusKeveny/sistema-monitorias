@@ -17,6 +17,7 @@ import { todas } from '@/lib/consultas';
 import { conferirNumerosDoMes, pendentesDaConferencia } from '@/lib/conferenciaDoMes';
 import { MONITORIAS_PADRAO, monitoriasPorSetor, setorDasPessoas, textoDoPiso } from '@/lib/monitoriasDoSetor';
 import { faixasDeCsat, filasDoSetor, metaDoCsat, setorDoPerformance, textoDaMeta, tomDoCsatPelaMeta } from '@/lib/filasDoSetor';
+import { opcoesDeFila } from '@/lib/galhos';
 
 /** O mês anterior de '2026-09-01' → '2026-08-01' (o de lib/competencia, que é só do servidor). */
 /** 'AAAA-MM-DD' + n dias. */
@@ -515,8 +516,10 @@ function Visao({ competencia, atual, comPendencias = true, fonte, dados, abertur
   }
 
   // ---------- Por canal ----------
-  const canal = (c: Canal, m: string) => {
-    const csatCanal = todoCsat.filter((x) => x.origem === c && x.mes_competencia === m);
+  // 4.14.0: uma opção do seletor pode juntar várias filas (todas, ou um galho).
+  const canal = (cs: Canal[], m: string) => {
+    const doGrupo = new Set(cs);
+    const csatCanal = todoCsat.filter((x) => doGrupo.has(x.origem) && x.mes_competencia === m);
     const csatSomado = csatCanal.filter((x) => conta.has(x.pessoa_id));
     const soma = (l: Csat[]) => l.reduce((a, x) => [a[0] + x.positivas, a[1] + x.avaliacoes], [0, 0]);
     const [pos, tot] = soma(csatSomado);
@@ -525,7 +528,7 @@ function Visao({ competencia, atual, comPendencias = true, fonte, dados, abertur
       return t ? { valor: p / t, positivas: p, avaliacoes: t } : null;
     });
 
-    const volTodos = todoVolume.filter((v) => v.canal === c && v.mes_competencia === m);
+    const volTodos = todoVolume.filter((v) => doGrupo.has(v.canal) && v.mes_competencia === m);
     const volCanal = volTodos.filter((v) => conta.has(v.pessoa_id));
     const volSemanas = [1, 2, 3, 4].map((s) =>
       volCanal.filter((v) => v.semana === s).reduce((a, v) => a + v.finalizados, 0) || null);
@@ -583,11 +586,14 @@ function Visao({ competencia, atual, comPendencias = true, fonte, dados, abertur
   };
 
   // As filas do setor da tela (4.4.0); a meta de C-SAT é a da faixa de cada uma.
-  const CANAIS: Canal[] = filas.map((f) => f.apelido);
-  const porCanal = Object.fromEntries(CANAIS.map((c) => {
-    const metaDaFila = metaCsat[c] ?? 0.95;
-    const agora = canal(c, competencia);
-    const antes = canal(c, anterior);
+  // 4.14.0: as opções do seletor — todas as filas, cada galho e cada fila.
+  const OPCOES = opcoesDeFila(filas);
+  const CANAIS: Canal[] = OPCOES.map((o) => o.chave);
+  const porCanal = Object.fromEntries(OPCOES.map(({ chave: c, filas: daOpcao }) => {
+    // Juntas, a meta da primeira fila (as do mesmo setor dividem as faixas).
+    const metaDaFila = metaCsat[daOpcao[0]] ?? 0.95;
+    const agora = canal(daOpcao, competencia);
+    const antes = canal(daOpcao, anterior);
     // Nomes da legenda dos gráficos semanais (1.41.0): o mês da tela e o anterior.
     const nomes = { rotuloAtual: maiusculo(nomeDoMes(competencia)), rotulo: maiusculo(nomeDoMes(anterior)) };
 
@@ -605,7 +611,9 @@ function Visao({ competencia, atual, comPendencias = true, fonte, dados, abertur
     // ----- Detalhe do volume e do TME -----
     const volListado = agora.volTodos.filter((v) => exibe.has(v.pessoa_id));
     const volumePorPessoa = [...new Set(volListado.map((v) => v.pessoa_id))].map((id) => {
-      const semanas = [1, 2, 3, 4].map((s) => agora.volTodos.find((v) => v.pessoa_id === id && v.semana === s)?.finalizados ?? 0);
+      // Soma, não o primeiro: em "Todas as filas" a pessoa tem uma linha por fila.
+      const semanas = [1, 2, 3, 4].map((s) => agora.volTodos.filter((v) => v.pessoa_id === id && v.semana === s)
+        .reduce((a, v) => a + v.finalizados, 0));
       return { id, semanas, total: semanas.reduce((a, b) => a + b, 0) };
     }).sort((a, b) => b.total - a.total);
     const maiorVolume = Math.max(1, ...volumePorPessoa.map((v) => v.total));

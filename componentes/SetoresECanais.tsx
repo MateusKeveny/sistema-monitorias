@@ -47,7 +47,7 @@ export default function SetoresECanais({ setores, canais, vistos, monitorias = {
   const rascunho: Record<string, string> = {
     ...Object.fromEntries([
       ...setores.flatMap((s) => [[`s${s.id}`, s.nome], [`n${s.id}`, (s.nomes_no_hub ?? []).join(', ')]]),
-      ...canais.flatMap((c) => [[`c${c.id}`, c.nome], [`h${c.id}`, c.nomes_no_hub.join(', ')]]),
+      ...canais.flatMap((c) => [[`c${c.id}`, c.nome], [`h${c.id}`, c.nomes_no_hub.join(', ')], [`g${c.id}`, c.galho ?? '']]),
     ]),
     ...editado,
   };
@@ -61,7 +61,8 @@ export default function SetoresECanais({ setores, canais, vistos, monitorias = {
   const mudou = setores.some((s) => rascunho[`s${s.id}`].trim() !== s.nome
       || lista(rascunho[`n${s.id}`]).join('|') !== (s.nomes_no_hub ?? []).join('|'))
     || canais.some((c) => rascunho[`c${c.id}`].trim() !== c.nome
-      || lista(rascunho[`h${c.id}`]).join('|') !== c.nomes_no_hub.join('|'));
+      || lista(rascunho[`h${c.id}`]).join('|') !== c.nomes_no_hub.join('|')
+      || rascunho[`g${c.id}`].trim() !== (c.galho ?? ''));
 
   // Nome do Hub que já está em algum canal (pelo rascunho, normalizado).
   const ligados = new Map(canais.flatMap((c) => lista(rascunho[`h${c.id}`]).map((n) => [normalizarSetor(n), c.nome])));
@@ -92,8 +93,11 @@ export default function SetoresECanais({ setores, canais, vistos, monitorias = {
     for (const c of canais) {
       const nome = rascunho[`c${c.id}`].trim();
       const nomes = lista(rascunho[`h${c.id}`]);
-      if (nome === c.nome && nomes.join('|') === c.nomes_no_hub.join('|')) continue;
-      const { error } = await db.from('canais_do_setor').update({ nome, nomes_no_hub: nomes }).eq('id', c.id);
+      // Galho (4.14.0): só vai junto quando mudou — sem a migração 113, salvar o resto continua valendo.
+      const galho = rascunho[`g${c.id}`].trim() || null;
+      const galhoMudou = galho !== (c.galho ?? null);
+      if (nome === c.nome && nomes.join('|') === c.nomes_no_hub.join('|') && !galhoMudou) continue;
+      const { error } = await db.from('canais_do_setor').update({ nome, nomes_no_hub: nomes, ...(galhoMudou ? { galho } : {}) }).eq('id', c.id);
       if (error) { setOcupado(false); setErro(await mensagemDoErro(error)); return; }
     }
     setOcupado(false);
@@ -330,6 +334,9 @@ export default function SetoresECanais({ setores, canais, vistos, monitorias = {
                             className="text-xs text-slate-500 hover:underline">cancelar</button>
                   </div>
                 )}
+                <datalist id={`galhos-${s.id}`}>
+                  {[...new Set(canais.filter((c) => c.setor_id === s.id).map((c) => rascunho[`g${c.id}`]?.trim()).filter(Boolean))].map((g) => <option key={g} value={g} />)}
+                </datalist>
                 <ul className="ml-5 mt-2 space-y-2 border-l-2 border-slate-200 pl-4">
                   {canais.filter((c) => c.setor_id === s.id).map((c) => (
                     <li key={c.id} className="grid gap-2 rounded-xl border border-slate-200 bg-superficie px-3 py-2.5 sm:grid-cols-[auto_14rem_auto_1fr] sm:items-center">
@@ -344,6 +351,12 @@ export default function SetoresECanais({ setores, canais, vistos, monitorias = {
                              placeholder="Como a fila aparece no relatório; separe por vírgula"
                              onChange={(e) => setRascunho((r) => ({ ...r, [`h${c.id}`]: e.target.value }))}
                              className={entrada} />
+                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Galho</span>
+                      <input value={rascunho[`g${c.id}`]} disabled={ocupado} aria-label={`Galho da fila ${c.nome}`}
+                             placeholder="Sozinha" list={`galhos-${s.id}`}
+                             onChange={(e) => setRascunho((r) => ({ ...r, [`g${c.id}`]: e.target.value }))}
+                             className={entrada} />
+                      <span className="text-xs text-slate-500 sm:col-span-2">Agrupa as filas no Início e no Extrato (ex.: Expansão, Marketing). Vazio: a fila aparece sozinha.</span>
                       <p className="text-xs text-slate-500 sm:col-span-4">{comoPontua(c)}</p>
                       {c.grupo_tme && c.regra_finalizado && (
                         <p className="flex flex-wrap items-center gap-2 text-xs text-slate-600 sm:col-span-4">

@@ -28,6 +28,8 @@ export type Canal = {
   grupo_csat?: string; grupo_nota?: string;
   /** Copiou as métricas desta fila e acompanha as mudanças dela (85). */
   copia_de?: number | null;
+  /** Galho da fila nas telas (4.14.0, migração 113): "Expansão", "Marketing"… Nulo = sozinha. */
+  galho?: string | null;
 };
 
 /** "Diretores-Expansão " → "diretores-expansao": como o nome do Hub é comparado. */

@@ -15,6 +15,7 @@ import { todas } from '@/lib/consultas';
 import VerComoAtendente from '@/componentes/VerComoAtendente';
 import { setorDoCookie } from '@/lib/setorEscolhido';
 import { filasDoSetor, setorDaPessoa, setorDoPerformance } from '@/lib/filasDoSetor';
+import { opcoesDeFila } from '@/lib/galhos';
 
 export const dynamic = 'force-dynamic';
 
@@ -190,8 +191,9 @@ export default async function InicioCota({
     const dbSetor = await criarClienteServidor();
     const { setorId } = await setorDoPerformance(dbSetor, setorPedido);
     const filas = await filasDoSetor(dbSetor, setorId);
+    // 4.14.0: abre em "Todas as filas"; o seletor oferece os galhos e as filas.
     return (
-      <ProvedorDeCanal inicial={canalPedido} canais={filas.map((f) => ({ chave: f.apelido, rotulo: f.nome }))}>
+      <ProvedorDeCanal inicial={canalPedido} canais={opcoesDeFila(filas)}>
         <div className="space-y-6">
           {copiaDeTeste && <VerComoAtendente />}
           {/* 4.4.0: a abertura no jeito da criação de setores, desenhada pelo
